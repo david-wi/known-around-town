@@ -102,29 +102,20 @@ em, .italic { font-style: italic; }
   font-weight: 500;
 }
 .header-cta:hover { background: var(--color-fg); color: white; text-decoration: none; }
+.header-lang {
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  border: 1px solid var(--color-line-strong);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  background: white;
+}
 
 /* ---- Hero (city home) ---- */
 .hero {
   padding: 0;
   border-bottom: 1px solid var(--color-line);
-}
-.hero-top {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 24px 28px 14px;
-  border-bottom: 1px solid var(--color-line);
-  max-width: 1240px; margin: 0 auto;
-}
-.hero-top-tags {
-  display: flex; gap: 24px;
-  letter-spacing: 0.18em; text-transform: uppercase; font-size: 11px;
-  font-weight: 600;
-}
-.hero-top-tags a { color: var(--color-fg-muted); }
-.hero-top-tags a:hover { color: var(--color-fg); text-decoration: none; }
-.hero-top-tags .is-active { color: var(--color-fg); }
-.hero-top-issue {
-  font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--color-fg-muted); font-weight: 600;
 }
 
 .hero-grid {
@@ -132,10 +123,19 @@ em, .italic { font-style: italic; }
   max-width: 1240px; margin: 0 auto;
 }
 .hero-text {
-  padding: 64px 56px 48px 28px;
+  padding: 56px 56px 48px 28px;
   display: flex; flex-direction: column; justify-content: center;
 }
 .hero-text .eyebrow { margin-bottom: 22px; }
+.hero-issue {
+  font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--color-fg-muted); font-weight: 600;
+  margin: 0 0 28px;
+  display: flex; align-items: center; gap: 14px;
+}
+.hero-issue::before {
+  content: ""; width: 28px; height: 1px; background: var(--color-accent);
+}
 .hero-display {
   font-family: var(--font-display);
   font-size: clamp(48px, 6.4vw, 84px);
@@ -271,6 +271,11 @@ em, .italic { font-style: italic; }
 }
 .browse-arrow { color: var(--color-fg-muted); }
 .browse-numbered li:hover .browse-arrow { color: var(--color-accent); }
+.browse-grid-wrap { }
+.browse-grid-label {
+  font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--color-fg-muted); font-weight: 700; margin: 0 0 14px;
+}
 .browse-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .neighborhood-card {
   position: relative; overflow: hidden; border-radius: var(--radius);
@@ -279,13 +284,24 @@ em, .italic { font-style: italic; }
 }
 .neighborhood-card:hover { transform: translateY(-2px); text-decoration: none; }
 .neighborhood-card img { width: 100%; height: 100%; object-fit: cover; }
+.neighborhood-card-count {
+  position: absolute; top: 12px; left: 12px; z-index: 2;
+  background: rgba(255,255,255,0.92); color: var(--color-fg);
+  font-size: 10px; letter-spacing: 0.12em; font-weight: 700;
+  padding: 5px 10px; border-radius: 999px;
+}
 .neighborhood-card-overlay {
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.65) 100%);
-  display: flex; align-items: flex-end; padding: 16px;
+  background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.65) 100%);
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 16px; gap: 4px;
 }
 .neighborhood-card-name {
   color: white; font-family: var(--font-display); font-size: 22px; font-weight: 500;
+  line-height: 1.1;
+}
+.neighborhood-card-vibe {
+  color: rgba(255,255,255,0.85); font-size: 12px; font-weight: 500;
 }
 .neighborhood-card--empty { background: linear-gradient(135deg, #5a4a3c, #3c2f24); }
 

@@ -83,6 +83,17 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
     footer_owners_items_raw = await copy.get("footer.owners.items") or ""
     footer_owners_items = [s.strip() for s in footer_owners_items_raw.split("|") if s.strip()]
 
+    # The header nav is a per-network short list of pinned links
+    # (e.g. Beauty shows "Lashes" instead of "Lash & Brow"). The route stores
+    # it on the city doc; fall back to the first 6 categories when not set.
+    header_nav = (city or {}).get("header_nav") if city else None
+    if not header_nav and nav_categories:
+        header_nav = [
+            {"slug": c["slug"], "label": c["name"]}
+            for c in nav_categories[:6]
+            if not c.get("parent_slug")
+        ]
+
     return {
         "request": request,
         "tenant": tenant,
@@ -93,8 +104,10 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "hero_issue_label": _issue_label(now),
         "nav_categories": nav_categories,
         "nav_neighborhoods": nav_neighborhoods,
+        "header_nav": header_nav or [],
         "now": now,
         "footer_legal": await copy.get("footer.legal"),
+        "footer_made_in": await copy.get("footer.made_in"),
         "footer_about_title": await copy.get("footer.about.title"),
         "footer_about_body": await copy.get("footer.about.body"),
         "footer_business_title": await copy.get("footer.business.title"),
@@ -123,13 +136,6 @@ def _build_hero_headline_html(text: str) -> str:
     return f'<em>{html.escape(tail)}</em>'
 
 
-_BROWSE_AXIS_LABELS = {
-    "beauty": "SERVICE",
-    "wellness": "SERVICE",
-    "health": "SPECIALTY",
-}
-
-
 def _resolve_by_slug(records: List[Dict[str, Any]], slugs: List[str]) -> List[Dict[str, Any]]:
     """Return records in the order of the slug list."""
     by_slug = {r.get("slug"): r for r in records}
@@ -156,16 +162,18 @@ async def home(request: Request) -> HTMLResponse:
 
     ctx = await _base_context(request, tenant)
 
-    headline_text = content_svc.active_editorial_headline(city) or city.get("tagline") \
-        or await copy.get("home.hero.headline")
+    # The hero headline carries inline italics — the seed stores the markup
+    # directly (e.g. "Miami's <em>best-kept</em> beauty addresses.") so the
+    # template can render it without guessing which words to italicize.
+    headline_html_from_copy = await copy.get("home.hero.headline_html")
+    if headline_html_from_copy:
+        headline_html = headline_html_from_copy
+    else:
+        headline_text = content_svc.active_editorial_headline(city) or city.get("tagline") \
+            or await copy.get("home.hero.headline") or ""
+        headline_html = _build_hero_headline_html(headline_text)
 
     all_live = await content_svc.list_businesses(city["_id"], limit=200)
-
-    # Listings count per neighborhood for the "N LISTED" pills.
-    nb_counts: Dict[str, int] = {}
-    for b in all_live:
-        for n in b.get("neighborhood_slugs") or []:
-            nb_counts[n] = nb_counts.get(n, 0) + 1
 
     # Editor's Picks + trending list — both pulled from the city doc when
     # configured, falling back to derived order when not.
@@ -176,10 +184,8 @@ async def home(request: Request) -> HTMLResponse:
     if not trending:
         trending = [b for b in all_live if not b.get("editors_pick")][:8]
 
-    # Spotlight (city-configured first, then most-listed fallback).
-    spotlight_slug = city.get("spotlight_neighborhood_slug") or (
-        max(nb_counts, key=nb_counts.get) if nb_counts else None
-    )
+    # Spotlight neighborhood — pulled from the city config.
+    spotlight_slug = city.get("spotlight_neighborhood_slug")
     spotlight_nb = None
     spotlight_businesses: List[Dict[str, Any]] = []
     if spotlight_slug:
@@ -191,26 +197,16 @@ async def home(request: Request) -> HTMLResponse:
                 b for b in all_live if spotlight_slug in (b.get("neighborhood_slugs") or [])
             ][:3]
 
-    # Two-column neighborhood mini-lists (city-configured first).
+    # Two-column neighborhood mini-lists (city-configured only — wellness and
+    # health intentionally don't show this section on the reference).
     columns: List[Dict[str, Any]] = []
-    configured_cols = city.get("two_column_neighborhoods") or []
-    if configured_cols:
-        for col in configured_cols:
-            nb = await content_svc.get_neighborhood(city["_id"], col["slug"])
-            if not nb:
-                continue
-            nb_biz = _resolve_by_slug(all_live, col.get("business_slugs") or [])
-            columns.append({"name": nb["name"], "slug": col["slug"], "businesses": nb_biz})
-    else:
-        # Fallback — next two neighborhoods after the spotlight.
-        for slug, _ in sorted(nb_counts.items(), key=lambda kv: -kv[1])[1:3]:
-            nb = await content_svc.get_neighborhood(city["_id"], slug)
-            if not nb:
-                continue
-            nb_biz = [b for b in all_live if slug in (b.get("neighborhood_slugs") or [])][:3]
-            columns.append({"name": nb["name"], "slug": slug, "businesses": nb_biz})
+    for col in city.get("two_column_neighborhoods") or []:
+        nb = await content_svc.get_neighborhood(city["_id"], col["slug"])
+        if not nb:
+            continue
+        nb_biz = _resolve_by_slug(all_live, col.get("business_slugs") or [])
+        columns.append({"name": nb["name"], "slug": col["slug"], "businesses": nb_biz})
 
-    # Search-suggestion chips ("SEARCHED TONIGHT") — keep on the city doc.
     search_chips = city.get("search_chips") or []
 
     # Owner CTA mini-card sample
@@ -221,30 +217,25 @@ async def home(request: Request) -> HTMLResponse:
             (b for b in all_live if b.get("slug") == owner_card_slug), None
         )
     if not owners_card:
-        owners_card = (
+        owners_card_list = (
             [b for b in all_live if (b.get("featured") or {}).get("enabled")] or all_live
-        )[:1]
-        owners_card = owners_card[0] if owners_card else None
+        )
+        owners_card = owners_card_list[0] if owners_card_list else None
 
-    # Hero featured photo (first editor's pick or first business).
     hero_featured = editor_picks[0] if editor_picks else (all_live[0] if all_live else None)
 
-    # Lookup tables used inline by the template for category / neighborhood names.
     category_names = {c["slug"]: c["name"] for c in ctx["nav_categories"]}
     neighborhood_names = {n["slug"]: n["name"] for n in ctx["nav_neighborhoods"]}
-
-    network_slug = tenant.network.get("slug", "")
-    browse_axis_label = _BROWSE_AXIS_LABELS.get(network_slug, "CATEGORY")
 
     ctx.update(
         {
             # Hero
-            "hero_eyebrow": await copy.get(
-                "home.hero.eyebrow",
-                extra={"vertical_word": _vertical_word(tenant.network)},
-            ),
-            "hero_headline_html": _build_hero_headline_html(headline_text),
+            "hero_eyebrow": await copy.get("home.hero.eyebrow"),
+            "hero_headline_html": headline_html,
             "hero_subhead": city.get("hero_description") or await copy.get("home.hero.subhead"),
+            "hero_search_placeholder": (
+                await copy.get("home.hero.search_placeholder") or ""
+            ),
             "hero_featured": hero_featured,
             "search_chips": search_chips,
             # Stats
@@ -264,44 +255,40 @@ async def home(request: Request) -> HTMLResponse:
             "stat_label_owners": (
                 await copy.get("home.stat.owners.label") or "FOR OWNERS"
             ),
-            # Browse / map
-            "browse_axis_label": browse_axis_label,
-            "neighborhood_counts": nb_counts,
+            # Map / browse
+            "browse_axis_label": await copy.get("home.browse.axis_label") or "BY CATEGORY",
+            "map_culture_word": await copy.get("home.map.culture_word") or _vertical_word(tenant.network).lower(),
             # Editor's Picks + trending
             "editor_picks": editor_picks,
             "trending_businesses": trending,
             # Spotlight
             "spotlight_neighborhood": spotlight_nb,
             "spotlight_businesses": spotlight_businesses,
-            "spotlight_lead": (
-                await copy.get("home.spotlight.lead") or "Neighborhood spotlight —"
-            ),
-            "spotlight_description": (
-                await copy.get("home.spotlight.description")
-            ),
+            "spotlight_eyebrow": await copy.get("home.spotlight.eyebrow") or "NEIGHBORHOOD SPOTLIGHT",
+            "spotlight_lead_a": await copy.get("home.spotlight.lead_a") or "",
+            "spotlight_lead_b": await copy.get("home.spotlight.lead_b") or "",
+            "spotlight_description": await copy.get("home.spotlight.description"),
             # Two-column mini-lists
             "neighborhood_columns": columns,
             "category_names": category_names,
             "neighborhood_names": neighborhood_names,
             # Owner CTA
-            "owners_eyebrow": (
-                await copy.get("home.owners.eyebrow") or "FOR OWNERS"
-            ),
+            "owners_eyebrow": await copy.get("home.owners.eyebrow") or "FOR OWNERS",
             "owners_headline": (
                 await copy.get("home.owners.headline") or "Own a business in this city?"
             ),
             "owners_italic": (
                 await copy.get("home.owners.italic") or "Your listing's already here."
             ),
-            "owners_body": (
-                await copy.get("home.owners.body") or ""
-            ),
-            "owners_cta": (
-                await copy.get("home.owners.cta") or "Claim your listing · Free"
-            ),
+            "owners_body": await copy.get("home.owners.body") or "",
+            "owners_cta": await copy.get("home.owners.cta") or "Claim your listing · Free",
             "owners_card": owners_card,
-            "owners_card_action": (
-                await copy.get("home.owners.card_action") or ""
+            "owners_card_action": await copy.get("home.owners.card_action") or "",
+            "owners_card_views":    await copy.get("home.owners.card_stats.views")    or "—",
+            "owners_card_calls":    await copy.get("home.owners.card_stats.calls")    or "—",
+            "owners_card_bookings": await copy.get("home.owners.card_stats.bookings") or "—",
+            "owners_card_bookings_label": (
+                await copy.get("home.owners.card_stats.bookings_label") or "New bookings"
             ),
             # SEO
             "seo_title": city.get("seo_title") or f"{tenant.network.get('name')} {city.get('name')}",
