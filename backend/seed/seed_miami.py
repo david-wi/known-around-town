@@ -350,7 +350,7 @@ NETWORK_CITY_CONFIG = {
     },
     "wellness": {
         "tagline": "Where Miami recovers, resets, and breathes.",
-        "headline_html": "Where Miami <em>recovers,</em> resets, and breathes.",
+        "headline_html": "Where Miami <em>recovers, resets, and breathes.</em>",
         "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
         "hero_subhead": "An index of the spas, saunas, recovery rooms, yoga studios, and IV lounges Miami locals actually book — between training blocks, after long flights, and before the week gets loud.",
         "search_placeholder": "Infrared sauna in Wynwood. Sunrise yoga in Edgewater. IV drip in Brickell.",
@@ -575,6 +575,15 @@ async def seed_network(network_slug: str) -> None:
             "updated_at": now,
         }
         await upsert("categories", {"city_id": city["_id"], "slug": group["slug"]}, cat_doc)
+
+    # Wipe stale businesses from earlier seeds so the editorial list on the
+    # home page matches the reference exactly (no leftover "Stillwater Spa"
+    # or "Gables Cosmetic Dentistry" from prior runs).
+    canonical_biz_slugs = [b["slug"] for b in businesses]
+    await db.businesses.delete_many({
+        "city_id": city["_id"],
+        "slug": {"$nin": canonical_biz_slugs},
+    })
 
     # Businesses
     for biz in businesses:
