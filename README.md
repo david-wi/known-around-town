@@ -1,4 +1,4 @@
-# Who Knows Local
+# Known Around Town
 
 A network of beautiful, AI-assisted local guide sites. One codebase, many cities, many verticals.
 
@@ -8,6 +8,9 @@ is hitting the same server. The server reads the hostname, figures out which **n
 (Beauty, Wellness, Health, …) and which **city** the visitor wants, and renders the
 matching content from MongoDB.
 
+The umbrella platform is **Known Around Town**. Each vertical is its own brand
+("Knows Beauty", "Knows Wellness", "Knows Health"). Each city is an edition.
+
 ## What's in here
 
 ```
@@ -16,7 +19,7 @@ backend/
     main.py            FastAPI entry point
     config.py          Settings (env vars)
     database.py        MongoDB client + index setup
-    models/            Pydantic models for every collection
+    models.py          Pydantic models for every collection
     services/          Tenant resolution, copy-block fallback, business lookups
     routes/public/     Server-rendered pages (Jinja2)
     routes/api/v1/     JSON API for content management
@@ -56,7 +59,7 @@ Visit `http://miami.knowsbeauty.localhost:8000/` and you should see Miami Knows 
 | City home | `miami.knowsbeauty.ai.devintensive.com/` |
 | Category | `miami.knowsbeauty.ai.devintensive.com/c/hair` |
 | Neighborhood | `miami.knowsbeauty.ai.devintensive.com/n/brickell` |
-| Business profile | `miami.knowsbeauty.ai.devintensive.com/b/glamour-nails` |
+| Business profile | `miami.knowsbeauty.ai.devintensive.com/b/glamour-nails-brickell` |
 | Category in neighborhood | `miami.knowsbeauty.ai.devintensive.com/n/brickell/c/nails` |
 | Editorial guide | `miami.knowsbeauty.ai.devintensive.com/guides/best-blowouts-before-art-basel` |
 
@@ -69,7 +72,7 @@ No code change, no deploy.
 Lookup order (most specific wins):
 
 ```
-business -> category(city) -> category(network default) -> city -> network -> global default
+business -> category(city) -> city -> network -> global default
 ```
 
 ## Status

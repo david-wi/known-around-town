@@ -10,11 +10,11 @@
 
 services:
   backend:
-    image: ghcr.io/david-wi/who-knows-local:latest
+    image: ghcr.io/david-wi/known-around-town:latest
     restart: unless-stopped
     environment:
       MONGODB_URL: ${MONGODB_URL}
-      MONGODB_DATABASE: ${MONGODB_DATABASE:-who_knows_local}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-known_around_town}
       NETWORK_DOMAINS: >-
         beauty:knowsbeauty.ai.devintensive.com,
         wellness:knowswellness.ai.devintensive.com,
@@ -35,34 +35,34 @@ services:
     labels:
       traefik.enable: "true"
       traefik.docker.network: "traefik"
-      traefik.http.services.who-knows-local.loadbalancer.server.port: "8000"
+      traefik.http.services.known-around-town.loadbalancer.server.port: "8000"
 
       # Beauty
-      traefik.http.routers.who-knows-beauty.entrypoints: "https"
-      traefik.http.routers.who-knows-beauty.rule: >-
+      traefik.http.routers.kat-beauty.entrypoints: "https"
+      traefik.http.routers.kat-beauty.rule: >-
         Host(`miami.knowsbeauty.ai.devintensive.com`) ||
         Host(`knowsbeauty.ai.devintensive.com`)
-      traefik.http.routers.who-knows-beauty.tls: "true"
-      traefik.http.routers.who-knows-beauty.tls.certresolver: "letsencrypt"
-      traefik.http.routers.who-knows-beauty.service: "who-knows-local"
+      traefik.http.routers.kat-beauty.tls: "true"
+      traefik.http.routers.kat-beauty.tls.certresolver: "letsencrypt"
+      traefik.http.routers.kat-beauty.service: "known-around-town"
 
       # Wellness
-      traefik.http.routers.who-knows-wellness.entrypoints: "https"
-      traefik.http.routers.who-knows-wellness.rule: >-
+      traefik.http.routers.kat-wellness.entrypoints: "https"
+      traefik.http.routers.kat-wellness.rule: >-
         Host(`miami.knowswellness.ai.devintensive.com`) ||
         Host(`knowswellness.ai.devintensive.com`)
-      traefik.http.routers.who-knows-wellness.tls: "true"
-      traefik.http.routers.who-knows-wellness.tls.certresolver: "letsencrypt"
-      traefik.http.routers.who-knows-wellness.service: "who-knows-local"
+      traefik.http.routers.kat-wellness.tls: "true"
+      traefik.http.routers.kat-wellness.tls.certresolver: "letsencrypt"
+      traefik.http.routers.kat-wellness.service: "known-around-town"
 
       # Health
-      traefik.http.routers.who-knows-health.entrypoints: "https"
-      traefik.http.routers.who-knows-health.rule: >-
+      traefik.http.routers.kat-health.entrypoints: "https"
+      traefik.http.routers.kat-health.rule: >-
         Host(`miami.knowshealth.ai.devintensive.com`) ||
         Host(`knowshealth.ai.devintensive.com`)
-      traefik.http.routers.who-knows-health.tls: "true"
-      traefik.http.routers.who-knows-health.tls.certresolver: "letsencrypt"
-      traefik.http.routers.who-knows-health.service: "who-knows-local"
+      traefik.http.routers.kat-health.tls: "true"
+      traefik.http.routers.kat-health.tls.certresolver: "letsencrypt"
+      traefik.http.routers.kat-health.service: "known-around-town"
 
 networks:
   traefik:

@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-app = FastAPI(title="Who Knows Local", version="0.1.0")
+app = FastAPI(title="Known Around Town", version="0.1.0")
 
 
 @app.on_event("startup")
