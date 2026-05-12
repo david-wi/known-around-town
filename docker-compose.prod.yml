@@ -1,0 +1,69 @@
+# Production compose — runs alongside the existing Traefik reverse proxy on
+# the shared droplet. The container joins the `traefik` Docker network and
+# Traefik picks up the routing rules from the labels below.
+#
+# Hostnames are listed explicitly so each one gets a Let's Encrypt cert via
+# the standard HTTP-01 challenge. To switch to wildcard subdomains
+# (`*.knowsbeauty.ai.devintensive.com`) we'd swap the rules for HostRegexp
+# and a DNS-01 cert resolver. For now we list every (city, network) host we
+# actually want to serve.
+
+services:
+  backend:
+    image: ghcr.io/david-wi/who-knows-local:latest
+    restart: unless-stopped
+    environment:
+      MONGODB_URL: ${MONGODB_URL}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-who_knows_local}
+      NETWORK_DOMAINS: >-
+        beauty:knowsbeauty.ai.devintensive.com,
+        wellness:knowswellness.ai.devintensive.com,
+        health:knowshealth.ai.devintensive.com,
+        beauty:knowsbeauty.com,
+        wellness:knowswellness.com,
+        health:knowshealth.com
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      LOG_LEVEL: INFO
+    networks:
+      - traefik
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "traefik"
+      traefik.http.services.who-knows-local.loadbalancer.server.port: "8000"
+
+      # Beauty
+      traefik.http.routers.who-knows-beauty.entrypoints: "https"
+      traefik.http.routers.who-knows-beauty.rule: >-
+        Host(`miami.knowsbeauty.ai.devintensive.com`) ||
+        Host(`knowsbeauty.ai.devintensive.com`)
+      traefik.http.routers.who-knows-beauty.tls: "true"
+      traefik.http.routers.who-knows-beauty.tls.certresolver: "letsencrypt"
+      traefik.http.routers.who-knows-beauty.service: "who-knows-local"
+
+      # Wellness
+      traefik.http.routers.who-knows-wellness.entrypoints: "https"
+      traefik.http.routers.who-knows-wellness.rule: >-
+        Host(`miami.knowswellness.ai.devintensive.com`) ||
+        Host(`knowswellness.ai.devintensive.com`)
+      traefik.http.routers.who-knows-wellness.tls: "true"
+      traefik.http.routers.who-knows-wellness.tls.certresolver: "letsencrypt"
+      traefik.http.routers.who-knows-wellness.service: "who-knows-local"
+
+      # Health
+      traefik.http.routers.who-knows-health.entrypoints: "https"
+      traefik.http.routers.who-knows-health.rule: >-
+        Host(`miami.knowshealth.ai.devintensive.com`) ||
+        Host(`knowshealth.ai.devintensive.com`)
+      traefik.http.routers.who-knows-health.tls: "true"
+      traefik.http.routers.who-knows-health.tls.certresolver: "letsencrypt"
+      traefik.http.routers.who-knows-health.service: "who-knows-local"
+
+networks:
+  traefik:
+    external: true
