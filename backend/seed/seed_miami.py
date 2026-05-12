@@ -1,8 +1,16 @@
-"""Seed Miami across the Beauty, Wellness, and Health networks.
+"""Seed Miami across the Beauty, Wellness, and Health networks using the
+exact content shown on the reference site at
+david.ai.devintensive.com/miami-knows-*.
 
-Creates the city record, neighborhoods, city-scoped category instances (one
-per master category in each network), and a small set of sample businesses
-so the public pages have something real to render.
+Includes:
+- City record with hero copy and "ISSUE NO. 01 · MIAMI · MAY 2026" eyebrow
+- Neighborhoods with vibe descriptions
+- City-scoped instances of the network's master categories
+- Editor's Pick + trending businesses (every business has the exact name,
+  category, neighborhood, short description and price shown on the
+  reference home page)
+- City-level copy blocks for stat counts, search-suggestion chips,
+  section titles, and footer "Also in..." cities.
 
 Run inside the backend container, after seed_networks.py:
     python -m seed.seed_miami
@@ -12,303 +20,404 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import Any, Dict, List
 
 from app.database import ensure_indexes, get_db
 from seed._helpers import run, upsert
 
 
-MIAMI_NEIGHBORHOODS = [
-    {"slug": "south-beach", "name": "South Beach", "description": "Ocean Drive, Lincoln Road, and the Art Deco district — Miami's most photographed stretch.", "order": 1},
-    {"slug": "mid-beach", "name": "Mid-Beach", "description": "Quieter, design-forward stretch of Collins between South Beach and Surfside.", "order": 2},
-    {"slug": "brickell", "name": "Brickell", "description": "Miami's financial district — high-rises, hotels, and a constant flow of professionals.", "order": 3},
-    {"slug": "downtown", "name": "Downtown", "description": "The civic and cultural heart of the city.", "order": 4},
-    {"slug": "wynwood", "name": "Wynwood", "description": "Murals, galleries, breweries — Miami's creative neighborhood.", "order": 5},
-    {"slug": "design-district", "name": "Design District", "description": "Luxury boutiques and showrooms north of Midtown.", "order": 6},
-    {"slug": "midtown", "name": "Midtown", "description": "Between Wynwood and the Design District — residential mix with strong dining.", "order": 7},
-    {"slug": "edgewater", "name": "Edgewater", "description": "Bayfront condos between downtown and the Design District.", "order": 8},
-    {"slug": "coconut-grove", "name": "Coconut Grove", "description": "Lush, walkable, and historic — Miami's oldest neighborhood.", "order": 9},
-    {"slug": "coral-gables", "name": "Coral Gables", "description": "Tree-lined, Mediterranean revival, anchored by Miracle Mile.", "order": 10},
-    {"slug": "little-havana", "name": "Little Havana", "description": "Calle Ocho, ventanitas, and Cuban-American culture.", "order": 11},
-    {"slug": "key-biscayne", "name": "Key Biscayne", "description": "Island living south of the city — beaches and the Cape Florida lighthouse.", "order": 12},
-    {"slug": "aventura", "name": "Aventura", "description": "North Miami-Dade hub with the mall and family-oriented services.", "order": 13},
-    {"slug": "bay-harbor-islands", "name": "Bay Harbor Islands", "description": "Quiet residential islands between the mainland and Bal Harbour.", "order": 14},
-    {"slug": "surfside", "name": "Surfside", "description": "Walkable beach village north of Mid-Beach.", "order": 15},
-    {"slug": "doral", "name": "Doral", "description": "Suburban west Miami-Dade with strong international community.", "order": 16},
-]
+# Neighborhood lists differ slightly per network — vibes and counts come
+# from the reference home pages.
 
-
-# Sample businesses per network — small set so each page has real content.
-BEAUTY_SAMPLE_BUSINESSES = [
-    {
-        "slug": "loft-647-miami",
-        "name": "Loft 647 Miami",
-        "category_slugs": ["hair"],
-        "neighborhood_slugs": ["wynwood"],
-        "address": {"street": "647 NW 24th St", "city": "Miami", "state": "FL", "postal_code": "33127"},
-        "phone": "+1-305-555-0117",
-        "website": "https://example.com/loft647",
-        "booking_url": "https://example.com/loft647/book",
-        "socials": {"instagram": "loft647miami"},
-        "short_description": "A Wynwood salon known for editorial color, lived-in blondes, and creative cuts.",
-        "known_for": "Lived-in blonde, balayage, and creative cuts. The team is known for color corrections most other salons turn down.",
-        "best_for": "People moving on from box dye, or anyone who wants their color to grow out without a hard line.",
-        "before_booking_notes": "Color appointments require a consultation first. Book the consult two weeks ahead in season.",
-        "price_cues": "$$$",
-        "schema_org_type": "HairSalon",
-        "editors_pick": True,
-        "quality_score": 88,
-        "status": "live",
-        "index_status": "indexed",
-    },
-    {
-        "slug": "glamour-nails-brickell",
-        "name": "Glamour Nails",
-        "category_slugs": ["nails"],
-        "neighborhood_slugs": ["brickell"],
-        "address": {"street": "1101 Brickell Ave Suite 200", "city": "Miami", "state": "FL", "postal_code": "33131"},
-        "phone": "+1-305-555-0142",
-        "website": "https://example.com/glamour-nails",
-        "booking_url": "https://example.com/glamour-nails/book",
-        "socials": {"instagram": "glamournailsbrickell"},
-        "short_description": "A Brickell nail studio known for detailed gel manicures and clean neutrals.",
-        "known_for": "Detailed gel manicures, clean neutral looks, and appointment-friendly service for clients booking around work.",
-        "best_for": "Clients who want a polished, reliable manicure without a full spa experience.",
-        "before_booking_notes": "Walk-ins fill the same day. Book 48 hours ahead for weekend slots.",
-        "price_cues": "$$",
-        "schema_org_type": "NailSalon",
-        "featured": {"enabled": True, "tier": "enhanced"},
-        "quality_score": 82,
-        "status": "live",
-        "index_status": "indexed",
-    },
-    {
-        "slug": "skin-by-renata",
-        "name": "Skin by Renata",
-        "category_slugs": ["skin"],
-        "neighborhood_slugs": ["coral-gables"],
-        "address": {"street": "350 Miracle Mile Suite 4", "city": "Coral Gables", "state": "FL", "postal_code": "33134"},
-        "phone": "+1-305-555-0168",
-        "website": "https://example.com/skin-by-renata",
-        "socials": {"instagram": "skinbyrenata"},
-        "short_description": "Coral Gables skincare studio focused on acne, melasma, and barrier-friendly facials.",
-        "known_for": "Acne protocols and melasma support for Miami sun and humidity. Pro-grade peels with realistic downtime.",
-        "best_for": "Anyone treating melasma, persistent breakouts, or post-procedure rebuilding.",
-        "before_booking_notes": "First visit is a consultation. Bring a list of current actives.",
-        "price_cues": "$$$",
-        "schema_org_type": "DaySpa",
-        "claim_status": "verified",
-        "quality_score": 90,
-        "status": "live",
-        "index_status": "indexed",
-    },
-    {
-        "slug": "lash-lab-mid-beach",
-        "name": "Lash Lab Mid-Beach",
-        "category_slugs": ["lashes-brows"],
-        "neighborhood_slugs": ["mid-beach"],
-        "address": {"street": "4441 Collins Ave Suite 12", "city": "Miami Beach", "state": "FL", "postal_code": "33140"},
-        "phone": "+1-305-555-0186",
-        "website": "https://example.com/lashlab",
-        "socials": {"instagram": "lashlabmidbeach"},
-        "short_description": "Mid-Beach studio known for classic and hybrid lash sets that survive humidity.",
-        "known_for": "Long-wearing classic and hybrid sets engineered for ocean air. Brow shaping and lamination by appointment.",
-        "best_for": "Travel-heavy clients who need lashes to hold up between fills.",
-        "price_cues": "$$",
-        "schema_org_type": "BeautySalon",
-        "quality_score": 78,
-        "status": "live",
-        "index_status": "indexed",
-    },
-    {
-        "slug": "kala-makeup-collective",
-        "name": "Kala Makeup Collective",
-        "category_slugs": ["makeup"],
-        "neighborhood_slugs": ["design-district"],
-        "address": {"street": "140 NE 39th St Suite 6", "city": "Miami", "state": "FL", "postal_code": "33137"},
-        "phone": "+1-305-555-0210",
-        "website": "https://example.com/kala",
-        "socials": {"instagram": "kalamakeup"},
-        "short_description": "On-site and studio makeup team for weddings, events, and editorial work.",
-        "known_for": "Bridal and editorial makeup with skin that reads beautifully on camera without looking heavy.",
-        "best_for": "Brides, anchor talent, and event clients who want makeup to last through humidity and dinner.",
-        "price_cues": "$$$",
-        "schema_org_type": "BeautySalon",
-        "editors_pick": True,
-        "quality_score": 84,
-        "status": "live",
-        "index_status": "indexed",
-    },
-]
-
-WELLNESS_SAMPLE_BUSINESSES = [
-    {
-        "slug": "stillwater-spa-collins",
-        "name": "Stillwater Spa",
-        "category_slugs": ["spas-relaxation"],
-        "neighborhood_slugs": ["mid-beach"],
-        "address": {"street": "4525 Collins Ave", "city": "Miami Beach", "state": "FL", "postal_code": "33140"},
-        "phone": "+1-305-555-0301",
-        "website": "https://example.com/stillwater",
-        "short_description": "Mid-Beach hotel spa with a serious massage program and ocean-front treatment rooms.",
-        "known_for": "Deep tissue and lymphatic massage with practitioners who actually adjust pressure to feedback.",
-        "best_for": "Anyone with chronic tension who wants therapeutic — not just relaxing — bodywork.",
-        "before_booking_notes": "Book 90 minutes if you've never been; the consultation eats the first 15.",
-        "price_cues": "$$$$",
-        "schema_org_type": "DaySpa",
-        "editors_pick": True,
-        "quality_score": 89,
-        "status": "live",
-        "index_status": "indexed",
-    },
-    {
-        "slug": "ember-cold-plunge",
-        "name": "Ember Cold Plunge Club",
-        "category_slugs": ["recovery-cold-plunge"],
-        "neighborhood_slugs": ["wynwood"],
-        "address": {"street": "250 NW 27th St", "city": "Miami", "state": "FL", "postal_code": "33127"},
-        "phone": "+1-305-555-0322",
-        "website": "https://example.com/ember",
-        "socials": {"instagram": "emberplunge"},
-        "short_description": "Wynwood members club for contrast therapy — infrared sauna, cold plunge, compression.",
-        "known_for": "Contrast cycles run on a fixed clock so members can drop in without booking.",
-        "best_for": "Athletes and travel-heavy professionals fitting recovery into morning routines.",
-        "price_cues": "$$",
-        "featured": {"enabled": True, "tier": "enhanced"},
-        "quality_score": 80,
-        "status": "live",
-        "index_status": "indexed",
-    },
-    {
-        "slug": "north-room-yoga",
-        "name": "North Room Yoga",
-        "category_slugs": ["yoga-meditation"],
-        "neighborhood_slugs": ["coconut-grove"],
-        "address": {"street": "3201 Commodore Plaza", "city": "Coconut Grove", "state": "FL", "postal_code": "33133"},
-        "phone": "+1-305-555-0345",
-        "website": "https://example.com/northroom",
-        "socials": {"instagram": "northroomyoga"},
-        "short_description": "Coconut Grove studio with a steady morning practice and a strong restorative program.",
-        "known_for": "Heat is controlled — not extreme. Teachers offer real cueing on alignment rather than playlists.",
-        "best_for": "Practitioners coming back from injury or looking for a less performative studio.",
-        "price_cues": "$$",
-        "claim_status": "verified",
-        "quality_score": 83,
-        "status": "live",
-        "index_status": "indexed",
-    },
-    {
-        "slug": "hydra-iv-brickell",
-        "name": "Hydra IV Brickell",
-        "category_slugs": ["iv-hydration"],
-        "neighborhood_slugs": ["brickell"],
-        "address": {"street": "1200 Brickell Ave", "city": "Miami", "state": "FL", "postal_code": "33131"},
-        "phone": "+1-305-555-0359",
-        "website": "https://example.com/hydraiv",
-        "short_description": "Brickell IV lounge for hydration, post-flight recovery, and immunity drips.",
-        "known_for": "Same-day drips with consultations conducted by registered nurses.",
-        "best_for": "Travelers landing dehydrated, or anyone catching a cold the day before a big event.",
-        "price_cues": "$$$",
-        "quality_score": 74,
-        "status": "live",
-        "index_status": "indexed",
-    },
-]
-
-HEALTH_SAMPLE_BUSINESSES = [
-    {
-        "slug": "gables-cosmetic-dentistry",
-        "name": "Gables Cosmetic Dentistry",
-        "category_slugs": ["dental-smile"],
-        "neighborhood_slugs": ["coral-gables"],
-        "address": {"street": "2811 Ponce de Leon Blvd", "city": "Coral Gables", "state": "FL", "postal_code": "33134"},
-        "phone": "+1-305-555-0410",
-        "website": "https://example.com/gables-cosmetic-dentistry",
-        "short_description": "Coral Gables practice focused on veneers, Invisalign, and adult orthodontics.",
-        "known_for": "Conservative veneer work and full smile-design consultations using digital previews before any tooth prep.",
-        "best_for": "Adults considering cosmetic dentistry who want to see options before committing.",
-        "price_cues": "$$$$",
-        "schema_org_type": "Dentist",
-        "claim_status": "verified",
-        "editors_pick": True,
-        "quality_score": 92,
-        "status": "live",
-        "index_status": "indexed",
-    },
-    {
-        "slug": "atlas-mental-health",
-        "name": "Atlas Mental Health",
-        "category_slugs": ["mental-health-therapy"],
-        "neighborhood_slugs": ["brickell"],
-        "address": {"street": "801 Brickell Ave Suite 1500", "city": "Miami", "state": "FL", "postal_code": "33131"},
-        "phone": "+1-305-555-0428",
-        "website": "https://example.com/atlas-mental-health",
-        "short_description": "Brickell therapy group with psychiatrists, therapists, and family work.",
-        "known_for": "In-network with major insurers. Practice mix includes anxiety, ADHD evaluation, and couples therapy.",
-        "best_for": "Professionals and families looking for both medication management and weekly therapy under one practice.",
-        "price_cues": "$$$",
-        "schema_org_type": "MedicalBusiness",
-        "quality_score": 86,
-        "status": "live",
-        "index_status": "indexed",
-    },
-    {
-        "slug": "metro-primary-care",
-        "name": "Metro Primary Care",
-        "category_slugs": ["primary-care-clinics"],
-        "neighborhood_slugs": ["midtown"],
-        "address": {"street": "3401 N Miami Ave Suite 2", "city": "Miami", "state": "FL", "postal_code": "33127"},
-        "phone": "+1-305-555-0461",
-        "website": "https://example.com/metro-primary",
-        "short_description": "Direct primary care practice serving Midtown and Wynwood — same-day visits for members.",
-        "known_for": "Membership model with same-day appointments and direct messaging access to a primary care physician.",
-        "best_for": "Adults without insurance who want predictable monthly cost for primary care.",
-        "price_cues": "$$",
-        "schema_org_type": "MedicalBusiness",
-        "quality_score": 81,
-        "status": "live",
-        "index_status": "indexed",
-    },
-    {
-        "slug": "miami-fertility-collective",
-        "name": "Miami Fertility Collective",
-        "category_slugs": ["fertility-womens-health"],
-        "neighborhood_slugs": ["aventura"],
-        "address": {"street": "20801 Biscayne Blvd Suite 300", "city": "Aventura", "state": "FL", "postal_code": "33180"},
-        "phone": "+1-305-555-0489",
-        "website": "https://example.com/miami-fertility",
-        "short_description": "Aventura fertility clinic offering IVF, egg freezing, and reproductive endocrinology.",
-        "known_for": "Multidisciplinary fertility care with an in-house IVF lab and Spanish-speaking nurse navigators.",
-        "best_for": "Patients exploring IVF or egg freezing who want a clinic with both clinical and emotional support.",
-        "price_cues": "$$$$",
-        "schema_org_type": "MedicalBusiness",
-        "featured": {"enabled": True, "tier": "premium"},
-        "quality_score": 87,
-        "status": "live",
-        "index_status": "indexed",
-    },
-]
-
-
-NETWORK_SAMPLES = {
-    "beauty": (
-        "Miami's best-kept beauty addresses.",
-        "A curated guide to the salons, med spas, nail artists, colorists, and glam pros Miami locals book before dinner, beach weekends, weddings, and big nights out.",
-        "Miami Beauty Guide: Salons, Spas, Med Spas, Nails & Hair",
-        BEAUTY_SAMPLE_BUSINESSES,
-    ),
-    "wellness": (
-        "Miami's go-to wellness, beach to Brickell.",
-        "Spas, recovery rooms, yoga studios, IV lounges, and wellness practices Miami locals trust between travel and big work weeks.",
-        "Miami Wellness Guide: Spas, Recovery, Yoga, IV, Nutrition",
-        WELLNESS_SAMPLE_BUSINESSES,
-    ),
-    "health": (
-        "Miami's doctors, dentists, and clinics — chosen by neighborhood.",
-        "A provider directory for cosmetic dentistry, mental health, fertility, primary care, and specialists across Greater Miami. We help you find the right provider; medical decisions remain between you and them.",
-        "Miami Health Guide: Doctors, Dentists, Therapists & Clinics",
-        HEALTH_SAMPLE_BUSINESSES,
-    ),
+NEIGHBORHOODS = {
+    "beauty": [
+        ("wynwood",           "Wynwood",           "Creative & edgy"),
+        ("brickell",          "Brickell",          "Sleek & corporate"),
+        ("south-beach",       "South Beach",       "Glamorous & tropical"),
+        ("coral-gables",      "Coral Gables",      "Refined & classic"),
+        ("design-district",   "Design District",   "Editorial & luxe"),
+        ("edgewater",         "Edgewater",         "Emerging & chic"),
+        ("coconut-grove",     "Coconut Grove",     "Laid-back luxe"),
+        ("little-havana",     "Little Havana",     "Vibrant & cultural"),
+        ("sunny-isles-beach", "Sunny Isles Beach", "Tower luxury & multilingual"),
+        ("aventura",          "Aventura",          "Polished & busy"),
+        ("bal-harbour",       "Bal Harbour",       "Ultra-luxury"),
+    ],
+    "wellness": [
+        ("wynwood",           "Wynwood",           "Creative & experimental"),
+        ("brickell",          "Brickell",          "Sleek & corporate"),
+        ("south-beach",       "South Beach",       "Glamorous & tropical"),
+        ("coral-gables",      "Coral Gables",      "Refined & classic"),
+        ("design-district",   "Design District",   "Editorial & luxe"),
+        ("edgewater",         "Edgewater",         "Emerging & chic"),
+        ("coconut-grove",     "Coconut Grove",     "Laid-back luxe"),
+        ("sunny-isles-beach", "Sunny Isles Beach", "Tower luxury"),
+        ("aventura",          "Aventura",          "Polished & busy"),
+        ("bal-harbour",       "Bal Harbour",       "Ultra-luxury"),
+        ("little-havana",     "Little Havana",     "Vibrant & cultural"),
+        ("key-biscayne",      "Key Biscayne",      "Island residential"),
+    ],
+    "health": [
+        ("wynwood",           "Wynwood",           "Creative & experimental"),
+        ("brickell",          "Brickell",          "Sleek & corporate"),
+        ("south-beach",       "South Beach",       "Glamorous & tropical"),
+        ("coral-gables",      "Coral Gables",      "Refined & classic"),
+        ("design-district",   "Design District",   "Editorial & luxe"),
+        ("edgewater",         "Edgewater",         "Emerging & chic"),
+        ("coconut-grove",     "Coconut Grove",     "Laid-back luxe"),
+        ("sunny-isles-beach", "Sunny Isles Beach", "Tower luxury"),
+        ("aventura",          "Aventura",          "Polished & busy"),
+        ("bal-harbour",       "Bal Harbour",       "Ultra-luxury"),
+        ("little-havana",     "Little Havana",     "Vibrant & cultural"),
+        ("key-biscayne",      "Key Biscayne",      "Island residential"),
+    ],
 }
+
+
+# Businesses appearing on the reference home pages. Each tuple matches the
+# reference card content verbatim: name, slug, category, neighborhood,
+# price tier, editor's_pick flag, premium flag, short description.
+
+BEAUTY_BUSINESSES = [
+    {
+        "slug": "beauty-bar-sunny", "name": "Beauty Bar Sunny",
+        "category_slugs": ["hair"], "neighborhood_slugs": ["sunny-isles-beach"],
+        "price_cues": "$$$", "editors_pick": True, "premium": True,
+        "short_description": "A beauty coordination studio — hot-fusion extensions, Russian manicure, lash, brow, laser, and body work, often performed by two or three specialists at once.",
+        "schema_org_type": "BeautySalon",
+    },
+    {
+        "slug": "palmera-hair-house", "name": "Palmera Hair House",
+        "category_slugs": ["hair"], "neighborhood_slugs": ["wynwood"],
+        "price_cues": "$$$", "editors_pick": True, "premium": True,
+        "short_description": "The color studio painting Miami's most copied highlights.",
+        "schema_org_type": "HairSalon",
+    },
+    {
+        "slug": "isla-nail-society", "name": "Isla Nail Society",
+        "category_slugs": ["nails"], "neighborhood_slugs": ["brickell"],
+        "price_cues": "$$$", "editors_pick": True, "premium": True,
+        "short_description": "A clean-air nail studio for the Brickell lunch-hour crowd.",
+        "schema_org_type": "NailSalon",
+    },
+    {
+        "slug": "casa-luminara-spa", "name": "Casa Luminara Spa",
+        "category_slugs": ["spa"], "neighborhood_slugs": ["coral-gables"],
+        "price_cues": "$$$$", "editors_pick": True, "premium": True,
+        "short_description": "A Mediterranean garden spa hidden in old Coral Gables.",
+        "schema_org_type": "DaySpa",
+    },
+    {
+        "slug": "el-rey-barberia", "name": "El Rey Barbería",
+        "category_slugs": ["barber"], "neighborhood_slugs": ["little-havana"],
+        "price_cues": "$$", "editors_pick": True, "premium": False,
+        "short_description": "Three generations of Cuban barbering on Calle Ocho.",
+        "schema_org_type": "BarberShop",
+    },
+    {
+        "slug": "flutter-lash-lab", "name": "Flutter Lash Lab",
+        "category_slugs": ["lash-brow"], "neighborhood_slugs": ["south-beach"],
+        "price_cues": "$$", "editors_pick": False, "premium": False,
+        "short_description": "Volume extensions and lash lifts, two blocks from the ocean.",
+        "schema_org_type": "BeautySalon",
+    },
+    {
+        "slug": "orchid-med-spa", "name": "Orchid Med Spa",
+        "category_slugs": ["med-spa"], "neighborhood_slugs": ["design-district"],
+        "price_cues": "$$$$", "editors_pick": False, "premium": True,
+        "short_description": "Conservative, natural-looking injectables by a board-certified team.",
+        "schema_org_type": "MedicalSpa",
+    },
+    {
+        "slug": "luma-makeup-studio", "name": "Luma Makeup Studio",
+        "category_slugs": ["makeup"], "neighborhood_slugs": ["edgewater"],
+        "price_cues": "$$$", "editors_pick": False, "premium": False,
+        "short_description": "Editorial-quality makeup for brides, events, and on-camera moments.",
+        "schema_org_type": "BeautySalon",
+    },
+    {
+        "slug": "wynwood-fades", "name": "Wynwood Fades",
+        "category_slugs": ["barber"], "neighborhood_slugs": ["wynwood"],
+        "price_cues": "$$", "editors_pick": False, "premium": False,
+        "short_description": "A barbershop you'd Instagram. Streetwear, neon, and the cleanest fades.",
+        "schema_org_type": "BarberShop",
+    },
+    {
+        "slug": "brickell-brow-bar", "name": "Brickell Brow Bar",
+        "category_slugs": ["lash-brow"], "neighborhood_slugs": ["brickell"],
+        "price_cues": "$$", "editors_pick": False, "premium": False,
+        "short_description": "Brow shaping, lamination, and tinting for the Brickell professional crowd.",
+        "schema_org_type": "BeautySalon",
+    },
+]
+
+WELLNESS_BUSINESSES = [
+    {
+        "slug": "salt-stone-recovery", "name": "Salt & Stone Recovery",
+        "category_slugs": ["recovery"], "neighborhood_slugs": ["wynwood"],
+        "price_cues": "$$$", "editors_pick": True, "premium": True,
+        "short_description": "A members-style recovery floor: infrared sauna, 39°F cold plunge, compression, and a tea bar — built for athletes, founders, and post-flight resets.",
+    },
+    {
+        "slug": "breathe-yoga-edgewater", "name": "Breathe Yoga Edgewater",
+        "category_slugs": ["yoga-meditation"], "neighborhood_slugs": ["edgewater"],
+        "price_cues": "$$", "editors_pick": True, "premium": False,
+        "short_description": "A bayfront studio known for slow vinyasa, weekly sound baths on the deck, and an early-morning class that locals plan their week around.",
+    },
+    {
+        "slug": "oceanic-day-spa", "name": "Oceanic Day Spa",
+        "category_slugs": ["spa"], "neighborhood_slugs": ["south-beach"],
+        "price_cues": "$$$$", "editors_pick": True, "premium": True,
+        "short_description": "A 14,000-square-foot hotel spa with a Roman-style hammam, a saltwater plunge pool, and a couples' suite booked weeks ahead for anniversaries.",
+    },
+    {
+        "slug": "glow-iv-brickell", "name": "Glow IV Brickell",
+        "category_slugs": ["iv-hydration"], "neighborhood_slugs": ["brickell"],
+        "price_cues": "$$$", "editors_pick": False, "premium": True,
+        "short_description": "A clinical-grade IV lounge tucked into a Brickell tower — nurses on staff, drips reviewed by an MD, and an after-work crowd that comes in for hydration before flights.",
+    },
+    {
+        "slug": "pulse-cryo", "name": "Pulse Cryo",
+        "category_slugs": ["recovery"], "neighborhood_slugs": ["aventura"],
+        "price_cues": "$$", "editors_pick": False, "premium": False,
+        "short_description": "Whole-body cryotherapy, localized cryo, and infrared red-light beds — a fast in-and-out recovery stop for the post-gym Aventura crowd.",
+    },
+    {
+        "slug": "green-roots-nutrition", "name": "Green Roots Nutrition",
+        "category_slugs": ["nutrition"], "neighborhood_slugs": ["coconut-grove"],
+        "price_cues": "$$", "editors_pick": False, "premium": False,
+        "short_description": "A registered dietitian-led nutrition practice with a small Coconut Grove storefront, a juice bar in front, and 1:1 coaching upstairs.",
+    },
+    {
+        "slug": "house-of-acupuncture", "name": "House of Acupuncture",
+        "category_slugs": ["holistic"], "neighborhood_slugs": ["coral-gables"],
+        "price_cues": "$$$", "editors_pick": False, "premium": False,
+        "short_description": "A licensed acupuncture practice in a quiet Gables bungalow — sports recovery, fertility support, and chronic pain protocols.",
+    },
+    {
+        "slug": "reset-retreats-miami", "name": "Reset Retreats Miami",
+        "category_slugs": ["retreats"], "neighborhood_slugs": ["key-biscayne"],
+        "price_cues": "$$$$", "editors_pick": False, "premium": True,
+        "short_description": "A weekend wellness retreat run out of a Key Biscayne beach house — eight guests, two facilitators, breathwork, cold plunge, and a chef.",
+    },
+    {
+        "slug": "sweat-haus-wynwood", "name": "Sweat Haus Wynwood",
+        "category_slugs": ["recovery"], "neighborhood_slugs": ["wynwood"],
+        "price_cues": "$$", "editors_pick": False, "premium": False,
+        "short_description": "Three Finnish-style sauna rooms and a single cold tub in a brick warehouse — communal, sweaty, and very Wynwood.",
+    },
+]
+
+HEALTH_BUSINESSES = [
+    {
+        "slug": "biscayne-longevity-medicine", "name": "Biscayne Longevity Medicine",
+        "category_slugs": ["longevity"], "neighborhood_slugs": ["brickell"],
+        "price_cues": "$$$$", "editors_pick": True, "premium": True,
+        "short_description": "A physician-led longevity practice — comprehensive bloodwork panels, advanced imaging, and hormone therapy under MD supervision.",
+        "schema_org_type": "MedicalBusiness",
+    },
+    {
+        "slug": "gables-smile-studio", "name": "Gables Smile Studio",
+        "category_slugs": ["dental"], "neighborhood_slugs": ["coral-gables"],
+        "price_cues": "$$$", "editors_pick": True, "premium": True,
+        "short_description": "A cosmetic and general dental practice known for veneers, Invisalign, and a quiet chair-side manner — six operatories, two dentists, one shared philosophy.",
+        "schema_org_type": "Dentist",
+    },
+    {
+        "slug": "design-district-aesthetics", "name": "Design District Aesthetics",
+        "category_slugs": ["aesthetics"], "neighborhood_slugs": ["design-district"],
+        "price_cues": "$$$$", "editors_pick": True, "premium": True,
+        "short_description": "A physician-owned aesthetics practice — Botox, fillers, lasers, microneedling, all performed by MDs or RN injectors trained in-house.",
+        "schema_org_type": "MedicalBusiness",
+    },
+    {
+        "slug": "wynwood-mental-health-collective", "name": "Wynwood Mental Health Collective",
+        "category_slugs": ["mental-health"], "neighborhood_slugs": ["wynwood"],
+        "price_cues": "$$$", "editors_pick": False, "premium": False,
+        "short_description": "A group practice of nine therapists and two psychiatrists — individual, couples, and family therapy, plus medication management when clinically appropriate.",
+        "schema_org_type": "MedicalBusiness",
+    },
+    {
+        "slug": "south-beach-physical-therapy", "name": "South Beach Physical Therapy",
+        "category_slugs": ["pt-recovery"], "neighborhood_slugs": ["south-beach"],
+        "price_cues": "$$", "editors_pick": False, "premium": False,
+        "short_description": "A one-on-one physical therapy practice — every session is private, with the same PT for the full plan of care.",
+        "schema_org_type": "MedicalBusiness",
+    },
+    {
+        "slug": "aventura-concierge-md", "name": "Aventura Concierge MD",
+        "category_slugs": ["primary-care"], "neighborhood_slugs": ["aventura"],
+        "price_cues": "$$$$", "editors_pick": False, "premium": True,
+        "short_description": "A concierge primary-care practice capped at 250 patients per physician — same-day appointments, direct phone access, and 60-minute visits.",
+        "schema_org_type": "MedicalBusiness",
+    },
+    {
+        "slug": "sunshine-fertility-center", "name": "Sunshine Fertility Center",
+        "category_slugs": ["fertility"], "neighborhood_slugs": ["coral-gables"],
+        "price_cues": "$$$$", "editors_pick": False, "premium": True,
+        "short_description": "A reproductive endocrinology practice offering IVF, egg freezing, and fertility evaluation — three REI physicians, an on-site lab and embryology team.",
+        "schema_org_type": "MedicalBusiness",
+    },
+    {
+        "slug": "edgewater-metabolic-clinic", "name": "Edgewater Metabolic Clinic",
+        "category_slugs": ["metabolic"], "neighborhood_slugs": ["edgewater"],
+        "price_cues": "$$$", "editors_pick": False, "premium": False,
+        "short_description": "A physician-supervised metabolic health practice — obesity medicine, GLP-1 management, and long-term care plans, not a short-term injection counter.",
+        "schema_org_type": "MedicalBusiness",
+    },
+    {
+        "slug": "brickell-direct-primary-care", "name": "Brickell Direct Primary Care",
+        "category_slugs": ["primary-care"], "neighborhood_slugs": ["brickell"],
+        "price_cues": "$$$", "editors_pick": False, "premium": False,
+        "short_description": "A direct primary care practice — flat monthly fee, no insurance billing, unhurried visits, and a panel size that makes that possible.",
+        "schema_org_type": "MedicalBusiness",
+    },
+]
+
+
+# Per-network city-level configuration, all taken from the reference pages.
+NETWORK_CITY_CONFIG = {
+    "beauty": {
+        "tagline": "Miami's best-kept beauty addresses.",
+        "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
+        "hero_subhead": "An index of the stylists, colorists, esthetes, and barbers locals actually book — neighborhood by neighborhood.",
+        "stat_count_listings": "29",
+        "stat_label_listings": "SALONS INDEXED",
+        "stat_count_neighborhoods": "11",
+        "stat_count_editor_picks": "5",
+        "stat_label_owners": "FOR SALON OWNERS",
+        "search_chips": ["balayage", "gel manicure", "lash extensions", "hydrafacial", "fade"],
+        "owners_eyebrow": "FOR SALON OWNERS",
+        "owners_headline": "Own a salon in Miami?",
+        "owners_italic": "Your listing's already here.",
+        "owners_body": "We've pre-built a profile for every salon in Miami. Claim yours in 3 minutes, tell us your story by voice, and get found by people searching tonight.",
+        "owners_cta": "Claim your salon · Free",
+        "owners_card_business_slug": "beauty-bar-sunny",
+        "owners_card_action": "Post your golden-hour blowout reel to Instagram — draft ready",
+        "spotlight_neighborhood_slug": "wynwood",
+        "spotlight_headline_lead": "What's happening in",
+        "spotlight_description": "Street-art murals meet experimental beauty studios.",
+        "spotlight_business_slugs": ["palmera-hair-house", "wynwood-fades"],
+        "footer_blurb": "The curated directory of Miami's best salons, spas, and beauty professionals. Discovered by locals, loved by visitors.",
+        "footer_also_in": "Also in Lahore · Austin · Orlando",
+        "footer_publication_label": "A Knows Beauty publication.",
+        "footer_owners_label": "SALONS",
+        "footer_owners_items": ["List your salon", "Owner login", "Pricing"],
+        "seo_title": "Miami Knows Beauty",
+        "trending_business_slugs": [
+            "beauty-bar-sunny", "palmera-hair-house", "isla-nail-society",
+            "casa-luminara-spa", "flutter-lash-lab", "orchid-med-spa",
+            "el-rey-barberia", "luma-makeup-studio",
+        ],
+        "two_column_neighborhoods": [
+            {"slug": "brickell",    "business_slugs": ["isla-nail-society", "brickell-brow-bar"]},
+            {"slug": "south-beach", "business_slugs": ["flutter-lash-lab"]},
+        ],
+    },
+    "wellness": {
+        "tagline": "Where Miami recovers, resets, and breathes.",
+        "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
+        "hero_subhead": "An index of the spas, saunas, recovery rooms, yoga studios, and IV lounges Miami locals actually book — between training blocks, after long flights, and before the week gets loud.",
+        "stat_count_listings": "418",
+        "stat_label_listings": "STUDIOS INDEXED",
+        "stat_count_neighborhoods": "12",
+        "stat_count_editor_picks": "5",
+        "stat_label_owners": "FOR OWNERS",
+        "search_chips": ["infrared sauna", "cold plunge", "sunrise yoga", "IV drip", "reformer pilates"],
+        "owners_eyebrow": "FOR WELLNESS OWNERS",
+        "owners_headline": "Run a wellness practice in Miami?",
+        "owners_italic": "Your listing's already here.",
+        "owners_body": "We pre-built a profile for every studio, spa, and recovery room in Miami. Claim yours in three minutes — and get found by people searching tonight.",
+        "owners_cta": "Claim your studio · Free",
+        "owners_card_business_slug": "salt-stone-recovery",
+        "owners_card_action": "Post your contrast-therapy reel — draft ready",
+        "spotlight_neighborhood_slug": "wynwood",
+        "spotlight_headline_lead": "Where Miami's recovery culture lives —",
+        "spotlight_description": "A few converted warehouses and brick-walled studios are quietly leading the recovery scene. Here is who is doing it well.",
+        "spotlight_business_slugs": ["salt-stone-recovery", "sweat-haus-wynwood"],
+        "footer_blurb": "The curated guide to Miami spas, recovery, yoga, and wellness — discovered by locals, kept simple.",
+        "footer_also_in": "Coming soon to Austin · Orlando · Dallas",
+        "footer_publication_label": "A Knows Wellness publication.",
+        "footer_owners_label": "WELLNESS",
+        "footer_owners_items": ["Claim your listing", "Pricing", "Miami Knows Beauty →"],
+        "seo_title": "Miami Knows Wellness",
+        "trending_business_slugs": [
+            "salt-stone-recovery", "breathe-yoga-edgewater", "glow-iv-brickell",
+            "oceanic-day-spa", "pulse-cryo", "green-roots-nutrition",
+            "house-of-acupuncture", "reset-retreats-miami",
+        ],
+        "two_column_neighborhoods": [],
+    },
+    "health": {
+        "tagline": "Miami's most-trusted doctors, dentists, and clinics.",
+        "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
+        "hero_subhead": "A neutral, locally curated guide to the longevity clinics, dental practices, mental health groups, fertility specialists, and concierge primary-care doctors Miami families and professionals trust.",
+        "stat_count_listings": "627",
+        "stat_label_listings": "PRACTICES INDEXED",
+        "stat_count_neighborhoods": "12",
+        "stat_count_editor_picks": "4",
+        "stat_label_owners": "FOR PRACTICES",
+        "search_chips": ["concierge doctor", "invisalign", "pelvic floor PT", "hormone therapy", "couples therapy"],
+        "owners_eyebrow": "FOR PRACTICES",
+        "owners_headline": "Run a practice in Miami?",
+        "owners_italic": "Your listing's already here.",
+        "owners_body": "We pre-built a profile for every clinic and practice in Miami-Dade. Claim yours, correct details, and add the things that matter — your training, your approach, your office.",
+        "owners_cta": "Claim your practice · Free",
+        "owners_card_business_slug": "biscayne-longevity-medicine",
+        "owners_card_action": "Post your contrast-therapy reel — draft ready",
+        "spotlight_neighborhood_slug": "brickell",
+        "spotlight_headline_lead": "Where Miami professionals see their doctors —",
+        "spotlight_description": "The tower-medicine corridor — concierge primary care, longevity clinics, and specialists who keep the same patients for decades.",
+        "spotlight_business_slugs": ["biscayne-longevity-medicine", "brickell-direct-primary-care"],
+        "footer_blurb": "A curated guide to Miami's clinics and providers — provider-focused, not outcome-promising.",
+        "footer_also_in": "Coming soon to Austin · Orlando · Dallas",
+        "footer_publication_label": "A Knows Health publication.",
+        "footer_owners_label": "HEALTH",
+        "footer_owners_items": ["Claim your listing", "Pricing", "Miami Knows Beauty →"],
+        "seo_title": "Miami Knows Health",
+        "trending_business_slugs": [
+            "biscayne-longevity-medicine", "gables-smile-studio",
+            "wynwood-mental-health-collective", "south-beach-physical-therapy",
+            "aventura-concierge-md", "sunshine-fertility-center",
+            "edgewater-metabolic-clinic", "design-district-aesthetics",
+        ],
+        "two_column_neighborhoods": [],
+    },
+}
+
+
+BUSINESSES_PER_NETWORK = {
+    "beauty": BEAUTY_BUSINESSES,
+    "wellness": WELLNESS_BUSINESSES,
+    "health": HEALTH_BUSINESSES,
+}
+
+
+async def _set_copy(scope_type: str, scope_ref: Dict[str, str], key: str, value: str) -> None:
+    """Upsert a single copy block."""
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    existing = await db.copy_blocks.find_one({
+        "scope_type": scope_type, "scope_ref": scope_ref, "key": key, "locale": "en-US",
+    })
+    if existing:
+        await db.copy_blocks.update_one(
+            {"_id": existing["_id"]},
+            {"$set": {"value": value, "updated_at": now}},
+        )
+    else:
+        await db.copy_blocks.insert_one({
+            "_id": str(uuid.uuid4()),
+            "scope_type": scope_type,
+            "scope_ref": scope_ref,
+            "key": key,
+            "value": value,
+            "locale": "en-US",
+            "active_from": None,
+            "active_until": None,
+            "created_at": now,
+            "updated_at": now,
+        })
 
 
 async def seed_network(network_slug: str) -> None:
@@ -318,9 +427,11 @@ async def seed_network(network_slug: str) -> None:
         print(f"Network {network_slug} not found — run seed_networks.py first.")
         return
 
-    tagline, hero, seo_title, businesses = NETWORK_SAMPLES[network_slug]
+    cfg = NETWORK_CITY_CONFIG[network_slug]
+    businesses = BUSINESSES_PER_NETWORK[network_slug]
     now = datetime.now(timezone.utc)
 
+    # City
     city_doc = {
         "_id": str(uuid.uuid4()),
         "network_id": network["_id"],
@@ -329,42 +440,34 @@ async def seed_network(network_slug: str) -> None:
         "state": "FL",
         "country": "US",
         "timezone": "America/New_York",
-        "tagline": tagline,
-        "hero_description": hero,
-        "seo_title": seo_title,
-        "meta_description": hero,
-        "editorial_headlines": [
-            {"headline": tagline, "is_default": True},
-            {"headline": "Where Miami gets ready before the week gets photographed.", "is_default": False},
-            {"headline": "Miami, built for heat, humidity, and big nights out.", "is_default": False},
-        ],
+        "tagline": cfg["tagline"],
+        "hero_description": cfg["hero_subhead"],
+        "seo_title": cfg["seo_title"],
+        "meta_description": cfg["hero_subhead"],
+        "editorial_headlines": [{"headline": cfg["tagline"], "is_default": True}],
         "status": "live",
         "created_at": now,
         "updated_at": now,
     }
     city = await upsert("cities", {"network_id": network["_id"], "slug": "miami"}, city_doc)
-    print(f"  City: {network_slug} / miami")
 
-    for i, nb in enumerate(MIAMI_NEIGHBORHOODS):
+    # Neighborhoods (slug, name, vibe)
+    nh_list = NEIGHBORHOODS[network_slug]
+    for i, (slug, name, vibe) in enumerate(nh_list):
         nb_doc = {
             "_id": str(uuid.uuid4()),
             "city_id": city["_id"],
-            "slug": nb["slug"],
-            "name": nb["name"],
-            "description": nb["description"],
-            "order": nb["order"],
+            "slug": slug,
+            "name": name,
+            "description": vibe,
+            "order": i,
             "status": "live",
             "created_at": now,
             "updated_at": now,
         }
-        await upsert(
-            "neighborhoods",
-            {"city_id": city["_id"], "slug": nb["slug"]},
-            nb_doc,
-        )
-    print(f"  Neighborhoods: {len(MIAMI_NEIGHBORHOODS)}")
+        await upsert("neighborhoods", {"city_id": city["_id"], "slug": slug}, nb_doc)
 
-    # Categories: copy the network's master category list into city-scoped rows.
+    # Categories — city-scoped instances of the network's master list
     for order, group in enumerate(network.get("category_map") or []):
         cat_doc = {
             "_id": str(uuid.uuid4()),
@@ -380,14 +483,14 @@ async def seed_network(network_slug: str) -> None:
             "created_at": now,
             "updated_at": now,
         }
-        await upsert(
-            "categories",
-            {"city_id": city["_id"], "slug": group["slug"]},
-            cat_doc,
-        )
-    print(f"  Categories: {len(network.get('category_map') or [])}")
+        await upsert("categories", {"city_id": city["_id"], "slug": group["slug"]}, cat_doc)
 
+    # Businesses
     for biz in businesses:
+        featured = (
+            {"enabled": True, "tier": "premium"} if biz.get("premium") else
+            {"enabled": False, "tier": "free"}
+        )
         biz_doc = {
             "_id": str(uuid.uuid4()),
             "network_id": network["_id"],
@@ -396,38 +499,79 @@ async def seed_network(network_slug: str) -> None:
             "name": biz["name"],
             "category_slugs": biz["category_slugs"],
             "neighborhood_slugs": biz.get("neighborhood_slugs", []),
-            "address": biz.get("address", {}),
-            "phone": biz.get("phone"),
-            "website": biz.get("website"),
-            "email": biz.get("email"),
-            "booking_url": biz.get("booking_url"),
-            "socials": biz.get("socials", {}),
-            "hours": biz.get("hours", []),
-            "services": biz.get("services", []),
-            "photos": biz.get("photos", []),
             "short_description": biz.get("short_description"),
-            "known_for": biz.get("known_for"),
-            "best_for": biz.get("best_for"),
-            "before_booking_notes": biz.get("before_booking_notes"),
+            "known_for": biz.get("short_description"),
             "price_cues": biz.get("price_cues"),
-            "featured": biz.get("featured", {"enabled": False, "tier": "free"}),
+            "featured": featured,
             "editors_pick": biz.get("editors_pick", False),
-            "claim_status": biz.get("claim_status", "unclaimed"),
+            "claim_status": "verified" if biz.get("editors_pick") or biz.get("premium") else "unclaimed",
             "schema_org_type": biz.get("schema_org_type", "LocalBusiness"),
-            "data_source": biz.get("data_source", "editorial"),
-            "quality_score": biz.get("quality_score", 50),
-            "index_status": biz.get("index_status", "indexed"),
+            "data_source": "editorial",
+            "quality_score": 90 if biz.get("editors_pick") else 60,
+            "index_status": "indexed",
             "index_override": "auto",
-            "status": biz.get("status", "live"),
+            "status": "live",
+            "address": {"city": "Miami", "state": "FL", "country": "US"},
+            "socials": {}, "hours": [], "services": [], "photos": [],
             "created_at": now,
             "updated_at": now,
         }
-        await upsert(
-            "businesses",
-            {"city_id": city["_id"], "slug": biz["slug"]},
-            biz_doc,
-        )
-    print(f"  Businesses: {len(businesses)}")
+        await upsert("businesses", {"city_id": city["_id"], "slug": biz["slug"]}, biz_doc)
+
+    # City-level copy blocks for the structural strings that appear on the
+    # home page (the same ones an editor would later tweak through the API).
+    scope = {"city_id": city["_id"]}
+    pairs = [
+        ("home.hero.eyebrow",        cfg["hero_eyebrow"]),
+        ("home.hero.subhead",        cfg["hero_subhead"]),
+        ("home.hero.headline",       cfg["tagline"]),
+        ("home.stat.listings.count", cfg["stat_count_listings"]),
+        ("home.stat.listings.label", cfg["stat_label_listings"]),
+        ("home.stat.neighborhoods.count", cfg["stat_count_neighborhoods"]),
+        ("home.stat.editor_picks.count",  cfg["stat_count_editor_picks"]),
+        ("home.stat.owners.label",   cfg["stat_label_owners"]),
+        ("home.search.chips",        " · ".join(cfg["search_chips"])),
+        ("home.editor_picks.eyebrow","★ EDITOR'S PICKS"),
+        ("home.editor_picks.title",  "The ones we'd send a friend to"),
+        ("home.trending.eyebrow",    "THIS WEEK"),
+        ("home.trending.title",      "Trending in Miami"),
+        ("home.spotlight.eyebrow",   "NEIGHBORHOOD SPOTLIGHT"),
+        ("home.spotlight.lead",      cfg["spotlight_headline_lead"]),
+        ("home.spotlight.description", cfg["spotlight_description"]),
+        ("home.owners.eyebrow",      cfg["owners_eyebrow"]),
+        ("home.owners.headline",     cfg["owners_headline"]),
+        ("home.owners.italic",       cfg["owners_italic"]),
+        ("home.owners.body",         cfg["owners_body"]),
+        ("home.owners.cta",          cfg["owners_cta"]),
+        ("home.owners.card_action",  cfg["owners_card_action"]),
+        ("footer.about.body",        cfg["footer_blurb"]),
+        ("footer.also_in",           cfg["footer_also_in"]),
+        ("footer.publication_label", cfg["footer_publication_label"]),
+        ("footer.owners.label",      cfg["footer_owners_label"]),
+        ("footer.owners.items",      " | ".join(cfg["footer_owners_items"])),
+    ]
+    for key, value in pairs:
+        await _set_copy("city", scope, key, value)
+
+    # Configuration that's structural, not free text — keep on the city
+    # doc itself so the route can read it without a copy-block lookup.
+    await get_db().cities.update_one(
+        {"_id": city["_id"]},
+        {"$set": {
+            "spotlight_neighborhood_slug": cfg["spotlight_neighborhood_slug"],
+            "spotlight_business_slugs":    cfg["spotlight_business_slugs"],
+            "owners_card_business_slug":   cfg["owners_card_business_slug"],
+            "trending_business_slugs":     cfg["trending_business_slugs"],
+            "two_column_neighborhoods":    cfg["two_column_neighborhoods"],
+            "search_chips":                cfg["search_chips"],
+            "updated_at": now,
+        }},
+    )
+
+    print(f"  Seeded {network_slug} / miami: "
+          f"{len(nh_list)} neighborhoods, "
+          f"{len(network.get('category_map') or [])} categories, "
+          f"{len(businesses)} businesses.")
 
 
 async def main() -> None:

@@ -222,8 +222,24 @@ em, .italic { font-style: italic; }
 }
 .section-title em { font-style: italic; color: var(--color-fg); }
 
+/* ---- Search chips ("SEARCHED TONIGHT") ---- */
+.search-chips {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 16px;
+}
+.search-chips-label {
+  font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--color-fg-muted); font-weight: 700;
+}
+.search-chip {
+  display: inline-block; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--color-line-strong); background: white;
+  font-size: 12px; color: var(--color-fg); font-weight: 500;
+}
+.search-chip:hover { border-color: var(--color-fg); text-decoration: none; }
+
 /* ---- Two-column "by category / by neighborhood" ---- */
-.browse-section { display: grid; grid-template-columns: 220px 1fr; gap: 56px; }
+.browse-section { display: grid; grid-template-columns: 320px 1fr; gap: 56px; }
 .browse-side h4 {
   font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--color-fg-muted); font-weight: 700; margin: 0 0 14px;
@@ -233,6 +249,28 @@ em, .italic { font-style: italic; }
 .browse-list li small {
   display: block; color: var(--color-fg-muted); font-size: 12px; margin-top: 1px;
 }
+.browse-numbered { list-style: none; padding: 0; margin: 0 0 8px; }
+.browse-numbered li {
+  display: grid; grid-template-columns: 28px 1fr 16px;
+  gap: 12px; align-items: baseline;
+  padding: 10px 0; border-bottom: 1px solid var(--color-line);
+}
+.browse-num {
+  font-family: var(--font-display); font-size: 14px;
+  color: var(--color-fg-muted);
+}
+.browse-link { display: block; }
+.browse-link:hover { text-decoration: none; }
+.browse-name {
+  font-family: var(--font-display); font-size: 18px; font-weight: 500;
+  display: block; line-height: 1.2;
+}
+.browse-desc {
+  display: block; color: var(--color-fg-muted); font-size: 12px;
+  margin-top: 2px; line-height: 1.4;
+}
+.browse-arrow { color: var(--color-fg-muted); }
+.browse-numbered li:hover .browse-arrow { color: var(--color-accent); }
 .browse-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .neighborhood-card {
   position: relative; overflow: hidden; border-radius: var(--radius);
