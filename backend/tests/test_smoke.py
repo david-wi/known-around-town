@@ -27,14 +27,16 @@ def test_miami_beauty_home(client):
     assert "Miami" in body
     # Hero headline pulled from city/editorial defaults
     assert "best-kept beauty" in body.lower() or "knows beauty" in body.lower()
-    # Featured Beauty business should appear on the home page.
-    assert "Glamour Nails" in body or "Loft 647" in body
+    # Featured Beauty businesses from the reference content should appear.
+    assert "Beauty Bar Sunny" in body or "Palmera Hair House" in body
+    # The Issue eyebrow comes from copy_blocks.
+    assert "ISSUE NO. 01" in body
 
 
 def test_miami_beauty_category(client):
     r = client.get("/c/nails", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
-    assert "Glamour Nails" in r.text
+    assert "Isla Nail Society" in r.text
 
 
 def test_miami_beauty_neighborhood(client):
@@ -45,11 +47,11 @@ def test_miami_beauty_neighborhood(client):
 
 def test_miami_beauty_business(client):
     r = client.get(
-        "/b/glamour-nails-brickell", headers={"host": "miami.knowsbeauty.localhost"}
+        "/b/isla-nail-society", headers={"host": "miami.knowsbeauty.localhost"}
     )
     assert r.status_code == 200, r.text
-    assert "Glamour Nails" in r.text
-    assert "gel manicures" in r.text
+    assert "Isla Nail Society" in r.text
+    assert "Brickell" in r.text
 
 
 def test_miami_wellness_home(client):
@@ -82,7 +84,7 @@ def test_unknown_city_renders_404(client):
 def test_sitemap_includes_business(client):
     r = client.get("/sitemap.xml", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200
-    assert "glamour-nails-brickell" in r.text
+    assert "isla-nail-society" in r.text
 
 
 def test_api_lists_networks(client):

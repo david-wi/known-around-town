@@ -19,24 +19,10 @@
     <a class="brand" href="/">{{ city.name if city else '' }}{% if city %} {% endif %}<span class="brand-knows">Knows</span> {{ vertical_word }}</a>
     {% if city %}
     <nav class="site-nav">
-      {% if nav_categories %}
-        {% for c in nav_categories[:5] %}
-          {% if not c.parent_slug %}
-            <a href="/c/{{ c.slug }}">{{ c.name }}</a>
-          {% endif %}
-        {% endfor %}
-        {% if nav_categories|length > 5 %}
-          <details class="nav-menu">
-            <summary>More</summary>
-            <div class="nav-panel">
-              {% for c in nav_categories[5:] %}
-                {% if not c.parent_slug %}<a href="/c/{{ c.slug }}">{{ c.name }}</a>{% endif %}
-              {% endfor %}
-            </div>
-          </details>
-        {% endif %}
-      {% endif %}
-      <a href="/owners" class="header-cta">For Owners</a>
+      {% for c in nav_categories[:6] %}
+        {% if not c.parent_slug %}<a href="/c/{{ c.slug }}">{{ c.name }}</a>{% endif %}
+      {% endfor %}
+      <a href="/owners" class="header-cta">{{ owners_header_cta or 'For Owners' }}</a>
     </nav>
     {% endif %}
   </div>
@@ -52,9 +38,9 @@
       <div>
         <p class="footer-brand">{{ city.name if city else '' }}{% if city %} {% endif %}<em>Knows</em> {{ vertical_word }}</p>
         <p>{{ footer_about_body }}</p>
-        <div class="footer-coming">
-          A {{ network.name }} publication. Coming soon to Austin, Orlando, Dallas.
-        </div>
+        {% if footer_publication_label %}
+          <div class="footer-coming">{{ footer_publication_label }} {{ footer_also_in }}</div>
+        {% endif %}
       </div>
       {% if nav_categories %}
       <div>
@@ -73,15 +59,14 @@
       </div>
       {% endif %}
       <div>
-        <h4>{{ network.name }}</h4>
+        <h4>{{ footer_owners_label or 'OWNERS' }}</h4>
         <ul class="footer-list">
-          <li><a href="/owners">Claim your listing</a></li>
-          <li><a href="/owners#pricing">Pricing</a></li>
+          {% for item in footer_owners_items %}<li>{{ item }}</li>{% endfor %}
         </ul>
       </div>
     </div>
     <div class="footer-bottom">
-      <span>{{ footer_legal }} {% if city %}A local-first directory.{% endif %}</span>
+      <span>© {{ now.year }} {{ city.name if city else '' }} Knows {{ vertical_word }} · A local-first directory{% if city %}.{% endif %}</span>
       <span>Made in {{ city.name if city else 'Miami' }} · Powered by Expertly</span>
     </div>
   </div>

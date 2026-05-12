@@ -80,6 +80,9 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
 
     now = datetime.now(timezone.utc)
 
+    footer_owners_items_raw = await copy.get("footer.owners.items") or ""
+    footer_owners_items = [s.strip() for s in footer_owners_items_raw.split("|") if s.strip()]
+
     return {
         "request": request,
         "tenant": tenant,
@@ -96,7 +99,12 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "footer_about_body": await copy.get("footer.about.body"),
         "footer_business_title": await copy.get("footer.business.title"),
         "footer_business_body": await copy.get("footer.business.body"),
+        "footer_also_in": await copy.get("footer.also_in"),
+        "footer_publication_label": await copy.get("footer.publication_label"),
+        "footer_owners_label": await copy.get("footer.owners.label") or "OWNERS",
+        "footer_owners_items": footer_owners_items,
         "page_featured_disclosure": await copy.get("page.featured_disclosure"),
+        "owners_header_cta": await copy.get("header.owners_cta") or "For Owners",
     }
 
 
@@ -115,26 +123,17 @@ def _build_hero_headline_html(text: str) -> str:
     return f'<em>{html.escape(tail)}</em>'
 
 
-_OWNER_NOUNS = {
-    "beauty": "salon",
-    "wellness": "studio",
-    "health": "practice",
-    "fitness": "gym",
-    "food": "restaurant",
-    "pets": "shop",
-    "home": "service",
-    "events": "venue",
-    "style": "boutique",
-    "real-estate": "agency",
-    "kids": "school",
-    "nightlife": "venue",
-    "travel": "service",
-    "money": "practice",
-    "business": "agency",
-    "law": "firm",
-    "cars": "shop",
-    "boats": "operator",
+_BROWSE_AXIS_LABELS = {
+    "beauty": "SERVICE",
+    "wellness": "SERVICE",
+    "health": "SPECIALTY",
 }
+
+
+def _resolve_by_slug(records: List[Dict[str, Any]], slugs: List[str]) -> List[Dict[str, Any]]:
+    """Return records in the order of the slug list."""
+    by_slug = {r.get("slug"): r for r in records}
+    return [by_slug[s] for s in (slugs or []) if s in by_slug]
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -161,55 +160,150 @@ async def home(request: Request) -> HTMLResponse:
         or await copy.get("home.hero.headline")
 
     all_live = await content_svc.list_businesses(city["_id"], limit=200)
-    featured = [b for b in all_live if (b.get("featured") or {}).get("enabled") or b.get("editors_pick")]
-    if not featured:
-        featured = all_live[:6]
 
-    # Spotlight: pick the neighborhood with the most listings.
+    # Listings count per neighborhood for the "N LISTED" pills.
     nb_counts: Dict[str, int] = {}
     for b in all_live:
         for n in b.get("neighborhood_slugs") or []:
             nb_counts[n] = nb_counts.get(n, 0) + 1
-    spotlight_slug = max(nb_counts, key=nb_counts.get) if nb_counts else None
+
+    # Editor's Picks + trending list — both pulled from the city doc when
+    # configured, falling back to derived order when not.
+    editor_picks = [b for b in all_live if b.get("editors_pick")][:8]
+
+    trending_slugs = city.get("trending_business_slugs") or []
+    trending = _resolve_by_slug(all_live, trending_slugs)[:8]
+    if not trending:
+        trending = [b for b in all_live if not b.get("editors_pick")][:8]
+
+    # Spotlight (city-configured first, then most-listed fallback).
+    spotlight_slug = city.get("spotlight_neighborhood_slug") or (
+        max(nb_counts, key=nb_counts.get) if nb_counts else None
+    )
     spotlight_nb = None
     spotlight_businesses: List[Dict[str, Any]] = []
     if spotlight_slug:
         spotlight_nb = await content_svc.get_neighborhood(city["_id"], spotlight_slug)
-        spotlight_businesses = [
-            b for b in all_live if spotlight_slug in (b.get("neighborhood_slugs") or [])
-        ][:3]
+        biz_slugs = city.get("spotlight_business_slugs") or []
+        spotlight_businesses = _resolve_by_slug(all_live, biz_slugs)
+        if not spotlight_businesses:
+            spotlight_businesses = [
+                b for b in all_live if spotlight_slug in (b.get("neighborhood_slugs") or [])
+            ][:3]
 
-    # Two-column "look at these neighborhoods" — pick the next two with listings
+    # Two-column neighborhood mini-lists (city-configured first).
     columns: List[Dict[str, Any]] = []
-    for slug, _ in sorted(nb_counts.items(), key=lambda kv: -kv[1])[1:3]:
-        nb = await content_svc.get_neighborhood(city["_id"], slug)
-        if not nb:
-            continue
-        nb_biz = [b for b in all_live if slug in (b.get("neighborhood_slugs") or [])][:3]
-        columns.append({"name": nb["name"], "slug": slug, "businesses": nb_biz})
+    configured_cols = city.get("two_column_neighborhoods") or []
+    if configured_cols:
+        for col in configured_cols:
+            nb = await content_svc.get_neighborhood(city["_id"], col["slug"])
+            if not nb:
+                continue
+            nb_biz = _resolve_by_slug(all_live, col.get("business_slugs") or [])
+            columns.append({"name": nb["name"], "slug": col["slug"], "businesses": nb_biz})
+    else:
+        # Fallback — next two neighborhoods after the spotlight.
+        for slug, _ in sorted(nb_counts.items(), key=lambda kv: -kv[1])[1:3]:
+            nb = await content_svc.get_neighborhood(city["_id"], slug)
+            if not nb:
+                continue
+            nb_biz = [b for b in all_live if slug in (b.get("neighborhood_slugs") or [])][:3]
+            columns.append({"name": nb["name"], "slug": slug, "businesses": nb_biz})
+
+    # Search-suggestion chips ("SEARCHED TONIGHT") — keep on the city doc.
+    search_chips = city.get("search_chips") or []
+
+    # Owner CTA mini-card sample
+    owner_card_slug = city.get("owners_card_business_slug")
+    owners_card: Optional[Dict[str, Any]] = None
+    if owner_card_slug:
+        owners_card = next(
+            (b for b in all_live if b.get("slug") == owner_card_slug), None
+        )
+    if not owners_card:
+        owners_card = (
+            [b for b in all_live if (b.get("featured") or {}).get("enabled")] or all_live
+        )[:1]
+        owners_card = owners_card[0] if owners_card else None
+
+    # Hero featured photo (first editor's pick or first business).
+    hero_featured = editor_picks[0] if editor_picks else (all_live[0] if all_live else None)
+
+    # Lookup tables used inline by the template for category / neighborhood names.
+    category_names = {c["slug"]: c["name"] for c in ctx["nav_categories"]}
+    neighborhood_names = {n["slug"]: n["name"] for n in ctx["nav_neighborhoods"]}
 
     network_slug = tenant.network.get("slug", "")
-    owner_noun = _OWNER_NOUNS.get(network_slug, "business")
-    owner_card_sample = featured[0] if featured else (all_live[0] if all_live else None)
+    browse_axis_label = _BROWSE_AXIS_LABELS.get(network_slug, "CATEGORY")
 
     ctx.update(
         {
+            # Hero
             "hero_eyebrow": await copy.get(
                 "home.hero.eyebrow",
                 extra={"vertical_word": _vertical_word(tenant.network)},
             ),
             "hero_headline_html": _build_hero_headline_html(headline_text),
             "hero_subhead": city.get("hero_description") or await copy.get("home.hero.subhead"),
-            "hero_featured": featured[0] if featured else None,
-            "featured_businesses": featured[:8],
+            "hero_featured": hero_featured,
+            "search_chips": search_chips,
+            # Stats
+            "stat_count_listings": (
+                await copy.get("home.stat.listings.count") or str(len(all_live))
+            ),
+            "stat_label_listings": (
+                await copy.get("home.stat.listings.label") or "LISTINGS"
+            ),
+            "stat_count_neighborhoods": (
+                await copy.get("home.stat.neighborhoods.count")
+                or str(len(ctx["nav_neighborhoods"]))
+            ),
+            "stat_count_editor_picks": (
+                await copy.get("home.stat.editor_picks.count") or str(len(editor_picks))
+            ),
+            "stat_label_owners": (
+                await copy.get("home.stat.owners.label") or "FOR OWNERS"
+            ),
+            # Browse / map
+            "browse_axis_label": browse_axis_label,
+            "neighborhood_counts": nb_counts,
+            # Editor's Picks + trending
+            "editor_picks": editor_picks,
+            "trending_businesses": trending,
+            # Spotlight
             "spotlight_neighborhood": spotlight_nb,
             "spotlight_businesses": spotlight_businesses,
+            "spotlight_lead": (
+                await copy.get("home.spotlight.lead") or "Neighborhood spotlight —"
+            ),
+            "spotlight_description": (
+                await copy.get("home.spotlight.description")
+            ),
+            # Two-column mini-lists
             "neighborhood_columns": columns,
-            "owner_noun": owner_noun,
-            "owner_card_sample": owner_card_sample,
-            "stat_listings": len(all_live),
-            "stat_neighborhoods": len([n for n in nb_counts]) or len(ctx["nav_neighborhoods"]),
-            "stat_editor_picks": sum(1 for b in all_live if b.get("editors_pick")),
+            "category_names": category_names,
+            "neighborhood_names": neighborhood_names,
+            # Owner CTA
+            "owners_eyebrow": (
+                await copy.get("home.owners.eyebrow") or "FOR OWNERS"
+            ),
+            "owners_headline": (
+                await copy.get("home.owners.headline") or "Own a business in this city?"
+            ),
+            "owners_italic": (
+                await copy.get("home.owners.italic") or "Your listing's already here."
+            ),
+            "owners_body": (
+                await copy.get("home.owners.body") or ""
+            ),
+            "owners_cta": (
+                await copy.get("home.owners.cta") or "Claim your listing · Free"
+            ),
+            "owners_card": owners_card,
+            "owners_card_action": (
+                await copy.get("home.owners.card_action") or ""
+            ),
+            # SEO
             "seo_title": city.get("seo_title") or f"{tenant.network.get('name')} {city.get('name')}",
             "meta_description": city.get("meta_description") or city.get("hero_description"),
         }
