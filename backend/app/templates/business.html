@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block head_extra %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "{{ business.schema_org_type or 'LocalBusiness' }}",
+  "name": "{{ business.name }}",
+  {% if business.address.street %}"address": {
+    "@type": "PostalAddress",
+    "streetAddress": "{{ business.address.street }}",
+    "addressLocality": "{{ business.address.city or city.name }}",
+    "addressRegion": "{{ business.address.state or '' }}",
+    "postalCode": "{{ business.address.postal_code or '' }}",
+    "addressCountry": "{{ business.address.country or 'US' }}"
+  },{% endif %}
+  {% if business.phone %}"telephone": "{{ business.phone }}",{% endif %}
+  {% if business.website %}"url": "{{ business.website }}",{% endif %}
+  "areaServed": "{{ city.name }}"
+}
+</script>
+{% endblock %}
+{% block content %}
+<article class="business">
+  {% set hero = (business.photos|selectattr('is_hero')|list|first) or (business.photos|first if business.photos else none) %}
+  <section class="business-hero {% if hero %}business-hero--with-image{% endif %}">
+    {% if hero %}<img class="business-hero-image" src="{{ hero.url }}" alt="{{ hero.alt or business.name }}">{% endif %}
+    <div class="container business-hero-inner">
+      <p class="eyebrow">
+        {% for slug in business.category_slugs[:2] %}
+          <a href="/c/{{ slug }}" class="muted-link">{{ slug|replace('-', ' ')|title }}</a>{% if not loop.last %} · {% endif %}
+        {% endfor %}
+        {% if business.neighborhood_slugs %}
+          · <a href="/n/{{ business.neighborhood_slugs[0] }}" class="muted-link">{{ business.neighborhood_slugs[0]|replace('-', ' ')|title }}</a>
+        {% endif %}
+      </p>
+      <h1 class="display">{{ business.name }}</h1>
+      <div class="badges">
+        {% if business.editors_pick %}<span class="badge badge--pick">{{ badge_editors_pick }}</span>{% endif %}
+        {% if business.featured.enabled %}<span class="badge badge--featured">{{ badge_featured }}</span>{% endif %}
+        {% if business.claim_status == 'verified' %}<span class="badge badge--verified">{{ badge_verified }}</span>
+        {% elif business.claim_status == 'claimed' %}<span class="badge badge--claimed">{{ badge_claimed }}</span>{% endif %}
+        {% if business.price_cues %}<span class="badge badge--price">{{ business.price_cues }}</span>{% endif %}
+      </div>
+      <div class="cta-row">
+        {% if business.booking_url %}<a class="cta cta--primary" href="{{ business.booking_url }}" target="_blank" rel="noopener nofollow">{{ cta_book }}</a>{% endif %}
+        {% if business.phone %}<a class="cta" href="tel:{{ business.phone }}">{{ cta_call }}</a>{% endif %}
+        {% if business.website %}<a class="cta" href="{{ business.website }}" target="_blank" rel="noopener nofollow">{{ cta_website }}</a>{% endif %}
+        {% if business.address.street %}<a class="cta" href="https://www.google.com/maps/search/?api=1&query={{ (business.address.street ~ ', ' ~ (business.address.city or city.name)) }}" target="_blank" rel="noopener nofollow">{{ cta_directions }}</a>{% endif %}
+      </div>
+      {% if business.short_description %}<p class="lede">{{ business.short_description }}</p>{% endif %}
+    </div>
+  </section>
+
+  <div class="container business-body">
+    <div class="business-main">
+      {% if business.known_for %}
+      <section class="business-section">
+        <h2>{{ section_known_for }}</h2>
+        <p>{{ business.known_for }}</p>
+      </section>
+      {% endif %}
+      {% if business.best_for %}
+      <section class="business-section">
+        <h2>{{ section_best_for }}</h2>
+        <p>{{ business.best_for }}</p>
+      </section>
+      {% endif %}
+      {% if business.before_booking_notes %}
+      <section class="business-section">
+        <h2>{{ section_before_booking }}</h2>
+        <p>{{ business.before_booking_notes }}</p>
+      </section>
+      {% endif %}
+      {% if business.services %}
+      <section class="business-section">
+        <h2>{{ section_services }}</h2>
+        <ul class="service-list">
+          {% for s in business.services %}
+            <li>
+              <strong>{{ s.name }}</strong>
+              {% if s.description %}<p class="muted small">{{ s.description }}</p>{% endif %}
+              <span class="service-meta">
+                {% if s.price_from %}From ${{ s.price_from|int }}{% endif %}
+                {% if s.duration_min %} · {{ s.duration_min }} min{% endif %}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+      {% if business.photos|length > 1 %}
+      <section class="business-section">
+        <h2>Photos</h2>
+        <div class="gallery">
+          {% for p in business.photos %}
+            <figure><img src="{{ p.url }}" alt="{{ p.alt or business.name }}"></figure>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+      {% if business.review_themes_summary %}
+      <section class="business-section">
+        <h2>What people say</h2>
+        <p>{{ business.review_themes_summary }}</p>
+      </section>
+      {% endif %}
+    </div>
+    <aside class="business-aside">
+      <section class="card">
+        <h3>{{ section_contact }}</h3>
+        <dl>
+          {% if business.address.street %}
+            <dt>Address</dt>
+            <dd>{{ business.address.street }}{% if business.address.city %}<br>{{ business.address.city }}{% if business.address.state %}, {{ business.address.state }}{% endif %}{% endif %}</dd>
+          {% endif %}
+          {% if business.phone %}<dt>Phone</dt><dd><a href="tel:{{ business.phone }}">{{ business.phone }}</a></dd>{% endif %}
+          {% if business.website %}<dt>Website</dt><dd><a href="{{ business.website }}" target="_blank" rel="noopener nofollow">{{ business.website|replace('https://', '')|replace('http://', '') }}</a></dd>{% endif %}
+          {% if business.socials.instagram %}<dt>Instagram</dt><dd><a href="https://instagram.com/{{ business.socials.instagram|replace('@','') }}" target="_blank" rel="noopener nofollow">@{{ business.socials.instagram|replace('@','') }}</a></dd>{% endif %}
+        </dl>
+      </section>
+      {% if business.hours %}
+      <section class="card">
+        <h3>{{ section_hours }}</h3>
+        <ul class="hours">
+          {% for h in business.hours %}
+            <li><span>{{ h.day|capitalize }}</span><span>{% if h.closed %}Closed{% else %}{{ h.opens_at }} – {{ h.closes_at }}{% endif %}</span></li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+      {% if business.claim_status in ['unclaimed', 'pending'] %}
+      <section class="card card--claim">
+        <h3>{{ claim_title }}</h3>
+        <p>{{ claim_body }}</p>
+        <a class="cta cta--primary" href="/claim/{{ business.slug }}">{{ claim_cta }}</a>
+      </section>
+      {% endif %}
+    </aside>
+  </div>
+
+  {% if nearby_businesses %}
+  <section class="section section--muted">
+    <div class="container">
+      <h2 class="section-title">{{ section_nearby }}</h2>
+      <div class="card-grid">
+        {% for b in nearby_businesses %}
+          {% include "partials/business_card.html" %}
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+</article>
+{% endblock %}

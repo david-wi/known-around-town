@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero hero--editorial">
+  <div class="container">
+    <p class="eyebrow">{{ network.name }}</p>
+    <h1 class="display">{{ network.tagline or network.name }}</h1>
+    {% if network.description %}<p class="lede">{{ network.description }}</p>{% endif %}
+    <p class="muted small">Pick a city to start.</p>
+  </div>
+</section>
+{% endblock %}

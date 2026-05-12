@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero hero--editorial">
+  <div class="container">
+    <p class="eyebrow">{{ hero_eyebrow }}</p>
+    <h1 class="display">{{ hero_headline }}</h1>
+    {% if hero_subhead %}<p class="lede">{{ hero_subhead }}</p>{% endif %}
+  </div>
+</section>
+
+{% if featured_businesses %}
+<section class="section">
+  <div class="container">
+    <h2 class="section-title">{{ featured_title }}</h2>
+    <div class="card-grid">
+      {% for b in featured_businesses %}
+        {% include "partials/business_card.html" %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if nav_categories %}
+<section class="section section--muted">
+  <div class="container">
+    <h2 class="section-title">{{ categories_title }}</h2>
+    <div class="chip-grid">
+      {% for c in nav_categories %}
+        {% if not c.parent_slug %}
+          <a class="chip" href="/c/{{ c.slug }}">{{ c.name }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if nav_neighborhoods %}
+<section class="section">
+  <div class="container">
+    <h2 class="section-title">{{ neighborhoods_title }}</h2>
+    <div class="chip-grid">
+      {% for n in nav_neighborhoods %}
+        <a class="chip chip--neighborhood" href="/n/{{ n.slug }}">{{ n.name }}</a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if editorial_guides %}
+<section class="section section--muted">
+  <div class="container">
+    <h2 class="section-title">{{ editorial_title }}</h2>
+    <div class="card-grid card-grid--guides">
+      {% for g in editorial_guides %}
+        <a class="guide-card" href="/guides/{{ g.slug }}">
+          {% if g.hero_image_url %}<img src="{{ g.hero_image_url }}" alt="">{% endif %}
+          <h3>{{ g.title }}</h3>
+          {% if g.subtitle %}<p>{{ g.subtitle }}</p>{% endif %}
+          {% if g.published_at %}<p class="small muted">{{ g.published_at|humantime }}</p>{% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

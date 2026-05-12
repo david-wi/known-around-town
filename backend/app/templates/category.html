@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero hero--editorial">
+  <div class="container">
+    <p class="eyebrow">{{ hero_eyebrow }}</p>
+    <h1 class="display">{{ hero_headline }}</h1>
+    {% if hero_subhead %}<p class="lede">{{ hero_subhead }}</p>{% endif %}
+    {% if category.examples %}
+    <p class="muted small">{{ category.examples|join(' · ') }}</p>
+    {% endif %}
+  </div>
+</section>
+
+{% if sub_categories %}
+<section class="section section--muted">
+  <div class="container">
+    <h2 class="section-title">More within {{ category.name }}</h2>
+    <div class="chip-grid">
+      {% for sc in sub_categories %}
+        <a class="chip" href="/c/{{ sc.slug }}">{{ sc.name }}</a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="section">
+  <div class="container">
+    <h2 class="section-title">{{ businesses|length }} {{ category.name|lower }} {% if neighborhood %}in {{ neighborhood.name }}{% else %}across {{ city.name }}{% endif %}</h2>
+    {% if businesses %}
+    <div class="card-grid">
+      {% for b in businesses %}
+        {% include "partials/business_card.html" %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+      <h3>{{ empty_title }}</h3>
+      <p>{{ empty_body }}</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

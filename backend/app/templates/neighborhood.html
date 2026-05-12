@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero hero--editorial">
+  <div class="container">
+    <p class="eyebrow">{{ hero_eyebrow }}</p>
+    <h1 class="display">{{ hero_headline }}</h1>
+    {% if hero_subhead %}<p class="lede">{{ hero_subhead }}</p>{% endif %}
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2 class="section-title">In {{ neighborhood.name }}</h2>
+    {% if businesses %}
+    <div class="card-grid">
+      {% for b in businesses %}
+        {% include "partials/business_card.html" %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+      <h3>We're still building this neighborhood guide.</h3>
+      <p>Check back soon.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ seo_title or (network.name ~ ' — ' ~ city.name) }}{% endblock %}</title>
+  {% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}
+  <meta property="og:title" content="{{ seo_title or (network.name ~ ' — ' ~ (city.name if city else '')) }}">
+  {% if meta_description %}<meta property="og:description" content="{{ meta_description }}">{% endif %}
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <style>
+    :root {
+      --color-primary: {{ network.theme.primary_color or '#0e0e10' }};
+      --color-accent: {{ network.theme.accent_color or '#c89f5b' }};
+      --font-body: {{ network.theme.body_font or 'Inter, system-ui, sans-serif' }};
+      --font-display: {{ network.theme.display_font or 'Playfair Display, Georgia, serif' }};
+    }
+  </style>
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-row">
+    <a class="brand" href="/">
+      <span class="brand-mark">{{ network.name }}</span>
+      {% if city %}<span class="brand-city">{{ city.name }}</span>{% endif %}
+    </a>
+    {% if city %}
+    <nav class="site-nav">
+      {% if nav_categories %}
+      <details class="nav-menu">
+        <summary>Categories</summary>
+        <div class="nav-panel">
+          {% for c in nav_categories %}
+            {% if not c.parent_slug %}
+              <a href="/c/{{ c.slug }}">{{ c.name }}</a>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+      {% if nav_neighborhoods %}
+      <details class="nav-menu">
+        <summary>Neighborhoods</summary>
+        <div class="nav-panel">
+          {% for n in nav_neighborhoods %}
+            <a href="/n/{{ n.slug }}">{{ n.name }}</a>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+      <a href="/guides/" class="nav-link">Guides</a>
+    </nav>
+    {% endif %}
+  </div>
+</header>
+
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div>
+      <h4>{{ footer_about_title }}</h4>
+      <p>{{ footer_about_body }}</p>
+      <p class="small muted">{{ page_featured_disclosure }}</p>
+    </div>
+    <div>
+      <h4>{{ footer_business_title }}</h4>
+      <p>{{ footer_business_body }}</p>
+    </div>
+    {% if nav_categories %}
+    <div>
+      <h4>Browse</h4>
+      <ul class="link-list">
+        {% for c in nav_categories[:8] %}
+          {% if not c.parent_slug %}
+            <li><a href="/c/{{ c.slug }}">{{ c.name }}</a></li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+  <div class="container footer-legal">{{ footer_legal }}</div>
+</footer>
+</body>
+</html>

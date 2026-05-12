@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<article class="guide">
+  <header class="guide-header">
+    {% if guide.hero_image_url %}<img class="guide-hero" src="{{ guide.hero_image_url }}" alt="{{ guide.title }}">{% endif %}
+    <div class="container">
+      <p class="eyebrow">{{ network.name }} {{ city.name }} · Editorial</p>
+      <h1 class="display">{{ guide.title }}</h1>
+      {% if guide.subtitle %}<p class="lede">{{ guide.subtitle }}</p>{% endif %}
+      <p class="small muted">
+        {% if guide.author %}{{ guide.author }} ·{% endif %}
+        {% if guide.published_at %}{{ guide.published_at|humantime }}{% endif %}
+      </p>
+    </div>
+  </header>
+
+  <div class="container guide-body markdown">
+    {{ guide.body_markdown|markdown|safe }}
+  </div>
+
+  {% if featured_businesses_in_guide %}
+  <section class="section section--muted">
+    <div class="container">
+      <h2 class="section-title">Featured in this guide</h2>
+      <div class="card-grid">
+        {% for b in featured_businesses_in_guide %}
+          {% include "partials/business_card.html" %}
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+</article>
+{% endblock %}
