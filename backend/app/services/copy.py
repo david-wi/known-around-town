@@ -92,7 +92,7 @@ async def get_copy(
     neighborhood_slug: Optional[str] = None,
     locale: str = "en-US",
     fmt: Optional[Dict[str, str]] = None,
-) -> str:
+) -> Optional[str]:
     db = get_db()
     now = datetime.now(timezone.utc)
 
@@ -114,11 +114,19 @@ async def get_copy(
         if doc and (doc.get("active_until") is None or doc["active_until"] >= now):
             return _format(doc["value"], fmt)
 
-    default = DEFAULTS.get(key, key)
+    # WHY: returning None (rather than the key string) lets callers use the
+    # idiomatic `await copy.get(key) or "fallback"` pattern. Returning the key
+    # string previously caused literal "header.owners_cta" text to render when
+    # neither a copy block nor a DEFAULTS entry existed.
+    default = DEFAULTS.get(key)
+    if default is None:
+        return None
     return _format(default, fmt)
 
 
-def _format(template: str, fmt: Optional[Dict[str, str]]) -> str:
+def _format(template: Optional[str], fmt: Optional[Dict[str, str]]) -> Optional[str]:
+    if template is None:
+        return None
     if not fmt:
         return template
     try:
@@ -155,7 +163,7 @@ class CopyResolver:
         neighborhood_slug: Optional[str] = None,
         neighborhood_name: Optional[str] = None,
         extra: Optional[Dict[str, str]] = None,
-    ) -> str:
+    ) -> Optional[str]:
         fmt = {
             "network_name": self.network_name,
             "city_name": self.city_name,

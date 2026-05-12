@@ -1,22 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-{# Top eyebrow with section tabs + issue label #}
 <section class="hero">
-  <div class="hero-top">
-    <div class="hero-top-tags">
-      {% for c in nav_categories[:6] %}{% if not c.parent_slug %}
-        <a href="/c/{{ c.slug }}">{{ c.name }}</a>
-      {% endif %}{% endfor %}
-    </div>
-    <div class="hero-top-issue">{{ hero_eyebrow }}</div>
-  </div>
-
   <div class="hero-grid">
     <div class="hero-text">
+      <p class="hero-issue">{{ hero_eyebrow }}</p>
       <h1 class="hero-display">{{ hero_headline_html|safe }}</h1>
       <p class="hero-subhead">{{ hero_subhead }}</p>
       <form class="search-bar" action="/search" method="get">
-        <input name="q" type="search" placeholder="">
+        <input name="q" type="search" placeholder="{{ hero_search_placeholder }}">
         <button type="submit">FIND</button>
       </form>
       {% if search_chips %}
@@ -51,14 +42,14 @@
   </div>
 </section>
 
-{# Browse by category + neighborhood #}
+{# THE MAP — categories + neighborhood cards #}
 <section class="section section--cream">
   <div class="container">
     <p class="section-eyebrow">THE MAP</p>
-    <h2 class="section-title">Every {{ city.name }} neighborhood<br><em>has its own {{ vertical_word|lower }} culture.</em></h2>
+    <h2 class="section-title">Every {{ city.name }} neighborhood<br><em>has its own {{ map_culture_word }} culture.</em></h2>
     <div class="browse-section">
       <div class="browse-side">
-        <h4>BY {{ browse_axis_label }}</h4>
+        <h4>{{ browse_axis_label }}</h4>
         <ol class="browse-numbered">
           {% for c in nav_categories %}{% if not c.parent_slug %}
             <li>
@@ -71,18 +62,20 @@
             </li>
           {% endif %}{% endfor %}
         </ol>
-        <h4 style="margin-top: 36px;">BY NEIGHBORHOOD</h4>
       </div>
-      <div class="browse-grid">
-        {% for n in nav_neighborhoods %}
-          <a href="/n/{{ n.slug }}" class="neighborhood-card neighborhood-card--empty">
-            <span class="neighborhood-card-count">{{ neighborhood_counts.get(n.slug, 0) }} LISTED</span>
-            <div class="neighborhood-card-overlay">
-              <span class="neighborhood-card-name">{{ n.name }}</span>
-              {% if n.description %}<span class="neighborhood-card-vibe">{{ n.description }}</span>{% endif %}
-            </div>
-          </a>
-        {% endfor %}
+      <div class="browse-grid-wrap">
+        <h4 class="browse-grid-label">BY NEIGHBORHOOD</h4>
+        <div class="browse-grid">
+          {% for n in nav_neighborhoods %}
+            <a href="/n/{{ n.slug }}" class="neighborhood-card neighborhood-card--empty">
+              <span class="neighborhood-card-count">{{ n.listed_count if n.listed_count is not none else 0 }} LISTED</span>
+              <div class="neighborhood-card-overlay">
+                <span class="neighborhood-card-name">{{ n.name }}</span>
+                {% if n.description %}<span class="neighborhood-card-vibe">{{ n.description }}</span>{% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
       </div>
     </div>
   </div>
@@ -119,8 +112,8 @@
 <section class="section section--cream" style="padding-top: 0;">
   <div class="spotlight">
     <div>
-      <p class="eyebrow">NEIGHBORHOOD SPOTLIGHT</p>
-      <h2>{{ spotlight_lead }} <em>{{ spotlight_neighborhood.name }}</em></h2>
+      <p class="eyebrow">{{ spotlight_eyebrow }}</p>
+      <h2>{{ spotlight_lead_a }}<br>{{ spotlight_lead_b }} <em>{{ spotlight_neighborhood.name }}</em></h2>
       <p style="color: #c7c0b0; max-width: 36ch; margin: 0 0 18px;">{{ spotlight_description }}</p>
       <a href="/n/{{ spotlight_neighborhood.slug }}" class="spotlight-link">See all of {{ spotlight_neighborhood.name }} →</a>
     </div>
@@ -195,9 +188,9 @@
         </div>
       </div>
       <div class="owner-card-stats">
-        <div class="row"><span>Profile views this week</span><b>3,128</b></div>
-        <div class="row"><span>Phone clicks</span><b>112</b></div>
-        <div class="row"><span>New bookings (Voice)</span><b class="plus">+31</b></div>
+        <div class="row"><span>Profile views this week</span><b>{{ owners_card_views }}</b></div>
+        <div class="row"><span>Phone clicks</span><b>{{ owners_card_calls }}</b></div>
+        <div class="row"><span>{{ owners_card_bookings_label }}</span><b class="plus">{{ owners_card_bookings }}</b></div>
       </div>
       <div class="owner-card-suggested">
         <b>Suggested action</b>
