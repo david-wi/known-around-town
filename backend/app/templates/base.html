@@ -14,7 +14,7 @@
   {% block head_extra %}{% endblock %}
 </head>
 <body>
-<header class="site-header">
+<header class="site-header{% if is_home %} site-header--over-hero{% endif %}">
   <div class="header-row">
     <a class="brand" href="/">{{ city.name if city else '' }}{% if city %} {% endif %}<span class="brand-knows">Knows</span> {{ vertical_word }}</a>
     {% if city %}

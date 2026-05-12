@@ -239,6 +239,7 @@ async def home(request: Request) -> HTMLResponse:
             "hero_featured": hero_featured,
             "hero_photo_url": city.get("hero_photo_url"),
             "search_chips": search_chips,
+            "is_home": True,
             # Stats
             "stat_count_listings": (
                 await copy.get("home.stat.listings.count") or str(len(all_live))

@@ -1,28 +1,34 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero">
-  <div class="hero-grid">
-    <div class="hero-text">
-      <p class="hero-issue">{{ hero_eyebrow }}</p>
-      <h1 class="hero-display">{{ hero_headline_html|safe }}</h1>
+<section class="hero hero--fullbleed">
+  {% if hero_photo_url %}<div class="hero-photo" style="background-image: url('{{ hero_photo_url }}');"></div>{% endif %}
+  <div class="hero-overlay hero-overlay--vertical"></div>
+  <div class="hero-overlay hero-overlay--horizontal"></div>
+  <div class="hero-content">
+    <div class="hero-issue">
+      <span class="hero-issue-line"></span>
+      <span class="hero-issue-text">{{ hero_eyebrow }}</span>
+      <span class="hero-issue-line hero-issue-line--right"></span>
+    </div>
+    <h1 class="hero-display">{{ hero_headline_html|safe }}</h1>
+    <div class="hero-subhead-row">
+      <span class="hero-subhead-line"></span>
       <p class="hero-subhead">{{ hero_subhead }}</p>
-      <form class="search-bar" action="/search" method="get">
-        <input name="q" type="search" placeholder="{{ hero_search_placeholder }}">
-        <button type="submit">FIND</button>
-      </form>
-      {% if search_chips %}
-      <div class="search-chips">
-        <span class="search-chips-label">SEARCHED TONIGHT</span>
-        {% for chip in search_chips %}<a href="/search?q={{ chip|urlencode }}" class="search-chip">{{ chip }}</a>{% endfor %}
-      </div>
-      {% endif %}
     </div>
-    <div class="hero-image{% if not hero_photo_url %} hero-image--placeholder{% endif %}">
-      {% if hero_photo_url %}<img src="{{ hero_photo_url }}" alt="">
-      {% elif hero_featured and hero_featured.photos %}<img src="{{ hero_featured.photos[0].url }}" alt="">{% endif %}
+    <form class="search-bar" action="/search" method="get">
+      <input name="q" type="search" placeholder="{{ hero_search_placeholder }}">
+      <button type="submit">FIND</button>
+    </form>
+    {% if search_chips %}
+    <div class="search-chips">
+      <span class="search-chips-label">SEARCHED TONIGHT</span>
+      {% for chip in search_chips %}<a href="/search?q={{ chip|urlencode }}" class="search-chip">{{ chip }}</a>{% endfor %}
     </div>
+    {% endif %}
   </div>
+</section>
 
+<section class="hero-stats-section">
   <div class="hero-stats">
     <div class="hero-stat">
       <div class="hero-stat-number">{{ stat_count_listings }}</div>

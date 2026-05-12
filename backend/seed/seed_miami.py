@@ -300,7 +300,7 @@ HEALTH_BUSINESSES = [
 NETWORK_CITY_CONFIG = {
     "beauty": {
         "tagline": "Miami's best-kept beauty addresses.",
-        "headline_html": "Miami's <em>best-kept</em> beauty addresses.",
+        "headline_html": "Miami's<br><em>best-kept</em><br>beauty addresses.",
         "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
         "hero_subhead": "An index of the stylists, colorists, esthetes, and barbers locals actually book — neighborhood by neighborhood.",
         "search_placeholder": "Balayage in Wynwood. Gel manicure in Brickell. Quiet barbershop near Coral Gables.",
@@ -360,7 +360,7 @@ NETWORK_CITY_CONFIG = {
     },
     "wellness": {
         "tagline": "Where Miami recovers, resets, and breathes.",
-        "headline_html": "Where Miami <em>recovers, resets, and breathes.</em>",
+        "headline_html": "Where Miami<br><em>recovers, resets, and breathes.</em>",
         "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
         "hero_subhead": "An index of the spas, saunas, recovery rooms, yoga studios, and IV lounges Miami locals actually book — between training blocks, after long flights, and before the week gets loud.",
         "search_placeholder": "Infrared sauna in Wynwood. Sunrise yoga in Edgewater. IV drip in Brickell.",
@@ -417,7 +417,7 @@ NETWORK_CITY_CONFIG = {
     },
     "health": {
         "tagline": "Miami's most-trusted doctors, dentists, and clinics.",
-        "headline_html": "Miami's <em>most-trusted</em> doctors, dentists, and clinics.",
+        "headline_html": "Miami's<br><em>most-trusted</em><br>doctors, dentists, and clinics.",
         "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
         "hero_subhead": "A neutral, locally curated guide to the longevity clinics, dental practices, mental health groups, fertility specialists, and concierge primary-care doctors Miami families and professionals trust.",
         "search_placeholder": "Concierge doctor in Brickell. Invisalign in Coral Gables. Couples therapist in Wynwood.",
