@@ -237,6 +237,7 @@ async def home(request: Request) -> HTMLResponse:
                 await copy.get("home.hero.search_placeholder") or ""
             ),
             "hero_featured": hero_featured,
+            "hero_photo_url": city.get("hero_photo_url"),
             "search_chips": search_chips,
             # Stats
             "stat_count_listings": (

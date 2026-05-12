@@ -17,8 +17,9 @@
       </div>
       {% endif %}
     </div>
-    <div class="hero-image hero-image--placeholder">
-      {% if hero_featured and hero_featured.photos %}<img src="{{ hero_featured.photos[0].url }}" alt="">{% endif %}
+    <div class="hero-image{% if not hero_photo_url %} hero-image--placeholder{% endif %}">
+      {% if hero_photo_url %}<img src="{{ hero_photo_url }}" alt="">
+      {% elif hero_featured and hero_featured.photos %}<img src="{{ hero_featured.photos[0].url }}" alt="">{% endif %}
     </div>
   </div>
 
@@ -67,7 +68,8 @@
         <h4 class="browse-grid-label">BY NEIGHBORHOOD</h4>
         <div class="browse-grid">
           {% for n in nav_neighborhoods %}
-            <a href="/n/{{ n.slug }}" class="neighborhood-card neighborhood-card--empty">
+            <a href="/n/{{ n.slug }}" class="neighborhood-card{% if not n.photo_url %} neighborhood-card--empty{% endif %}">
+              {% if n.photo_url %}<div class="neighborhood-card-photo" style="background-image: url('{{ n.photo_url }}');"></div>{% endif %}
               <span class="neighborhood-card-count">{{ n.listed_count if n.listed_count is not none else 0 }} LISTED</span>
               <div class="neighborhood-card-overlay">
                 <span class="neighborhood-card-name">{{ n.name }}</span>
@@ -120,7 +122,8 @@
     <div class="spotlight-cards">
       {% for b in spotlight_businesses %}
         <a class="spotlight-card" href="/b/{{ b.slug }}">
-          <div style="width:64px;height:64px;border-radius:6px;background:#2a2420;flex:0 0 64px;"></div>
+          {% if b.photos and b.photos[0].url %}<img src="{{ b.photos[0].url }}" alt="">
+          {% else %}<div class="spotlight-card-thumb-empty"></div>{% endif %}
           <div class="spotlight-card-body">
             <div class="spotlight-card-name">{{ b.name }}{% if b.editors_pick %} <span class="spotlight-card-pin">★ EDITOR'S PICK</span>{% endif %}</div>
             <p class="spotlight-card-desc">{{ b.short_description or b.known_for or '' }}</p>
@@ -142,7 +145,8 @@
           <h3>{{ col.name }}</h3>
           {% for b in col.businesses %}
             <a class="mini-biz" href="/b/{{ b.slug }}">
-              <div style="width:56px;height:56px;border-radius:6px;background:#2a2420;flex:0 0 56px;"></div>
+              {% if b.photos and b.photos[0].url %}<img src="{{ b.photos[0].url }}" alt="">
+              {% else %}<div class="mini-biz-thumb-empty"></div>{% endif %}
               <div class="mini-biz-body">
                 <div class="mini-biz-name">{{ b.name }}</div>
                 <div class="mini-biz-meta">

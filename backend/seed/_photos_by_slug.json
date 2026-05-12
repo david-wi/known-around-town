@@ -1,0 +1,78 @@
+{
+  "beauty": {
+    "hero": "https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=2400&q=90&auto=format&fit=crop",
+    "neighborhoods": {
+      "wynwood": "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1600&q=80&auto=format&fit=crop",
+      "brickell": "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=1600&q=80&auto=format&fit=crop",
+      "south-beach": "https://images.unsplash.com/photo-1583241800698-e8ab01830a07?w=1600&q=80&auto=format&fit=crop",
+      "coral-gables": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1600&q=80&auto=format&fit=crop",
+      "design-district": "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=1600&q=80&auto=format&fit=crop",
+      "edgewater": "https://images.unsplash.com/photo-1487070183336-b863922373d4?w=1600&q=80&auto=format&fit=crop",
+      "coconut-grove": "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=1600&q=80&auto=format&fit=crop",
+      "little-havana": "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=1600&q=80&auto=format&fit=crop",
+      "sunny-isles-beach": "https://static.tildacdn.net/tild6434-3666-4630-a336-616137663538/photo.png",
+      "aventura": "https://images.unsplash.com/photo-1556228852-80b6e5eeff06?w=1600&q=80&auto=format&fit=crop",
+      "bal-harbour": "https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=1600&q=80&auto=format&fit=crop"
+    },
+    "businesses": {
+      "beauty-bar-sunny": "https://static.tildacdn.net/tild6434-3666-4630-a336-616137663538/photo.png",
+      "palmera-hair-house": "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1600&q=80&auto=format&fit=crop",
+      "isla-nail-society": "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=1600&q=80&auto=format&fit=crop",
+      "casa-luminara-spa": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1600&q=80&auto=format&fit=crop",
+      "el-rey-barberia": "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=1600&q=80&auto=format&fit=crop",
+      "flutter-lash-lab": "https://images.unsplash.com/photo-1583241800698-e8ab01830a07?w=1600&q=80&auto=format&fit=crop",
+      "orchid-med-spa": "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=1600&q=80&auto=format&fit=crop",
+      "luma-makeup-studio": "https://images.unsplash.com/photo-1487070183336-b863922373d4?w=1600&q=80&auto=format&fit=crop",
+      "wynwood-fades": "https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=1600&q=80&auto=format&fit=crop"
+    }
+  },
+  "wellness": {
+    "hero": "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=2400&q=90&auto=format&fit=crop",
+    "neighborhoods": {
+      "wynwood": "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=1600&q=80&auto=format&fit=crop",
+      "brickell": "https://images.unsplash.com/photo-1612277795421-9bc7706a4a34?w=1600&q=80&auto=format&fit=crop",
+      "south-beach": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1600&q=80&auto=format&fit=crop",
+      "coral-gables": "https://images.unsplash.com/photo-1591343395082-e120087004b4?w=1600&q=80&auto=format&fit=crop",
+      "design-district": "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1600&q=80&auto=format&fit=crop",
+      "edgewater": "https://images.unsplash.com/photo-1545389336-cf090694435e?w=1600&q=80&auto=format&fit=crop",
+      "coconut-grove": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=1600&q=80&auto=format&fit=crop",
+      "aventura": "https://images.unsplash.com/photo-1571019613540-996a69f4f59a?w=1600&q=80&auto=format&fit=crop",
+      "key-biscayne": "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=1600&q=80&auto=format&fit=crop"
+    },
+    "businesses": {
+      "salt-stone-recovery": "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=1600&q=80&auto=format&fit=crop",
+      "breathe-yoga-edgewater": "https://images.unsplash.com/photo-1545389336-cf090694435e?w=1600&q=80&auto=format&fit=crop",
+      "oceanic-day-spa": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1600&q=80&auto=format&fit=crop",
+      "glow-iv-brickell": "https://images.unsplash.com/photo-1612277795421-9bc7706a4a34?w=1600&q=80&auto=format&fit=crop",
+      "pulse-cryo": "https://images.unsplash.com/photo-1571019613540-996a69f4f59a?w=1600&q=80&auto=format&fit=crop",
+      "green-roots-nutrition": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=1600&q=80&auto=format&fit=crop",
+      "house-of-acupuncture": "https://images.unsplash.com/photo-1591343395082-e120087004b4?w=1600&q=80&auto=format&fit=crop",
+      "reset-retreats-miami": "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=1600&q=80&auto=format&fit=crop",
+      "sweat-haus-wynwood": "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1600&q=80&auto=format&fit=crop"
+    }
+  },
+  "health": {
+    "hero": "https://images.unsplash.com/photo-1666214280391-8ff5bd3c0bf0?w=2400&q=90&auto=format&fit=crop",
+    "neighborhoods": {
+      "wynwood": "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=1600&q=80&auto=format&fit=crop",
+      "brickell": "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=1600&q=80&auto=format&fit=crop",
+      "south-beach": "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1600&q=80&auto=format&fit=crop",
+      "coral-gables": "https://images.unsplash.com/photo-1606811971618-4486d14f3f99?w=1600&q=80&auto=format&fit=crop",
+      "design-district": "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=1600&q=80&auto=format&fit=crop",
+      "edgewater": "https://images.unsplash.com/photo-1666214280165-bbd66c0fd8e3?w=1600&q=80&auto=format&fit=crop",
+      "aventura": "https://images.unsplash.com/photo-1666214280391-8ff5bd3c0bf0?w=1600&q=80&auto=format&fit=crop",
+      "bal-harbour": "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=1600&q=80&auto=format&fit=crop"
+    },
+    "businesses": {
+      "biscayne-longevity-medicine": "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=1600&q=80&auto=format&fit=crop",
+      "gables-smile-studio": "https://images.unsplash.com/photo-1606811971618-4486d14f3f99?w=1600&q=80&auto=format&fit=crop",
+      "design-district-aesthetics": "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=1600&q=80&auto=format&fit=crop",
+      "wynwood-mental-health-collective": "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=1600&q=80&auto=format&fit=crop",
+      "south-beach-physical-therapy": "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1600&q=80&auto=format&fit=crop",
+      "aventura-concierge-md": "https://images.unsplash.com/photo-1666214280391-8ff5bd3c0bf0?w=1600&q=80&auto=format&fit=crop",
+      "sunshine-fertility-center": "https://images.unsplash.com/photo-1631815588090-d4bfec5b1ccb?w=1600&q=80&auto=format&fit=crop",
+      "edgewater-metabolic-clinic": "https://images.unsplash.com/photo-1666214280165-bbd66c0fd8e3?w=1600&q=80&auto=format&fit=crop",
+      "brickell-direct-primary-care": "https://images.unsplash.com/photo-1666214277657-e9c1c2456cee?w=1600&q=80&auto=format&fit=crop"
+    }
+  }
+}
