@@ -1,69 +1,197 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero hero--editorial">
-  <div class="container">
-    <p class="eyebrow">{{ hero_eyebrow }}</p>
-    <h1 class="display">{{ hero_headline }}</h1>
-    {% if hero_subhead %}<p class="lede">{{ hero_subhead }}</p>{% endif %}
+{# ---- Top eyebrow strip (brand + section tabs + issue label) ---- #}
+<section class="hero">
+  <div class="hero-top">
+    <div class="hero-top-tags">
+      <a href="/" class="is-active">All</a>
+      {% for c in nav_categories[:5] %}{% if not c.parent_slug %}
+        <a href="/c/{{ c.slug }}">{{ c.name }}</a>
+      {% endif %}{% endfor %}
+    </div>
+    <div class="hero-top-issue">{{ hero_issue_label }}</div>
+  </div>
+
+  <div class="hero-grid">
+    <div class="hero-text">
+      <p class="eyebrow">{{ hero_eyebrow }}</p>
+      <h1 class="hero-display">{{ hero_headline_html|safe }}</h1>
+      <p class="hero-subhead">{{ hero_subhead }}</p>
+      <form class="search-bar" action="/c/{{ (nav_categories|first).slug if nav_categories else '' }}" method="get">
+        <input name="q" type="search" placeholder="Search by business, neighborhood, or service">
+        <button type="submit">Find</button>
+      </form>
+    </div>
+    <div class="hero-image hero-image--placeholder">
+      {% set hero_photo = hero_featured.photos[0] if (hero_featured and hero_featured.photos) else None %}
+      {% if hero_photo %}<img src="{{ hero_photo.url }}" alt="{{ hero_photo.alt or city.name }}">{% endif %}
+    </div>
+  </div>
+
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-stat-number">{{ stat_listings }}</div>
+      <div class="hero-stat-label">{{ vertical_word|lower }} profiled</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-number">{{ stat_neighborhoods }}</div>
+      <div class="hero-stat-label">Neighborhoods</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-number">{{ stat_editor_picks }}</div>
+      <div class="hero-stat-label">Editor's picks</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-number is-accent">Free</div>
+      <div class="hero-stat-label">For visitors</div>
+    </div>
   </div>
 </section>
 
-{% if featured_businesses %}
-<section class="section">
+{# ---- Browse by category + neighborhood ---- #}
+<section class="section section--cream">
   <div class="container">
-    <h2 class="section-title">{{ featured_title }}</h2>
+    <p class="section-eyebrow">— THE MAP</p>
+    <h2 class="section-title">Every {{ city.name }} neighborhood <em>has its own {{ vertical_word|lower }} culture.</em></h2>
+    <div class="browse-section">
+      <div class="browse-side">
+        <h4>By {{ vertical_word|lower }}</h4>
+        <ul class="browse-list">
+          {% for c in nav_categories[:8] %}{% if not c.parent_slug %}
+            <li>
+              <a href="/c/{{ c.slug }}">{{ c.name }}</a>
+              {% if c.examples %}<small>{{ c.examples[:3]|join(' · ') }}</small>{% endif %}
+            </li>
+          {% endif %}{% endfor %}
+        </ul>
+        <h4>By neighborhood</h4>
+        <ul class="browse-list">
+          {% for n in nav_neighborhoods[:6] %}
+            <li><a href="/n/{{ n.slug }}">{{ n.name }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="browse-grid">
+        {% for n in nav_neighborhoods[:8] %}
+          <a href="/n/{{ n.slug }}" class="neighborhood-card neighborhood-card--empty">
+            <div class="neighborhood-card-overlay">
+              <span class="neighborhood-card-name">{{ n.name }}</span>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ---- Featured listings ---- #}
+{% if featured_businesses %}
+<section class="section section--cream">
+  <div class="container">
+    <p class="section-eyebrow">— EDITOR'S PICKS</p>
+    <h2 class="section-title">Hand-picked this <em>edition.</em></h2>
     <div class="card-grid">
       {% for b in featured_businesses %}
-        {% include "partials/business_card.html" %}
+        {% set b = b %}{% include "partials/business_card.html" %}
       {% endfor %}
     </div>
   </div>
 </section>
 {% endif %}
 
-{% if nav_categories %}
-<section class="section section--muted">
-  <div class="container">
-    <h2 class="section-title">{{ categories_title }}</h2>
-    <div class="chip-grid">
-      {% for c in nav_categories %}
-        {% if not c.parent_slug %}
-          <a class="chip" href="/c/{{ c.slug }}">{{ c.name }}</a>
-        {% endif %}
-      {% endfor %}
+{# ---- Neighborhood spotlight (dark) ---- #}
+{% if spotlight_neighborhood %}
+<section class="section section--cream" style="padding-top: 0;">
+  <div class="spotlight">
+    <div>
+      <p class="eyebrow">Neighborhood Spotlight</p>
+      <h2>What's happening in <em>{{ spotlight_neighborhood.name }}</em></h2>
+      <p style="color: #c7c0b0; max-width: 36ch; margin: 0 0 18px;">{{ spotlight_neighborhood.description or 'A neighborhood with its own beauty culture.' }}</p>
+      <a href="/n/{{ spotlight_neighborhood.slug }}" class="spotlight-link">See all of {{ spotlight_neighborhood.name }} →</a>
     </div>
-  </div>
-</section>
-{% endif %}
-
-{% if nav_neighborhoods %}
-<section class="section">
-  <div class="container">
-    <h2 class="section-title">{{ neighborhoods_title }}</h2>
-    <div class="chip-grid">
-      {% for n in nav_neighborhoods %}
-        <a class="chip chip--neighborhood" href="/n/{{ n.slug }}">{{ n.name }}</a>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-{% endif %}
-
-{% if editorial_guides %}
-<section class="section section--muted">
-  <div class="container">
-    <h2 class="section-title">{{ editorial_title }}</h2>
-    <div class="card-grid card-grid--guides">
-      {% for g in editorial_guides %}
-        <a class="guide-card" href="/guides/{{ g.slug }}">
-          {% if g.hero_image_url %}<img src="{{ g.hero_image_url }}" alt="">{% endif %}
-          <h3>{{ g.title }}</h3>
-          {% if g.subtitle %}<p>{{ g.subtitle }}</p>{% endif %}
-          {% if g.published_at %}<p class="small muted">{{ g.published_at|humantime }}</p>{% endif %}
+    <div class="spotlight-cards">
+      {% for b in spotlight_businesses[:3] %}
+        <a class="spotlight-card" href="/b/{{ b.slug }}">
+          {% set thumb = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
+          {% if thumb %}<img src="{{ thumb.url }}" alt="">{% else %}<div style="width:64px;height:64px;border-radius:6px;background:#2a2420;"></div>{% endif %}
+          <div class="spotlight-card-body">
+            <div class="spotlight-card-name">{{ b.name }}</div>
+            <p class="spotlight-card-desc">{{ b.short_description or b.known_for or '' }}</p>
+          </div>
+          {% if b.editors_pick %}<span class="spotlight-card-pin">★ Editor's Pick</span>{% endif %}
         </a>
       {% endfor %}
     </div>
   </div>
 </section>
 {% endif %}
+
+{# ---- Two neighborhood mini-lists ---- #}
+{% if neighborhood_columns %}
+<section class="section section--cream">
+  <div class="container">
+    <div class="cols2">
+      {% for col in neighborhood_columns %}
+        <div>
+          <h3>{{ col.name }}</h3>
+          {% for b in col.businesses %}
+            <a class="mini-biz" href="/b/{{ b.slug }}">
+              {% set thumb = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
+              {% if thumb %}<img src="{{ thumb.url }}" alt="">{% else %}<div style="width:56px;height:56px;border-radius:6px;background:#2a2420;flex:0 0 56px;"></div>{% endif %}
+              <div class="mini-biz-body">
+                <div class="mini-biz-name">{{ b.name }}</div>
+                <div class="mini-biz-meta">
+                  {{ col.name }} · {% if b.category_slugs %}{{ b.category_slugs[0]|replace('-', ' ') }}{% endif %}
+                  {% if b.price_cues %} <span class="muted">·</span> {{ b.price_cues }}{% endif %}
+                  {% if b.editors_pick %}<span class="pick">★ Editor's Pick</span>{% endif %}
+                </div>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ---- Owner CTA ---- #}
+<section class="section section--cream" style="padding-top: 0;">
+  <div class="owner-cta">
+    <div>
+      <p class="eyebrow">For {{ vertical_word|lower }} owners</p>
+      <h2>Own a {{ owner_noun }} in {{ city.name }}?<br><em>Your listing's already here.</em></h2>
+      <p>We've pre-built a profile for every {{ owner_noun }} in {{ city.name }}. Claim yours in 3 minutes, tell us your story by voice, and get found by people searching tonight.</p>
+      <div class="owner-cta-actions">
+        <a href="/owners" class="btn btn-primary">Claim your {{ owner_noun }} — Free</a>
+        <a href="/owners#pricing" class="btn btn-outline">See pricing</a>
+      </div>
+      <div class="owner-cta-perks">
+        <span>Free basic listing</span>
+        <span>Voice-driven setup</span>
+        <span>Cancel anytime</span>
+      </div>
+    </div>
+    {% if owner_card_sample %}
+    <div class="owner-card">
+      <div class="owner-card-head">
+        <div class="owner-card-icon"></div>
+        <div>
+          <div class="owner-card-name">{{ owner_card_sample.name }}</div>
+          <div class="owner-card-meta">{% if owner_card_sample.neighborhood_slugs %}{{ owner_card_sample.neighborhood_slugs[0]|replace('-', ' ') }}{% endif %} · Premium</div>
+        </div>
+      </div>
+      <div class="owner-card-stats">
+        <div class="row"><span>Profile views this week</span><b>3,128</b></div>
+        <div class="row"><span>Phone clicks</span><b>112</b></div>
+        <div class="row"><span>New bookings (Voice)</span><b class="plus">+31</b></div>
+      </div>
+      <div class="owner-card-suggested">
+        <b>Suggested action</b>
+        Post your golden-hour blowout reel to Instagram — <span class="draft">draft ready</span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</section>
 {% endblock %}

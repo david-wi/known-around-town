@@ -1,37 +1,32 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero hero--editorial">
-  <div class="container">
-    <p class="eyebrow">{{ hero_eyebrow }}</p>
-    <h1 class="display">{{ hero_headline }}</h1>
-    {% if hero_subhead %}<p class="lede">{{ hero_subhead }}</p>{% endif %}
-    {% if category.examples %}
-    <p class="muted small">{{ category.examples|join(' · ') }}</p>
-    {% endif %}
-  </div>
-</section>
-
-{% if sub_categories %}
-<section class="section section--muted">
-  <div class="container">
-    <h2 class="section-title">More within {{ category.name }}</h2>
-    <div class="chip-grid">
-      {% for sc in sub_categories %}
-        <a class="chip" href="/c/{{ sc.slug }}">{{ sc.name }}</a>
-      {% endfor %}
+<section class="hero">
+  <div class="hero-top">
+    <div class="hero-top-tags">
+      <a href="/">All</a>
+      {% for c in nav_categories[:5] %}{% if not c.parent_slug %}
+        <a href="/c/{{ c.slug }}" class="{% if c.slug == category.slug %}is-active{% endif %}">{{ c.name }}</a>
+      {% endif %}{% endfor %}
     </div>
+    <div class="hero-top-issue">{{ hero_issue_label }}</div>
+  </div>
+  <div class="hero-grid">
+    <div class="hero-text">
+      <p class="eyebrow">{{ category.name }} in {{ city.name }}</p>
+      <h1 class="hero-display">{{ category.editorial_blurb or category.description or category.name }}</h1>
+      {% if category.examples %}<p class="hero-subhead">{{ category.examples|join(' · ') }}</p>{% endif %}
+    </div>
+    <div class="hero-image hero-image--placeholder"></div>
   </div>
 </section>
-{% endif %}
 
-<section class="section">
+<section class="section section--cream">
   <div class="container">
-    <h2 class="section-title">{{ businesses|length }} {{ category.name|lower }} {% if neighborhood %}in {{ neighborhood.name }}{% else %}across {{ city.name }}{% endif %}</h2>
+    <p class="section-eyebrow">— {{ businesses|length }} listings</p>
+    <h2 class="section-title">{{ category.name }} in <em>{{ city.name }}</em></h2>
     {% if businesses %}
     <div class="card-grid">
-      {% for b in businesses %}
-        {% include "partials/business_card.html" %}
-      {% endfor %}
+      {% for b in businesses %}{% include "partials/business_card.html" %}{% endfor %}
     </div>
     {% else %}
     <div class="empty">

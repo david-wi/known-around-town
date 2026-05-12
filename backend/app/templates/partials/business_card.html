@@ -1,22 +1,26 @@
-<a class="biz-card {% if b.featured.enabled %}biz-card--featured{% endif %}" href="/b/{{ b.slug }}">
+<a class="biz-card {% if b.featured.enabled or b.editors_pick %}biz-card--featured{% endif %}" href="/b/{{ b.slug }}">
   {% set thumb = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
-  {% if thumb %}<img class="biz-card-image" src="{{ thumb.url }}" alt="{{ thumb.alt or b.name }}" loading="lazy">
-  {% else %}<div class="biz-card-image biz-card-image--empty"></div>{% endif %}
+  <div style="position: relative;">
+    {% if thumb %}<img class="biz-card-image" src="{{ thumb.url }}" alt="{{ thumb.alt or b.name }}" loading="lazy">
+    {% else %}<div class="biz-card-image"></div>{% endif %}
+    {% if b.editors_pick %}<span class="biz-pin biz-pin--pick">Editor's Pick</span>
+    {% elif b.claim_status == 'verified' %}<span class="biz-pin biz-pin--verified">Verified</span>{% endif %}
+    {% if b.featured.enabled %}<span class="biz-pin biz-pin--premium">{{ b.featured.tier or 'Premium' }}</span>{% endif %}
+  </div>
   <div class="biz-card-body">
-    <div class="biz-card-badges">
-      {% if b.editors_pick %}<span class="badge badge--pick">Editor's Pick</span>{% endif %}
-      {% if b.featured.enabled %}<span class="badge badge--featured">Featured</span>{% endif %}
-      {% if b.claim_status == 'verified' %}<span class="badge badge--verified">Verified</span>{% endif %}
-    </div>
-    <h3 class="biz-card-name">{{ b.name }}</h3>
-    {% if b.known_for %}
-      <p class="biz-card-line">{{ b.known_for }}</p>
-    {% elif b.short_description %}
-      <p class="biz-card-line">{{ b.short_description }}</p>
-    {% endif %}
-    <p class="biz-card-meta">
-      {% if b.neighborhood_slugs %}{{ b.neighborhood_slugs[0]|replace('-', ' ')|title }}{% endif %}
-      {% if b.price_cues %} · {{ b.price_cues }}{% endif %}
+    {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
+    {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
+    <p class="biz-card-tag">
+      {% if primary_cat %}{{ primary_cat|replace('-', ' ') }}{% endif %}
+      {% if primary_cat and primary_nb %} · {% endif %}
+      {% if primary_nb %}{{ primary_nb|replace('-', ' ') }}{% endif %}
     </p>
+    <h3 class="biz-card-name">{{ b.name }}</h3>
+    {% if b.known_for %}<p class="biz-card-desc">{{ b.known_for }}</p>
+    {% elif b.short_description %}<p class="biz-card-desc">{{ b.short_description }}</p>{% endif %}
+    <div class="biz-card-foot">
+      {% if b.price_cues %}<span class="price">{{ b.price_cues }}</span>{% else %}<span></span>{% endif %}
+      <span class="verified">{% if b.claim_status == 'verified' %}Verified by editors{% elif primary_nb %}{{ primary_nb|replace('-', ' ') }}{% endif %}</span>
+    </div>
   </div>
 </a>
