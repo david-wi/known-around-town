@@ -360,7 +360,7 @@ NETWORK_CITY_CONFIG = {
     },
     "wellness": {
         "tagline": "Where Miami recovers, resets, and breathes.",
-        "headline_html": "Where Miami<br><em>recovers, resets, and breathes.</em>",
+        "headline_html": "Where Miami<br><em>recovers,</em><br>resets, and<br>breathes.",
         "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
         "hero_subhead": "An index of the spas, saunas, recovery rooms, yoga studios, and IV lounges Miami locals actually book — between training blocks, after long flights, and before the week gets loud.",
         "search_placeholder": "Infrared sauna in Wynwood. Sunrise yoga in Edgewater. IV drip in Brickell.",
