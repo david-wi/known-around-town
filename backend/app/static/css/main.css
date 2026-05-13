@@ -94,12 +94,15 @@ em, .italic { font-style: italic; }
   max-width: 1240px; margin: 0 auto;
 }
 .brand {
-  font-family: var(--font-display);
-  font-size: 22px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 24px;
   font-weight: 500;
   letter-spacing: -0.005em;
+  white-space: nowrap;
 }
-.brand-knows { font-style: italic; padding: 0 0.18em; }
+.brand-knows {
+  font-style: italic; font-weight: 300; padding: 0 0.18em;
+}
 .site-nav {
   display: flex; gap: 28px; align-items: center;
   font-size: 14px;
@@ -187,17 +190,17 @@ em, .italic { font-style: italic; }
 }
 .hero-display {
   color: white;
-  font-family: var(--font-display);
-  font-size: clamp(48px, 8.5vw, 112px);
-  line-height: 0.92;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(48px, 9vw, 128px);
+  line-height: 1.0;
   font-weight: 300;
-  letter-spacing: -0.01em;
-  margin: 0 0 32px;
+  letter-spacing: -0.015em;
+  margin: 0 0 40px;
   max-width: 14ch;
 }
 .hero-display em {
   font-style: italic; font-weight: 400;
-  color: rgba(245, 211, 152, 0.95);
+  color: #fef3c7;
 }
 .hero-subhead-row {
   display: flex; align-items: center; gap: 16px;
@@ -273,13 +276,16 @@ em, .italic { font-style: italic; }
   margin: 0 0 18px;
 }
 .section-title {
-  font-family: var(--font-display);
-  font-size: clamp(32px, 4vw, 48px);
-  font-weight: 500; line-height: 1.05;
-  margin: 0 0 36px;
-  max-width: 22ch;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(40px, 5.4vw, 64px);
+  font-weight: 400; line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin: 0 0 40px;
+  max-width: 32ch;
 }
-.section-title em { font-style: italic; color: var(--color-fg); }
+.section-title em {
+  font-style: italic; color: #78716c; font-weight: 400;
+}
 
 /* ---- Search chips ("SEARCHED TONIGHT") ---- */
 .search-chips {
