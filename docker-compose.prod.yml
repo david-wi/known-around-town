@@ -12,6 +12,7 @@ services:
   backend:
     image: ghcr.io/david-wi/known-around-town:latest
     restart: unless-stopped
+    mem_limit: 256m  # WHY: matches other small services on the shared droplet; prevents unbounded growth
     environment:
       MONGODB_URL: ${MONGODB_URL}
       MONGODB_DATABASE: ${MONGODB_DATABASE:-known_around_town}
