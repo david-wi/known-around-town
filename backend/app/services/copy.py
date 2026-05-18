@@ -27,9 +27,12 @@ DEFAULTS: Dict[str, str] = {
     "category.hero.subhead": "The places locals book.",
     "category.empty.title": "We're still building this list.",
     "category.empty.body": "Check back soon. If you run a {category_name} business in {city_name}, get listed.",
-    # Neighborhood page
-    "neighborhood.hero.eyebrow": "{neighborhood_name}",
-    "neighborhood.hero.subhead": "A neighborhood guide.",
+    # Neighborhood page — the eyebrow is the small all-caps tag above the
+    # neighborhood name (e.g. "NEIGHBORHOOD GUIDE"). The subhead is a one-line
+    # description of the neighborhood; if not set we leave it blank rather
+    # than show a generic line that would look like editorial filler.
+    "neighborhood.hero.eyebrow": "Neighborhood Guide",
+    "neighborhood.hero.subhead": "",
     # Business profile
     "business.cta.book": "Book",
     "business.cta.call": "Call",
