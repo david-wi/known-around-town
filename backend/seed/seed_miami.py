@@ -519,7 +519,13 @@ async def seed_network(network_slug: str) -> None:
     # Businesses
     biz_photos = PHOTOS.get(network_slug, {}).get("businesses", {})
     for biz in businesses:
-        biz["photo_url"] = biz_photos.get(biz["slug"])
+        # Per-business curated photo wins when we have one; otherwise keep the
+        # category-based fallback URL that was set when the business was loaded.
+        # Without this guard, AI-sourced businesses (which have no per-slug
+        # photo entry) would end up with no image at all on the live site.
+        per_biz_photo = biz_photos.get(biz["slug"])
+        if per_biz_photo:
+            biz["photo_url"] = per_biz_photo
         featured = (
             {"enabled": True, "tier": "premium"} if biz.get("premium") else
             {"enabled": False, "tier": "free"}
