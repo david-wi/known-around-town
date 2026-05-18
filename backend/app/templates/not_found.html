@@ -1,10 +1,10 @@
 {% extends "base.html" %}
+{% set header_variant = 'sticky' %}
 {% block content %}
-<section class="hero hero--editorial">
-  <div class="container">
-    <p class="eyebrow">404</p>
-    <h1 class="display">We couldn't find that page.</h1>
-    <p class="lede">Try browsing categories or neighborhoods from the menu.</p>
-  </div>
+<section class="max-w-7xl mx-auto px-6 lg:px-10 py-32 text-center">
+  <div class="text-[10px] uppercase tracking-[0.3em] text-stone-500 font-semibold mb-4">404</div>
+  <h1 class="font-serif text-5xl md:text-6xl font-light text-stone-900 leading-[0.95] mb-6"
+      style='font-family: Georgia, "Times New Roman", serif;'>We couldn't find that page.</h1>
+  <p class="text-lg text-stone-600 max-w-xl mx-auto">Try browsing categories or neighborhoods from the menu, or <a class="{{ theme.accent_text_full }} underline" href="/">head back to the home page</a>.</p>
 </section>
 {% endblock %}

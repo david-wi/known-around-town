@@ -1,26 +1,29 @@
-<a class="biz-card {% if b.featured.enabled or b.editors_pick %}biz-card--featured{% endif %}" href="/b/{{ b.slug }}">
-  {% set thumb = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
-  <div style="position: relative;">
-    {% if thumb %}<img class="biz-card-image" src="{{ thumb.url }}" alt="{{ thumb.alt or b.name }}" loading="lazy">
-    {% else %}<div class="biz-card-image"></div>{% endif %}
-    {% if b.editors_pick %}<span class="biz-pin biz-pin--pick">Editor's Pick</span>
-    {% elif b.claim_status == 'verified' %}<span class="biz-pin biz-pin--verified">Verified</span>{% endif %}
-    {% if b.featured.enabled %}<span class="biz-pin biz-pin--premium">{{ b.featured.tier or 'Premium' }}</span>{% endif %}
+{#-
+  Standard business card used in the editor's-picks grid and the trending grid
+  on the home page, and as the listing tile on category and neighborhood pages.
+  Expects `b` in context (the business doc) and `theme` (for accent hover color).
+-#}
+{% set photo = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
+{% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
+{% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
+<a class="group block bg-white rounded-2xl overflow-hidden border border-stone-200/70 hover:border-stone-300 hover:shadow-xl hover:shadow-stone-900/5 transition-all duration-300" href="/b/{{ b.slug }}">
+  <div class="relative aspect-[4/3] bg-stone-100 overflow-hidden">
+    {% if photo %}<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" style='background-image: url("{{ photo.url }}");'></div>{% endif %}
+    {% if b.editors_pick %}<div class="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/95 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-semibold text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
+    {% if b.featured and b.featured.enabled %}<div class="absolute top-3 right-3 bg-gradient-to-br from-amber-400 to-yellow-500 text-stone-900 text-[9px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full">{{ b.featured.tier or 'Premium' }}</div>{% endif %}
   </div>
-  <div class="biz-card-body">
-    {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
-    {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
-    <p class="biz-card-tag">
-      {% if primary_cat %}{{ primary_cat|replace('-', ' ') }}{% endif %}
-      {% if primary_cat and primary_nb %} · {% endif %}
-      {% if primary_nb %}{{ primary_nb|replace('-', ' ') }}{% endif %}
-    </p>
-    <h3 class="biz-card-name">{{ b.name }}</h3>
-    {% if b.known_for %}<p class="biz-card-desc">{{ b.known_for }}</p>
-    {% elif b.short_description %}<p class="biz-card-desc">{{ b.short_description }}</p>{% endif %}
-    <div class="biz-card-foot">
-      {% if b.price_cues %}<span class="price">{{ b.price_cues }}</span>{% else %}<span></span>{% endif %}
-      <span class="verified">{% if b.claim_status == 'verified' %}Verified by editors{% elif primary_nb %}{{ primary_nb|replace('-', ' ') }}{% endif %}</span>
+  <div class="p-5">
+    <div class="flex items-start justify-between gap-2 mb-2">
+      <div>
+        <div class="text-[10px] uppercase tracking-[0.18em] text-stone-500 font-semibold mb-1">{% if primary_cat %}{{ (category_names.get(primary_cat) if category_names else None) or primary_cat|replace('-', ' ')|title }}{% endif %}{% if primary_cat and primary_nb %} · {% endif %}{% if primary_nb %}{{ (neighborhood_names.get(primary_nb) if neighborhood_names else None) or primary_nb|replace('-', ' ')|title }}{% endif %}</div>
+        <h3 class="text-xl font-serif text-stone-900 leading-tight group-hover:{{ theme.accent_text_full }} transition-colors" style='font-family: Georgia, "Times New Roman", serif;'>{{ b.name }}</h3>
+      </div>
+      {% if b.price_cues %}<span class="text-xs text-stone-400 font-semibold whitespace-nowrap pt-1">{{ b.price_cues }}</span>{% endif %}
+    </div>
+    {% if b.short_description %}<p class="text-sm text-stone-600 line-clamp-2 mb-4 min-h-[2.5rem]">{{ b.short_description }}</p>{% endif %}
+    <div class="flex items-center justify-between">
+      <span class="text-[10px] uppercase tracking-[0.18em] text-stone-500 font-medium">{% if b.claim_status == 'verified' %}Verified by editors{% elif b.claim_status == 'unclaimed' %}Unclaimed{% else %}Editor selection{% endif %}</span>
+      <span class="{{ theme.accent_text_full }} font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity">View →</span>
     </div>
   </div>
 </a>

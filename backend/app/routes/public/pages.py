@@ -68,6 +68,77 @@ def _issue_label(now: datetime) -> str:
     return f"EDITION VOL. 1 — {months[now.month]} {now.year}"
 
 
+# Per-network theme tokens. The reference design uses different accent colors
+# per vertical (rose for Beauty, emerald for Wellness, sky-blue for Health).
+# These are passed into every template as `theme` so the same templates can
+# render network-specific accent colors without hand-tweaking the markup.
+# Class strings must come from the reference's compiled Tailwind stylesheet
+# (every utility class listed here is present in /assets/css/reference.css).
+_NETWORK_THEMES: Dict[str, Dict[str, str]] = {
+    "beauty": {
+        "accent_text":              "text-rose-600",
+        "accent_text_full":         "text-rose-600",
+        "accent_text_strong":       "text-rose-700",
+        "accent_text_light":        "text-rose-300",
+        "accent_text_lighter":      "text-rose-200",
+        "accent_text_lighter_full": "text-rose-200",
+        "accent_border_subtle":     "border-rose-300/30",
+        "accent_hover_text":        "hover:text-rose-600",
+        "focus_ring":               "focus:ring-rose-400",
+        "ring_accent":              "ring-rose-500",
+        "button_bg":                "bg-rose-600",
+        "button_bg_hover":          "hover:bg-rose-700",
+        "category_banner_gradient": "from-rose-50 via-orange-50/40 to-amber-50",
+        "owners_gradient":          "from-rose-100 via-orange-50 to-amber-50",
+        "owners_blob_a":            "bg-rose-300",
+        "owners_blob_b":            "bg-amber-300",
+        "owners_eyebrow_color":     "text-rose-700",
+    },
+    "wellness": {
+        "accent_text":              "text-emerald-600",
+        "accent_text_full":         "text-emerald-600",
+        "accent_text_strong":       "text-emerald-700",
+        "accent_text_light":        "text-emerald-300",
+        "accent_text_lighter":      "text-emerald-200",
+        "accent_text_lighter_full": "text-emerald-200",
+        "accent_border_subtle":     "border-emerald-300/30",
+        "accent_hover_text":        "hover:text-emerald-600",
+        "focus_ring":               "focus:ring-emerald-400",
+        "ring_accent":              "ring-emerald-500",
+        "button_bg":                "bg-emerald-600",
+        "button_bg_hover":          "hover:bg-emerald-700",
+        "category_banner_gradient": "from-emerald-50 via-teal-50/40 to-amber-50",
+        "owners_gradient":          "from-emerald-100 via-teal-50 to-amber-50",
+        "owners_blob_a":            "bg-emerald-300",
+        "owners_blob_b":            "bg-teal-300",
+        "owners_eyebrow_color":     "text-emerald-700",
+    },
+    "health": {
+        "accent_text":              "text-sky-700",
+        "accent_text_full":         "text-sky-700",
+        "accent_text_strong":       "text-sky-800",
+        "accent_text_light":        "text-sky-300",
+        "accent_text_lighter":      "text-sky-200",
+        "accent_text_lighter_full": "text-sky-200",
+        "accent_border_subtle":     "border-sky-300/30",
+        "accent_hover_text":        "hover:text-sky-700",
+        "focus_ring":               "focus:ring-sky-400",
+        "ring_accent":              "ring-sky-500",
+        "button_bg":                "bg-sky-700",
+        "button_bg_hover":          "hover:bg-sky-800",
+        "category_banner_gradient": "from-sky-50 via-blue-50/40 to-amber-50",
+        "owners_gradient":          "from-sky-100 via-blue-50 to-amber-50",
+        "owners_blob_a":            "bg-sky-300",
+        "owners_blob_b":            "bg-amber-300",
+        "owners_eyebrow_color":     "text-sky-800",
+    },
+}
+
+
+def _network_theme(network: Dict[str, Any]) -> Dict[str, str]:
+    return _NETWORK_THEMES.get(network.get("slug", ""), _NETWORK_THEMES["beauty"])
+
+
 async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, Any]:
     copy = await _build_copy(tenant)
     city = tenant.city
@@ -100,6 +171,7 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "network": network,
         "city": city,
         "copy": copy,
+        "theme": _network_theme(network),
         "vertical_word": _vertical_word(network),
         "hero_issue_label": _issue_label(now),
         "nav_categories": nav_categories,
