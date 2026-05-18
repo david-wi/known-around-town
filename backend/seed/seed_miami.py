@@ -92,205 +92,13 @@ NEIGHBORHOODS = {
 }
 
 
-# Editorial businesses. Each tuple matches the reference card content
-# verbatim: name, slug, category, neighborhood, price tier, editor's_pick
-# flag, premium flag, short description.
+# Handcrafted-showcase business arrays were removed in favor of real,
+# verifiable Miami businesses loaded from _real_businesses.json. The empty
+# lists below are kept so the merge helper still finds expected names.
 
-BEAUTY_BUSINESSES = [
-    {
-        "slug": "beauty-bar-sunny", "name": "Beauty Bar Sunny",
-        "category_slugs": ["hair"], "neighborhood_slugs": ["sunny-isles-beach"],
-        "price_cues": "$$$", "editors_pick": True, "premium": True,
-        "short_description": "A beauty coordination studio — hot-fusion extensions, Russian manicure, lash, brow, laser, and body work, often performed by two or three specialists at once.",
-        "schema_org_type": "BeautySalon",
-    },
-    {
-        "slug": "palmera-hair-house", "name": "Palmera Hair House",
-        "category_slugs": ["hair"], "neighborhood_slugs": ["wynwood"],
-        "price_cues": "$$$", "editors_pick": True, "premium": True,
-        "short_description": "The color studio painting Miami's most copied highlights.",
-        "schema_org_type": "HairSalon",
-    },
-    {
-        "slug": "isla-nail-society", "name": "Isla Nail Society",
-        "category_slugs": ["nails"], "neighborhood_slugs": ["brickell"],
-        "price_cues": "$$$", "editors_pick": True, "premium": True,
-        "short_description": "A clean-air nail studio for the Brickell lunch-hour crowd.",
-        "schema_org_type": "NailSalon",
-    },
-    {
-        "slug": "casa-luminara-spa", "name": "Casa Luminara Spa",
-        "category_slugs": ["spa"], "neighborhood_slugs": ["coral-gables"],
-        "price_cues": "$$$$", "editors_pick": True, "premium": True,
-        "short_description": "A Mediterranean garden spa hidden in old Coral Gables.",
-        "schema_org_type": "DaySpa",
-    },
-    {
-        "slug": "el-rey-barberia", "name": "El Rey Barbería",
-        "category_slugs": ["barber"], "neighborhood_slugs": ["little-havana"],
-        "price_cues": "$$", "editors_pick": True, "premium": False,
-        "short_description": "Three generations of Cuban barbering on Calle Ocho.",
-        "schema_org_type": "BarberShop",
-    },
-    {
-        "slug": "flutter-lash-lab", "name": "Flutter Lash Lab",
-        "category_slugs": ["lash-brow"], "neighborhood_slugs": ["south-beach"],
-        "price_cues": "$$", "editors_pick": False, "premium": False,
-        "short_description": "Volume extensions and lash lifts, two blocks from the ocean.",
-        "schema_org_type": "BeautySalon",
-    },
-    {
-        "slug": "orchid-med-spa", "name": "Orchid Med Spa",
-        "category_slugs": ["med-spa"], "neighborhood_slugs": ["design-district"],
-        "price_cues": "$$$$", "editors_pick": False, "premium": True,
-        "short_description": "Conservative, natural-looking injectables by a board-certified team.",
-        "schema_org_type": "MedicalSpa",
-    },
-    {
-        "slug": "luma-makeup-studio", "name": "Luma Makeup Studio",
-        "category_slugs": ["makeup"], "neighborhood_slugs": ["edgewater"],
-        "price_cues": "$$$", "editors_pick": False, "premium": False,
-        "short_description": "Editorial-quality makeup for brides, events, and on-camera moments.",
-        "schema_org_type": "BeautySalon",
-    },
-    {
-        "slug": "wynwood-fades", "name": "Wynwood Fades",
-        "category_slugs": ["barber"], "neighborhood_slugs": ["wynwood"],
-        "price_cues": "$$", "editors_pick": False, "premium": False,
-        "short_description": "A barbershop you'd Instagram. Streetwear, neon, and the cleanest fades.",
-        "schema_org_type": "BarberShop",
-    },
-    {
-        "slug": "brickell-brow-bar", "name": "Brickell Brow Bar",
-        "category_slugs": ["lash-brow"], "neighborhood_slugs": ["brickell"],
-        "price_cues": "$$", "editors_pick": False, "premium": False,
-        "short_description": "Brow shaping, lamination, and tinting for the Brickell professional crowd.",
-        "schema_org_type": "BeautySalon",
-    },
-]
-
-WELLNESS_BUSINESSES = [
-    {
-        "slug": "salt-stone-recovery", "name": "Salt & Stone Recovery",
-        "category_slugs": ["recovery"], "neighborhood_slugs": ["wynwood"],
-        "price_cues": "$$$", "editors_pick": True, "premium": True,
-        "short_description": "A members-style recovery floor: infrared sauna, 39°F cold plunge, compression, and a tea bar — built for athletes, founders, and post-flight resets.",
-    },
-    {
-        "slug": "breathe-yoga-edgewater", "name": "Breathe Yoga Edgewater",
-        "category_slugs": ["yoga-meditation"], "neighborhood_slugs": ["edgewater"],
-        "price_cues": "$$", "editors_pick": True, "premium": False,
-        "short_description": "A bayfront studio known for slow vinyasa, weekly sound baths on the deck, and an early-morning class that locals plan their week around.",
-    },
-    {
-        "slug": "oceanic-day-spa", "name": "Oceanic Day Spa",
-        "category_slugs": ["spa"], "neighborhood_slugs": ["south-beach"],
-        "price_cues": "$$$$", "editors_pick": True, "premium": True,
-        "short_description": "A 14,000-square-foot hotel spa with a Roman-style hammam, a saltwater plunge pool, and a couples' suite booked weeks ahead for anniversaries.",
-    },
-    {
-        "slug": "glow-iv-brickell", "name": "Glow IV Brickell",
-        "category_slugs": ["iv-hydration"], "neighborhood_slugs": ["brickell"],
-        "price_cues": "$$$", "editors_pick": False, "premium": True,
-        "short_description": "A clinical-grade IV lounge tucked into a Brickell tower — nurses on staff, drips reviewed by an MD, and an after-work crowd that comes in for hydration before flights.",
-    },
-    {
-        "slug": "pulse-cryo", "name": "Pulse Cryo",
-        "category_slugs": ["recovery"], "neighborhood_slugs": ["aventura"],
-        "price_cues": "$$", "editors_pick": False, "premium": False,
-        "short_description": "Whole-body cryotherapy, localized cryo, and infrared red-light beds — a fast in-and-out recovery stop for the post-gym Aventura crowd.",
-    },
-    {
-        "slug": "green-roots-nutrition", "name": "Green Roots Nutrition",
-        "category_slugs": ["nutrition"], "neighborhood_slugs": ["coconut-grove"],
-        "price_cues": "$$", "editors_pick": False, "premium": False,
-        "short_description": "A registered dietitian-led nutrition practice with a small Coconut Grove storefront, a juice bar in front, and 1:1 coaching upstairs.",
-    },
-    {
-        "slug": "house-of-acupuncture", "name": "House of Acupuncture",
-        "category_slugs": ["holistic"], "neighborhood_slugs": ["coral-gables"],
-        "price_cues": "$$$", "editors_pick": False, "premium": False,
-        "short_description": "A licensed acupuncture practice in a quiet Gables bungalow — sports recovery, fertility support, and chronic pain protocols.",
-    },
-    {
-        "slug": "reset-retreats-miami", "name": "Reset Retreats Miami",
-        "category_slugs": ["retreats"], "neighborhood_slugs": ["key-biscayne"],
-        "price_cues": "$$$$", "editors_pick": False, "premium": True,
-        "short_description": "A weekend wellness retreat run out of a Key Biscayne beach house — eight guests, two facilitators, breathwork, cold plunge, and a chef.",
-    },
-    {
-        "slug": "sweat-haus-wynwood", "name": "Sweat Haus Wynwood",
-        "category_slugs": ["recovery"], "neighborhood_slugs": ["wynwood"],
-        "price_cues": "$$", "editors_pick": False, "premium": False,
-        "short_description": "Three Finnish-style sauna rooms and a single cold tub in a brick warehouse — communal, sweaty, and very Wynwood.",
-    },
-]
-
-HEALTH_BUSINESSES = [
-    {
-        "slug": "biscayne-longevity-medicine", "name": "Biscayne Longevity Medicine",
-        "category_slugs": ["longevity"], "neighborhood_slugs": ["brickell"],
-        "price_cues": "$$$$", "editors_pick": True, "premium": True,
-        "short_description": "A physician-led longevity practice — comprehensive bloodwork panels, advanced imaging, and hormone therapy under MD supervision.",
-        "schema_org_type": "MedicalBusiness",
-    },
-    {
-        "slug": "gables-smile-studio", "name": "Gables Smile Studio",
-        "category_slugs": ["dental"], "neighborhood_slugs": ["coral-gables"],
-        "price_cues": "$$$", "editors_pick": True, "premium": True,
-        "short_description": "A cosmetic and general dental practice known for veneers, Invisalign, and a quiet chair-side manner — six operatories, two dentists, one shared philosophy.",
-        "schema_org_type": "Dentist",
-    },
-    {
-        "slug": "design-district-aesthetics", "name": "Design District Aesthetics",
-        "category_slugs": ["aesthetics"], "neighborhood_slugs": ["design-district"],
-        "price_cues": "$$$$", "editors_pick": True, "premium": True,
-        "short_description": "A physician-owned aesthetics practice — Botox, fillers, lasers, microneedling, all performed by MDs or RN injectors trained in-house.",
-        "schema_org_type": "MedicalBusiness",
-    },
-    {
-        "slug": "wynwood-mental-health-collective", "name": "Wynwood Mental Health Collective",
-        "category_slugs": ["mental-health"], "neighborhood_slugs": ["wynwood"],
-        "price_cues": "$$$", "editors_pick": False, "premium": False,
-        "short_description": "A group practice of nine therapists and two psychiatrists — individual, couples, and family therapy, plus medication management when clinically appropriate.",
-        "schema_org_type": "MedicalBusiness",
-    },
-    {
-        "slug": "south-beach-physical-therapy", "name": "South Beach Physical Therapy",
-        "category_slugs": ["pt-recovery"], "neighborhood_slugs": ["south-beach"],
-        "price_cues": "$$", "editors_pick": False, "premium": False,
-        "short_description": "A one-on-one physical therapy practice — every session is private, with the same PT for the full plan of care.",
-        "schema_org_type": "MedicalBusiness",
-    },
-    {
-        "slug": "aventura-concierge-md", "name": "Aventura Concierge MD",
-        "category_slugs": ["primary-care"], "neighborhood_slugs": ["aventura"],
-        "price_cues": "$$$$", "editors_pick": False, "premium": True,
-        "short_description": "A concierge primary-care practice capped at 250 patients per physician — same-day appointments, direct phone access, and 60-minute visits.",
-        "schema_org_type": "MedicalBusiness",
-    },
-    {
-        "slug": "sunshine-fertility-center", "name": "Sunshine Fertility Center",
-        "category_slugs": ["fertility"], "neighborhood_slugs": ["coral-gables"],
-        "price_cues": "$$$$", "editors_pick": False, "premium": True,
-        "short_description": "A reproductive endocrinology practice offering IVF, egg freezing, and fertility evaluation — three REI physicians, an on-site lab and embryology team.",
-        "schema_org_type": "MedicalBusiness",
-    },
-    {
-        "slug": "edgewater-metabolic-clinic", "name": "Edgewater Metabolic Clinic",
-        "category_slugs": ["metabolic"], "neighborhood_slugs": ["edgewater"],
-        "price_cues": "$$$", "editors_pick": False, "premium": False,
-        "short_description": "A physician-supervised metabolic health practice — obesity medicine, GLP-1 management, and long-term care plans, not a short-term injection counter.",
-        "schema_org_type": "MedicalBusiness",
-    },
-    {
-        "slug": "brickell-direct-primary-care", "name": "Brickell Direct Primary Care",
-        "category_slugs": ["primary-care"], "neighborhood_slugs": ["brickell"],
-        "price_cues": "$$$", "editors_pick": False, "premium": False,
-        "short_description": "A direct primary care practice — flat monthly fee, no insurance billing, unhurried visits, and a panel size that makes that possible.",
-        "schema_org_type": "MedicalBusiness",
-    },
-]
+BEAUTY_BUSINESSES:   List[Dict[str, Any]] = []
+WELLNESS_BUSINESSES: List[Dict[str, Any]] = []
+HEALTH_BUSINESSES:   List[Dict[str, Any]] = []
 
 
 # Per-network city-level configuration, all taken from the reference pages.
@@ -327,7 +135,7 @@ NETWORK_CITY_CONFIG = {
         "owners_italic": "Your listing's already here.",
         "owners_body": "We've pre-built a profile for every salon in Miami. Claim yours in 3 minutes, tell us your story by voice, and get found by people searching tonight.",
         "owners_cta": "Claim your salon · Free",
-        "owners_card_business_slug": "beauty-bar-sunny",
+        "owners_card_business_slug": "rossano-ferretti-hair-spa-miami",
         "owners_card_stats": {
             "views": "3,128",
             "calls": "112",
@@ -342,7 +150,7 @@ NETWORK_CITY_CONFIG = {
         "spotlight_lead_a": "What's",
         "spotlight_lead_b": "happening in",
         "spotlight_description": "Street-art murals meet experimental beauty studios.",
-        "spotlight_business_slugs": ["palmera-hair-house", "wynwood-fades"],
+        "spotlight_business_slugs": ["ayesha-beauty-studio-wynwood", "nue-studio-wynwood", "the-spot-barbershop-wynwood"],
         "footer_blurb": "The curated directory of Miami's best salons, spas, and beauty professionals. Discovered by locals, loved by visitors.",
         "footer_also_in": "Also in Lahore · Austin · Orlando",
         "footer_publication_label": "A Knows Beauty publication.",
@@ -352,13 +160,18 @@ NETWORK_CITY_CONFIG = {
         "footer_made_in": "Made in Miami · Powered by Expertly",
         "seo_title": "Miami Knows Beauty",
         "trending_business_slugs": [
-            "beauty-bar-sunny", "palmera-hair-house", "isla-nail-society",
-            "casa-luminara-spa", "flutter-lash-lab", "orchid-med-spa",
-            "el-rey-barberia", "luma-makeup-studio",
+            "rossano-ferretti-hair-spa-miami",
+            "warren-tricomi-salon-miami-beach",
+            "ayesha-beauty-studio-wynwood",
+            "elia-spa-ritz-carlton-south-beach",
+            "vanity-projects-miami-design-district",
+            "pfrankmd-miami-beach",
+            "igk-salon-south-beach",
+            "the-spa-at-the-setai",
         ],
         "two_column_neighborhoods": [
-            {"slug": "brickell",    "business_slugs": ["isla-nail-society", "brickell-brow-bar"]},
-            {"slug": "south-beach", "business_slugs": ["flutter-lash-lab"]},
+            {"slug": "south-beach", "business_slugs": ["warren-tricomi-salon-miami-beach", "elia-spa-ritz-carlton-south-beach", "the-spa-at-the-setai"]},
+            {"slug": "brickell",    "business_slugs": ["blow-dry-bar-brickell", "the-broward-brow-studio-brickell"]},
         ],
     },
     "wellness": {
@@ -389,7 +202,7 @@ NETWORK_CITY_CONFIG = {
         "owners_italic": "Your listing's already here.",
         "owners_body": "We pre-built a profile for every studio, spa, and recovery room in Miami. Claim yours in three minutes — and get found by people searching tonight.",
         "owners_cta": "Claim your studio · Free",
-        "owners_card_business_slug": "salt-stone-recovery",
+        "owners_card_business_slug": "restore-hyper-wellness-miami",
         "owners_card_stats": {
             "views": "2,847",
             "calls": "94",
@@ -404,7 +217,7 @@ NETWORK_CITY_CONFIG = {
         "spotlight_lead_a": "Where Miami's",
         "spotlight_lead_b": "recovery culture lives —",
         "spotlight_description": "A few converted warehouses and brick-walled studios are quietly leading the recovery scene. Here is who is doing it well.",
-        "spotlight_business_slugs": ["salt-stone-recovery", "sweat-haus-wynwood"],
+        "spotlight_business_slugs": ["the-sweat-shop-wynwood", "pause-studio-miami", "the-sacred-space-miami"],
         "footer_blurb": "The curated guide to Miami spas, recovery, yoga, and wellness — discovered by locals, kept simple.",
         "footer_also_in": "Coming soon to Austin · Orlando · Dallas",
         "footer_publication_label": "A Knows Wellness publication.",
@@ -414,11 +227,19 @@ NETWORK_CITY_CONFIG = {
         "footer_made_in": "Made in Miami · Powered by Expertly",
         "seo_title": "Miami Knows Wellness",
         "trending_business_slugs": [
-            "salt-stone-recovery", "breathe-yoga-edgewater", "glow-iv-brickell",
-            "oceanic-day-spa", "pulse-cryo", "green-roots-nutrition",
-            "house-of-acupuncture", "reset-retreats-miami",
+            "ahimsa-yoga-music-center-miami",
+            "green-monkey-yoga-miami",
+            "restore-hyper-wellness-miami",
+            "spa-ritz-carlton-south-beach",
+            "lapis-spa-fontainebleau-miami-beach",
+            "the-sweat-shop-wynwood",
+            "spa-st-regis-bal-harbour",
+            "pause-studio-miami",
         ],
-        "two_column_neighborhoods": [],
+        "two_column_neighborhoods": [
+            {"slug": "south-beach", "business_slugs": ["spa-ritz-carlton-south-beach", "miami-life-center-miami-beach"]},
+            {"slug": "wynwood",    "business_slugs": ["the-sweat-shop-wynwood", "pause-studio-miami", "the-sacred-space-miami"]},
+        ],
     },
     "health": {
         "tagline": "Miami's most-trusted doctors, dentists, and clinics.",
@@ -448,7 +269,7 @@ NETWORK_CITY_CONFIG = {
         "owners_italic": "Your listing's already here.",
         "owners_body": "We pre-built a profile for every clinic and practice in Miami-Dade. Claim yours, correct details, and add the things that matter — your training, your approach, your office.",
         "owners_cta": "Claim your practice · Free",
-        "owners_card_business_slug": "biscayne-longevity-medicine",
+        "owners_card_business_slug": "cleveland-clinic-florida-orthopaedic-sports-medicine-center-aventura",
         "owners_card_stats": {
             "views": "2,847",
             "calls": "94",
@@ -463,7 +284,7 @@ NETWORK_CITY_CONFIG = {
         "spotlight_lead_a": "Where Miami professionals",
         "spotlight_lead_b": "see their doctors —",
         "spotlight_description": "The tower-medicine corridor — concierge primary care, longevity clinics, and specialists who keep the same patients for decades.",
-        "spotlight_business_slugs": ["biscayne-longevity-medicine", "brickell-direct-primary-care"],
+        "spotlight_business_slugs": ["platinum-physical-therapy-brickell", "concierge-medicine-of-south-florida-brickell"],
         "footer_blurb": "A curated guide to Miami's clinics and providers — provider-focused, not outcome-promising.",
         "footer_also_in": "Coming soon to Austin · Orlando · Dallas",
         "footer_publication_label": "A Knows Health publication.",
@@ -473,12 +294,19 @@ NETWORK_CITY_CONFIG = {
         "footer_made_in": "Made in Miami · Powered by Expertly",
         "seo_title": "Miami Knows Health",
         "trending_business_slugs": [
-            "biscayne-longevity-medicine", "gables-smile-studio",
-            "wynwood-mental-health-collective", "south-beach-physical-therapy",
-            "aventura-concierge-md", "sunshine-fertility-center",
-            "edgewater-metabolic-clinic", "design-district-aesthetics",
+            "cleveland-clinic-florida-orthopaedic-sports-medicine-center-aventura",
+            "sabal-palm-house-mental-health-treatment-center",
+            "garcia-facial-plastic-surgery-coral-gables",
+            "platinum-physical-therapy-brickell",
+            "the-movement-lab-wynwood",
+            "sidelinger-md",
+            "concierge-medicine-of-south-florida-brickell",
+            "the-biostation-miami",
         ],
-        "two_column_neighborhoods": [],
+        "two_column_neighborhoods": [
+            {"slug": "coral-gables", "business_slugs": ["garcia-facial-plastic-surgery-coral-gables", "sabal-palm-house-mental-health-treatment-center"]},
+            {"slug": "brickell",     "business_slugs": ["platinum-physical-therapy-brickell", "concierge-medicine-of-south-florida-brickell"]},
+        ],
     },
 }
 
@@ -501,10 +329,10 @@ _CATEGORY_FALLBACK_PHOTOS: Dict[str, str] = {
     "recovery":        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1600&q=80&auto=format&fit=crop",
     "iv-hydration":    "https://images.unsplash.com/photo-1582719471384-894fbb16e074?w=1600&q=80&auto=format&fit=crop",
     "yoga-meditation": "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=1600&q=80&auto=format&fit=crop",
-    "holistic":        "https://images.unsplash.com/photo-1597252056283-9c79d1f5b8c5?w=1600&q=80&auto=format&fit=crop",
+    "holistic":        "https://images.unsplash.com/photo-1591343395082-e120087004b4?w=1600&q=80&auto=format&fit=crop",
     "nutrition":       "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=1600&q=80&auto=format&fit=crop",
-    "sleep-stress":    "https://images.unsplash.com/photo-1521539558977-7c8d34a6e6e0?w=1600&q=80&auto=format&fit=crop",
-    "retreats":        "https://images.unsplash.com/photo-1474898856510-884a2c0be0d7?w=1600&q=80&auto=format&fit=crop",
+    "sleep-stress":    "https://images.unsplash.com/photo-1522337660859-02fbefca4702?w=1600&q=80&auto=format&fit=crop",
+    "retreats":        "https://images.unsplash.com/photo-1540206395-68808572332f?w=1600&q=80&auto=format&fit=crop",
     # health
     "aesthetics":      "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=1600&q=80&auto=format&fit=crop",
     "metabolic":       "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=1600&q=80&auto=format&fit=crop",
