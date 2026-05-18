@@ -26,6 +26,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List
 
 from app.database import ensure_indexes, get_db
@@ -482,11 +483,95 @@ NETWORK_CITY_CONFIG = {
 }
 
 
-BUSINESSES_PER_NETWORK = {
-    "beauty": BEAUTY_BUSINESSES,
-    "wellness": WELLNESS_BUSINESSES,
-    "health": HEALTH_BUSINESSES,
+# Fallback Unsplash photo URLs by category. Used for the bulk-loaded "real"
+# businesses below — those came from an LLM lookup that returns names, addresses
+# and editorial blurbs but no photo URLs. Each category gets a generic but
+# topical photo so cards don't render with empty hero space.
+_CATEGORY_FALLBACK_PHOTOS: Dict[str, str] = {
+    # beauty
+    "hair":            "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1600&q=80&auto=format&fit=crop",
+    "nails":           "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=1600&q=80&auto=format&fit=crop",
+    "spa":             "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1600&q=80&auto=format&fit=crop",
+    "lash-brow":       "https://images.unsplash.com/photo-1583241800698-e8ab01830a07?w=1600&q=80&auto=format&fit=crop",
+    "med-spa":         "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=1600&q=80&auto=format&fit=crop",
+    "barber":          "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=1600&q=80&auto=format&fit=crop",
+    "makeup":          "https://images.unsplash.com/photo-1487070183336-b863922373d4?w=1600&q=80&auto=format&fit=crop",
+    "waxing":          "https://images.unsplash.com/photo-1556228852-80b6e5eeff06?w=1600&q=80&auto=format&fit=crop",
+    # wellness
+    "recovery":        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1600&q=80&auto=format&fit=crop",
+    "iv-hydration":    "https://images.unsplash.com/photo-1582719471384-894fbb16e074?w=1600&q=80&auto=format&fit=crop",
+    "yoga-meditation": "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=1600&q=80&auto=format&fit=crop",
+    "holistic":        "https://images.unsplash.com/photo-1597252056283-9c79d1f5b8c5?w=1600&q=80&auto=format&fit=crop",
+    "nutrition":       "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=1600&q=80&auto=format&fit=crop",
+    "sleep-stress":    "https://images.unsplash.com/photo-1521539558977-7c8d34a6e6e0?w=1600&q=80&auto=format&fit=crop",
+    "retreats":        "https://images.unsplash.com/photo-1474898856510-884a2c0be0d7?w=1600&q=80&auto=format&fit=crop",
+    # health
+    "aesthetics":      "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=1600&q=80&auto=format&fit=crop",
+    "metabolic":       "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=1600&q=80&auto=format&fit=crop",
+    "longevity":       "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1600&q=80&auto=format&fit=crop",
+    "dental":          "https://images.unsplash.com/photo-1606811971618-4486d14f3f99?w=1600&q=80&auto=format&fit=crop",
+    "mental-health":   "https://images.unsplash.com/photo-1573497019418-b400bb3ab074?w=1600&q=80&auto=format&fit=crop",
+    "fertility":       "https://images.unsplash.com/photo-1530497610245-94d3c16cda28?w=1600&q=80&auto=format&fit=crop",
+    "pt-recovery":     "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1600&q=80&auto=format&fit=crop",
+    "primary-care":    "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=1600&q=80&auto=format&fit=crop",
 }
+
+
+def _load_real_businesses() -> Dict[str, List[Dict[str, Any]]]:
+    """Load the LLM-generated 'real' businesses and reshape into the same
+    structure the handcrafted showcase entries use, so they can be merged.
+    """
+    import json as _json
+    path = Path(__file__).parent / "_real_businesses.json"
+    if not path.exists():
+        return {"beauty": [], "wellness": [], "health": []}
+    raw = _json.loads(path.read_text())
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    for net, items in raw.items():
+        rows: List[Dict[str, Any]] = []
+        for it in items:
+            rows.append({
+                "slug": it["slug"],
+                "name": it["name"],
+                "category_slugs":     [it["category_slug"]],
+                "neighborhood_slugs": [it["neighborhood_slug"]],
+                "price_cues":         it.get("price_cues"),
+                "editors_pick":       bool(it.get("editors_pick")),
+                "premium":            bool(it.get("premium")),
+                "short_description":  it.get("short_description"),
+                "phone":              it.get("phone"),
+                "website":            it.get("website"),
+                "instagram":          it.get("instagram"),
+                "address_full":       it.get("address"),
+                # No specific photo from the LLM — fall back to a category photo
+                "photo_url":          _CATEGORY_FALLBACK_PHOTOS.get(it["category_slug"]),
+            })
+        out[net] = rows
+    return out
+
+
+def _merged_businesses() -> Dict[str, List[Dict[str, Any]]]:
+    """Combine the handcrafted showcase entries with the LLM-generated real
+    businesses. Handcrafted entries win on slug collision (their rich blurbs
+    and curated home-page placements are referenced elsewhere in the seed).
+    """
+    real = _load_real_businesses()
+    merged: Dict[str, List[Dict[str, Any]]] = {}
+    for net, showcase in (
+        ("beauty",   BEAUTY_BUSINESSES),
+        ("wellness", WELLNESS_BUSINESSES),
+        ("health",   HEALTH_BUSINESSES),
+    ):
+        by_slug: Dict[str, Dict[str, Any]] = {}
+        for b in real.get(net, []):
+            by_slug[b["slug"]] = b
+        for b in showcase:
+            by_slug[b["slug"]] = b  # showcase wins on slug collision
+        merged[net] = list(by_slug.values())
+    return merged
+
+
+BUSINESSES_PER_NETWORK = _merged_businesses()
 
 
 async def _set_copy(scope_type: str, scope_ref: Dict[str, str], key: str, value: str) -> None:
@@ -612,6 +697,15 @@ async def seed_network(network_slug: str) -> None:
             {"enabled": False, "tier": "free"}
         )
         photos = [{"url": biz["photo_url"]}] if biz.get("photo_url") else []
+        # Use the LLM-supplied street address if we have one; otherwise fall back
+        # to the bare city stub. The frontend formats it as "{street}, {city}".
+        address: Dict[str, Any] = {"city": "Miami", "state": "FL", "country": "US"}
+        if biz.get("address_full"):
+            address["street"] = biz["address_full"]
+        # Socials block for the business detail sidebar.
+        socials: Dict[str, Any] = {}
+        if biz.get("instagram"):
+            socials["instagram"] = biz["instagram"]
         biz_doc = {
             "_id": str(uuid.uuid4()),
             "network_id": network["_id"],
@@ -632,8 +726,14 @@ async def seed_network(network_slug: str) -> None:
             "index_status": "indexed",
             "index_override": "auto",
             "status": "live",
-            "address": {"city": "Miami", "state": "FL", "country": "US"},
-            "socials": {}, "hours": [], "services": [], "photos": photos,
+            "address": address,
+            "phone": biz.get("phone"),
+            "website": biz.get("website"),
+            "instagram": biz.get("instagram"),
+            "socials": socials,
+            "hours": [],
+            "services": [],
+            "photos": photos,
             "created_at": now,
             "updated_at": now,
         }
