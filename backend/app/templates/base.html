@@ -1,76 +1,39 @@
-<!doctype html>
+{#-
+  Base layout shell — every page extends this.
+
+  We use the *exact* compiled stylesheet from the reference design
+  (reference.css) so our visual output matches the reference 1:1.
+  Don't add a parallel hand-written stylesheet; if a small project-specific
+  tweak is needed, add a tiny "overrides.css" later.
+
+  Header/footer markup lives in partials so it can be reused across pages,
+  with two header variants: "over_hero" (transparent, floating over the
+  dark home hero) and "sticky" (white sticky bar on inner pages).
+-#}
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}{{ seo_title or ((city.name ~ ' Knows ' ~ vertical_word) if city else network.name) }}{% endblock %}</title>
   {% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}
   <meta property="og:title" content="{{ seo_title or ((city.name ~ ' Knows ' ~ vertical_word) if city else network.name) }}">
   {% if meta_description %}<meta property="og:description" content="{{ meta_description }}">{% endif %}
   <meta property="og:type" content="website">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/reference.css">
   {% block head_extra %}{% endblock %}
 </head>
 <body>
-<header class="site-header{% if is_home %} site-header--over-hero{% endif %}">
-  <div class="header-row">
-    <a class="brand" href="/">{{ city.name if city else '' }}{% if city %} {% endif %}<span class="brand-knows">Knows</span> {{ vertical_word }}</a>
-    {% if city %}
-    <nav class="site-nav">
-      {% for item in header_nav %}
-        <a href="/c/{{ item.slug }}">{{ item.label }}</a>
-      {% endfor %}
-      <span class="header-lang">🌐 English ▾</span>
-      <a href="/owners" class="header-cta">{{ owners_header_cta }}</a>
-    </nav>
-    {% endif %}
-  </div>
-</header>
-
-<main>
-{% block content %}{% endblock %}
-</main>
-
-<footer class="site-footer">
-  <div class="container">
-    <div class="footer-grid">
-      <div>
-        <p class="footer-brand">{{ city.name if city else '' }}{% if city %} {% endif %}<em>Knows</em> {{ vertical_word }}</p>
-        <p>{{ footer_about_body }}</p>
-        {% if footer_publication_label %}
-          <div class="footer-coming">{{ footer_publication_label }} {{ footer_also_in }}</div>
-        {% endif %}
-      </div>
-      {% if header_nav %}
-      <div>
-        <h4>Categories</h4>
-        <ul class="footer-list">
-          {% for item in header_nav %}<li><a href="/c/{{ item.slug }}">{{ item.label }}</a></li>{% endfor %}
-        </ul>
-      </div>
-      {% endif %}
-      {% if nav_neighborhoods %}
-      <div>
-        <h4>Neighborhoods</h4>
-        <ul class="footer-list">
-          {% for n in nav_neighborhoods[:6] %}<li><a href="/n/{{ n.slug }}">{{ n.name }}</a></li>{% endfor %}
-        </ul>
-      </div>
-      {% endif %}
-      <div>
-        <h4>{{ footer_owners_label or 'OWNERS' }}</h4>
-        <ul class="footer-list">
-          {% for item in footer_owners_items %}<li>{{ item }}</li>{% endfor %}
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <span>{{ footer_legal or ('© ' ~ now.year ~ ' ' ~ (city.name if city else '') ~ ' Knows ' ~ vertical_word ~ ' · A local-first directory.') }}</span>
-      <span>{{ footer_made_in or 'Made in Miami · Powered by Expertly' }}</span>
+  <div id="root">
+    <div class="min-h-screen bg-stone-50/40 text-stone-900 antialiased">
+      {% include 'partials/header.html' %}
+      <main>
+        {% block content %}{% endblock %}
+      </main>
+      {% include 'partials/footer.html' %}
     </div>
   </div>
-</footer>
 </body>
 </html>

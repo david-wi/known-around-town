@@ -1,11 +1,16 @@
 {% extends "base.html" %}
+{#-
+  Shown when someone hits the bare network host (no city). The reference site
+  doesn't have an equivalent — it's just a graceful landing page that prompts
+  the visitor to pick a city.
+-#}
+{% set header_variant = 'sticky' %}
 {% block content %}
-<section class="hero hero--editorial">
-  <div class="container">
-    <p class="eyebrow">{{ network.name }}</p>
-    <h1 class="display">{{ network.tagline or network.name }}</h1>
-    {% if network.description %}<p class="lede">{{ network.description }}</p>{% endif %}
-    <p class="muted small">Pick a city to start.</p>
-  </div>
+<section class="max-w-7xl mx-auto px-6 lg:px-10 py-32 text-center">
+  <div class="text-[10px] uppercase tracking-[0.3em] text-stone-500 font-semibold mb-4">{{ network.name }}</div>
+  <h1 class="font-serif text-5xl md:text-6xl font-light text-stone-900 leading-[0.95] mb-6"
+      style='font-family: Georgia, "Times New Roman", serif;'>{{ network.tagline or network.name }}</h1>
+  {% if network.description %}<p class="text-lg text-stone-600 max-w-2xl mx-auto">{{ network.description }}</p>{% endif %}
+  <p class="text-stone-500 text-sm mt-8">Pick a city to start.</p>
 </section>
 {% endblock %}

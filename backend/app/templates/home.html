@@ -1,87 +1,139 @@
 {% extends "base.html" %}
+{#-
+  Home page — mirrors the reference site's beauty/wellness/health home page
+  structure exactly. Sections, top to bottom:
+    1. Full-bleed dark hero with stat strip pinned to the bottom
+    2. "The Map" — categories on the left, neighborhood card grid on the right
+    3. Editor's Picks — big feature card + two stacked + a grid of 3 cards
+    4. Trending — grid of up to 8 cards
+    5. Neighborhood Spotlight — dark feature with 2 listed businesses
+    6. Two-column neighborhood mini-lists (where the city has them configured)
+    7. Owners CTA — rounded gradient card with an example owner dashboard
+
+  All HTML class strings come from the reference's compiled Tailwind stylesheet
+  (loaded as /assets/css/reference.css). Per-network theming (accent color words
+  like rose/emerald/sky) is passed in via the `theme` dict from the route handler.
+-#}
+
+{% set header_variant = 'over_hero' %}
+
 {% block content %}
-<section class="hero hero--fullbleed">
-  {% if hero_photo_url %}<div class="hero-photo" style="background-image: url('{{ hero_photo_url }}');"></div>{% endif %}
-  <div class="hero-overlay hero-overlay--vertical"></div>
-  <div class="hero-overlay hero-overlay--horizontal"></div>
-  <div class="hero-content">
-    <div class="hero-issue">
-      <span class="hero-issue-line"></span>
-      <span class="hero-issue-text">{{ hero_eyebrow }}</span>
-      <span class="hero-issue-line hero-issue-line--right"></span>
-    </div>
-    <h1 class="hero-display">{{ hero_headline_html|safe }}</h1>
-    <div class="hero-subhead-row">
-      <span class="hero-subhead-line"></span>
-      <p class="hero-subhead">{{ hero_subhead }}</p>
-    </div>
-    <form class="search-bar" action="/search" method="get">
-      <input name="q" type="search" placeholder="{{ hero_search_placeholder }}">
-      <button type="submit">FIND</button>
-    </form>
-    {% if search_chips %}
-    <div class="search-chips">
-      <span class="search-chips-label">SEARCHED TONIGHT</span>
-      {% for chip in search_chips %}<a href="/search?q={{ chip|urlencode }}" class="search-chip">{{ chip }}</a>{% endfor %}
-    </div>
-    {% endif %}
-  </div>
-</section>
+{# ============= HERO ============= #}
+<section class="relative min-h-[92vh] flex items-end overflow-hidden bg-stone-950">
+  {% if hero_photo_url %}
+  <div class="absolute inset-0 bg-cover bg-center scale-105" style='background-image: url("{{ hero_photo_url }}");'></div>
+  {% endif %}
+  <div class="absolute inset-0 bg-gradient-to-b from-stone-950/55 via-stone-950/35 to-stone-950/90"></div>
+  <div class="absolute inset-0 bg-gradient-to-r from-stone-950/70 via-stone-950/20 to-transparent"></div>
 
-<section class="hero-stats-section">
-  <div class="hero-stats">
-    <div class="hero-stat">
-      <div class="hero-stat-number">{{ stat_count_listings }}</div>
-      <div class="hero-stat-label">{{ stat_label_listings }}</div>
-    </div>
-    <div class="hero-stat">
-      <div class="hero-stat-number">{{ stat_count_neighborhoods }}</div>
-      <div class="hero-stat-label">NEIGHBORHOODS</div>
-    </div>
-    <div class="hero-stat">
-      <div class="hero-stat-number">{{ stat_count_editor_picks }}</div>
-      <div class="hero-stat-label">EDITOR'S PICKS</div>
-    </div>
-    <div class="hero-stat">
-      <div class="hero-stat-number is-accent">Free</div>
-      <div class="hero-stat-label">{{ stat_label_owners }}</div>
-    </div>
-  </div>
-</section>
-
-{# THE MAP — categories + neighborhood cards #}
-<section class="section section--cream">
-  <div class="container">
-    <p class="section-eyebrow">THE MAP</p>
-    <h2 class="section-title">Every {{ city.name }} neighborhood<br><em>has its own {{ map_culture_word }} culture.</em></h2>
-    <div class="browse-section">
-      <div class="browse-side">
-        <h4>{{ browse_axis_label }}</h4>
-        <ol class="browse-numbered">
-          {% for c in nav_categories %}{% if not c.parent_slug %}
-            <li>
-              <span class="browse-num">{{ '%02d' % loop.index }}</span>
-              <a href="/c/{{ c.slug }}" class="browse-link">
-                <span class="browse-name">{{ c.name }}</span>
-                {% if c.description %}<span class="browse-desc">{{ c.description }}</span>{% endif %}
-              </a>
-              <span class="browse-arrow">→</span>
-            </li>
-          {% endif %}{% endfor %}
-        </ol>
+  <div class="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-24 pt-36 w-full">
+    <div class="max-w-3xl">
+      <div class="flex items-center gap-4 mb-10">
+        <div class="h-px w-12 bg-amber-300/70"></div>
+        <span class="text-[10px] uppercase tracking-[0.35em] text-amber-200/90 font-medium">{{ hero_eyebrow }}</span>
+        <div class="h-px flex-1 bg-amber-300/40 max-w-[120px]"></div>
       </div>
-      <div class="browse-grid-wrap">
-        <h4 class="browse-grid-label">BY NEIGHBORHOOD</h4>
-        <div class="browse-grid">
-          {% for n in nav_neighborhoods %}
-            <a href="/n/{{ n.slug }}" class="neighborhood-card{% if not n.photo_url %} neighborhood-card--empty{% endif %}">
-              {% if n.photo_url %}<div class="neighborhood-card-photo" style="background-image: url('{{ n.photo_url }}');"></div>{% endif %}
-              <span class="neighborhood-card-count">{{ n.listed_count if n.listed_count is not none else 0 }} LISTED</span>
-              <div class="neighborhood-card-overlay">
-                <span class="neighborhood-card-name">{{ n.name }}</span>
-                {% if n.description %}<span class="neighborhood-card-vibe">{{ n.description }}</span>{% endif %}
+      <h1 class="text-white font-light leading-[0.92] tracking-tight mb-8"
+          style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(3rem, 8.5vw, 7rem); font-weight: 300;'>{{ hero_headline_html|safe }}</h1>
+      <div class="flex items-center gap-4 mb-10 max-w-xl">
+        <div class="h-px w-8 bg-white/40"></div>
+        <p class="text-white/85 text-base md:text-lg leading-relaxed font-light tracking-wide">{{ hero_subhead }}</p>
+      </div>
+      <form class="bg-white/95 backdrop-blur-md ring-1 ring-white/30 shadow-2xl shadow-stone-950/40 flex items-center max-w-xl" method="get" action="/search">
+        <div class="flex items-center pl-5 pr-3 text-stone-500">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="M21 21l-4.35-4.35" stroke-linecap="round"></path>
+          </svg>
+        </div>
+        <input type="text" name="q" placeholder="{{ hero_search_placeholder }}" class="flex-1 py-4 px-1 bg-transparent text-stone-900 placeholder-stone-400 focus:outline-none text-sm tracking-wide" value="">
+        <button type="submit" class="bg-stone-950 hover:bg-stone-800 text-white font-medium px-7 py-4 text-xs uppercase tracking-[0.2em] transition">Find</button>
+      </form>
+      {% if search_chips %}
+      <div class="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2">
+        <span class="text-[10px] uppercase tracking-[0.25em] text-white/55 font-medium">Searched tonight</span>
+        {% for chip in search_chips %}
+        <button class="text-white/85 text-sm italic hover:text-amber-100 underline underline-offset-[6px] decoration-white/25 hover:decoration-amber-200 transition" style="font-family: Georgia, serif;">{{ chip }}</button>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Stat strip pinned to the bottom of the hero, inside the dark photo #}
+  <div class="absolute bottom-0 left-0 right-0 hidden lg:block">
+    <div class="max-w-7xl mx-auto px-10">
+      <div class="border-t border-amber-200/25 grid grid-cols-4 divide-x divide-white/10">
+        <div class="text-white text-center py-8">
+          <div class="text-3xl md:text-4xl mb-2 font-light text-amber-50" style="font-family: Georgia, serif;">{{ stat_count_listings }}</div>
+          <div class="text-[10px] uppercase tracking-[0.25em] text-white/60 font-medium">{{ stat_label_listings }}</div>
+        </div>
+        <div class="text-white text-center py-8">
+          <div class="text-3xl md:text-4xl mb-2 font-light text-amber-50" style="font-family: Georgia, serif;">{{ stat_count_neighborhoods }}</div>
+          <div class="text-[10px] uppercase tracking-[0.25em] text-white/60 font-medium">Neighborhoods</div>
+        </div>
+        <div class="text-white text-center py-8">
+          <div class="text-3xl md:text-4xl mb-2 font-light text-amber-50" style="font-family: Georgia, serif;">{{ stat_count_editor_picks }}</div>
+          <div class="text-[10px] uppercase tracking-[0.25em] text-white/60 font-medium">Editor's picks</div>
+        </div>
+        <div class="text-white text-center py-8">
+          <div class="text-3xl md:text-4xl mb-2 font-light text-amber-50" style="font-family: Georgia, serif;">Free</div>
+          <div class="text-[10px] uppercase tracking-[0.25em] text-white/60 font-medium">{{ stat_label_owners }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ============= MAP / BROWSE ============= #}
+<section class="py-20 lg:py-28 bg-stone-50/60 border-y border-stone-200/60">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10">
+    <div class="mb-12">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="h-px w-8 bg-stone-900/40"></div>
+        <span class="text-[10px] uppercase tracking-[0.3em] text-stone-700 font-medium">The Map</span>
+      </div>
+      <h2 class="font-light text-stone-900 leading-[1.02] tracking-tight max-w-3xl"
+          style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.25rem, 4.5vw, 3.75rem);'>Every {{ city.name }} neighborhood<br><em class="italic text-stone-500">has its own {{ map_culture_word }} culture.</em></h2>
+    </div>
+    <div class="grid lg:grid-cols-12 gap-10 lg:gap-14">
+      <aside class="lg:col-span-3">
+        <div class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text }} font-semibold mb-5">{{ browse_axis_label }}</div>
+        <ul>
+          {% for c in nav_categories %}
+          {% if not c.parent_slug %}
+          <li>
+            <a class="group flex items-baseline gap-3 py-3 border-b border-stone-200/80 last:border-0 hover:border-stone-900 transition-colors" href="/c/{{ c.slug }}">
+              <span class="text-[10px] tabular-nums text-stone-400 font-medium pt-1.5">{{ '%02d' % loop.index }}</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-serif text-base text-stone-900 group-hover:{{ theme.accent_text_full }} transition-colors leading-tight" style='font-family: Georgia, "Times New Roman", serif;'>{{ c.name }}</div>
+                {% if c.description %}<div class="text-[11px] text-stone-500 mt-0.5 line-clamp-1">{{ c.description }}</div>{% endif %}
               </div>
+              <span class="text-stone-300 group-hover:text-stone-900 transition-colors pt-1.5 text-sm">→</span>
             </a>
+          </li>
+          {% endif %}
+          {% endfor %}
+        </ul>
+      </aside>
+      <div class="lg:col-span-9">
+        <div class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text }} font-semibold mb-5">By neighborhood</div>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {% for n in nav_neighborhoods %}
+          <a class="group relative aspect-[4/5] overflow-hidden bg-stone-900" href="/n/{{ n.slug }}">
+            {% if n.photo_url %}
+            <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" style='background-image: url("{{ n.photo_url }}");'></div>
+            {% endif %}
+            <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/30 to-transparent group-hover:from-stone-950/95 transition-colors"></div>
+            <div class="absolute inset-0 p-4 flex flex-col justify-between">
+              {% if n.listed_count %}<span class="text-[9px] uppercase tracking-[0.2em] text-white/75 font-medium">{{ n.listed_count }} listed</span>{% else %}<span></span>{% endif %}
+              <div>
+                <h3 class="font-serif text-xl text-white leading-tight" style='font-family: Georgia, "Times New Roman", serif;'>{{ n.name }}</h3>
+                <div class="h-px w-6 bg-amber-200/70 my-2 transition-all duration-500 group-hover:w-12"></div>
+                {% if n.description %}<p class="text-[10px] text-white/80 italic leading-snug">{{ n.description }}</p>{% endif %}
+              </div>
+            </div>
+          </a>
           {% endfor %}
         </div>
       </div>
@@ -89,125 +141,219 @@
   </div>
 </section>
 
-{# Editor's Picks #}
+{# ============= EDITOR'S PICKS ============= #}
 {% if editor_picks %}
-<section class="section section--cream">
-  <div class="container">
-    <p class="section-eyebrow">★ EDITOR'S PICKS</p>
-    <h2 class="section-title">The ones we'd send a friend to</h2>
-    <div class="card-grid">
-      {% for b in editor_picks %}{% set b = b %}{% include "partials/business_card.html" %}{% endfor %}
+<section class="py-16 lg:py-24 bg-gradient-to-b from-stone-50 to-stone-100/50">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10">
+    <div class="flex items-end justify-between mb-12">
+      <div>
+        <div class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text }} font-semibold mb-3">★ Editor's Picks</div>
+        <h2 class="font-serif text-4xl md:text-5xl font-light text-stone-900" style="font-family: Georgia, serif;">The ones we'd send a friend to</h2>
+      </div>
     </div>
-  </div>
-</section>
-{% endif %}
 
-{# Trending #}
-{% if trending_businesses %}
-<section class="section section--cream" style="padding-top: 0;">
-  <div class="container">
-    <p class="section-eyebrow">THIS WEEK</p>
-    <h2 class="section-title">Trending in {{ city.name }}</h2>
-    <div class="card-grid">
-      {% for b in trending_businesses %}{% set b = b %}{% include "partials/business_card.html" %}{% endfor %}
-    </div>
-  </div>
-</section>
-{% endif %}
-
-{# Neighborhood Spotlight #}
-{% if spotlight_neighborhood %}
-<section class="section section--cream" style="padding-top: 0;">
-  <div class="spotlight">
-    <div>
-      <p class="eyebrow">{{ spotlight_eyebrow }}</p>
-      <h2>{{ spotlight_lead_a }}<br>{{ spotlight_lead_b }} <em>{{ spotlight_neighborhood.name }}</em></h2>
-      <p style="color: #c7c0b0; max-width: 36ch; margin: 0 0 18px;">{{ spotlight_description }}</p>
-      <a href="/n/{{ spotlight_neighborhood.slug }}" class="spotlight-link">See all of {{ spotlight_neighborhood.name }} →</a>
-    </div>
-    <div class="spotlight-cards">
-      {% for b in spotlight_businesses %}
-        <a class="spotlight-card" href="/b/{{ b.slug }}">
-          {% if b.photos and b.photos[0].url %}<img src="{{ b.photos[0].url }}" alt="">
-          {% else %}<div class="spotlight-card-thumb-empty"></div>{% endif %}
-          <div class="spotlight-card-body">
-            <div class="spotlight-card-name">{{ b.name }}{% if b.editors_pick %} <span class="spotlight-card-pin">★ EDITOR'S PICK</span>{% endif %}</div>
-            <p class="spotlight-card-desc">{{ b.short_description or b.known_for or '' }}</p>
+    {# Feature row: 1 large card (col-7) + 2 stacked cards (col-5) #}
+    <div class="grid md:grid-cols-12 gap-6 mb-10">
+      {% set big = editor_picks[0] %}
+      <div class="md:col-span-7">
+        {% set b = big %}
+        {% set photo = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
+        {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
+        {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
+        <a class="group block relative overflow-hidden rounded-3xl bg-stone-100 h-[480px] md:h-[560px]" href="/b/{{ b.slug }}">
+          {% if photo %}<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" style='background-image: url("{{ photo.url }}");'></div>{% endif %}
+          <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-900/40 to-transparent"></div>
+          {% if b.editors_pick %}<div class="absolute top-6 left-6 inline-flex items-center gap-2 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
+          {% if b.featured and b.featured.enabled %}<div class="absolute top-6 right-6 bg-gradient-to-br from-amber-400 to-yellow-500 text-stone-900 text-[10px] font-bold tracking-[0.15em] uppercase px-3 py-1.5 rounded-full">{{ b.featured.tier or 'Premium' }}</div>{% endif %}
+          <div class="absolute bottom-0 left-0 right-0 p-8 text-white">
+            <div class="text-[10px] uppercase tracking-[0.2em] text-white/70 mb-3 font-medium">{% if primary_cat %}{{ category_names.get(primary_cat) or primary_cat|replace('-', ' ')|title }}{% endif %}{% if primary_cat and primary_nb %} · {% endif %}{% if primary_nb %}{{ neighborhood_names.get(primary_nb) or primary_nb|replace('-', ' ')|title }}{% endif %}</div>
+            <h3 class="text-3xl md:text-4xl font-serif leading-tight mb-3" style='font-family: Georgia, "Times New Roman", serif;'>{{ b.name }}</h3>
+            {% if b.short_description %}<p class="text-white/85 text-sm md:text-base line-clamp-2 mb-4 max-w-md">{{ b.short_description }}</p>{% endif %}
+            <div class="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-white/75 font-medium">
+              {% if b.price_cues %}<span class="text-amber-200">{{ b.price_cues }}</span><span class="text-white/30">·</span>{% endif %}
+              {% if primary_nb %}<span>{{ neighborhood_names.get(primary_nb) or primary_nb|replace('-', ' ')|title }}</span>{% endif %}
+            </div>
           </div>
         </a>
-      {% endfor %}
+      </div>
+      <div class="md:col-span-5 grid grid-cols-1 gap-6">
+        {% for b in editor_picks[1:3] %}
+        {% set photo = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
+        {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
+        {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
+        <a class="group block relative overflow-hidden rounded-3xl bg-stone-100 h-[228px] md:h-[268px]" href="/b/{{ b.slug }}">
+          {% if photo %}<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" style='background-image: url("{{ photo.url }}");'></div>{% endif %}
+          <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-900/40 to-transparent"></div>
+          {% if b.editors_pick %}<div class="absolute top-6 left-6 inline-flex items-center gap-2 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
+          {% if b.featured and b.featured.enabled %}<div class="absolute top-6 right-6 bg-gradient-to-br from-amber-400 to-yellow-500 text-stone-900 text-[10px] font-bold tracking-[0.15em] uppercase px-3 py-1.5 rounded-full">{{ b.featured.tier or 'Premium' }}</div>{% endif %}
+          <div class="absolute bottom-0 left-0 right-0 p-6 text-white">
+            <div class="text-[10px] uppercase tracking-[0.2em] text-white/70 mb-2 font-medium">{% if primary_cat %}{{ category_names.get(primary_cat) or primary_cat|replace('-', ' ')|title }}{% endif %}{% if primary_cat and primary_nb %} · {% endif %}{% if primary_nb %}{{ neighborhood_names.get(primary_nb) or primary_nb|replace('-', ' ')|title }}{% endif %}</div>
+            <h3 class="text-2xl md:text-3xl font-serif leading-tight mb-2" style='font-family: Georgia, "Times New Roman", serif;'>{{ b.name }}</h3>
+            {% if b.short_description %}<p class="text-white/80 text-sm line-clamp-1 mb-1 max-w-md">{{ b.short_description }}</p>{% endif %}
+            {% if b.price_cues %}<div class="text-[10px] uppercase tracking-[0.2em] text-amber-200 font-medium">{{ b.price_cues }}</div>{% endif %}
+          </div>
+        </a>
+        {% endfor %}
+      </div>
     </div>
-  </div>
-</section>
-{% endif %}
 
-{# Neighborhood mini-lists #}
-{% if neighborhood_columns %}
-<section class="section section--cream">
-  <div class="container">
-    <div class="cols2">
-      {% for col in neighborhood_columns %}
-        <div>
-          <h3>{{ col.name }}</h3>
-          {% for b in col.businesses %}
-            <a class="mini-biz" href="/b/{{ b.slug }}">
-              {% if b.photos and b.photos[0].url %}<img src="{{ b.photos[0].url }}" alt="">
-              {% else %}<div class="mini-biz-thumb-empty"></div>{% endif %}
-              <div class="mini-biz-body">
-                <div class="mini-biz-name">{{ b.name }}</div>
-                <div class="mini-biz-meta">
-                  {{ col.name }} ·
-                  {% if b.category_slugs %}<span>{{ (category_names.get(b.category_slugs[0]) or b.category_slugs[0])|upper }}</span>{% endif %}
-                  {% if b.price_cues %} · {{ b.price_cues }}{% endif %}
-                  {% if b.editors_pick %}<span class="pick">★ EDITOR'S PICK</span>{% endif %}
-                </div>
-              </div>
-            </a>
-          {% endfor %}
-        </div>
+    {# Grid of 3 smaller cards #}
+    {% if editor_picks[3:] %}
+    <div class="grid md:grid-cols-3 gap-6">
+      {% for b in editor_picks[3:6] %}
+        {% include 'partials/business_card.html' %}
       {% endfor %}
-    </div>
-  </div>
-</section>
-{% endif %}
-
-{# Owner CTA #}
-<section class="section section--cream" style="padding-top: 0;">
-  <div class="owner-cta">
-    <div>
-      <p class="eyebrow">{{ owners_eyebrow }}</p>
-      <h2>{{ owners_headline }}<br><em>{{ owners_italic }}</em></h2>
-      <p>{{ owners_body }}</p>
-      <div class="owner-cta-actions">
-        <a href="/owners" class="btn btn-primary">{{ owners_cta }}</a>
-        <a href="/owners#pricing" class="btn btn-outline">See pricing</a>
-      </div>
-      <div class="owner-cta-perks">
-        <span>Free basic listing</span>
-        <span>Voice-driven setup</span>
-        <span>Cancel anytime</span>
-      </div>
-    </div>
-    {% if owners_card %}
-    <div class="owner-card">
-      <div class="owner-card-head">
-        <div class="owner-card-icon">{{ owners_card.name[0] }}</div>
-        <div>
-          <div class="owner-card-name">{{ owners_card.name }}</div>
-          <div class="owner-card-meta">{% if owners_card.neighborhood_slugs %}{{ (neighborhood_names.get(owners_card.neighborhood_slugs[0]) or owners_card.neighborhood_slugs[0]) }}{% endif %} · Premium</div>
-        </div>
-      </div>
-      <div class="owner-card-stats">
-        <div class="row"><span>Profile views this week</span><b>{{ owners_card_views }}</b></div>
-        <div class="row"><span>Phone clicks</span><b>{{ owners_card_calls }}</b></div>
-        <div class="row"><span>{{ owners_card_bookings_label }}</span><b class="plus">{{ owners_card_bookings }}</b></div>
-      </div>
-      <div class="owner-card-suggested">
-        <b>Suggested action</b>
-        {{ owners_card_action }}
-      </div>
     </div>
     {% endif %}
   </div>
 </section>
+{% endif %}
+
+{# ============= TRENDING ============= #}
+{% if trending_businesses %}
+<section class="py-20 lg:py-28 max-w-7xl mx-auto px-6 lg:px-10">
+  <div class="flex items-end justify-between mb-12">
+    <div>
+      <div class="text-[10px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-3">This Week</div>
+      <h2 class="font-serif text-4xl md:text-5xl font-light text-stone-900" style="font-family: Georgia, serif;">Trending in {{ city.name }}</h2>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+    {% for b in trending_businesses[:8] %}
+      {% include 'partials/business_card.html' %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ============= NEIGHBORHOOD SPOTLIGHT ============= #}
+{% if spotlight_neighborhood %}
+{% set spotlight_photo = spotlight_neighborhood.photo_url %}
+<section class="py-20 lg:py-28 bg-gradient-to-br from-stone-900 via-stone-900 to-stone-950 text-white relative overflow-hidden">
+  {% if spotlight_photo %}
+  <div class="absolute top-0 right-0 w-1/2 h-full opacity-30 bg-cover bg-center" style='background-image: url("{{ spotlight_photo }}");'></div>
+  {% endif %}
+  <div class="absolute inset-0 bg-gradient-to-r from-stone-950 via-stone-950/95 to-transparent"></div>
+  <div class="relative max-w-7xl mx-auto px-6 lg:px-10">
+    <div class="grid md:grid-cols-12 gap-12 items-center">
+      <div class="md:col-span-5">
+        <div class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_light }} font-semibold mb-4">{{ spotlight_eyebrow }}</div>
+        <h2 class="font-serif text-5xl md:text-6xl font-light mb-6 leading-[0.95]" style="font-family: Georgia, serif;">{{ spotlight_lead_a }}<br>{{ spotlight_lead_b }}<br><em class="italic {{ theme.accent_text_light }}">{{ spotlight_neighborhood.name }}</em></h2>
+        {% if spotlight_description %}<p class="text-white/70 text-lg mb-8 leading-relaxed">{{ spotlight_description }}</p>{% endif %}
+        <a class="inline-flex items-center gap-2 {{ theme.accent_text_lighter }} hover:text-white font-medium border-b {{ theme.accent_border_subtle }} hover:border-white pb-1 transition" href="/n/{{ spotlight_neighborhood.slug }}">See all of {{ spotlight_neighborhood.name }} <span>→</span></a>
+      </div>
+      <div class="md:col-span-7 space-y-2">
+        {% for b in spotlight_businesses[:3] %}
+        {% set photo = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
+        <div class="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl overflow-hidden">
+          <a class="flex gap-5 p-5 group" href="/b/{{ b.slug }}">
+            {% if photo %}<div class="w-24 h-24 rounded-xl bg-cover bg-center shrink-0 ring-1 ring-white/10" style='background-image: url("{{ photo.url }}");'></div>{% endif %}
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between mb-1">
+                <h3 class="font-serif text-xl text-white group-hover:{{ theme.accent_text_lighter_full }} transition" style="font-family: Georgia, serif;">{{ b.name }}</h3>
+                {% if b.editors_pick %}<span class="text-[10px] uppercase tracking-[0.18em] text-amber-200 font-semibold whitespace-nowrap ml-3">★ Editor's Pick</span>{% endif %}
+              </div>
+              {% if b.short_description %}<p class="text-white/60 text-sm line-clamp-2">{{ b.short_description }}</p>{% endif %}
+            </div>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ============= TWO-COLUMN MINI-LISTS ============= #}
+{% if neighborhood_columns %}
+<section class="py-16 lg:py-20 max-w-7xl mx-auto px-6 lg:px-10">
+  <div class="grid lg:grid-cols-2 gap-10">
+    {% for col in neighborhood_columns %}
+    <div>
+      <h3 class="font-serif text-3xl font-light text-stone-900 mb-6" style="font-family: Georgia, serif;">{{ col.name }}</h3>
+      <div class="space-y-2">
+        {% for b in col.businesses %}
+        {% set photo = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
+        {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
+        <a class="group flex items-center gap-4 p-3 rounded-2xl hover:bg-stone-50 transition" href="/b/{{ b.slug }}">
+          {% if photo %}<div class="w-20 h-20 rounded-xl bg-cover bg-center shrink-0" style='background-image: url("{{ photo.url }}");'></div>{% endif %}
+          <div class="flex-1 min-w-0">
+            <h4 class="font-serif text-lg text-stone-900 truncate group-hover:{{ theme.accent_text_full }} transition-colors" style='font-family: Georgia, "Times New Roman", serif;'>{{ b.name }}</h4>
+            <p class="text-xs text-stone-500 truncate">{{ col.name }}</p>
+            <div class="flex items-center gap-2 mt-1 text-[10px] uppercase tracking-[0.18em] text-stone-500 font-semibold">
+              {% if primary_cat %}<span>{{ category_names.get(primary_cat) or primary_cat|replace('-', ' ')|title }}</span>{% endif %}
+              {% if primary_cat and b.price_cues %}<span class="text-stone-300">·</span>{% endif %}
+              {% if b.price_cues %}<span class="text-stone-700">{{ b.price_cues }}</span>{% endif %}
+              {% if b.editors_pick %}<span class="text-stone-300">·</span><span class="text-amber-600">★ Editor's Pick</span>{% endif %}
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ============= OWNERS CTA ============= #}
+{% if owners_card %}
+<section class="py-20 lg:py-28">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10">
+    <div class="relative bg-gradient-to-br {{ theme.owners_gradient }} rounded-3xl overflow-hidden">
+      <div class="absolute inset-0 opacity-30">
+        <div class="absolute top-0 right-0 w-96 h-96 {{ theme.owners_blob_a }} rounded-full blur-3xl -translate-y-1/4 translate-x-1/4"></div>
+        <div class="absolute bottom-0 left-0 w-96 h-96 {{ theme.owners_blob_b }} rounded-full blur-3xl translate-y-1/4 -translate-x-1/4"></div>
+      </div>
+      <div class="relative grid md:grid-cols-2 gap-10 p-10 lg:p-16 items-center">
+        <div>
+          <div class="text-[10px] uppercase tracking-[0.25em] {{ theme.owners_eyebrow_color }} font-semibold mb-4">{{ owners_eyebrow }}</div>
+          <h2 class="font-serif text-4xl md:text-5xl font-light text-stone-900 mb-5 leading-[1.05]" style="font-family: Georgia, serif;">{{ owners_headline }}<br><em class="italic {{ theme.owners_eyebrow_color }}">{{ owners_italic }}</em></h2>
+          {% if owners_body %}<p class="text-stone-700 text-lg mb-8 max-w-md leading-relaxed">{{ owners_body }}</p>{% endif %}
+          <div class="flex flex-wrap gap-3">
+            <a class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-800 text-white font-semibold px-7 py-3.5 rounded-full transition" href="/owners">{{ owners_cta }}</a>
+            <a class="inline-flex items-center gap-2 text-stone-900 font-medium px-7 py-3.5 rounded-full border border-stone-900/30 hover:border-stone-900 transition" href="/owners#pricing">See pricing</a>
+          </div>
+          <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-stone-700">
+            <div class="flex items-center gap-2"><span class="text-emerald-700">✓</span> Free basic listing</div>
+            <div class="flex items-center gap-2"><span class="text-emerald-700">✓</span> Voice-driven setup</div>
+            <div class="flex items-center gap-2"><span class="text-emerald-700">✓</span> Cancel anytime</div>
+          </div>
+        </div>
+        <div class="relative">
+          <div class="bg-white rounded-2xl shadow-xl p-6 max-w-sm mx-auto">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center text-white font-bold">{{ owners_card.name[0] }}</div>
+              <div>
+                <div class="font-semibold text-stone-900">{{ owners_card.name }}</div>
+                <div class="text-xs text-stone-500">{% if owners_card.neighborhood_slugs %}{{ neighborhood_names.get(owners_card.neighborhood_slugs[0]) or owners_card.neighborhood_slugs[0] }}{% endif %}{% if owners_card.featured and owners_card.featured.enabled %} · {{ owners_card.featured.tier or 'Premium' }}{% endif %}</div>
+              </div>
+            </div>
+            <div class="space-y-2 mb-4">
+              <div class="flex justify-between text-sm">
+                <span class="text-stone-600">Profile views this week</span>
+                <span class="font-semibold text-stone-900">{{ owners_card_views }}</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-stone-600">Phone clicks</span>
+                <span class="font-semibold text-stone-900">{{ owners_card_calls }}</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-stone-600">{{ owners_card_bookings_label }}</span>
+                <span class="font-semibold text-emerald-600">{{ owners_card_bookings }}</span>
+              </div>
+            </div>
+            {% if owners_card_action %}
+            <div class="border-t border-stone-100 pt-4">
+              <div class="text-xs text-stone-500 mb-1">Suggested action</div>
+              <div class="text-sm text-stone-900">{{ owners_card_action|safe }}</div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
 {% endblock %}

@@ -1,39 +1,74 @@
 {% extends "base.html" %}
+{#-
+  Category page (e.g. "Hair salons in Miami"). Mirrors the reference's
+  /miami-knows-beauty/category/hair layout: warm-gradient banner with breadcrumb,
+  big italic-accent title, sticky filter bar, then a 3-col grid of cards.
+-#}
+
+{% set header_variant = 'sticky' %}
+
 {% block content %}
-<section class="hero">
-  <div class="hero-top">
-    <div class="hero-top-tags">
-      <a href="/">All</a>
-      {% for c in nav_categories[:5] %}{% if not c.parent_slug %}
-        <a href="/c/{{ c.slug }}" class="{% if c.slug == category.slug %}is-active{% endif %}">{{ c.name }}</a>
-      {% endif %}{% endfor %}
+<section class="relative bg-gradient-to-br {{ theme.category_banner_gradient }} border-b border-stone-200/70">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10 pt-14 pb-12">
+    <div class="text-sm text-stone-500 mb-6">
+      <a class="hover:text-stone-900" href="/">{{ city.name }}</a> · <span class="text-stone-700">{{ category.name }}</span>
     </div>
-    <div class="hero-top-issue">{{ hero_issue_label }}</div>
-  </div>
-  <div class="hero-grid">
-    <div class="hero-text">
-      <p class="eyebrow">{{ category.name }} in {{ city.name }}</p>
-      <h1 class="hero-display">{{ category.editorial_blurb or category.description or category.name }}</h1>
-      {% if category.examples %}<p class="hero-subhead">{{ category.examples|join(' · ') }}</p>{% endif %}
+    <div class="grid md:grid-cols-12 gap-8 items-end">
+      <div class="md:col-span-8">
+        {% if category.emoji %}<div class="text-7xl mb-4">{{ category.emoji }}</div>{% endif %}
+        <h1 class="font-serif text-5xl md:text-6xl lg:text-7xl font-light text-stone-900 leading-[0.95] mb-4"
+            style='font-family: Georgia, "Times New Roman", serif;'>{{ category.name }} in <em class="italic {{ theme.accent_text_strong }}">{{ city.name }}</em></h1>
+        {% if hero_subhead or category.description %}<p class="text-lg text-stone-700 max-w-2xl">{{ hero_subhead or category.description }}</p>{% endif %}
+      </div>
+      <div class="md:col-span-4 md:text-right">
+        <div class="inline-flex items-center gap-2 text-sm text-stone-700 bg-white border border-stone-200 rounded-full px-4 py-2">
+          <span class="font-semibold text-stone-900">{{ businesses|length }}</span>
+          <span>listed in {{ city.name }}</span>
+        </div>
+      </div>
     </div>
-    <div class="hero-image hero-image--placeholder"></div>
   </div>
 </section>
 
-<section class="section section--cream">
-  <div class="container">
-    <p class="section-eyebrow">— {{ businesses|length }} listings</p>
-    <h2 class="section-title">{{ category.name }} in <em>{{ city.name }}</em></h2>
-    {% if businesses %}
-    <div class="card-grid">
-      {% for b in businesses %}{% include "partials/business_card.html" %}{% endfor %}
+{# Sticky filter bar — visually mirrors the reference. Form is non-functional for now
+   (filtering would need server-side wiring); this section exists so the page looks
+   complete and matches the reference. #}
+<section class="sticky top-[72px] z-30 bg-white/95 backdrop-blur-lg border-b border-stone-200/60">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10 py-4 flex flex-wrap items-center gap-3">
+    <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-stone-500 font-semibold mr-2">Filter</div>
+    <select class="text-sm bg-stone-100 hover:bg-stone-200 transition border-0 rounded-full px-4 py-2 font-medium text-stone-700 focus:outline-none focus:ring-2 {{ theme.focus_ring }}">
+      <option value="all">All neighborhoods</option>
+      {% for n in nav_neighborhoods %}<option value="{{ n.slug }}">{{ n.name }}</option>{% endfor %}
+    </select>
+    <select class="text-sm bg-stone-100 hover:bg-stone-200 transition border-0 rounded-full px-4 py-2 font-medium text-stone-700 focus:outline-none focus:ring-2 {{ theme.focus_ring }}">
+      <option value="all">All listings</option>
+      <option value="premium">Premium only</option>
+      <option value="pro">Pro &amp; Premium</option>
+    </select>
+    <div class="ml-auto flex items-center gap-2">
+      <span class="text-xs uppercase tracking-wide text-stone-500 font-semibold">Sort</span>
+      <select class="text-sm bg-stone-100 hover:bg-stone-200 transition border-0 rounded-full px-4 py-2 font-medium text-stone-700 focus:outline-none focus:ring-2 {{ theme.focus_ring }}">
+        <option value="editor">Editor's Picks</option>
+        <option value="alpha">A to Z</option>
+        <option value="price-low">Price: Low to high</option>
+        <option value="price-high">Price: High to low</option>
+      </select>
     </div>
-    {% else %}
-    <div class="empty">
-      <h3>{{ empty_title }}</h3>
-      <p>{{ empty_body }}</p>
-    </div>
-    {% endif %}
   </div>
+</section>
+
+<section class="max-w-7xl mx-auto px-6 lg:px-10 py-12">
+  {% if businesses %}
+  <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for b in businesses %}
+      {% include 'partials/business_card.html' %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-16 max-w-xl mx-auto">
+    {% if empty_title %}<h2 class="font-serif text-3xl text-stone-900 mb-3" style="font-family: Georgia, serif;">{{ empty_title }}</h2>{% endif %}
+    {% if empty_body %}<p class="text-stone-600">{{ empty_body }}</p>{% endif %}
+  </div>
+  {% endif %}
 </section>
 {% endblock %}
