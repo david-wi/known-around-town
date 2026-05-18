@@ -17,8 +17,9 @@
       <div class="md:col-span-8">
         {% if category.emoji %}<div class="text-7xl mb-4">{{ category.emoji }}</div>{% endif %}
         <h1 class="font-serif text-5xl md:text-6xl lg:text-7xl font-light text-stone-900 leading-[0.95] mb-4"
-            style='font-family: Georgia, "Times New Roman", serif;'>{{ category.name }} in <em class="italic {{ theme.accent_text_strong }}">{{ city.name }}</em></h1>
-        {% if hero_subhead or category.description %}<p class="text-lg text-stone-700 max-w-2xl">{{ hero_subhead or category.description }}</p>{% endif %}
+            style='font-family: Georgia, "Times New Roman", serif;'>{{ category.name }} {{ listing_word_plural }} in <em class="italic {{ theme.accent_text_strong }}">{{ city.name }}</em></h1>
+        {% set sub = category.description or hero_subhead %}
+        {% if sub %}<p class="text-lg text-stone-700 max-w-2xl">{{ sub }}</p>{% endif %}
       </div>
       <div class="md:col-span-4 md:text-right">
         <div class="inline-flex items-center gap-2 text-sm text-stone-700 bg-white border border-stone-200 rounded-full px-4 py-2">

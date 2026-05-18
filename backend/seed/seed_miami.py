@@ -300,7 +300,7 @@ HEALTH_BUSINESSES = [
 NETWORK_CITY_CONFIG = {
     "beauty": {
         "tagline": "Miami's best-kept beauty addresses.",
-        "headline_html": "Miami's<br><em>best-kept</em><br>beauty addresses.",
+        "headline_html": "Miami's<br><em class=\"italic font-normal text-amber-100/95\">best-kept</em><br>beauty addresses.",
         "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
         "hero_subhead": "An index of the stylists, colorists, esthetes, and barbers locals actually book — neighborhood by neighborhood.",
         "search_placeholder": "Balayage in Wynwood. Gel manicure in Brickell. Quiet barbershop near Coral Gables.",
@@ -333,7 +333,9 @@ NETWORK_CITY_CONFIG = {
             "bookings": "+31",
             "bookings_label": "New bookings (Voice)",
         },
-        "owners_card_action": "Post your golden-hour blowout reel to Instagram — draft ready",
+        "owners_card_action": "Post your golden-hour blowout reel to Instagram — <span class=\"text-rose-600 underline\">draft ready</span>",
+        "listing_word_plural":   "Salons",
+        "listing_word_singular": "salon",
         "spotlight_neighborhood_slug": "wynwood",
         "spotlight_eyebrow": "NEIGHBORHOOD SPOTLIGHT",
         "spotlight_lead_a": "What's",
@@ -360,7 +362,7 @@ NETWORK_CITY_CONFIG = {
     },
     "wellness": {
         "tagline": "Where Miami recovers, resets, and breathes.",
-        "headline_html": "Where Miami<br><em>recovers,</em><br>resets, and<br>breathes.",
+        "headline_html": "Where Miami<br><em class=\"italic font-normal text-amber-100/95\">recovers,</em><br>resets, and<br>breathes.",
         "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
         "hero_subhead": "An index of the spas, saunas, recovery rooms, yoga studios, and IV lounges Miami locals actually book — between training blocks, after long flights, and before the week gets loud.",
         "search_placeholder": "Infrared sauna in Wynwood. Sunrise yoga in Edgewater. IV drip in Brickell.",
@@ -393,7 +395,9 @@ NETWORK_CITY_CONFIG = {
             "bookings": "+22",
             "bookings_label": "New bookings",
         },
-        "owners_card_action": "Post your contrast-therapy reel — draft ready",
+        "owners_card_action": "Post your contrast-therapy reel — <span class=\"text-emerald-600 underline\">draft ready</span>",
+        "listing_word_plural":   "Studios",
+        "listing_word_singular": "studio",
         "spotlight_neighborhood_slug": "wynwood",
         "spotlight_eyebrow": "NEIGHBORHOOD SPOTLIGHT",
         "spotlight_lead_a": "Where Miami's",
@@ -417,7 +421,7 @@ NETWORK_CITY_CONFIG = {
     },
     "health": {
         "tagline": "Miami's most-trusted doctors, dentists, and clinics.",
-        "headline_html": "Miami's<br><em>most-trusted</em><br>doctors, dentists, and clinics.",
+        "headline_html": "Miami's<br><em class=\"italic font-normal text-amber-100/95\">most-trusted</em><br>doctors, dentists, and clinics.",
         "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
         "hero_subhead": "A neutral, locally curated guide to the longevity clinics, dental practices, mental health groups, fertility specialists, and concierge primary-care doctors Miami families and professionals trust.",
         "search_placeholder": "Concierge doctor in Brickell. Invisalign in Coral Gables. Couples therapist in Wynwood.",
@@ -450,7 +454,9 @@ NETWORK_CITY_CONFIG = {
             "bookings": "+22",
             "bookings_label": "New bookings",
         },
-        "owners_card_action": "Post your contrast-therapy reel — draft ready",
+        "owners_card_action": "Post your patient-trust update — <span class=\"text-sky-700 underline\">draft ready</span>",
+        "listing_word_plural":   "Clinics",
+        "listing_word_singular": "clinic",
         "spotlight_neighborhood_slug": "brickell",
         "spotlight_eyebrow": "NEIGHBORHOOD SPOTLIGHT",
         "spotlight_lead_a": "Where Miami professionals",
@@ -691,6 +697,12 @@ async def seed_network(network_slug: str) -> None:
             "two_column_neighborhoods":    cfg["two_column_neighborhoods"],
             "search_chips":                cfg["search_chips"],
             "header_nav":                  [{"slug": s, "label": l} for s, l in cfg["header_nav"]],
+            # Per-network word for what a single listing is called. Beauty
+            # calls them "salons", Wellness "studios", Health "clinics". The
+            # category page title uses the plural ("Hair Salons in Miami");
+            # the neighborhood count chip uses the singular+s ("2 salons listed").
+            "listing_word_plural":         cfg.get("listing_word_plural", "Listings"),
+            "listing_word_singular":       cfg.get("listing_word_singular", "listing"),
             "hero_photo_url":              PHOTOS.get(network_slug, {}).get("hero"),
             "updated_at": now,
         }},

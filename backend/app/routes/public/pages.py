@@ -173,6 +173,11 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "copy": copy,
         "theme": _network_theme(network),
         "vertical_word": _vertical_word(network),
+        # Word for one (or many) listings on this network. Beauty uses "Salons"/"salon",
+        # Wellness "Studios"/"studio", Health "Clinics"/"clinic". Stored on the
+        # city doc by the seed, with sensible fallbacks for older data.
+        "listing_word_plural": (city or {}).get("listing_word_plural", "Listings"),
+        "listing_word_singular": (city or {}).get("listing_word_singular", "listing"),
         "hero_issue_label": _issue_label(now),
         "nav_categories": nav_categories,
         "nav_neighborhoods": nav_neighborhoods,
@@ -396,6 +401,7 @@ async def category_page(request: Request, category_slug: str) -> HTMLResponse:
     ctx.update(
         {
             "category": category,
+            "active_category_slug": category_slug,
             "hero_eyebrow": await copy.get(
                 "category.hero.eyebrow",
                 category_slug=category_slug,
