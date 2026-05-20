@@ -48,6 +48,16 @@ def _match_suffix(host: str) -> tuple[Optional[str], Optional[str], Optional[str
             # we don't yet support nested subdomains.
             if "." in sub:
                 continue
+            # WHY: "stage-" / "preview-" prefixes let a parallel staging
+            # deployment serve the same city content under a distinct
+            # hostname (e.g. stage-miami.knowsbeauty.ai... renders Miami
+            # so a reviewer can compare proposed changes side-by-side with
+            # the live miami.knows... URL). The prefix is stripped before
+            # the city lookup so no duplicate city records are needed.
+            for prefix in ("stage-", "preview-"):
+                if sub.startswith(prefix):
+                    sub = sub[len(prefix):]
+                    break
             return net_slug, suffix, sub
     return None, None, None
 

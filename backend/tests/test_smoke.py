@@ -75,6 +75,31 @@ def test_expertly_voice_page(client):
     assert r.status_code == 200, r.text
     assert "Never miss a booking" in r.text
     assert "Expertly · Voice for Salons" in r.text
+    # Trial length: the salon-facing offer is one week free.
+    # If this assertion ever fails because the trial copy changed, update
+    # the marketing copy and the quote at the same time — the page and the
+    # sales quote must agree.
+    assert "1-week free trial" in r.text or "1 week free" in r.text.lower()
+
+
+def test_owners_page(client):
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "For Business Owners" in r.text
+    assert "Claim your listing" in r.text
+    # Three-tier explainer must mention all three tier names.
+    for tier in ("Free", "Featured", "Concierge"):
+        assert tier in r.text
+
+
+def test_stage_hostname_resolves_to_underlying_city(client):
+    """`stage-miami.knowsbeauty.localhost` should render Miami content,
+    so a reviewer can compare a preview deployment to the live miami.knows...
+    URL side-by-side without needing a duplicate city record."""
+    r = client.get("/", headers={"host": "stage-miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "Knows Beauty" in r.text
+    assert "Miami" in r.text
 
 
 def test_home_promotes_voice_page(client):

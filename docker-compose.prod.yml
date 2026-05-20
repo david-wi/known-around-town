@@ -65,6 +65,72 @@ services:
       traefik.http.routers.kat-health.tls.certresolver: "letsencrypt"
       traefik.http.routers.kat-health.service: "known-around-town"
 
+  # Stage / preview environment.
+  #
+  # Same codebase but pinned to the `:stage` image tag, so a branch can be
+  # built and deployed here for review before promoting to `:latest`.
+  # Routes hostnames of the form `stage-<city>.<network>.ai.devintensive.com`
+  # (e.g. stage-miami.knowsbeauty.ai.devintensive.com). The tenant resolver
+  # strips the `stage-` prefix and looks up the underlying city, so the
+  # stage instance shows the same content as production with whatever
+  # template/code changes are in the `:stage` image. Shares MongoDB with
+  # production for now; a separate DB can be wired later if we want
+  # content isolation too.
+  backend-stage:
+    image: ghcr.io/david-wi/known-around-town:stage
+    restart: unless-stopped
+    mem_limit: 256m
+    environment:
+      MONGODB_URL: ${MONGODB_URL}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-known_around_town}
+      NETWORK_DOMAINS: >-
+        beauty:knowsbeauty.ai.devintensive.com,
+        wellness:knowswellness.ai.devintensive.com,
+        health:knowshealth.ai.devintensive.com
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      LOG_LEVEL: INFO
+    networks:
+      - traefik
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "traefik"
+      traefik.http.services.known-around-town-stage.loadbalancer.server.port: "8000"
+
+      # Beauty — stage hostnames. Literal Host() rules (not HostRegexp) so
+      # Let's Encrypt can generate certs per-hostname via HTTP-01 challenge.
+      # Add new stage cities here as needed.
+      traefik.http.routers.kat-stage-beauty.entrypoints: "https"
+      traefik.http.routers.kat-stage-beauty.rule: >-
+        Host(`stage-miami.knowsbeauty.ai.devintensive.com`) ||
+        Host(`stage.knowsbeauty.ai.devintensive.com`)
+      traefik.http.routers.kat-stage-beauty.tls: "true"
+      traefik.http.routers.kat-stage-beauty.tls.certresolver: "letsencrypt"
+      traefik.http.routers.kat-stage-beauty.service: "known-around-town-stage"
+
+      # Wellness — stage hostnames
+      traefik.http.routers.kat-stage-wellness.entrypoints: "https"
+      traefik.http.routers.kat-stage-wellness.rule: >-
+        Host(`stage-miami.knowswellness.ai.devintensive.com`) ||
+        Host(`stage.knowswellness.ai.devintensive.com`)
+      traefik.http.routers.kat-stage-wellness.tls: "true"
+      traefik.http.routers.kat-stage-wellness.tls.certresolver: "letsencrypt"
+      traefik.http.routers.kat-stage-wellness.service: "known-around-town-stage"
+
+      # Health — stage hostnames
+      traefik.http.routers.kat-stage-health.entrypoints: "https"
+      traefik.http.routers.kat-stage-health.rule: >-
+        Host(`stage-miami.knowshealth.ai.devintensive.com`) ||
+        Host(`stage.knowshealth.ai.devintensive.com`)
+      traefik.http.routers.kat-stage-health.tls: "true"
+      traefik.http.routers.kat-stage-health.tls.certresolver: "letsencrypt"
+      traefik.http.routers.kat-stage-health.service: "known-around-town-stage"
+
 networks:
   traefik:
     external: true
