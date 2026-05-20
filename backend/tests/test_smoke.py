@@ -77,6 +77,14 @@ def test_expertly_voice_page(client):
     assert "Expertly · Voice for Salons" in r.text
 
 
+def test_home_promotes_voice_page(client):
+    """The home page Owners CTA and footer should link to /expertly-voice.html."""
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "/expertly-voice.html" in r.text
+    assert "Voice for Salons" in r.text
+
+
 def test_unknown_host_404(client):
     r = client.get("/", headers={"host": "miami.unknownsite.localhost"})
     assert r.status_code == 404
