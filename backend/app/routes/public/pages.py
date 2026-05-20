@@ -631,6 +631,20 @@ async def expertly_voice_page(request: Request) -> HTMLResponse:
     return _templates.TemplateResponse("expertly_voice.html", ctx)
 
 
+@router.get("/owners", response_class=HTMLResponse)
+async def owners_page(request: Request) -> HTMLResponse:
+    tenant = await _require_tenant(request)
+    ctx = await _base_context(request, tenant)
+    city_name = tenant.city.get("name", "") if tenant.city else ""
+    vertical = _vertical_word(tenant.network)
+    ctx["seo_title"] = f"For Business Owners — {city_name} Knows {vertical}".strip(" —")
+    ctx["meta_description"] = (
+        f"Run a business in {city_name}? Your listing's already in {city_name} Knows "
+        f"{vertical}. Claim it, upgrade it, and get found by people searching tonight."
+    )
+    return _templates.TemplateResponse("owners.html", ctx)
+
+
 @router.get("/robots.txt")
 async def robots_txt(request: Request) -> HTMLResponse:
     tenant = await resolve_tenant(request.headers.get("host", ""))

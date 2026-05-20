@@ -1,0 +1,104 @@
+{#-
+  For Business Owners landing page. Reached from the header CTA and the
+  footer's Owners column on every site in the network.
+
+  Three-tier explainer (Free / Featured / Concierge) with a clear claim
+  CTA. Vertical-neutral copy — works for Beauty salons, Wellness studios,
+  Health practices — by referring to "your business" and using the
+  network's `vertical_word` / `place_label_plural` where appropriate.
+-#}
+{% extends 'base.html' %}
+{% set header_variant = 'sticky' %}
+
+{% block content %}
+
+<section class="bg-stone-50/60 border-b border-stone-200/60">
+  <div class="max-w-5xl mx-auto px-6 lg:px-10 py-20 lg:py-28">
+    <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-5">For Business Owners</p>
+    <h1 class="font-light text-stone-900 leading-[1.05] tracking-tight mb-6"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 300;'>
+      Run a {{ place_label_singular or 'business' }} in {{ city.name if city else 'town' }}?<br>
+      <em class="italic text-stone-500">Your listing's already here.</em>
+    </h1>
+    <p class="text-lg text-stone-600 leading-relaxed max-w-2xl mb-8">
+      Every credible {{ place_label_singular or 'business' }} in {{ city.name if city else 'the city' }} starts out listed in
+      {{ city.name ~ ' Knows ' ~ vertical_word if city else network.name }}. Free. No claim required.
+      Claim yours to take control of the profile, get found by people
+      searching tonight, and unlock the tools that bring bookings to the door.
+    </p>
+    <a class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
+       href="mailto:hello@knowsbeauty.ai.devintensive.com?subject=Claim%20my%20listing">
+      Claim your listing <span aria-hidden="true">→</span>
+    </a>
+  </div>
+</section>
+
+<section class="bg-white">
+  <div class="max-w-6xl mx-auto px-6 lg:px-10 py-20">
+    <p class="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-semibold mb-3">Three tiers</p>
+    <h2 class="font-light text-stone-900 leading-tight tracking-tight mb-12"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.875rem, 3vw, 2.5rem); font-weight: 300;'>
+      Start free. <em class="italic text-stone-500">Grow into more.</em>
+    </h2>
+
+    <div class="grid md:grid-cols-3 gap-8">
+
+      <div class="border border-stone-200 rounded-2xl p-8 bg-stone-50/40">
+        <p class="text-[11px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-3">Free</p>
+        <p class="text-3xl font-light text-stone-900 mb-1">$0</p>
+        <p class="text-sm text-stone-500 mb-6">for every business</p>
+        <ul class="space-y-3 text-sm text-stone-700 leading-relaxed">
+          <li>• Listing on the directory: name, neighborhood, category, price tier, hours, address, phone.</li>
+          <li>• Found via search, category, and neighborhood pages.</li>
+          <li>• No claim required to appear.</li>
+        </ul>
+      </div>
+
+      <div class="rounded-2xl p-8 bg-gradient-to-br {{ theme.owners_gradient or 'from-stone-100 via-stone-50 to-white' }} border border-stone-200">
+        <p class="text-[11px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-3">Featured</p>
+        <p class="text-3xl font-light text-stone-900 mb-1">$29<span class="text-base text-stone-500">/month</span></p>
+        <p class="text-sm text-stone-500 mb-6">for owners who claim and customize</p>
+        <ul class="space-y-3 text-sm text-stone-700 leading-relaxed">
+          <li>• Owner dashboard — edit your profile, photos, services, hours, menu.</li>
+          <li>• Editor's Pick eligibility, neighborhood-spotlight rotation, premium search positioning.</li>
+          <li>• Marketing AI tools: Instagram drafts, ad copy, Google Business sync.</li>
+          <li>• Owner-curated quotes from your reviews.</li>
+        </ul>
+      </div>
+
+      <div class="rounded-2xl p-8 bg-stone-900 text-white">
+        <p class="text-[11px] uppercase tracking-[0.25em] text-amber-300 font-semibold mb-3">Concierge</p>
+        <p class="text-3xl font-light mb-1">$299<span class="text-base text-white/60">/month</span></p>
+        <p class="text-sm text-white/60 mb-6">Featured + Expertly Voice receptionist</p>
+        <ul class="space-y-3 text-sm text-white/85 leading-relaxed">
+          <li>• AI phone receptionist that books straight into your calendar.</li>
+          <li>• 150 calls included @ 5 min each, $2 per overage call.</li>
+          <li>• Multi-language. Live calendar sync with Fresha, Vagaro, Mindbody, Square, Booksy.</li>
+          <li>• 1 week free, setup included, walk away anytime.</li>
+        </ul>
+        <a class="inline-flex items-center gap-2 mt-6 text-sm text-amber-300 hover:text-amber-200 font-medium tracking-wide" href="/expertly-voice.html">
+          See how Voice works <span aria-hidden="true">→</span>
+        </a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section class="bg-stone-50/60 border-t border-stone-200/60">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-20 text-center">
+    <h2 class="font-light text-stone-900 leading-tight tracking-tight mb-6"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.75rem, 2.5vw, 2.25rem); font-weight: 300;'>
+      Ready to claim your <em class="italic text-stone-500">{{ place_label_singular or 'listing' }}</em>?
+    </h2>
+    <p class="text-stone-600 leading-relaxed mb-8">
+      Drop us a line with your business name and we'll get you set up — usually within a day.
+    </p>
+    <a class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
+       href="mailto:hello@knowsbeauty.ai.devintensive.com?subject=Claim%20my%20listing">
+      Email us to claim <span aria-hidden="true">→</span>
+    </a>
+  </div>
+</section>
+
+{% endblock %}
