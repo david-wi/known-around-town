@@ -20,7 +20,7 @@
   <div class="absolute inset-0 bg-gradient-to-br from-stone-900 via-stone-950 to-stone-950"></div>
   <div class="absolute inset-0 bg-gradient-to-r from-stone-950/70 via-stone-950/20 to-transparent"></div>
   {# A single warm amber glow behind the headline keeps the dark canvas from feeling cold. #}
-  <div class="absolute top-1/3 right-[10%] w-[480px] h-[480px] bg-amber-500/10 rounded-full blur-3xl"></div>
+  <div class="absolute top-1/3 right-[10%] w-[480px] h-[480px] bg-amber-500/20 rounded-full blur-3xl"></div>
 
   <div class="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-24 pt-36 w-full">
     <div class="grid lg:grid-cols-12 gap-12 items-center">
@@ -37,10 +37,10 @@
           <p class="text-white/85 text-base md:text-lg leading-relaxed font-light tracking-wide">A warm, on-brand phone assistant that answers when you're with a client or closed — and books the appointment straight into your calendar.</p>
         </div>
         <div class="flex flex-wrap items-center gap-6">
-          <a class="inline-flex items-center gap-2 bg-amber-200 hover:bg-amber-100 text-stone-950 font-medium px-7 py-3.5 rounded-full transition tracking-wide text-sm" href="#start">Start a 14-day free trial
+          <a class="inline-flex items-center gap-2 bg-amber-300 hover:opacity-90 text-stone-900 font-medium px-7 py-3.5 rounded-full transition tracking-wide text-sm" href="#start">Start a 14-day free trial
             <span aria-hidden="true">→</span>
           </a>
-          <a class="inline-flex items-center gap-2 text-white/90 hover:text-white font-medium pb-1 border-b border-white/40 hover:border-amber-200 transition text-sm tracking-wide" href="#sample">
+          <a class="inline-flex items-center gap-2 text-white/90 hover:text-white font-medium pb-1 border-b border-white/40 hover:border-amber-300 transition text-sm tracking-wide" href="#sample">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
               <polygon points="6 4 20 12 6 20" fill="currentColor"></polygon>
             </svg>
@@ -53,7 +53,7 @@
       {# Phone frame floating on the right of the hero — pure HTML/SVG so it scales cleanly. #}
       <div class="lg:col-span-5 hidden lg:block" id="sample">
         <div class="relative mx-auto" style="max-width: 320px;">
-          <div class="absolute -inset-6 bg-amber-200/10 rounded-[44px] blur-2xl"></div>
+          <div class="absolute -inset-6 bg-amber-300/40 rounded-[44px] blur-2xl"></div>
           <div class="relative bg-stone-900 ring-1 ring-white/10 rounded-[36px] p-3 shadow-2xl shadow-stone-950/60">
             <div class="bg-stone-50 rounded-[28px] overflow-hidden">
               {# iOS-ish status bar #}
@@ -67,7 +67,7 @@
               </div>
               {# Call header #}
               <div class="px-5 py-3 border-b border-stone-200/70 flex items-center gap-3">
-                <div class="w-9 h-9 rounded-full bg-amber-200 flex items-center justify-center text-stone-900 font-serif font-medium" style="font-family: Georgia, serif;">V</div>
+                <div class="w-9 h-9 rounded-full bg-amber-300 flex items-center justify-center text-stone-900 font-serif font-medium" style="font-family: Georgia, serif;">V</div>
                 <div class="flex-1 min-w-0">
                   <div class="text-[13px] font-semibold text-stone-900 leading-tight">Expertly Voice</div>
                   <div class="text-[10px] text-emerald-700 uppercase tracking-[0.2em] font-medium">● On call · 0:14</div>
@@ -83,7 +83,7 @@
               {# Waveform #}
               <div class="px-4 pb-4 pt-2 flex items-center gap-[3px] h-10">
                 {% for h in [6, 12, 18, 9, 22, 14, 7, 20, 11, 16, 24, 10, 18, 8, 13, 6] %}
-                <span class="block w-[3px] bg-amber-500/80 rounded-full" style="height: {{ h }}px;"></span>
+                <span class="block w-[3px] bg-amber-500 rounded-full" style="height: {{ h }}px;"></span>
                 {% endfor %}
               </div>
             </div>
@@ -125,7 +125,7 @@
       {# The transcript itself, large and readable — editorial print column. #}
       <div class="bg-white rounded-3xl ring-1 ring-stone-200/70 p-8 md:p-10 shadow-xl shadow-stone-200/40">
         <div class="flex items-center gap-3 pb-5 mb-5 border-b border-stone-200/60">
-          <div class="w-11 h-11 rounded-full bg-amber-200 flex items-center justify-center text-stone-900 font-medium" style="font-family: Georgia, serif;">V</div>
+          <div class="w-11 h-11 rounded-full bg-amber-300 flex items-center justify-center text-stone-900 font-medium" style="font-family: Georgia, serif;">V</div>
           <div>
             <div class="font-serif text-lg text-stone-900" style="font-family: Georgia, serif;">Expertly Voice</div>
             <div class="text-[10px] text-emerald-700 uppercase tracking-[0.2em] font-semibold">● On call · 0:14</div>
@@ -210,7 +210,7 @@
 
     <div class="grid md:grid-cols-2 gap-6">
       {# Feature 1 — Sounds like a real person #}
-      <div class="group bg-stone-50/70 border border-stone-200/70 hover:border-amber-300/70 rounded-3xl p-8 md:p-10 transition">
+      <div class="group bg-stone-50/60 border border-stone-200/70 hover:border-amber-300 rounded-3xl p-8 md:p-10 transition">
         <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200/60 flex items-center justify-center mb-6 text-stone-900">
           <svg width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <circle cx="16" cy="11" r="6" fill="currentColor" opacity="0.15"></circle>
@@ -226,7 +226,7 @@
       </div>
 
       {# Feature 2 — Books on the spot #}
-      <div class="group bg-stone-50/70 border border-stone-200/70 hover:border-amber-300/70 rounded-3xl p-8 md:p-10 transition">
+      <div class="group bg-stone-50/60 border border-stone-200/70 hover:border-amber-300 rounded-3xl p-8 md:p-10 transition">
         <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200/60 flex items-center justify-center mb-6 text-stone-900">
           <svg width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <rect x="5" y="7" width="22" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
@@ -241,7 +241,7 @@
       </div>
 
       {# Feature 3 — Speaks your salon #}
-      <div class="group bg-stone-50/70 border border-stone-200/70 hover:border-amber-300/70 rounded-3xl p-8 md:p-10 transition">
+      <div class="group bg-stone-50/60 border border-stone-200/70 hover:border-amber-300 rounded-3xl p-8 md:p-10 transition">
         <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200/60 flex items-center justify-center mb-6 text-stone-900">
           <svg width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M6 11a5 5 0 0 1 5-5h10a5 5 0 0 1 5 5v6a5 5 0 0 1-5 5h-7l-5 4v-4a5 5 0 0 1-3-5v-6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
@@ -254,7 +254,7 @@
       </div>
 
       {# Feature 4 — Suggests add-ons #}
-      <div class="group bg-stone-50/70 border border-stone-200/70 hover:border-amber-300/70 rounded-3xl p-8 md:p-10 transition">
+      <div class="group bg-stone-50/60 border border-stone-200/70 hover:border-amber-300 rounded-3xl p-8 md:p-10 transition">
         <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200/60 flex items-center justify-center mb-6 text-stone-900">
           <svg width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M16 4l2.6 6.4 6.9.5-5.3 4.4 1.8 6.7L16 18.5l-6 3.5 1.8-6.7-5.3-4.4 6.9-.5L16 4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
@@ -281,7 +281,7 @@
         style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.75rem, 3.5vw, 2.75rem);'>The booking software <em class="italic text-stone-500">you already use.</em></h2>
     <div class="flex flex-wrap items-center justify-center gap-3">
       {% for tool in ["Fresha", "Vagaro", "Mindbody", "Square Appointments", "Booksy"] %}
-      <span class="inline-flex items-center gap-2 bg-white border border-amber-200/80 hover:border-amber-300 rounded-full px-5 py-2.5 text-sm font-medium text-stone-800 transition">
+      <span class="inline-flex items-center gap-2 bg-white border border-amber-200/70 hover:border-amber-300 rounded-full px-5 py-2.5 text-sm font-medium text-stone-800 transition">
         <span class="w-2 h-2 rounded-full bg-amber-400"></span>
         {{ tool }}
       </span>
@@ -296,8 +296,8 @@
   <div class="max-w-7xl mx-auto px-6 lg:px-10">
     <div class="relative bg-gradient-to-br from-stone-900 via-stone-900 to-stone-950 rounded-3xl overflow-hidden">
       <div class="absolute inset-0 opacity-40">
-        <div class="absolute top-0 right-0 w-96 h-96 bg-amber-400/30 rounded-full blur-3xl -translate-y-1/4 translate-x-1/4"></div>
-        <div class="absolute bottom-0 left-0 w-96 h-96 bg-amber-200/20 rounded-full blur-3xl translate-y-1/4 -translate-x-1/4"></div>
+        <div class="absolute top-0 right-0 w-96 h-96 bg-amber-400/60 rounded-full blur-3xl -translate-y-1/4 translate-x-1/4"></div>
+        <div class="absolute bottom-0 left-0 w-96 h-96 bg-amber-300/40 rounded-full blur-3xl translate-y-1/4 -translate-x-1/4"></div>
       </div>
       <div class="relative px-10 py-16 lg:px-20 lg:py-24 text-center">
         <div class="flex items-center justify-center gap-4 mb-8">
@@ -309,10 +309,10 @@
             style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.75rem, 6vw, 4.5rem); font-weight: 300;'>Sound like<br><em class="italic text-amber-200">your salon?</em></h2>
         <p class="text-white/80 text-lg leading-relaxed max-w-xl mx-auto mb-10">Two weeks free, no card needed. If your phone isn't picking up more bookings by day 14, walk away — we'll uninstall it for you.</p>
         <div class="flex flex-wrap items-center justify-center gap-5">
-          <a class="inline-flex items-center gap-2 bg-amber-200 hover:bg-amber-100 text-stone-950 font-medium px-8 py-4 rounded-full transition tracking-wide" href="mailto:hello@expertly.ai?subject=Voice%20for%20Salons%20trial">Start a 14-day free trial
+          <a class="inline-flex items-center gap-2 bg-amber-300 hover:opacity-90 text-stone-900 font-medium px-8 py-4 rounded-full transition tracking-wide" href="mailto:hello@expertly.ai?subject=Voice%20for%20Salons%20trial">Start a 14-day free trial
             <span aria-hidden="true">→</span>
           </a>
-          <a class="inline-flex items-center gap-2 text-white/90 hover:text-white font-medium pb-1 border-b border-white/40 hover:border-amber-200 transition text-sm tracking-wide" href="tel:+13055551212">
+          <a class="inline-flex items-center gap-2 text-white/90 hover:text-white font-medium pb-1 border-b border-white/40 hover:border-amber-300 transition text-sm tracking-wide" href="tel:+13055551212">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z" stroke-linecap="round" stroke-linejoin="round"></path>
             </svg>
