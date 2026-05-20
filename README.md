@@ -79,3 +79,6 @@ business -> category(city) -> city -> network -> global default
 
 Initial scaffold. Public pages render from the DB; JSON API supports CRUD. Admin UI is
 the JSON API for now — a React admin panel can come later.
+
+<!-- Auto-deploy webhook verified 2026-05-20. Pushes to main now redeploy automatically. -->
+
