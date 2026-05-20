@@ -83,6 +83,11 @@ services:
   # something like preview.knowsbeauty.com, that's a deliberate decision
   # to add, not an oversight to fix.
   backend-stage:
+    # WHY: profile keeps the stage service opt-in. Normal production
+    # deploys (`docker compose up -d`) ignore this service so they
+    # never try to pull a `:stage` image that doesn't exist yet.
+    # To start it, run `docker compose --profile stage up -d`.
+    profiles: ["stage"]
     image: ghcr.io/david-wi/known-around-town:stage
     restart: unless-stopped
     mem_limit: 256m
