@@ -17,23 +17,23 @@
     <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-5">For Business Owners</p>
     <h1 class="font-light text-stone-900 leading-[1.05] tracking-tight mb-6"
         style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 300;'>
-      Run a {{ place_label_singular or 'business' }} in {{ city.name if city else 'town' }}?<br>
+      Run a {{ listing_word_singular or 'business' }} in {{ city.name if city else 'town' }}?<br>
       <em class="italic text-stone-500">Your listing's already here.</em>
     </h1>
     <p class="text-lg text-stone-600 leading-relaxed max-w-2xl mb-8">
-      Every credible {{ place_label_singular or 'business' }} in {{ city.name if city else 'the city' }} starts out listed in
+      Every credible {{ listing_word_singular or 'business' }} in {{ city.name if city else 'the city' }} starts out listed in
       {{ city.name ~ ' Knows ' ~ vertical_word if city else network.name }}. Free. No claim required.
       Claim yours to take control of the profile, get found by people
       searching tonight, and unlock the tools that bring bookings to the door.
     </p>
     <a class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
-       href="mailto:hello@knowsbeauty.ai.devintensive.com?subject=Claim%20my%20listing">
+       href="mailto:hello@expertly.ai?subject=Claim%20my%20listing">
       Claim your listing <span aria-hidden="true">→</span>
     </a>
   </div>
 </section>
 
-<section class="bg-white">
+<section id="pricing" class="bg-white">
   <div class="max-w-6xl mx-auto px-6 lg:px-10 py-20">
     <p class="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-semibold mb-3">Three tiers</p>
     <h2 class="font-light text-stone-900 leading-tight tracking-tight mb-12"
@@ -74,7 +74,7 @@
           <li>• AI phone receptionist that books straight into your calendar.</li>
           <li>• 150 calls included @ 5 min each, $2 per overage call.</li>
           <li>• Multi-language. Live calendar sync with Fresha, Vagaro, Mindbody, Square, Booksy.</li>
-          <li>• 1 week free, setup included, walk away anytime.</li>
+          <li>• 1-week free trial, setup included, walk away anytime.</li>
         </ul>
         <a class="inline-flex items-center gap-2 mt-6 text-sm text-amber-300 hover:text-amber-200 font-medium tracking-wide" href="/expertly-voice.html">
           See how Voice works <span aria-hidden="true">→</span>
@@ -89,13 +89,13 @@
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-20 text-center">
     <h2 class="font-light text-stone-900 leading-tight tracking-tight mb-6"
         style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.75rem, 2.5vw, 2.25rem); font-weight: 300;'>
-      Ready to claim your <em class="italic text-stone-500">{{ place_label_singular or 'listing' }}</em>?
+      Ready to claim your <em class="italic text-stone-500">{{ listing_word_singular or 'listing' }}</em>?
     </h2>
     <p class="text-stone-600 leading-relaxed mb-8">
       Drop us a line with your business name and we'll get you set up — usually within a day.
     </p>
     <a class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
-       href="mailto:hello@knowsbeauty.ai.devintensive.com?subject=Claim%20my%20listing">
+       href="mailto:hello@expertly.ai?subject=Claim%20my%20listing">
       Email us to claim <span aria-hidden="true">→</span>
     </a>
   </div>

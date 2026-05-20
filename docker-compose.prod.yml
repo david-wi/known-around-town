@@ -76,6 +76,12 @@ services:
   # template/code changes are in the `:stage` image. Shares MongoDB with
   # production for now; a separate DB can be wired later if we want
   # content isolation too.
+  #
+  # WHY only the dev hostnames are listed here (not the customer-facing
+  # .com domains): staging is intentionally dev-only. The .com domains
+  # are reserved for production. If we ever need a public preview at
+  # something like preview.knowsbeauty.com, that's a deliberate decision
+  # to add, not an oversight to fix.
   backend-stage:
     image: ghcr.io/david-wi/known-around-town:stage
     restart: unless-stopped
