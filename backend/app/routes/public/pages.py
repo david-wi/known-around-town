@@ -618,6 +618,19 @@ async def editorial_guide_page(request: Request, slug: str) -> HTMLResponse:
     return _templates.TemplateResponse("editorial_guide.html", ctx)
 
 
+@router.get("/expertly-voice.html", response_class=HTMLResponse)
+async def expertly_voice_page(request: Request) -> HTMLResponse:
+    tenant = await _require_tenant(request)
+    ctx = await _base_context(request, tenant)
+    ctx["seo_title"] = "Expertly Voice for Salons"
+    ctx["meta_description"] = (
+        "Never miss a booking. Expertly Voice answers your salon's phone "
+        "when you're with a client or closed — and books appointments "
+        "straight into your calendar."
+    )
+    return _templates.TemplateResponse("expertly_voice.html", ctx)
+
+
 @router.get("/robots.txt")
 async def robots_txt(request: Request) -> HTMLResponse:
     tenant = await resolve_tenant(request.headers.get("host", ""))

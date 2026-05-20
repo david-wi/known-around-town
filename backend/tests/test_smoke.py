@@ -68,6 +68,15 @@ def test_miami_health_home(client):
     assert "doctor" in r.text.lower() or "clinic" in r.text.lower() or "provider" in r.text.lower()
 
 
+def test_expertly_voice_page(client):
+    r = client.get(
+        "/expertly-voice.html", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    assert "Never miss a booking" in r.text
+    assert "Expertly · Voice for Salons" in r.text
+
+
 def test_unknown_host_404(client):
     r = client.get("/", headers={"host": "miami.unknownsite.localhost"})
     assert r.status_code == 404
