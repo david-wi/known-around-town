@@ -40,7 +40,8 @@
       "website": "https://www.ayeshabeautystudio.com",
       "instagram": "@ayeshabeautystudio",
       "editors_pick": true,
-      "premium": false
+      "premium": false,
+      "is_founding_partner": true
     },
     {
       "slug": "the-broward-brow-studio-brickell",
@@ -124,7 +125,8 @@
       "website": "https://www.vanityprojects.com",
       "instagram": "@vanityprojects",
       "editors_pick": true,
-      "premium": false
+      "premium": false,
+      "is_founding_partner": true
     },
     {
       "slug": "bellacures-coral-gables",
@@ -348,7 +350,8 @@
       "website": "https://www.igkhair.com/pages/miami-salon",
       "instagram": "@igksalon",
       "editors_pick": true,
-      "premium": false
+      "premium": false,
+      "is_founding_partner": true
     },
     {
       "slug": "drybar-miami-beach",
@@ -432,7 +435,8 @@
       "website": "https://www.blowdrybar.com/",
       "instagram": "@blowdrybar",
       "editors_pick": false,
-      "premium": false
+      "premium": false,
+      "is_founding_partner": true
     },
     {
       "slug": "massage-envy-brickell",
@@ -516,7 +520,8 @@
       "website": "https://www.nuestudio.co/",
       "instagram": "@nuestudio",
       "editors_pick": true,
-      "premium": false
+      "premium": false,
+      "is_founding_partner": true
     },
     {
       "slug": "the-nail-lab-wynwood",

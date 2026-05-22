@@ -266,6 +266,11 @@ class Business(BaseModel):
     verified_at: Optional[datetime] = None
     featured: Featured = Field(default_factory=Featured)
     editors_pick: bool = False
+    # WHY: First 8-10 salons to come aboard as design partners receive a
+    # "Founding Partner" badge on their listing. Stored as a plain boolean
+    # so it survives a normal upsert and so the home/detail templates can
+    # render the badge with a single boolean check, no join needed.
+    is_founding_partner: bool = False
     index_status: IndexStatus = IndexStatus.thin
     index_override: IndexOverride = IndexOverride.auto
     meta_title_override: Optional[str] = None

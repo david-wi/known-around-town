@@ -54,6 +54,11 @@
     <div class="md:col-span-8">
       <div class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text }} font-semibold mb-3">{% if neighborhood_obj %}{{ neighborhood_obj.name }}{% endif %}{% if neighborhood_obj and category_obj %} · {% endif %}{% if category_obj %}{{ category_obj.name }}{% endif %}{% if business.price_cues %} · {{ business.price_cues }}{% endif %}</div>
       <h1 class="font-serif text-5xl md:text-6xl lg:text-7xl font-light text-stone-900 leading-[0.95] mb-5" style='font-family: Georgia, "Times New Roman", serif;'>{{ business.name }}</h1>
+      {% if business.is_founding_partner %}
+      <div class="mb-5">
+        {% with variant='inline', tenant_label=tenant_label %}{% include 'partials/founding_partner_badge.html' %}{% endwith %}
+      </div>
+      {% endif %}
       {% if business.short_description %}<p class="text-xl text-stone-600 max-w-2xl leading-relaxed">{{ business.short_description }}</p>{% endif %}
     </div>
     <div class="md:col-span-4 flex md:justify-end">

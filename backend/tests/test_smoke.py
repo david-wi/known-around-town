@@ -219,3 +219,42 @@ def test_copy_block_override(client, seeded_db):
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200
     assert "An editors&#39; guide for Miami" in r.text or "An editors' guide for Miami" in r.text
+
+
+def test_founding_partner_badge_on_business_detail(client):
+    """A business that's been flagged as a Founding Partner shows the
+    badge label on its detail page. Ayesha Beauty Studio in Wynwood is
+    one of the five mock founding partners seeded for the design-partner
+    outreach demo — if this fails, check `is_founding_partner` is still
+    set on it in `_real_businesses.json`."""
+    r = client.get(
+        "/b/ayesha-beauty-studio-wynwood",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "Founding Partner" in r.text
+    # Tooltip should reference the publication name.
+    assert "Founding member of Miami Knows Beauty" in r.text
+
+
+def test_founding_partner_badge_on_trending_row(client):
+    """The home page's trending row also surfaces the Founding Partner
+    badge for any business that has the flag. Three of the five mock
+    founding partners are in the Miami Beauty trending list
+    (Ayesha, Vanity Projects, IGK), so the badge text should appear on
+    the home page."""
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "Founding Partner" in r.text
+
+
+def test_non_founding_partner_does_not_show_badge(client):
+    """A salon NOT flagged as a Founding Partner doesn't render the
+    badge on its detail page. Drybar Miami Beach is a real, non-founding
+    business in the seed, so its page should NOT mention the badge."""
+    r = client.get(
+        "/b/drybar-miami-beach",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "Founding Partner" not in r.text
