@@ -94,6 +94,7 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "owners_blob_a":            "bg-rose-300",
         "owners_blob_b":            "bg-amber-300",
         "owners_eyebrow_color":     "text-rose-700",
+        "highlight_border":         "border-rose-300",
     },
     "wellness": {
         "accent_text":              "text-emerald-600",
@@ -113,6 +114,7 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "owners_blob_a":            "bg-emerald-300",
         "owners_blob_b":            "bg-teal-300",
         "owners_eyebrow_color":     "text-emerald-700",
+        "highlight_border":         "border-emerald-300",
     },
     "health": {
         "accent_text":              "text-sky-700",
@@ -132,6 +134,7 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "owners_blob_a":            "bg-sky-300",
         "owners_blob_b":            "bg-amber-300",
         "owners_eyebrow_color":     "text-sky-800",
+        "highlight_border":         "border-sky-300",
     },
 }
 
@@ -942,6 +945,21 @@ async def owners_caption_preview(request: Request) -> HTMLResponse:
         }
     )
     return _templates.TemplateResponse("owners_caption_preview.html", ctx)
+
+
+@router.get("/pricing", response_class=HTMLResponse)
+async def pricing_page(request: Request) -> HTMLResponse:
+    tenant = await _require_tenant(request)
+    ctx = await _base_context(request, tenant)
+    city_name = tenant.city.get("name", "") if tenant.city else ""
+    vertical = _vertical_word(tenant.network)
+    ctx["seo_title"] = f"Pricing — {city_name} Knows {vertical}".strip(" —")
+    ctx["meta_description"] = (
+        f"Three ways to show up on {city_name} Knows {vertical}. "
+        f"Free listing, $29/month Featured, or $299/month Concierge with an AI phone "
+        f"receptionist. First month free on Featured, cancel anytime."
+    ).strip()
+    return _templates.TemplateResponse("pricing.html", ctx)
 
 
 @router.get("/robots.txt")

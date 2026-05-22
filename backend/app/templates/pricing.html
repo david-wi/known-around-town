@@ -1,0 +1,224 @@
+{#-
+  Dedicated pricing comparison page at /pricing.
+
+  The /owners page has a brief three-tile pricing strip near the bottom; this
+  page is the deep version: detailed feature lists side-by-side, the price
+  comparison clearly anchored, and a FAQ that handles the questions a salon
+  owner asks right before committing. Visual language matches the rest of the
+  site (Georgia serif headlines, Tailwind stone neutrals, per-network accent
+  color via the `theme` context).
+
+  Featured is highlighted as the recommended choice — bolder card via a
+  thicker accent border plus a "Most popular" badge — because that's the
+  conversion target documented in the Featured tier spec.
+
+  All Tailwind utility classes used here are present in the compiled
+  reference.css. Anything not in that stylesheet would silently no-op,
+  so be careful when adding new classes.
+
+  Vertical-neutral copy: uses `listing_word_singular` (salon / studio / clinic)
+  and `vertical_word` (Beauty / Wellness / Health) so the same template
+  renders sensibly across all three networks.
+-#}
+{% extends 'base.html' %}
+{% set header_variant = 'sticky' %}
+
+{% block content %}
+
+{# ----- Hero ----- #}
+<section class="bg-stone-50/60 border-b border-stone-200/60">
+  <div class="max-w-4xl mx-auto px-6 lg:px-10 py-20 lg:py-24 text-center">
+    <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-5">Pricing</p>
+    <h1 class="font-light text-stone-900 leading-[1.05] tracking-tight mb-6"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.25rem, 4.5vw, 3.75rem); font-weight: 300;'>
+      Three ways to show up on<br>
+      <em class="italic text-stone-500">{{ (city.name ~ ' Knows ' ~ vertical_word) if city else network.name }}</em>.
+    </h1>
+    <p class="text-lg text-stone-600 leading-relaxed max-w-2xl mx-auto">
+      Pick what fits your {{ listing_word_singular or 'business' }}. Start free, upgrade when you're ready, cancel anytime.
+    </p>
+  </div>
+</section>
+
+{# ----- Tier comparison ----- #}
+<section class="bg-white">
+  <div class="max-w-6xl mx-auto px-6 lg:px-10 py-20">
+
+    <div class="grid md:grid-cols-3 gap-8">
+
+      {# ----- Free ----- #}
+      <div class="flex flex-col h-full border border-stone-200 rounded-2xl p-8 bg-stone-50/40">
+        <p class="text-[11px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-3">Free</p>
+        <p class="text-4xl font-light text-stone-900 mb-1"
+           style='font-family: Georgia, "Times New Roman", serif;'>$0</p>
+        <p class="text-sm text-stone-500 mb-2">for every {{ listing_word_singular or 'business' }}</p>
+        <p class="text-sm text-stone-600 leading-relaxed mb-6">
+          You're already here. The basics, on the house.
+        </p>
+        <ul class="space-y-3 text-sm text-stone-700 leading-relaxed mb-8">
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Listing on the directory: name, neighborhood, category, price tier, hours, address, phone.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Found via search, category pages, and neighborhood pages.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>No claim required to appear.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Short bio (about 200 characters).</span></li>
+        </ul>
+        <a class="inline-flex items-center justify-center gap-2 border border-stone-900/30 hover:bg-stone-800 hover:text-white text-stone-900 font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
+           href="/">
+          View the directory <span aria-hidden="true">→</span>
+        </a>
+      </div>
+
+      {# ----- Featured (highlighted with a thicker accent border + "Most popular" badge) ----- #}
+      <div class="relative flex flex-col h-full rounded-2xl p-8 bg-gradient-to-br {{ theme.owners_gradient or 'from-stone-100 via-stone-50 to-white' }} border-4 {{ theme.highlight_border or 'border-rose-300' }} shadow-xl">
+        <span class="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.2em] font-semibold {{ theme.button_bg }} text-white">
+          Most popular
+        </span>
+        <p class="text-[11px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-3">Featured</p>
+        <p class="text-4xl font-light text-stone-900 mb-1"
+           style='font-family: Georgia, "Times New Roman", serif;'>
+          $29<span class="text-base text-stone-500">/month</span>
+        </p>
+        <p class="text-sm text-stone-500 mb-2">or $290/year &middot; first month free</p>
+        <p class="text-sm text-stone-700 leading-relaxed mb-6">
+          Control how you appear. Get the marketing AI tools that bring bookings to the door.
+        </p>
+        <ul class="space-y-3 text-sm text-stone-700 leading-relaxed mb-8">
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong>Everything in Free</strong>, plus:</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Owner dashboard — edit profile, photos, services, hours, menu.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Up to 12 photos plus a hero image. Longer bio (up to ~800 characters).</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>3-5 house specialties pinned at the top of your page.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Editor's Pick eligibility &middot; neighborhood spotlight rotation &middot; premium search positioning.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Instagram caption generator (50/month).</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Ad copy drafts for Google &amp; Meta (20 campaigns/month).</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Google Business Profile sync — hours, photos, services.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Owner-curated quotes from your reviews.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Email support (~1 business day).</span></li>
+        </ul>
+        <a class="inline-flex items-center justify-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
+           href="/owners#claim">
+          Claim your listing <span aria-hidden="true">→</span>
+        </a>
+      </div>
+
+      {# ----- Concierge ----- #}
+      <div class="flex flex-col h-full rounded-2xl p-8 bg-stone-900 text-white">
+        <p class="text-[11px] uppercase tracking-[0.25em] text-amber-400 font-semibold mb-3">Concierge</p>
+        <p class="text-4xl font-light text-white mb-1"
+           style='font-family: Georgia, "Times New Roman", serif;'>
+          $299<span class="text-base text-white/60">/month</span>
+        </p>
+        <p class="text-sm text-white/60 mb-2">Featured + AI phone receptionist</p>
+        <p class="text-sm text-white/80 leading-relaxed mb-6">
+          Never miss a booking. We answer the phone for you, in any language, and book straight into your calendar.
+        </p>
+        <ul class="space-y-3 text-sm text-white/85 leading-relaxed mb-8">
+          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span><strong class="text-white">Everything in Featured</strong>, plus:</span></li>
+          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>AI phone receptionist that books straight into your calendar.</span></li>
+          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>150 calls included @ 5 min each, $2 per overage call.</span></li>
+          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>Multi-language phone handling.</span></li>
+          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>Live calendar sync with Fresha, Vagaro, Mindbody, Square, Booksy.</span></li>
+          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>Call recording, transcription, translation.</span></li>
+          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>1-week free trial, setup included, walk away anytime.</span></li>
+        </ul>
+        <a class="inline-flex items-center justify-center gap-2 bg-amber-300 hover:opacity-90 text-stone-900 font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
+           href="/expertly-voice.html">
+          Talk to us <span aria-hidden="true">→</span>
+        </a>
+      </div>
+
+    </div>
+
+    {# ----- Trust line ----- #}
+    <p class="text-center text-sm text-stone-500 mt-12 italic">
+      First month free on Featured. Cancel anytime. Refunds pro-rated by full months unused.
+    </p>
+  </div>
+</section>
+
+{# ----- FAQ ----- #}
+<section class="bg-stone-50/60 border-t border-stone-200/60">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-20">
+    <p class="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-semibold mb-3 text-center">Questions</p>
+    <h2 class="font-light text-stone-900 leading-tight tracking-tight mb-12 text-center"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.875rem, 3vw, 2.5rem); font-weight: 300;'>
+      The <em class="italic text-stone-500">small print</em>, in plain English.
+    </h2>
+
+    <div class="space-y-10">
+
+      <div>
+        <h3 class="text-base font-semibold text-stone-900 mb-2">How do I claim my listing?</h3>
+        <p class="text-stone-600 leading-relaxed text-sm">
+          Find your {{ listing_word_singular or 'business' }} in the directory and click "Claim this listing"
+          on the page, or head to <a class="{{ theme.accent_text_full }} underline" href="/owners">our owner page</a>
+          and enter your business name. We email a verification link, you set a password, and you're in your dashboard.
+          Most claims are approved within one business day.
+        </p>
+      </div>
+
+      <div>
+        <h3 class="text-base font-semibold text-stone-900 mb-2">Can I switch tiers?</h3>
+        <p class="text-stone-600 leading-relaxed text-sm">
+          Anytime, from your dashboard. Upgrades take effect immediately and we charge the
+          difference pro-rated. Downgrades take effect at the end of your current billing
+          period — you keep everything you paid for until then.
+        </p>
+      </div>
+
+      <div>
+        <h3 class="text-base font-semibold text-stone-900 mb-2">Is there a per-photo or per-AI-draft fee?</h3>
+        <p class="text-stone-600 leading-relaxed text-sm">
+          No. Featured includes up to 12 photos plus a hero image, 50 Instagram caption
+          drafts per month, and 20 ad-copy campaigns per month. Concierge call overages
+          (above 150 calls/month) are billed at $2 per call.
+        </p>
+      </div>
+
+      <div>
+        <h3 class="text-base font-semibold text-stone-900 mb-2">What happens if I cancel?</h3>
+        <p class="text-stone-600 leading-relaxed text-sm">
+          Your listing stays live forever as a Free listing — you don't lose your spot in
+          the directory. You lose the dashboard, marketing AI tools, and the editorial
+          enhancements when the paid period ends. We refund any full unused months
+          pro-rated.
+        </p>
+      </div>
+
+      <div>
+        <h3 class="text-base font-semibold text-stone-900 mb-2">Is there a setup fee?</h3>
+        <p class="text-stone-600 leading-relaxed text-sm">
+          No setup fee on any tier. Concierge includes phone setup at no charge — we
+          handle the call forwarding and calendar integration on a short onboarding call.
+        </p>
+      </div>
+
+      <div>
+        <h3 class="text-base font-semibold text-stone-900 mb-2">What's the trial period?</h3>
+        <p class="text-stone-600 leading-relaxed text-sm">
+          Featured: first month free. We take a card at signup and charge on day 31
+          unless you cancel — no surprises. Concierge: one-week free trial of the phone
+          receptionist, setup included, walk away anytime in that week at no charge.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+{# ----- Closing CTA ----- #}
+<section class="bg-white">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-20 text-center">
+    <h2 class="font-light text-stone-900 leading-tight tracking-tight mb-6"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.75rem, 2.5vw, 2.25rem); font-weight: 300;'>
+      Ready to <em class="italic text-stone-500">claim your {{ listing_word_singular or 'listing' }}</em>?
+    </h2>
+    <p class="text-stone-600 leading-relaxed mb-8">
+      It takes about a minute. First month's on us.
+    </p>
+    <a class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
+       href="/owners#claim">
+      Claim your listing <span aria-hidden="true">→</span>
+    </a>
+  </div>
+</section>
+
+{% endblock %}
