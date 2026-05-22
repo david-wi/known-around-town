@@ -641,7 +641,10 @@ async def expertly_voice_page(request: Request) -> HTMLResponse:
 
 
 @router.get("/owners", response_class=HTMLResponse)
-async def owners_page(request: Request) -> HTMLResponse:
+async def owners_page(
+    request: Request,
+    slug: Optional[str] = None,
+) -> HTMLResponse:
     tenant = await _require_tenant(request)
     ctx = await _base_context(request, tenant)
     city_name = tenant.city.get("name", "") if tenant.city else ""
@@ -651,6 +654,39 @@ async def owners_page(request: Request) -> HTMLResponse:
         f"Run a business in {city_name}? Your listing's already in {city_name} Knows "
         f"{vertical}. Claim it, upgrade it, and get found by people searching tonight."
     )
+
+    # WHY: The claim form needs a real business_id to submit against the
+    # existing POST /api/v1/claims endpoint (it rejects unknown business ids
+    # with 404). We give the page two paths to resolve that id:
+    #   1. A direct prefill when the visitor arrived via `?slug=<biz-slug>`
+    #      (e.g. from a "Claim this listing" link on a business detail page).
+    #   2. A lightweight client-side directory of {id, name, slug} for every
+    #      live business in the city, so a free-text business-name typer can
+    #      be matched against an existing record without a new endpoint.
+    prefill: Optional[Dict[str, Any]] = None
+    directory: List[Dict[str, Any]] = []
+    if tenant.city:
+        city_id = tenant.city["_id"]
+        if slug:
+            biz = await content_svc.get_business(city_id, slug)
+            if biz:
+                prefill = {
+                    "id": biz["_id"],
+                    "name": biz.get("name", ""),
+                    "slug": biz.get("slug", ""),
+                }
+        # WHY: 500 keeps the embedded JSON small. Miami has well under 100
+        # live businesses today; 500 leaves comfortable headroom before
+        # we'd want a real server-side search endpoint instead.
+        live = await content_svc.list_businesses(city_id, limit=500)
+        directory = [
+            {"id": b["_id"], "name": b.get("name", ""), "slug": b.get("slug", "")}
+            for b in live
+            if b.get("name")
+        ]
+
+    ctx["claim_prefill"] = prefill
+    ctx["claim_directory"] = directory
     return _templates.TemplateResponse("owners.html", ctx)
 
 

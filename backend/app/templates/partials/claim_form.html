@@ -1,0 +1,328 @@
+{#-
+  Claim form partial. Submits via fetch to POST /api/v1/claims using the
+  existing endpoint and BusinessClaim model — no new endpoint required.
+
+  Variables expected from caller's context:
+    claim_prefill   Optional[{id, name, slug}] — if set, the form is locked
+                    to a specific listing (visitor arrived via ?slug=...).
+    claim_directory List[{id, name, slug}]    — fallback for free-text name
+                                                 typing when no prefill.
+
+  Anchor id: `#claim-form` — the bottom CTA on /owners scroll-links here.
+-#}
+
+<div id="claim-form" class="max-w-xl scroll-mt-24">
+  <div id="claim-form__wrapper"
+       class="rounded-2xl bg-white border border-stone-200 shadow-sm p-6 lg:p-8">
+
+    {# Pre-fill banner — only when ?slug=<biz> resolved to a real listing #}
+    {% if claim_prefill %}
+      <div class="mb-5 px-4 py-3 rounded-lg bg-stone-50 border border-stone-200">
+        <p class="text-[11px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-1">Claiming</p>
+        <p class="text-stone-900 font-medium">{{ claim_prefill.name }}</p>
+        <p class="text-xs text-stone-500 mt-1">
+          Not your listing?
+          <a class="underline hover:text-stone-700" href="/owners">Start fresh</a>.
+        </p>
+      </div>
+    {% endif %}
+
+    <form id="claim-form__form" class="space-y-4" novalidate>
+      {# Hidden field set by JS once the typed name resolves to a real
+         business in the directory, or set up-front when claim_prefill exists. #}
+      <input type="hidden"
+             id="claim-form__business-id"
+             value="{{ claim_prefill.id if claim_prefill else '' }}">
+
+      <div>
+        <label for="claim-form__business-name"
+               class="block text-sm font-medium text-stone-700 mb-1.5">
+          Business name <span class="text-stone-400" aria-hidden="true">*</span>
+        </label>
+        <input type="text"
+               id="claim-form__business-name"
+               name="business_name"
+               required
+               autocomplete="organization"
+               value="{{ claim_prefill.name if claim_prefill else '' }}"
+               {% if claim_prefill %}readonly{% endif %}
+               class="w-full px-4 py-2.5 rounded-lg border border-stone-300 bg-white text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent {% if claim_prefill %}bg-stone-50 text-stone-600 cursor-not-allowed{% endif %}"
+               placeholder="{% if claim_prefill %}{{ claim_prefill.name }}{% else %}e.g. {{ city.name if city else 'Your' }} {{ listing_word_singular or 'Business' }}{% endif %}">
+        {% if not claim_prefill %}
+          <p class="text-xs text-stone-500 mt-1.5">
+            We'll match against listings in {{ city.name if city else 'this city' }}. Spelling counts.
+          </p>
+        {% endif %}
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label for="claim-form__your-name"
+                 class="block text-sm font-medium text-stone-700 mb-1.5">
+            Your name <span class="text-stone-400" aria-hidden="true">*</span>
+          </label>
+          <input type="text"
+                 id="claim-form__your-name"
+                 name="your_name"
+                 required
+                 autocomplete="name"
+                 class="w-full px-4 py-2.5 rounded-lg border border-stone-300 bg-white text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent"
+                 placeholder="Jane Owner">
+        </div>
+
+        <div>
+          <label for="claim-form__your-email"
+                 class="block text-sm font-medium text-stone-700 mb-1.5">
+            Your email <span class="text-stone-400" aria-hidden="true">*</span>
+          </label>
+          <input type="email"
+                 id="claim-form__your-email"
+                 name="your_email"
+                 required
+                 autocomplete="email"
+                 inputmode="email"
+                 class="w-full px-4 py-2.5 rounded-lg border border-stone-300 bg-white text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent"
+                 placeholder="you@yourbusiness.com">
+        </div>
+      </div>
+
+      <div>
+        <label for="claim-form__your-phone"
+               class="block text-sm font-medium text-stone-700 mb-1.5">
+          Your phone <span class="text-stone-400 font-normal">(optional)</span>
+        </label>
+        <input type="tel"
+               id="claim-form__your-phone"
+               name="your_phone"
+               autocomplete="tel"
+               inputmode="tel"
+               class="w-full px-4 py-2.5 rounded-lg border border-stone-300 bg-white text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent"
+               placeholder="(305) 555-0142">
+      </div>
+
+      <div>
+        <label for="claim-form__notes"
+               class="block text-sm font-medium text-stone-700 mb-1.5">
+          Anything else? <span class="text-stone-400 font-normal">(optional)</span>
+        </label>
+        <textarea id="claim-form__notes"
+                  name="notes"
+                  rows="3"
+                  maxlength="500"
+                  class="w-full px-4 py-2.5 rounded-lg border border-stone-300 bg-white text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent resize-none"
+                  placeholder="Your role, what you're hoping to update, anything that helps us verify."></textarea>
+        <p class="text-xs text-stone-500 mt-1.5"><span id="claim-form__notes-count">0</span> / 500</p>
+      </div>
+
+      {# Inline error region — hidden until the form has something to say. #}
+      <div id="claim-form__error"
+           role="alert"
+           aria-live="polite"
+           class="hidden rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-800"></div>
+
+      <button type="submit"
+              id="claim-form__submit"
+              class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-700 disabled:bg-stone-400 disabled:cursor-not-allowed text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm">
+        <span id="claim-form__submit-label">Claim my listing</span>
+        <span aria-hidden="true">→</span>
+      </button>
+
+      <p class="text-xs text-stone-500 mt-3">
+        We'll email you to verify ownership before any changes go live.
+        Free to claim — never a charge.
+      </p>
+    </form>
+  </div>
+
+  {# Success state — JS swaps the form for this on a successful submit. #}
+  <template id="claim-form__success-template">
+    <div class="rounded-2xl bg-white border border-stone-200 shadow-sm p-6 lg:p-8">
+      <div class="flex items-start gap-4">
+        <div class="shrink-0 w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
+        <div class="flex-1">
+          <p class="text-[11px] uppercase tracking-[0.25em] text-emerald-700 font-semibold mb-2">Claim submitted</p>
+          <h3 class="text-xl font-light text-stone-900 mb-2"
+              style='font-family: Georgia, "Times New Roman", serif;'>
+            We got your claim for <em class="italic text-stone-700" id="claim-form__success-business"></em>.
+          </h3>
+          <p class="text-stone-600 leading-relaxed">
+            We'll email you at <strong class="text-stone-800" id="claim-form__success-email"></strong>
+            within one business day to verify ownership.
+          </p>
+        </div>
+      </div>
+    </div>
+  </template>
+</div>
+
+<script>
+  // Claim form behavior — vanilla JS, no framework dependency.
+  //
+  // The endpoint POST /api/v1/claims requires `business_id`. We resolve it
+  // from one of:
+  //   (a) the prefilled hidden input (visitor arrived via ?slug=<biz>), or
+  //   (b) a client-side match against the embedded city directory below.
+  //
+  // We rebuild the form-vs-success swap so a failed submit doesn't leave
+  // the form disabled with no way to recover.
+  (function () {
+    // WHY: tojson is the right Jinja filter for JSON-safe inlining — it
+    // handles quoting, unicode, and HTML-special characters correctly.
+    // Without this, a business name containing an apostrophe would break
+    // the JS parse.
+    var DIRECTORY = {{ claim_directory | tojson | safe }};
+
+    var form         = document.getElementById('claim-form__form');
+    if (!form) return; // defensive: should always be present
+    var wrapper      = document.getElementById('claim-form__wrapper');
+    var bizIdInput   = document.getElementById('claim-form__business-id');
+    var bizNameInput = document.getElementById('claim-form__business-name');
+    var yourName     = document.getElementById('claim-form__your-name');
+    var yourEmail    = document.getElementById('claim-form__your-email');
+    var yourPhone    = document.getElementById('claim-form__your-phone');
+    var notes        = document.getElementById('claim-form__notes');
+    var notesCount   = document.getElementById('claim-form__notes-count');
+    var errorEl      = document.getElementById('claim-form__error');
+    var submitBtn    = document.getElementById('claim-form__submit');
+    var submitLabel  = document.getElementById('claim-form__submit-label');
+
+    // WHY: A very permissive email regex — we just want to catch obvious
+    // typos like missing @ or domain. The server has the real validation
+    // and the verification email is the ultimate proof anyway.
+    var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    function updateNotesCount() {
+      notesCount.textContent = String(notes.value.length);
+    }
+    // WHY: Browsers (especially Safari/Firefox restoring form state on back
+    // navigation) can populate the textarea before our script runs. Sync
+    // once on load so the counter never shows a stale 0 next to filled text.
+    updateNotesCount();
+    notes.addEventListener('input', updateNotesCount);
+
+    function showError(message) {
+      errorEl.textContent = message;
+      errorEl.classList.remove('hidden');
+    }
+
+    function clearError() {
+      errorEl.textContent = '';
+      errorEl.classList.add('hidden');
+    }
+
+    function resolveBusinessId(typedName) {
+      // Pre-filled (the slug path) wins — the hidden input is authoritative.
+      var prefilled = (bizIdInput.value || '').trim();
+      if (prefilled) return prefilled;
+
+      var query = (typedName || '').trim().toLowerCase();
+      if (!query) return null;
+      // 1. Exact match (case-insensitive).
+      for (var i = 0; i < DIRECTORY.length; i++) {
+        if ((DIRECTORY[i].name || '').toLowerCase() === query) {
+          return DIRECTORY[i].id;
+        }
+      }
+      // 2. First substring match — helpful when the visitor drops a "the"
+      //    or includes the neighborhood in the name.
+      for (var j = 0; j < DIRECTORY.length; j++) {
+        var n = (DIRECTORY[j].name || '').toLowerCase();
+        if (n && (n.indexOf(query) !== -1 || query.indexOf(n) !== -1)) {
+          return DIRECTORY[j].id;
+        }
+      }
+      return null;
+    }
+
+    function showSuccess(businessName, email) {
+      var tmpl = document.getElementById('claim-form__success-template');
+      var node = tmpl.content.cloneNode(true);
+      node.getElementById('claim-form__success-business').textContent = businessName;
+      node.getElementById('claim-form__success-email').textContent = email;
+      wrapper.replaceWith(node.firstElementChild);
+    }
+
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      clearError();
+
+      var businessName = (bizNameInput.value || '').trim();
+      var nameVal      = (yourName.value || '').trim();
+      var emailVal     = (yourEmail.value || '').trim();
+      var phoneVal     = (yourPhone.value || '').trim();
+      var notesVal     = (notes.value || '').trim();
+
+      if (!businessName) { showError('Please enter your business name.'); bizNameInput.focus(); return; }
+      if (!nameVal)      { showError('Please enter your name.'); yourName.focus(); return; }
+      if (!emailVal)     { showError('Please enter your email so we can reach you.'); yourEmail.focus(); return; }
+      if (!EMAIL_RE.test(emailVal)) {
+        showError('That email address looks off — please double-check it.');
+        yourEmail.focus();
+        return;
+      }
+
+      var businessId = resolveBusinessId(businessName);
+      if (!businessId) {
+        showError(
+          "We couldn't find a listing matching “" + businessName +
+          "”. Try the exact name as it appears in your storefront, or " +
+          "find your listing on the site first and use the Claim link there."
+        );
+        bizNameInput.focus();
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitLabel.textContent = 'Submitting…';
+
+      var payload = {
+        business_id: businessId,
+        submitter_name: nameVal,
+        submitter_email: emailVal,
+        submitter_phone: phoneVal || null,
+        notes: notesVal || null,
+      };
+
+      fetch('/api/v1/claims', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+        .then(function (res) {
+          if (res.ok) {
+            showSuccess(businessName, emailVal);
+            return;
+          }
+          // WHY: We give the visitor a useful inline error rather than
+          // dumping the raw HTTP response. Most failure paths are 404
+          // (couldn't find the business — directory drift) or 5xx (server
+          // hiccup); either way, surfacing the technical detail just
+          // confuses a non-developer.
+          return res.text().then(function () {
+            if (res.status === 404) {
+              showError(
+                "We couldn't match that listing on our side. Try the exact " +
+                "business name as it appears in your storefront."
+              );
+            } else {
+              showError(
+                "Something went wrong saving your claim. Try again in a " +
+                "minute, or email hello@expertly.ai if it keeps failing."
+              );
+            }
+            submitBtn.disabled = false;
+            submitLabel.textContent = 'Claim my listing';
+          });
+        })
+        .catch(function () {
+          showError(
+            "We couldn't reach the server. Check your connection and try again."
+          );
+          submitBtn.disabled = false;
+          submitLabel.textContent = 'Claim my listing';
+        });
+    });
+  })();
+</script>
