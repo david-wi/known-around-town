@@ -20,6 +20,7 @@ from app.routes.api.v1 import (
     editorial as api_editorial,
     claims as api_claims,
     inquiries as api_inquiries,
+    marketing_ai as api_marketing_ai,
 )
 from app.routes.public import pages as public_pages
 
@@ -59,6 +60,7 @@ app.include_router(api_copy_blocks.router, prefix="/api/v1")
 app.include_router(api_editorial.router, prefix="/api/v1")
 app.include_router(api_claims.router, prefix="/api/v1")
 app.include_router(api_inquiries.router, prefix="/api/v1")
+app.include_router(api_marketing_ai.router, prefix="/api/v1")
 
 
 public_pages.attach_templates(templates)
