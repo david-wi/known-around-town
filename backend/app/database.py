@@ -61,3 +61,25 @@ async def ensure_indexes() -> None:
     # them for 24 hours as a short audit trail and to keep the rate-limit
     # math honest for the recent past.
     await db.owner_magic_codes.create_index("created_at", expireAfterSeconds=86400)
+
+    # --- claim-and-pay: OwnerSession indexes (from stashed WIP) ---
+    # WHY: code-entry lookups filter by email and an unexpired code.
+    await db.owner_sessions.create_index([("email", 1), ("code_expires_at", 1)])
+    # WHY: cookie-auth path looks the session up by the hashed token; the
+    # token hash is unique because we issue one fresh per exchange.
+    # `sparse=True` because not every row has a session token yet (a row
+    # exists from the moment a code is requested).
+    await db.owner_sessions.create_index(
+        "session_token_hash", unique=True, sparse=True
+    )
+    # WHY: Mongo TTL indexes drop documents shortly after the named field's
+    # timestamp. We piggyback on session_expires_at so spent sessions self-
+    # expire from the collection 30 days after issue, keeping it small.
+    await db.owner_sessions.create_index(
+        "session_expires_at", expireAfterSeconds=0
+    )
+
+    # --- claim-and-pay: StripeEvent indexes (from stashed WIP) ---
+    # WHY: webhook idempotency — second delivery of the same event id is
+    # a duplicate-key insert error and we treat that as "already handled".
+    await db.stripe_events.create_index("_id", unique=True)
