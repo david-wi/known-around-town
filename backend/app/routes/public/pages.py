@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app.database import get_db
 from app.services import content as content_svc
 from app.services.copy import CopyResolver
 from app.services.tenant import TenantContext, resolve_tenant
@@ -771,6 +772,85 @@ async def owner_dashboard_preview(request: Request) -> HTMLResponse:
         }
     )
     return _templates.TemplateResponse("owner_dashboard.html", ctx)
+
+@router.get("/owners/preview/caption", response_class=HTMLResponse)
+async def owners_caption_preview(request: Request) -> HTMLResponse:
+    """Standalone preview of the Featured-tier Instagram caption generator.
+
+    Why this route exists separately from the full owner dashboard:
+
+    * The dashboard is being built in a parallel workstream and isn't
+      live on stage yet. Reviewers (David, Posey) need to play with the
+      caption panel right now to react to wording, length, and the
+      copy/regenerate UX before the dashboard ships.
+    * The panel is fully self-contained — it picks a business from the
+      seed data and renders the panel pointed at that business. When
+      the dashboard merges, the same JavaScript and the same backend
+      endpoint power it; only the page wrapper changes.
+
+    The route returns 404 when the marketing-AI feature flag is off so
+    that production (which keeps the flag off) does not expose this
+    surface even by URL guessing.
+    """
+    from app.services import ai_caption  # local import to avoid module cycles at startup
+
+    if not ai_caption.feature_enabled():
+        raise HTTPException(404, "Not found")
+
+    tenant = await _require_tenant(request)
+    ctx = await _base_context(request, tenant)
+    city = tenant.city
+    if not city:
+        raise HTTPException(404, "Caption preview requires a known city")
+
+    # Pick a Featured business if any exist, else the first business in the city.
+    # Either way we get a real, recognizable business name in the preview so
+    # the generated captions don't sound made-up.
+    db = get_db()
+    business_doc = await db.businesses.find_one(
+        {"city_id": city["_id"], "featured.enabled": True}
+    )
+    if not business_doc:
+        business_doc = await db.businesses.find_one({"city_id": city["_id"]})
+    if not business_doc:
+        raise HTTPException(404, "No businesses found for caption preview")
+
+    # Resolve display-friendly neighborhood label
+    neighborhood_name: Optional[str] = None
+    neighborhood_slugs = business_doc.get("neighborhood_slugs") or []
+    if neighborhood_slugs:
+        nb = await db.neighborhoods.find_one(
+            {"city_id": city["_id"], "slug": neighborhood_slugs[0]}
+        )
+        if nb:
+            neighborhood_name = nb.get("name")
+
+    category_slug = (business_doc.get("category_slugs") or [None])[0]
+    category_name: Optional[str] = None
+    if category_slug:
+        cat = await db.categories.find_one(
+            {"city_id": city["_id"], "slug": category_slug}
+        )
+        if cat:
+            category_name = cat.get("name")
+
+    ctx.update(
+        {
+            "seo_title": f"Caption generator preview — {business_doc.get('name')}",
+            "meta_description": (
+                "Featured-tier Instagram caption generator preview "
+                f"for {business_doc.get('name')}."
+            ),
+            "preview_business": {
+                "id": business_doc.get("_id"),
+                "name": business_doc.get("name"),
+                "slug": business_doc.get("slug"),
+                "category_name": category_name,
+                "neighborhood_name": neighborhood_name,
+            },
+        }
+    )
+    return _templates.TemplateResponse("owners_caption_preview.html", ctx)
 
 
 @router.get("/robots.txt")
