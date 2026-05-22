@@ -112,6 +112,16 @@ services:
       # `backend` service (absent = disabled).
       MARKETING_AI_ENABLED: ${MARKETING_AI_ENABLED:-true}
       AI_GATEWAY_KEY: ${KAT_AI_GATEWAY_KEY:-}
+      # WHY: owner email-code login (PR #27). Without RESEND_API_KEY the
+      # app logs codes to stderr instead of emailing them (intentional
+      # dev fallback). Without OWNER_SESSION_SECRET, every server
+      # restart logs every signed-in owner out. The FROM_NAME and
+      # FROM_ADDRESS defaults are sensible so the app still boots
+      # without them set on the host.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      OWNER_SESSION_SECRET: ${OWNER_SESSION_SECRET:-}
+      OWNER_EMAIL_FROM_NAME: ${OWNER_EMAIL_FROM_NAME:-Knows Beauty}
+      OWNER_EMAIL_FROM_ADDRESS: ${OWNER_EMAIL_FROM_ADDRESS:-noreply@knowsbeauty.ai.devintensive.com}
       LOG_LEVEL: INFO
     networks:
       - traefik
