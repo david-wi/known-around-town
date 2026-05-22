@@ -30,6 +30,14 @@ services:
       # service block below.
       MARKETING_AI_ENABLED: ${MARKETING_AI_ENABLED_PROD:-}
       AI_GATEWAY_KEY: ${KAT_AI_GATEWAY_KEY:-}
+      # WHY: owner sign-in codes need the same Resend credentials already
+      # used by Identity; without these, production logs the code instead
+      # of emailing it to the owner.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # WHY: defaults match the current single-brand email template until
+      # the owner email copy is made network-aware.
+      OWNER_EMAIL_FROM_NAME: ${OWNER_EMAIL_FROM_NAME:-Knows Beauty}
+      OWNER_EMAIL_FROM_ADDRESS: ${OWNER_EMAIL_FROM_ADDRESS:-noreply@knowsbeauty.ai.devintensive.com}
       LOG_LEVEL: INFO
     networks:
       - traefik
@@ -112,6 +120,13 @@ services:
       # `backend` service (absent = disabled).
       MARKETING_AI_ENABLED: ${MARKETING_AI_ENABLED:-true}
       AI_GATEWAY_KEY: ${KAT_AI_GATEWAY_KEY:-}
+      # WHY: stage exercises the owner sign-in flow before launch; missing
+      # credentials caused codes to be logged instead of sent.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # WHY: defaults match the current single-brand email template until
+      # the owner email copy is made network-aware.
+      OWNER_EMAIL_FROM_NAME: ${OWNER_EMAIL_FROM_NAME:-Knows Beauty}
+      OWNER_EMAIL_FROM_ADDRESS: ${OWNER_EMAIL_FROM_ADDRESS:-noreply@knowsbeauty.ai.devintensive.com}
       LOG_LEVEL: INFO
     networks:
       - traefik
