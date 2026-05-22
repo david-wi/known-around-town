@@ -19,6 +19,17 @@ def test_health(client):
     assert r.json() == {"status": "ok"}
 
 
+def test_favicon_routes_do_not_404(client):
+    for path in ("/favicon.ico", "/favicon.png"):
+        r = client.get(path, follow_redirects=False)
+        assert r.status_code == 308
+        assert r.headers["location"] == "/assets/favicon.svg"
+
+    r = client.get("/assets/favicon.svg")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/svg+xml")
+
+
 def test_miami_beauty_home(client):
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
