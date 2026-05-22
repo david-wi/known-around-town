@@ -13,6 +13,20 @@ async def list_neighborhoods(city_id: str) -> List[Dict[str, Any]]:
     return await cur.sort([("order", 1), ("name", 1)]).to_list(length=200)
 
 
+async def list_cities(network_id: str) -> List[Dict[str, Any]]:
+    """Cities that have been seeded under a network, sorted by name.
+
+    Used by the network-wide landing page (rendered at the bare apex host like
+    `knowsbeauty.ai.devintensive.com/`) to show visitors which cities they can
+    open.
+    """
+    db = get_db()
+    cur = db.cities.find({"network_id": network_id, "status": {"$ne": "archived"}})
+    # WHY: alphabetical is the safest default when there's more than one
+    # city; it's a stable order that needs no per-city configuration.
+    return await cur.sort([("name", 1)]).to_list(length=200)
+
+
 async def list_categories(
     city_id: str, parent_slug: Optional[str] = None
 ) -> List[Dict[str, Any]]:

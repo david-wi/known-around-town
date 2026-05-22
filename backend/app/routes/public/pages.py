@@ -198,6 +198,100 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
     }
 
 
+# Cities planned to launch next, per network. These render as dimmed
+# "coming soon" tiles on the bare-apex landing page so visitors can see
+# what's on the roadmap even before the city exists in the database.
+#
+# Order and timing come from the strategy note in Posey's space at
+# notes/2026-05-20-known-around-town-verticals.md (Beauty is named as
+# expanding into Austin / Philadelphia / Dallas / Scottsdale / LA / NY;
+# Wellness and Health follow Beauty's footprint, slower for Health
+# because the copy review is heavier).
+_PLANNED_CITIES_BY_NETWORK: Dict[str, List[Dict[str, str]]] = {
+    "beauty": [
+        {"name": "Austin",       "eta": "Coming 2026"},
+        {"name": "Philadelphia", "eta": "Coming 2026"},
+        {"name": "Dallas",       "eta": "Coming 2027"},
+        {"name": "Scottsdale",   "eta": "Coming 2027"},
+        {"name": "Los Angeles",  "eta": "Coming 2027"},
+        {"name": "New York",     "eta": "Coming 2027"},
+    ],
+    "wellness": [
+        {"name": "Austin",       "eta": "Coming 2026"},
+        {"name": "Los Angeles",  "eta": "Coming 2027"},
+        {"name": "New York",     "eta": "Coming 2027"},
+    ],
+    "health": [
+        {"name": "Austin",       "eta": "Coming 2027"},
+        {"name": "New York",     "eta": "Coming 2027"},
+    ],
+}
+
+
+async def _render_network_landing(request: Request, tenant: TenantContext) -> HTMLResponse:
+    """Render the bare-apex landing page that lists the cities for a network.
+
+    Reached when the request host is something like `knowsbeauty.ai.devintensive.com`
+    with no city subdomain. Before this existed, the no-city branch served a
+    near-empty stub with no city links — visitors had nowhere to click.
+    """
+    ctx = await _base_context(request, tenant)
+    network = tenant.network
+    host = request.headers.get("host", "")
+    scheme = request.url.scheme or "https"
+    suffix = tenant.network_domain_suffix or host
+
+    live_cities_raw = await content_svc.list_cities(network["_id"])
+    live_cities: List[Dict[str, Any]] = []
+    for city in live_cities_raw:
+        live_cities.append(
+            {
+                "name": city.get("name", ""),
+                "slug": city.get("slug", ""),
+                "tagline": city.get("tagline") or city.get("hero_description") or "",
+                "hero_photo_url": city.get("hero_photo_url"),
+                # WHY: the city is served at its own subdomain (e.g.
+                # `miami.knowsbeauty.ai.devintensive.com/`), so we build an
+                # absolute URL from the resolved network suffix rather than
+                # a relative path the browser would route back to the apex.
+                "url": f"{scheme}://{city.get('slug', '')}.{suffix}/",
+            }
+        )
+
+    live_slugs = {c["slug"] for c in live_cities}
+    live_names_lower = {c["name"].lower() for c in live_cities}
+    planned = [
+        p for p in _PLANNED_CITIES_BY_NETWORK.get(network.get("slug", ""), [])
+        # WHY: don't show a city as "coming soon" if it has already been
+        # seeded as a live edition (matches by display name or slug).
+        if p["name"].lower() not in live_names_lower
+        and p["name"].lower().replace(" ", "-") not in live_slugs
+    ]
+
+    vertical = _vertical_word(network)
+    ctx.update(
+        {
+            "is_network_landing": True,
+            "live_cities": live_cities,
+            "planned_cities": planned,
+            "landing_eyebrow": f"{network.get('name', '').upper()} — A LOCAL GUIDE NETWORK",
+            "landing_headline": network.get("tagline") or network.get("name", ""),
+            "landing_subhead": (
+                network.get("description")
+                or f"A curated guide to the best {vertical.lower()} in every city we cover."
+            ),
+            "landing_cities_eyebrow": "CITIES",
+            "landing_cities_intro": (
+                f"We're starting in Miami and expanding. Pick a city to open its "
+                f"{vertical.lower()} guide."
+            ),
+            "seo_title": network.get("name", ""),
+            "meta_description": network.get("description"),
+        }
+    )
+    return _templates.TemplateResponse("network_landing.html", ctx)
+
+
 def _build_hero_headline_html(text: str) -> str:
     """The hero headline italicizes the last 2-3 words and accents one of them
     (matching the editorial treatment in the reference design)."""
@@ -224,10 +318,7 @@ async def home(request: Request) -> HTMLResponse:
     tenant = await _require_tenant(request)
 
     if not tenant.city:
-        return _templates.TemplateResponse(
-            "network_home.html",
-            await _base_context(request, tenant),
-        )
+        return await _render_network_landing(request, tenant)
 
     city = tenant.city
     copy = CopyResolver(
