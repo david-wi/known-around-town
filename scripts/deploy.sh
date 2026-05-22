@@ -1,23 +1,87 @@
 #!/usr/bin/env bash
-# Pull the latest image, restart the container, and run the seed scripts the
-# first time. Idempotent — re-runs do not re-create data because the seed
-# scripts upsert by stable keys (network slug, city slug, business slug).
+# Pull the latest code, build the image, restart the container, and run the
+# seed scripts the first time. Idempotent — re-runs do not re-create data
+# because the seed scripts upsert by stable keys (network slug, city slug,
+# business slug).
+#
+# Two deploy targets are supported, selected by the DEPLOY_TARGET env var:
+#
+#   DEPLOY_TARGET=latest  (default)
+#     Pulls origin/main, builds the image tagged `:latest`, and (re)starts
+#     the production container. This is what the auto-deploy webhook runs
+#     on every push to the `main` branch.
+#
+#   DEPLOY_TARGET=stage
+#     Pulls origin/stage, builds the image tagged `:stage`, and (re)starts
+#     the preview container under Compose's `stage` profile so it doesn't
+#     collide with production. This is what the auto-deploy webhook runs
+#     on every push to the `stage` branch — for previewing a proposed
+#     change at stage-miami.knowsbeauty.ai.devintensive.com (and the
+#     wellness / health equivalents) before promoting it to main.
+#
+# Both targets share the same compose file and the same MongoDB; only the
+# image tag, the branch checked out, and the Compose profile differ.
 set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-/opt/known-around-town}"
+# WHY: Default to 'latest' so existing callers (including the original
+# auto-deploy webhook before stage support landed) keep working unchanged.
+DEPLOY_TARGET="${DEPLOY_TARGET:-latest}"
+
+case "$DEPLOY_TARGET" in
+  latest)
+    BRANCH="main"
+    IMAGE_TAG="latest"
+    # WHY: Empty profile arg means production-only services start. The
+    # stage service in docker-compose.prod.yml is gated by `profiles:
+    # ["stage"]`, so it stays dormant on a normal production deploy.
+    COMPOSE_PROFILE_ARGS=()
+    SEED_AFTER_DEPLOY="true"
+    ;;
+  stage)
+    BRANCH="stage"
+    IMAGE_TAG="stage"
+    # WHY: --profile stage activates the backend-stage service in the
+    # compose file. The production backend keeps running untouched
+    # because Compose only stops/recreates the services it can see in
+    # the active profile set.
+    COMPOSE_PROFILE_ARGS=(--profile stage)
+    # WHY: Stage shares the production MongoDB, so re-seeding from the
+    # stage branch is unnecessary and risks rewriting prod content if
+    # the stage branch carries seed changes we haven't approved yet.
+    SEED_AFTER_DEPLOY="false"
+    ;;
+  *)
+    echo "Unknown DEPLOY_TARGET='$DEPLOY_TARGET' (expected 'latest' or 'stage')" >&2
+    exit 2
+    ;;
+esac
+
 cd "$REPO_DIR"
 
 git fetch --quiet
-git reset --hard origin/main
+git reset --hard "origin/$BRANCH"
 
 # Build the image locally — this server doesn't use a registry pipeline yet.
-docker build -t ghcr.io/david-wi/known-around-town:latest ./backend
+docker build -t "ghcr.io/david-wi/known-around-town:$IMAGE_TAG" ./backend
 
-docker compose -p known-around-town -f docker-compose.prod.yml up -d
+docker compose -p known-around-town "${COMPOSE_PROFILE_ARGS[@]}" \
+  -f docker-compose.prod.yml up -d
 
-echo "Waiting for /health..."
+# WHY: Compose appends `-N` (replica index) to the container name, so the
+# real container names are `known-around-town-backend-1` and
+# `known-around-town-backend-stage-1`. We pin to the exact name via a
+# `^...-\d+$` regex anchor so a bare `name=known-around-town-backend`
+# filter does not accidentally match the stage container too.
+if [ "$DEPLOY_TARGET" = "latest" ]; then
+  CONTAINER_FILTER='^known-around-town-backend-[0-9]+$'
+else
+  CONTAINER_FILTER='^known-around-town-backend-stage-[0-9]+$'
+fi
+
+echo "Waiting for /health on $CONTAINER_FILTER..."
 for i in {1..30}; do
-  cid=$(docker ps -q -f name=known-around-town-backend)
+  cid=$(docker ps -q -f name="$CONTAINER_FILTER")
   if [ -n "$cid" ] && docker exec "$cid" curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
     echo "healthy"
     break
@@ -25,8 +89,11 @@ for i in {1..30}; do
   sleep 1
 done
 
-# Seed (upsert) the catalog. Safe to re-run.
-docker compose -p known-around-town -f docker-compose.prod.yml exec -T backend python -m seed.seed_networks
-docker compose -p known-around-town -f docker-compose.prod.yml exec -T backend python -m seed.seed_miami
+# Seed (upsert) the catalog. Safe to re-run, but only for the production
+# target — see SEED_AFTER_DEPLOY rationale above.
+if [ "$SEED_AFTER_DEPLOY" = "true" ]; then
+  docker compose -p known-around-town -f docker-compose.prod.yml exec -T backend python -m seed.seed_networks
+  docker compose -p known-around-town -f docker-compose.prod.yml exec -T backend python -m seed.seed_miami
+fi
 
-echo "Deploy complete."
+echo "Deploy complete ($DEPLOY_TARGET)."
