@@ -1,0 +1,275 @@
+{#-
+  Owner Dashboard — UX PREVIEW ONLY.
+
+  This page is a static mockup of what an owner sees after they claim and
+  pay for the Featured tier. The real claim-and-pay flow is being built on
+  a parallel workstream (see work/2026-05-22-claim-and-pay-mvp-spec.md).
+  Every interactive control here is rigged to show a "Coming soon" toast
+  rather than perform a real action — so reviewers can react to the shape
+  and tone of the dashboard before the backend exists.
+
+  The amber preview banner at the top is intentional and must stay until
+  real auth lands. Removing it would let this page masquerade as the live
+  experience, which would confuse anyone arriving at the URL directly.
+-#}
+{% extends 'base.html' %}
+{% set header_variant = 'sticky' %}
+
+{% block content %}
+
+{# ---- Preview banner: visible warning that nothing here is wired up. ---- #}
+<div class="bg-amber-50 border-b border-amber-200">
+  <div class="max-w-5xl mx-auto px-6 lg:px-10 py-3 flex items-start gap-3">
+    <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-200 text-amber-900 text-[11px] font-semibold mt-0.5">!</span>
+    <p class="text-sm text-amber-900 leading-relaxed">
+      <strong class="font-semibold">Preview</strong> &mdash; this is a mockup of the owner dashboard.
+      The real claim-and-pay flow is in progress; nothing on this page is wired up yet.
+      Sample data is drawn from <span class="font-medium">{{ business.name }}</span>.
+    </p>
+  </div>
+</div>
+
+{# ---- Header band: business name, neighborhood, tier badge. ---- #}
+<section class="bg-stone-50/60 border-b border-stone-200/60">
+  <div class="max-w-5xl mx-auto px-6 lg:px-10 py-12 lg:py-16">
+    <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-5">Owner Dashboard</p>
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <div>
+        <h1 class="font-light text-stone-900 leading-[1.05] tracking-tight mb-3"
+            style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.25rem, 4vw, 3.25rem); font-weight: 300;'>
+          {{ business.name }}
+        </h1>
+        <p class="text-stone-600 text-base">
+          {% if neighborhood %}{{ neighborhood.name }} &middot; {% endif %}{{ city.name if city else '' }}
+          &middot; <a class="underline decoration-stone-300 hover:decoration-stone-700" href="/b/{{ business.slug }}">View public listing</a>
+        </p>
+      </div>
+      <span class="inline-flex items-center gap-2 rounded-full bg-stone-900 text-white px-4 py-1.5 text-xs font-medium tracking-wide">
+        <span class="text-amber-300">&#9733;</span> Tier: Featured
+      </span>
+    </div>
+  </div>
+</section>
+
+{# ---- Hero block: photo + business essentials with edit affordances. ---- #}
+<section class="bg-white">
+  <div class="max-w-5xl mx-auto px-6 lg:px-10 py-12">
+    <div class="grid md:grid-cols-12 gap-8 items-start">
+      <div class="md:col-span-7">
+        {% if hero_photo %}
+        <div class="rounded-2xl overflow-hidden shadow-sm border border-stone-200 bg-stone-100 aspect-[4/3] bg-cover bg-center relative group"
+             style='background-image: url("{{ hero_photo.url }}");'>
+          <button type="button"
+                  data-coming-soon="Replace primary photo"
+                  class="absolute top-3 right-3 inline-flex items-center gap-1.5 bg-white/90 hover:bg-white text-stone-700 text-xs font-medium px-3 py-1.5 rounded-full shadow-sm transition"
+                  title="Coming soon &mdash; upload a new primary photo">
+            <span aria-hidden="true">&#9998;</span> Replace photo
+          </button>
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-dashed border-stone-300 bg-stone-50 aspect-[4/3] flex items-center justify-center">
+          <p class="text-sm text-stone-500">No photo yet &mdash; <button type="button" data-coming-soon="Upload a primary photo" class="underline {{ theme.accent_text_full }}">add one</button></p>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="md:col-span-5 space-y-5">
+        {# Each row: label, value, and an edit pencil that opens a "Coming soon" toast. #}
+        <div class="rounded-xl border border-stone-200 bg-stone-50/40 px-5 py-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-[10px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-1">Phone</p>
+              <p class="text-stone-900 font-medium truncate">{{ business.phone or 'Not set' }}</p>
+            </div>
+            <button type="button" data-coming-soon="Edit phone number"
+                    class="text-stone-400 hover:text-stone-700 transition"
+                    title="Coming soon &mdash; edit phone number">
+              <span aria-hidden="true">&#9998;</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-stone-200 bg-stone-50/40 px-5 py-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-[10px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-1">Hours</p>
+              <p class="text-stone-900 font-medium">Tue&ndash;Sat &middot; 10:00 am &ndash; 7:00 pm</p>
+              <p class="text-stone-500 text-sm">Closed Sunday and Monday</p>
+            </div>
+            <button type="button" data-coming-soon="Edit hours"
+                    class="text-stone-400 hover:text-stone-700 transition"
+                    title="Coming soon &mdash; edit hours">
+              <span aria-hidden="true">&#9998;</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-stone-200 bg-stone-50/40 px-5 py-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-[10px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-1">Address</p>
+              <p class="text-stone-900 font-medium">{{ business.address.street or 'Not set' }}</p>
+            </div>
+            <button type="button" data-coming-soon="Edit address"
+                    class="text-stone-400 hover:text-stone-700 transition"
+                    title="Coming soon &mdash; edit address">
+              <span aria-hidden="true">&#9998;</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-stone-200 bg-stone-50/40 px-5 py-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-[10px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-1">Website</p>
+              <p class="text-stone-900 font-medium truncate">{{ business.website or 'Not set' }}</p>
+            </div>
+            <button type="button" data-coming-soon="Edit website"
+                    class="text-stone-400 hover:text-stone-700 transition"
+                    title="Coming soon &mdash; edit website">
+              <span aria-hidden="true">&#9998;</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ---- Stats block: how the listing is performing. ---- #}
+<section class="bg-stone-50/60 border-y border-stone-200/60">
+  <div class="max-w-5xl mx-auto px-6 lg:px-10 py-12">
+    <p class="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-semibold mb-6">How your listing is doing</p>
+    <div class="grid sm:grid-cols-3 gap-5">
+      <div class="rounded-2xl bg-white border border-stone-200 p-6">
+        <p class="font-serif text-4xl text-stone-900 mb-1" style="font-family: Georgia, serif;">{{ stat_views_this_week }}</p>
+        <p class="text-sm text-stone-500">Profile visits this week</p>
+      </div>
+      <div class="rounded-2xl bg-white border border-stone-200 p-6">
+        <p class="font-serif text-4xl text-stone-900 mb-1" style="font-family: Georgia, serif;">{{ stat_views_this_month }}</p>
+        <p class="text-sm text-stone-500">Profile visits this month</p>
+      </div>
+      <div class="rounded-2xl bg-white border border-stone-200 p-6">
+        <p class="font-serif text-4xl text-stone-900 mb-1" style="font-family: Georgia, serif;">{{ stat_claims_since_launch }}</p>
+        <p class="text-sm text-stone-500">Direct contacts since launch</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ---- Marketing AI: three Featured-tier tools, all "coming soon". ---- #}
+<section class="bg-white">
+  <div class="max-w-5xl mx-auto px-6 lg:px-10 py-14">
+    <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-3">Marketing AI</p>
+    <h2 class="font-light text-stone-900 leading-tight tracking-tight mb-2"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.625rem, 2.5vw, 2rem); font-weight: 300;'>
+      Bring people to the door.
+    </h2>
+    <p class="text-stone-600 leading-relaxed mb-8 max-w-2xl">
+      Three tools that draft on-brand marketing for you, included in Featured. We&rsquo;re finishing each one now.
+    </p>
+    <div class="grid md:grid-cols-3 gap-6">
+      <div class="rounded-2xl p-6 bg-gradient-to-br {{ theme.owners_gradient or 'from-stone-100 via-stone-50 to-white' }} border border-stone-200">
+        <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-3">Instagram</p>
+        <h3 class="font-serif text-xl text-stone-900 mb-2" style="font-family: Georgia, serif;">Generate caption</h3>
+        <p class="text-sm text-stone-600 leading-relaxed mb-5">
+          Drop a photo, pick a vibe, get four captions in your salon&rsquo;s voice.
+        </p>
+        <button type="button" data-coming-soon="Generate Instagram captions"
+                class="w-full rounded-full bg-stone-200 text-stone-500 px-4 py-2 text-sm font-medium cursor-not-allowed"
+                disabled>
+          Coming soon
+        </button>
+      </div>
+      <div class="rounded-2xl p-6 bg-gradient-to-br {{ theme.owners_gradient or 'from-stone-100 via-stone-50 to-white' }} border border-stone-200">
+        <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-3">Ads</p>
+        <h3 class="font-serif text-xl text-stone-900 mb-2" style="font-family: Georgia, serif;">Generate ad copy</h3>
+        <p class="text-sm text-stone-600 leading-relaxed mb-5">
+          Google and Meta ad drafts, tuned to your services and your tone.
+        </p>
+        <button type="button" data-coming-soon="Generate ad copy"
+                class="w-full rounded-full bg-stone-200 text-stone-500 px-4 py-2 text-sm font-medium cursor-not-allowed"
+                disabled>
+          Coming soon
+        </button>
+      </div>
+      <div class="rounded-2xl p-6 bg-gradient-to-br {{ theme.owners_gradient or 'from-stone-100 via-stone-50 to-white' }} border border-stone-200">
+        <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-3">Google</p>
+        <h3 class="font-serif text-xl text-stone-900 mb-2" style="font-family: Georgia, serif;">Sync Google Business</h3>
+        <p class="text-sm text-stone-600 leading-relaxed mb-5">
+          Keep hours, photos, and services in sync with Google &mdash; you approve every change.
+        </p>
+        <button type="button" data-coming-soon="Sync Google Business profile"
+                class="w-full rounded-full bg-stone-200 text-stone-500 px-4 py-2 text-sm font-medium cursor-not-allowed"
+                disabled>
+          Coming soon
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ---- Billing summary ---- #}
+<section class="bg-stone-50/60 border-y border-stone-200/60">
+  <div class="max-w-5xl mx-auto px-6 lg:px-10 py-12">
+    <p class="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-semibold mb-6">Billing</p>
+    <div class="rounded-2xl bg-white border border-stone-200 p-6 lg:p-8 flex flex-wrap items-center justify-between gap-6">
+      <div class="min-w-0">
+        <p class="font-serif text-2xl text-stone-900 mb-1" style="font-family: Georgia, serif;">
+          Featured &middot; <span class="text-stone-500 font-normal">$29 per month</span>
+        </p>
+        <p class="text-sm text-stone-600">
+          Next charge: <span class="font-medium text-stone-900">{{ next_billing_date }}</span>
+          &middot; Free trial active &middot; cancel anytime
+        </p>
+      </div>
+      <a href="#"
+         data-coming-soon="Manage billing"
+         class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-5 py-2.5 rounded-full transition text-sm">
+        Manage billing <span aria-hidden="true">&rarr;</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+{# ---- Footer block: support + public listing link ---- #}
+<section class="bg-white">
+  <div class="max-w-5xl mx-auto px-6 lg:px-10 py-12 text-center">
+    <p class="text-stone-600 leading-relaxed mb-3">
+      Need a hand? Email
+      <a class="{{ theme.accent_text_full }} underline" href="mailto:hello@expertly.ai?subject=Featured%20support">hello@expertly.ai</a>
+      &mdash; we usually reply within a business day.
+    </p>
+    <p class="text-sm text-stone-500">
+      <a class="underline decoration-stone-300 hover:decoration-stone-700" href="/b/{{ business.slug }}">View your public listing &rarr;</a>
+    </p>
+  </div>
+</section>
+
+{# ---- "Coming soon" toast: shared inline JS for every disabled control. ---- #}
+{# A single delegated click handler keeps every "Coming soon" button in
+   sync without sprinkling event handlers across each one. Plain DOM,
+   no framework dependency. #}
+<div id="coming-soon-toast"
+     class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-900 text-white text-sm px-4 py-2 rounded-full shadow-lg opacity-0 pointer-events-none transition-opacity duration-200"
+     role="status" aria-live="polite">
+  Coming soon
+</div>
+<script>
+  (function () {
+    var toast = document.getElementById("coming-soon-toast");
+    var timer = null;
+    document.addEventListener("click", function (e) {
+      var el = e.target.closest ? e.target.closest("[data-coming-soon]") : null;
+      if (!el) return;
+      e.preventDefault();
+      var label = el.getAttribute("data-coming-soon") || "Coming soon";
+      toast.textContent = label + " — coming soon";
+      toast.style.opacity = "1";
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(function () { toast.style.opacity = "0"; }, 1800);
+    });
+  })();
+</script>
+
+{% endblock %}
