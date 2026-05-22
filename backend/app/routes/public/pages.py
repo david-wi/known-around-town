@@ -173,6 +173,15 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "copy": copy,
         "theme": _network_theme(network),
         "vertical_word": _vertical_word(network),
+        # WHY: A short human label like "Miami Knows Beauty" used inside
+        # the Founding Partner tooltip ("Founding member of <tenant_label>").
+        # Falls back to the network name on the network-home page where
+        # there's no city in context (e.g. the landing page before a city
+        # has been picked).
+        "tenant_label": (
+            f"{city['name']} Knows {_vertical_word(network)}"
+            if city else network.get("name", "this publication")
+        ),
         # Word for one (or many) listings on this network. Beauty uses "Salons"/"salon",
         # Wellness "Studios"/"studio", Health "Clinics"/"clinic". Stored on the
         # city doc by the seed, with sensible fallbacks for older data.

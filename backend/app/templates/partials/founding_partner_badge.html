@@ -1,0 +1,42 @@
+{#-
+  Founding Partner badge.
+
+  Used on:
+    - business detail page next to the business name (inline variant)
+    - home page trending tile overlaid on the photo (overlay variant)
+
+  Inputs:
+    - variant: "inline" (default) or "overlay"
+    - tenant_label: the human-readable publication label, e.g. "Miami Knows Beauty",
+      used inside the tooltip ("Founding member of <tenant_label>"). Falls back to a
+      generic "this publication" string if missing.
+
+  The badge is intentionally small, gold/amber gradient, with a small star icon. The
+  `title=` attribute provides the hover/tap-and-hold tooltip — this is the standard
+  HTML hover-tip mechanism and is keyboard accessible via the surrounding link.
+-#}
+{% set _variant = variant or 'inline' %}
+{% set _tooltip = 'Founding member of ' ~ (tenant_label or 'this publication') %}
+
+{% if _variant == 'overlay' %}
+  {#- Overlaid on the photo of a trending card. Positioned by the parent
+      (the card sets `relative` on the photo container). -#}
+  <span class="absolute bottom-3 left-3 inline-flex items-center gap-1 bg-gradient-to-br from-amber-300 to-yellow-500 text-stone-900 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full shadow-sm ring-1 ring-amber-200"
+        title="{{ _tooltip }}"
+        aria-label="{{ _tooltip }}">
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2l2.6 7.5H22l-6.2 4.5 2.4 7.5L12 17l-6.2 4.5 2.4-7.5L2 9.5h7.4L12 2z"></path>
+    </svg>
+    Founding Partner
+  </span>
+{% else %}
+  {#- Inline next to a heading, e.g. on the business detail page. -#}
+  <span class="inline-flex items-center gap-1 bg-gradient-to-br from-amber-300 to-yellow-500 text-stone-900 text-[11px] font-bold tracking-wider uppercase px-3 py-1 rounded-full shadow-sm ring-1 ring-amber-200"
+        title="{{ _tooltip }}"
+        aria-label="{{ _tooltip }}">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2l2.6 7.5H22l-6.2 4.5 2.4 7.5L12 17l-6.2 4.5 2.4-7.5L2 9.5h7.4L12 2z"></path>
+    </svg>
+    Founding Partner
+  </span>
+{% endif %}
