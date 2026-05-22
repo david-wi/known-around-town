@@ -72,8 +72,11 @@ git reset --hard "origin/$BRANCH"
 # Build the image locally — this server doesn't use a registry pipeline yet.
 docker build -t "ghcr.io/david-wi/known-around-town:$IMAGE_TAG" ./backend
 
+# WHY: the image tag is stable (:latest or :stage). Without force-recreate,
+# Compose may keep the old container running after a code-only rebuild
+# because the service config did not change.
 docker compose -p known-around-town "${COMPOSE_PROFILE_ARGS[@]}" \
-  -f docker-compose.prod.yml up -d "$COMPOSE_SERVICE"
+  -f docker-compose.prod.yml up -d --force-recreate "$COMPOSE_SERVICE"
 
 # WHY: Compose appends `-N` (replica index) to the container name, so the
 # real container names are `known-around-town-backend-1` and
