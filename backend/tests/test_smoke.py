@@ -103,6 +103,111 @@ def test_owners_page(client):
         assert tier in r.text
 
 
+def test_owners_page_has_claim_form_not_mailto(client):
+    """The owners page used to be two `mailto:hello@expertly.ai` links.
+    Both have been replaced by a real claim form that posts to the
+    existing /api/v1/claims endpoint. If this assertion ever fails, an
+    edit accidentally reintroduced an email-based CTA."""
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # No mailto CTA anywhere on the page.
+    assert "mailto:hello@expertly.ai" not in r.text
+    # A real form, with the required fields, posting to the existing endpoint.
+    assert 'id="claim-form__form"' in r.text
+    assert "/api/v1/claims" in r.text
+    for field_id in (
+        "claim-form__business-name",
+        "claim-form__your-name",
+        "claim-form__your-email",
+        "claim-form__your-phone",
+        "claim-form__notes",
+    ):
+        assert field_id in r.text
+
+
+def test_owners_page_prefills_from_slug(client, seeded_db):
+    """When the visitor lands at /owners?slug=<biz>, the form shows the
+    listing as a read-only confirmation and locks the business name to it.
+    Without ?slug, the field is editable."""
+    # With ?slug: pre-filled. Use a real seeded Miami salon (see
+    # backend/seed/_real_businesses.json) so the route can resolve it.
+    r = client.get(
+        "/owners?slug=blow-dry-bar-brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "Blow Dry Bar Brickell" in r.text
+    assert "readonly" in r.text
+    assert "Claiming" in r.text
+
+    # Without ?slug: editable, no prefill banner.
+    r2 = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r2.status_code == 200, r2.text
+    # The "Claiming" prefill banner is only rendered when prefilled.
+    assert ">Claiming<" not in r2.text
+
+
+def test_owners_page_embeds_business_directory(client, seeded_db):
+    """The form needs a client-side directory of {id, name, slug} so a
+    visitor who types a business name can be matched to a real listing
+    record without a new endpoint. Confirm the directory is in the page."""
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "var DIRECTORY" in r.text
+    assert "Blow Dry Bar Brickell" in r.text
+
+
+def test_claim_endpoint_accepts_payload_from_form(client, seeded_db):
+    """End-to-end: the JSON payload our form posts must be accepted by the
+    existing POST /api/v1/claims endpoint. If the model schema ever changes
+    (e.g. a field is renamed), this test breaks early."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    biz = asyncio.run(
+        seeded_db.businesses.find_one(
+            {"city_id": city["_id"], "slug": "blow-dry-bar-brickell"}
+        )
+    )
+    assert biz is not None, "test seed missing blow-dry-bar-brickell"
+
+    payload = {
+        "business_id": biz["_id"],
+        "submitter_name": "Jane Owner",
+        "submitter_email": "jane@example.com",
+        "submitter_phone": "(305) 555-0142",
+        "notes": "I run the front desk.",
+    }
+    r = client.post("/api/v1/claims", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["business_id"] == biz["_id"]
+    assert body["submitter_email"] == "jane@example.com"
+    assert body["status"] == "pending"
+
+    # The business itself should now show as claim_status=pending.
+    updated = asyncio.run(seeded_db.businesses.find_one({"_id": biz["_id"]}))
+    assert updated["claim_status"] == "pending"
+
+
+def test_claim_endpoint_rejects_unknown_business(client, seeded_db):
+    """Defense-in-depth: if the embedded directory drifts and the form
+    submits a stale id, the server must return 404 rather than create an
+    orphan claim. The form's JS handles 404 with a friendly inline error."""
+    r = client.post(
+        "/api/v1/claims",
+        json={
+            "business_id": "00000000-0000-0000-0000-000000000000",
+            "submitter_name": "X",
+            "submitter_email": "x@example.com",
+        },
+    )
+    assert r.status_code == 404
+
+
 def test_owner_dashboard_preview(client):
     """The owner-dashboard preview page must render with the amber preview
     banner, the Featured-tier badge, the three Marketing AI cards, the
