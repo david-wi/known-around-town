@@ -1,0 +1,76 @@
+{#-
+  Placeholder "you're signed in" page.
+
+  Confirms the cookie works end-to-end and gives the owner a way to
+  log out. The real dashboard replaces this template in a follow-up
+  change — for now we just show their email and a single log-out
+  button.
+-#}
+{% extends 'base.html' %}
+{% set header_variant = 'sticky' %}
+
+{% block content %}
+
+<section class="bg-stone-50/60 border-b border-stone-200/60 min-h-[70vh]">
+  <div class="max-w-md mx-auto px-6 lg:px-10 py-16 lg:py-24">
+    <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-5">
+      For Business Owners
+    </p>
+    <h1 class="font-light text-stone-900 leading-[1.1] tracking-tight mb-6"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2rem, 4vw, 3rem); font-weight: 300;'>
+      You're <em class="italic text-stone-500">signed in.</em>
+    </h1>
+    <p class="text-base text-stone-600 leading-relaxed mb-2">
+      Signed in as
+      <strong id="owner-me-email" class="text-stone-900">{{ owner_email }}</strong>.
+    </p>
+    <p class="text-base text-stone-600 leading-relaxed mb-8">
+      Your dashboard is coming soon — this is the stub page that confirms your sign-in works.
+    </p>
+
+    <button type="button"
+            id="owner-logout"
+            class="inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm disabled:opacity-60 disabled:cursor-not-allowed">
+      <span data-label-default>Log out</span>
+      <span data-label-loading class="hidden">Logging out…</span>
+    </button>
+    <p id="owner-logout-error"
+       class="text-sm text-rose-700 hidden mt-4"
+       role="alert"
+       aria-live="polite"></p>
+  </div>
+</section>
+
+<script>
+(function() {
+  var btn = document.getElementById('owner-logout');
+  var err = document.getElementById('owner-logout-error');
+
+  function setLoading(loading) {
+    btn.disabled = loading;
+    btn.querySelector('[data-label-default]').classList.toggle('hidden', loading);
+    btn.querySelector('[data-label-loading]').classList.toggle('hidden', !loading);
+  }
+
+  btn.addEventListener('click', async function() {
+    err.classList.add('hidden');
+    setLoading(true);
+    try {
+      var r = await fetch('/api/v1/owner/logout', {method: 'POST'});
+      if (!r.ok) {
+        err.textContent = 'Could not log out. Please try again.';
+        err.classList.remove('hidden');
+        setLoading(false);
+        return;
+      }
+      window.location.href = '/owners/login';
+    } catch (e) {
+      err.textContent = 'Network error. Please try again.';
+      err.classList.remove('hidden');
+      setLoading(false);
+    }
+  });
+})();
+</script>
+
+{% endblock %}
