@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -45,6 +45,14 @@ async def on_startup() -> None:
 @app.get("/health")
 async def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+@app.get("/favicon.png", include_in_schema=False)
+async def favicon() -> RedirectResponse:
+    # WHY: browsers still probe these root paths even when the page points
+    # at the SVG favicon; redirecting avoids noisy 404 console errors.
+    return RedirectResponse(url="/assets/favicon.svg", status_code=308)
 
 
 # Static assets are served at /assets so it doesn't conflict with /api or
