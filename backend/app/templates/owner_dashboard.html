@@ -140,7 +140,10 @@
 <section class="bg-stone-50/60 border-y border-stone-200/60">
   <div class="max-w-5xl mx-auto px-6 lg:px-10 py-12">
     <p class="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-semibold mb-6">How your listing is doing</p>
-    <div class="grid sm:grid-cols-3 gap-5">
+    {# WHY: md:grid-cols-3 (not sm:grid-cols-3) because the project's
+       compiled Tailwind stylesheet only ships sm:grid-cols-2 — using a
+       missing utility silently stacks the stats as one column. #}
+    <div class="grid md:grid-cols-3 gap-5">
       <div class="rounded-2xl bg-white border border-stone-200 p-6">
         <p class="font-serif text-4xl text-stone-900 mb-1" style="font-family: Georgia, serif;">{{ stat_views_this_week }}</p>
         <p class="text-sm text-stone-500">Profile visits this week</p>
