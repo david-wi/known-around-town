@@ -21,6 +21,7 @@ from app.routes.api.v1 import (
     claims as api_claims,
     inquiries as api_inquiries,
 )
+from app.routes.admin import claims_admin
 from app.routes.public import pages as public_pages
 
 settings = get_settings()
@@ -62,6 +63,12 @@ app.include_router(api_inquiries.router, prefix="/api/v1")
 
 
 public_pages.attach_templates(templates)
+claims_admin.attach_templates(templates)
+
+# Admin HTML pages — registered BEFORE the public SSR catch-all so /admin/*
+# resolves to the admin router rather than being swallowed by the public
+# tenant-aware not-found handler.
+app.include_router(claims_admin.router)
 
 # Public SSR routes (last, since they catch broad URL patterns).
 app.include_router(public_pages.router)
