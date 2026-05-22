@@ -2,10 +2,22 @@
   For Business Owners landing page. Reached from the header CTA and the
   footer's Owners column on every site in the network.
 
-  Three-tier explainer (Free / Featured / Concierge) with a clear claim
-  CTA. Vertical-neutral copy — works for Beauty salons, Wellness studios,
-  Health practices — by referring to "your business" and using the
-  network's `vertical_word` / `place_label_plural` where appropriate.
+  Three-tier explainer (Free / Featured / Concierge) with a real claim
+  form. The form posts to the existing POST /api/v1/claims endpoint —
+  no new endpoint, no new model. Vertical-neutral copy — works for
+  Beauty salons, Wellness studios, Health practices — by referring to
+  "your business" and using the network's `vertical_word` /
+  `place_label_plural` where appropriate.
+
+  Two ways the form can resolve a listing to a real database record
+  (which the claim endpoint requires):
+    1. The visitor arrived via `/owners?slug=<biz-slug>` — the route
+       resolved the slug to a record and passed `claim_prefill` in.
+       The form shows the listing as a read-only confirmation.
+    2. The visitor types a business name. The form matches against
+       `claim_directory` (a small, embedded list of live businesses in
+       this city). Exact match wins; otherwise the first substring
+       match. No match = friendly inline error.
 -#}
 {% extends 'base.html' %}
 {% set header_variant = 'sticky' %}
@@ -26,10 +38,8 @@
       Claim yours to take control of the profile, get found by people
       searching tonight, and unlock the tools that bring bookings to the door.
     </p>
-    <a class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
-       href="mailto:hello@expertly.ai?subject=Claim%20my%20listing">
-      Claim your listing <span aria-hidden="true">→</span>
-    </a>
+
+    {% include 'partials/claim_form.html' %}
   </div>
 </section>
 
@@ -93,11 +103,14 @@
       Ready to claim your <em class="italic text-stone-500">{{ listing_word_singular or 'listing' }}</em>?
     </h2>
     <p class="text-stone-600 leading-relaxed mb-8">
-      Drop us a line with your business name and we'll get you set up — usually within a day.
+      Drop your business name and contact details — we'll get you set up, usually within one business day.
     </p>
+    {# WHY: A second copy of the form would mean two independent submission
+       states to maintain (and the risk of a confused visitor filling out
+       both). Scroll-link up to the single form at the top instead. #}
     <a class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
-       href="mailto:hello@expertly.ai?subject=Claim%20my%20listing">
-      Email us to claim <span aria-hidden="true">→</span>
+       href="#claim-form">
+      Claim your listing <span aria-hidden="true">→</span>
     </a>
   </div>
 </section>
