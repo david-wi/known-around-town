@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{#-
+  Rendered at the bare network host (no city subdomain) — e.g.
+  `knowsbeauty.ai.devintensive.com/`. Lists the live cities for the network
+  with brand-matched accent colors, plus dimmed "coming soon" tiles for the
+  planned next cities. Header uses the sticky white variant so the page reads
+  as a polished landing, not a takeover-style city home.
+-#}
+{% set header_variant = 'sticky' %}
+
+{% block content %}
+<section class="max-w-7xl mx-auto px-6 lg:px-10 pt-24 md:pt-32 pb-12 md:pb-16 text-center">
+  <div class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_strong }} font-semibold mb-5">
+    {{ landing_eyebrow }}
+  </div>
+  <h1 class="font-serif text-5xl md:text-7xl font-light text-stone-900 leading-[0.95] mb-6"
+      style='font-family: Georgia, "Times New Roman", serif;'>
+    {% set _parts = network.name.split(' ', 1) %}
+    {% if _parts|length == 2 %}<em class="italic font-light">{{ _parts[0] }}</em> {{ _parts[1] }}{% else %}{{ network.name }}{% endif %}
+  </h1>
+  {% if landing_subhead %}
+  <p class="text-lg md:text-xl text-stone-600 max-w-2xl mx-auto leading-relaxed">
+    {{ landing_subhead }}
+  </p>
+  {% endif %}
+</section>
+
+<section class="max-w-7xl mx-auto px-6 lg:px-10 pb-32">
+  <div class="flex items-end justify-between mb-10 md:mb-14">
+    <div>
+      <div class="text-[10px] uppercase tracking-[0.3em] text-stone-500 font-semibold mb-3">
+        {{ landing_cities_eyebrow }}
+      </div>
+      <h2 class="font-serif text-3xl md:text-4xl font-light text-stone-900"
+          style='font-family: Georgia, "Times New Roman", serif;'>
+        {{ landing_cities_intro }}
+      </h2>
+    </div>
+  </div>
+
+  {% if live_cities %}
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mb-12">
+    {% for c in live_cities %}
+    <a href="{{ c.url }}"
+       class="group block rounded-2xl overflow-hidden bg-white border border-stone-200/70 hover:border-stone-300 transition shadow-sm hover:shadow-md">
+      {% if c.hero_photo_url %}
+      <div class="aspect-[4/3] w-full overflow-hidden bg-stone-100">
+        <img src="{{ c.hero_photo_url }}" alt="{{ c.name }}"
+             class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500" />
+      </div>
+      {% else %}
+      <div class="aspect-[4/3] w-full bg-gradient-to-br {{ theme.category_banner_gradient }}"></div>
+      {% endif %}
+      <div class="p-7">
+        <div class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_strong }} font-semibold mb-2">
+          {{ c.name }} · {{ network.name }}
+        </div>
+        <h3 class="font-serif text-2xl md:text-3xl font-light text-stone-900 leading-tight mb-3"
+            style='font-family: Georgia, "Times New Roman", serif;'>
+          {{ c.name }} {{ vertical_word }}
+        </h3>
+        {% if c.tagline %}
+        <p class="text-stone-600 text-sm leading-relaxed mb-5">{{ c.tagline }}</p>
+        {% endif %}
+        <span class="inline-flex items-center gap-1.5 text-sm font-medium {{ theme.accent_text_strong }} {{ theme.accent_hover_text }}">
+          Open the guide
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M5 12h14M13 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if planned_cities %}
+  <div class="mt-8">
+    <div class="text-[10px] uppercase tracking-[0.3em] text-stone-500 font-semibold mb-6">
+      Expanding to
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
+      {% for p in planned_cities %}
+      <div class="rounded-xl border border-stone-200/70 bg-stone-50/60 p-6 opacity-70">
+        <h3 class="font-serif text-xl font-light text-stone-700 leading-tight mb-2"
+            style='font-family: Georgia, "Times New Roman", serif;'>
+          {{ p.name }} {{ vertical_word }}
+        </h3>
+        <span class="inline-flex items-center text-[10px] uppercase tracking-[0.2em] px-2.5 py-1 rounded-full bg-white border border-stone-200 text-stone-500 font-semibold">
+          {{ p.eta }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -126,6 +126,49 @@ def test_unknown_host_404(client):
     assert r.status_code == 404
 
 
+def test_bare_apex_beauty_returns_200(client):
+    """The bare network host (no city subdomain) must render a real landing
+    page, not a 403 / 404. Before this fix it silently fell through to a
+    near-empty stub and the upstream proxy was returning 403 on HEAD probes;
+    we now serve the network_landing template with a real city tile so
+    visitors who land on the apex have somewhere to click."""
+    r = client.get("/", headers={"host": "knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+
+
+def test_bare_apex_renders_network_landing_with_city_tile(client):
+    """The bare-apex landing page must list the live cities for the network
+    and link each tile to its own city subdomain (not back to the apex)."""
+    r = client.get("/", headers={"host": "knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    body = r.text
+    # Brand chrome present.
+    assert "Knows Beauty" in body
+    # City tile for the only currently-live city in the seed.
+    assert "Miami Beauty" in body
+    # City tile is a real link to the city subdomain — not a relative URL
+    # that would route back to the apex.
+    assert "miami.knowsbeauty.localhost" in body
+    # The "Cities" section eyebrow shows we're on the landing page, not the
+    # bare network_home stub.
+    assert "CITIES" in body
+    # The planned-expansion section surfaces at least one "coming soon" city.
+    assert "Austin Beauty" in body
+    assert "Coming 202" in body  # year prefix shared by all ETAs
+
+
+def test_bare_apex_wellness_and_health_also_render(client):
+    """Bare apex must work for every network, not just Beauty."""
+    for host, expected_brand in [
+        ("knowswellness.localhost", "Knows Wellness"),
+        ("knowshealth.localhost", "Knows Health"),
+    ]:
+        r = client.get("/", headers={"host": host})
+        assert r.status_code == 200, f"{host}: {r.text}"
+        assert expected_brand in r.text
+        assert "miami." in r.text  # the live Miami city tile must link out
+
+
 def test_unknown_city_renders_404(client):
     """Network is known but the city slug isn't in the database."""
     r = client.get("/", headers={"host": "atlantis.knowsbeauty.localhost"})
