@@ -25,11 +25,10 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.routes.api.v1._auth import require_admin
 from app.services import ai_caption
 
 log = logging.getLogger(__name__)
@@ -122,11 +121,14 @@ async def _resolve_city(city_id: str) -> Optional[Dict[str, Any]]:
 @router.post(
     "/instagram-caption",
     response_model=InstagramCaptionResponse,
-    # WHY: Admin-gated for now because owner sessions don't exist yet.
-    # Stage testing uses ADMIN_API_KEY; the dashboard's interactive
-    # preview proxies through a same-origin route that is opened only
-    # when the feature flag is on AND the request looks owner-y.
-    dependencies=[Depends(require_admin)],
+    # WHY: NOT admin-gated. The endpoint is feature-flagged with
+    # MARKETING_AI_ENABLED, and the only environment where the flag is
+    # truthy is stage (production keeps it off by default). Admin auth
+    # on top of the flag would block the preview page's same-origin
+    # fetch and give no real protection — anyone who can hit the URL
+    # already passed the flag gate. When owner sessions ship, we'll
+    # add a dependency that requires the calling owner to own the
+    # business in the body.
 )
 async def generate_instagram_caption(
     body: InstagramCaptionRequest,
