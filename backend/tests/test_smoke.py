@@ -264,6 +264,38 @@ def test_owner_dashboard_links_back_to_public_listing(client):
     assert "/b/" in r.text
 
 
+def test_pricing_page(client):
+    """The dedicated /pricing page shows the three tiers side-by-side
+    with prices, FAQs, and conversion CTAs. This is the page that converts
+    a "thinking about it" owner into a "claim my listing" click."""
+    r = client.get("/pricing", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # All three tier names appear
+    for tier in ("Free", "Featured", "Concierge"):
+        assert tier in r.text
+    # Prices are present and unambiguous
+    assert "$29" in r.text
+    assert "$290" in r.text  # annual
+    assert "$299" in r.text
+    # Featured is positioned as the recommended tier
+    assert "Most popular" in r.text
+    # Trial / cancel terms appear (must align with owners.html copy)
+    assert "first month free" in r.text.lower()
+    # At least one FAQ question is rendered
+    assert "How do I claim" in r.text
+    # Conversion CTA points to the claim form anchor on the owners page
+    assert "/owners#claim" in r.text
+
+
+def test_pricing_link_in_header_nav(client):
+    """The pricing page must be discoverable from the global nav so owners
+    can find it without knowing the URL."""
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert 'href="/pricing"' in r.text
+    assert ">Pricing<" in r.text
+
+
 def test_stage_hostname_resolves_to_underlying_city(client):
     """`stage-miami.knowsbeauty.localhost` should render Miami content,
     so a reviewer can compare a preview deployment to the live miami.knows...
