@@ -21,6 +21,7 @@ from app.routes.api.v1 import (
     claims as api_claims,
     inquiries as api_inquiries,
     marketing_ai as api_marketing_ai,
+    owner_login as api_owner_login,
 )
 from app.routes.admin import claims_admin
 from app.routes.public import pages as public_pages
@@ -62,6 +63,8 @@ app.include_router(api_editorial.router, prefix="/api/v1")
 app.include_router(api_claims.router, prefix="/api/v1")
 app.include_router(api_inquiries.router, prefix="/api/v1")
 app.include_router(api_marketing_ai.router, prefix="/api/v1")
+# Owner login (passwordless code-by-email). Public — no admin key required.
+app.include_router(api_owner_login.router, prefix="/api/v1")
 
 
 public_pages.attach_templates(templates)

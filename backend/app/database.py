@@ -49,3 +49,15 @@ async def ensure_indexes() -> None:
 
     await db.business_claims.create_index([("business_id", 1), ("status", 1)])
     await db.business_inquiries.create_index([("business_id", 1), ("submitted_at", -1)])
+
+    # Owner login (passwordless verification-code flow).
+    # WHY: lookup pattern is "give me the most recent unused code for this
+    # email", so we sort by (email, created_at desc). The same index also
+    # answers the rate-limit count query that filters by email + a
+    # created_at lower bound.
+    await db.owner_magic_codes.create_index([("email", 1), ("created_at", -1)])
+    # WHY: a Mongo TTL index garbage-collects rows after they've been around
+    # well past their useful life. Codes expire in 15 minutes, but we keep
+    # them for 24 hours as a short audit trail and to keep the rate-limit
+    # math honest for the recent past.
+    await db.owner_magic_codes.create_index("created_at", expireAfterSeconds=86400)

@@ -12,12 +12,13 @@ from typing import Any, Dict, List, Optional
 
 import markdown2
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.database import get_db
 from app.services import content as content_svc
 from app.services.copy import CopyResolver
+from app.services.owner_auth import SESSION_COOKIE_NAME, verify_session
 from app.services.tenant import TenantContext, resolve_tenant
 
 router = APIRouter()
@@ -869,6 +870,66 @@ async def pricing_page(request: Request) -> HTMLResponse:
         f"receptionist. First month free on Featured, cancel anytime."
     ).strip()
     return _templates.TemplateResponse("pricing.html", ctx)
+
+
+@router.get("/owners/login", response_class=HTMLResponse)
+async def owners_login_page(request: Request) -> HTMLResponse:
+    """The two-step sign-in form for salon owners.
+
+    Step 1 collects the email; step 2 collects the code. Both steps live
+    on the same page — the JS in the template swaps which one is
+    visible without a full reload.
+    """
+    tenant = await _require_tenant(request)
+    ctx = await _base_context(request, tenant)
+    ctx["seo_title"] = "Sign in for owners"
+    ctx["meta_description"] = (
+        "Sign in to manage your Knows Beauty listing. Enter your email and we'll "
+        "send you a one-time code."
+    )
+    # If the visitor is already signed in, send them to the placeholder
+    # dashboard rather than asking for an email they don't need.
+    cookie = request.cookies.get(SESSION_COOKIE_NAME)
+    if cookie and verify_session(cookie):
+        return RedirectResponse(url="/owners/me", status_code=303)
+    return _templates.TemplateResponse("owner_login.html", ctx)
+
+
+@router.get("/owners/me", response_class=HTMLResponse)
+async def owners_me_page(request: Request) -> HTMLResponse:
+    """Placeholder 'you're signed in' page.
+
+    This is the dashboard stub: it confirms the cookie works end-to-end
+    and gives the owner a logout button. The actual dashboard will
+    replace this template in a follow-up change.
+    """
+    tenant = await _require_tenant(request)
+    cookie = request.cookies.get(SESSION_COOKIE_NAME)
+    session = verify_session(cookie) if cookie else None
+    if not session:
+        return RedirectResponse(url="/owners/login", status_code=303)
+
+    ctx = await _base_context(request, tenant)
+    ctx["owner_email"] = session["email"]
+    ctx["seo_title"] = "Your account"
+    ctx["meta_description"] = "Your Knows Beauty owner account."
+    response = _templates.TemplateResponse("owner_me.html", ctx)
+    # WHY: rolling 30-day expiry. Reissue the cookie on every successful
+    # visit so an active owner never has to sign in again. The freshly
+    # signed cookie carries a new issued_at, so the 30-day clock starts
+    # over from this hit.
+    from app.services.owner_auth import SESSION_LIFETIME, sign_session
+    is_secure = request.url.scheme == "https"
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=sign_session(session["email"]),
+        max_age=int(SESSION_LIFETIME.total_seconds()),
+        httponly=True,
+        secure=is_secure,
+        samesite="lax",
+        path="/",
+    )
+    return response
 
 
 @router.get("/robots.txt")

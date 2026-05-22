@@ -361,3 +361,37 @@ class BusinessInquiry(BaseModel):
     submitted_at: datetime = Field(default_factory=_now)
 
     model_config = {"populate_by_name": True}
+
+
+class OwnerMagicCode(BaseModel):
+    """A short-lived verification code emailed to a salon owner who wants to sign in.
+
+    One row per code we send. The cleartext six-character code lives in the
+    email itself; we keep only a SHA-256 hash so a database leak cannot let
+    anyone impersonate an owner. The row also doubles as the rate-limit
+    ledger: by counting recent rows for the same email we can refuse to
+    flood the inbox.
+
+    `used_at` going from None to a timestamp marks the code as consumed —
+    a successfully verified code cannot be replayed.
+    """
+    id: str = Field(default_factory=_id, alias="_id")
+    # WHY: stored lowercase so we don't need a case-insensitive index for
+    # the rate-limit and lookup queries.
+    email: str
+    # SHA-256 hex digest of the six-character code. Cleartext never lands
+    # in the database — only in the email body.
+    code_hash: str
+    created_at: datetime = Field(default_factory=_now)
+    # WHY: 15 minutes is short enough to limit replay risk if the email is
+    # intercepted, and long enough that an owner walking from inbox to
+    # browser still succeeds on the first try.
+    expires_at: datetime
+    # Set the moment a code is successfully verified. Once non-null, the
+    # row is kept as an audit trail but can no longer be redeemed.
+    used_at: Optional[datetime] = None
+    # WHY: hard cap on entry retries so a guesser can't sweep the keyspace
+    # one code at a time. After this many failures we refuse the row.
+    attempts: int = 0
+
+    model_config = {"populate_by_name": True}
