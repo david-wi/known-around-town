@@ -103,10 +103,16 @@
                   {% endif %}
                 </td>
                 <td class="px-5 py-4 text-right whitespace-nowrap">
+                  {# WHY: bg-emerald-500 + hover:bg-emerald-600 are the
+                     specific shades present in the project's pre-compiled
+                     Tailwind stylesheet (reference.css). Using -600 or -700
+                     as the base would render unstyled because those rules
+                     aren't in the bundle — the button would be invisible
+                     white-on-white. #}
                   <div class="inline-flex items-center gap-2">
                     <button type="button"
                             data-action="verify"
-                            class="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-1.5 text-xs transition">
+                            class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-1.5 text-xs transition">
                       Verify
                     </button>
                     <button type="button"
