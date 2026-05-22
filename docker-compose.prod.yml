@@ -34,6 +34,11 @@ services:
       # used by Identity; without these, production logs the code instead
       # of emailing it to the owner.
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # WHY: signed session cookie for owner login. Without a stable
+      # value here, every container restart logs every signed-in
+      # owner out (the auth module falls back to a process-lifetime
+      # random key, which dies with each redeploy).
+      OWNER_SESSION_SECRET: ${OWNER_SESSION_SECRET:-}
       # WHY: defaults match the current single-brand email template until
       # the owner email copy is made network-aware.
       OWNER_EMAIL_FROM_NAME: ${OWNER_EMAIL_FROM_NAME:-Knows Beauty}
@@ -123,6 +128,11 @@ services:
       # WHY: stage exercises the owner sign-in flow before launch; missing
       # credentials caused codes to be logged instead of sent.
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # WHY: signed session cookie for owner login. Without a stable
+      # value here, every container restart logs every signed-in
+      # owner out (the auth module falls back to a process-lifetime
+      # random key, which dies with each redeploy).
+      OWNER_SESSION_SECRET: ${OWNER_SESSION_SECRET:-}
       # WHY: defaults match the current single-brand email template until
       # the owner email copy is made network-aware.
       OWNER_EMAIL_FROM_NAME: ${OWNER_EMAIL_FROM_NAME:-Knows Beauty}
