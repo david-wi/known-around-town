@@ -103,6 +103,62 @@ def test_owners_page(client):
         assert tier in r.text
 
 
+def test_owner_dashboard_preview(client):
+    """The owner-dashboard preview page must render with the amber preview
+    banner, the Featured-tier badge, the three Marketing AI cards, the
+    billing summary, and a real seeded salon name. It's a static mockup,
+    so the goal here is to confirm every section the spec calls for is
+    actually in the HTML — not to test live functionality, which doesn't
+    exist yet."""
+    r = client.get(
+        "/owner/dashboard", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    body = r.text
+    # Preview banner must be present so reviewers know this isn't live.
+    assert "Preview" in body
+    assert "mockup" in body
+    # Tier badge and section headings.
+    assert "Tier: Featured" in body
+    assert "Owner Dashboard" in body
+    assert "How your listing is doing" in body
+    assert "Marketing AI" in body
+    assert "Billing" in body
+    # The three Marketing AI cards.
+    assert "Generate caption" in body
+    assert "Generate ad copy" in body
+    assert "Sync Google Business" in body
+    # Fake stats and billing copy.
+    assert "127" in body  # weekly visits stat
+    assert "$29" in body
+    # A real seeded Miami salon should be the sample. The route picks the
+    # first available from a short priority list — Rossano Ferretti is the
+    # default, with two real-Miami fallbacks if that ever drops from the
+    # seed.
+    assert (
+        "Rossano Ferretti" in body
+        or "Warren-Tricomi" in body
+        or "Eli" in body  # "Eliá Spa" without the accent
+    )
+    # The "Coming soon" controls must be present and disabled.
+    assert "Coming soon" in body
+    assert "data-coming-soon" in body
+
+
+def test_owner_dashboard_links_back_to_public_listing(client):
+    """The dashboard should link to the public listing of whatever sample
+    salon it's showing, so reviewers can compare the owner view to the
+    public view in one click."""
+    r = client.get(
+        "/owner/dashboard", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    # The public listing URL pattern is /b/<slug>. The route falls through
+    # a short priority list of slugs, so we just check that *some* /b/
+    # link exists in the rendered HTML.
+    assert "/b/" in r.text
+
+
 def test_stage_hostname_resolves_to_underlying_city(client):
     """`stage-miami.knowsbeauty.localhost` should render Miami content,
     so a reviewer can compare a preview deployment to the live miami.knows...

@@ -7,7 +7,7 @@ template only receives plain data — no DB access from the template.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import markdown2
@@ -743,6 +743,89 @@ async def owners_page(request: Request) -> HTMLResponse:
         f"{vertical}. Claim it, upgrade it, and get found by people searching tonight."
     )
     return _templates.TemplateResponse("owners.html", ctx)
+
+
+# Preferred sample salons for the preview dashboard. The first one that
+# exists in the current city's seed is used. Rossano Ferretti is the first
+# choice because it's an Editor's Pick on the reference site and reads as
+# plausibly high-tier in the mockup; the others are real Miami salons
+# included as fallbacks in case the priority slug ever leaves the seed.
+_OWNER_DASHBOARD_SAMPLE_SLUGS: List[str] = [
+    "rossano-ferretti-hair-spa-miami",
+    "warren-tricomi-salon-miami-beach",
+    "elia-spa-ritz-carlton-south-beach",
+]
+
+
+@router.get("/owner/dashboard", response_class=HTMLResponse)
+async def owner_dashboard_preview(request: Request) -> HTMLResponse:
+    """Static, unauthenticated preview of the owner dashboard.
+
+    This is a UX mockup — the real claim-and-pay flow is being built on a
+    separate workstream. We render a real seeded business as if its owner
+    had just signed up for Featured, with every interactive control wired
+    to a "Coming soon" toast instead of a backend action. A clearly visible
+    preview banner at the top makes it obvious to any reviewer that the
+    page is not live functionality.
+    """
+    tenant = await _require_tenant(request)
+    if not tenant.city:
+        raise HTTPException(404, "City required")
+    city = tenant.city
+
+    business: Optional[Dict[str, Any]] = None
+    for slug in _OWNER_DASHBOARD_SAMPLE_SLUGS:
+        business = await content_svc.get_business(city["_id"], slug)
+        if business:
+            break
+    # Final fallback: any live business in this city. The preview is
+    # supposed to be visually intact even if the slug list above gets stale
+    # or the city's seed changes — we'd rather show *some* salon than 404.
+    if not business:
+        live = await content_svc.list_businesses(city["_id"], limit=1)
+        business = live[0] if live else None
+    if not business:
+        raise HTTPException(404, "No businesses available for preview")
+
+    primary_nb_slug = (business.get("neighborhood_slugs") or [None])[0]
+    neighborhood = None
+    if primary_nb_slug:
+        neighborhood = await content_svc.get_neighborhood(
+            city["_id"], primary_nb_slug
+        )
+
+    photos = business.get("photos") or []
+    hero_photo = next((p for p in photos if p.get("is_hero")), None) or (
+        photos[0] if photos else None
+    )
+
+    ctx = await _base_context(request, tenant)
+    ctx.update(
+        {
+            "business": business,
+            "neighborhood": neighborhood,
+            "hero_photo": hero_photo,
+            # Fake-but-plausible numbers so reviewers see realistic shapes.
+            # Stat values are illustrative only and are not derived from
+            # the seed or any live traffic data.
+            "stat_views_this_week": 127,
+            "stat_views_this_month": 482,
+            "stat_claims_since_launch": 38,
+            # Trial billing date — chosen as ~23 days out from "now" so
+            # the date is always in the future relative to the page
+            # render, and roughly matches the 30-day-free-trial promise
+            # on the /owners page.
+            "next_billing_date": (
+                datetime.now(timezone.utc) + timedelta(days=23)
+            ).strftime("%B %-d, %Y"),
+            "seo_title": "Owner Dashboard Preview",
+            "meta_description": (
+                "Preview of the owner dashboard for the Featured tier — "
+                "this is a mockup, not the live claim-and-pay flow."
+            ),
+        }
+    )
+    return _templates.TemplateResponse("owner_dashboard.html", ctx)
 
 
 @router.get("/robots.txt")
