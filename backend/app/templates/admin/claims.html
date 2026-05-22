@@ -1,0 +1,190 @@
+{#-
+  Pending claims review page.
+
+  Each row is one claim a salon owner submitted. The Verify button confirms
+  they really do own the business and locks the claim in. The Reject button
+  is for spam, mistaken submissions, or claims from someone other than the
+  real owner — it opens the business back up so the right person can try
+  to claim it later.
+
+  Both buttons POST to the existing JSON endpoints under /api/v1/claims/ —
+  the page itself doesn't perform DB writes. On success the row is removed
+  from the visible table; on failure a small message appears on the row
+  with the server's error.
+-#}
+{% extends 'admin/_layout.html' %}
+
+{% block title %}Pending claims · Admin{% endblock %}
+
+{% block content %}
+<section class="bg-stone-50/60 border-b border-stone-200/60">
+  <div class="max-w-6xl mx-auto px-6 lg:px-10 py-12">
+    <p class="text-[11px] uppercase tracking-[0.3em] text-rose-600 font-semibold mb-3">Pending claims</p>
+    <h1 class="font-light text-stone-900 leading-[1.05] tracking-tight mb-3"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 300;'>
+      {% if claims %}
+        {{ claims|length }} pending claim{{ '' if claims|length == 1 else 's' }}
+      {% else %}
+        No pending claims
+      {% endif %}
+    </h1>
+    <p class="text-stone-600 leading-relaxed max-w-2xl">
+      These are the businesses someone has tried to claim. Verify the
+      legit ones; reject anything that looks like spam or a wrong-person
+      claim. Rejecting puts the business back on the market so the right
+      owner can claim it later.
+    </p>
+  </div>
+</section>
+
+<section class="bg-white">
+  <div class="max-w-6xl mx-auto px-6 lg:px-10 py-10">
+    {% if not claims %}
+      <div class="rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-8 py-16 text-center">
+        <p class="text-stone-600">Nothing to review right now. New claim submissions will show up here automatically.</p>
+      </div>
+    {% else %}
+      <div id="claims-table" class="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+        <table class="min-w-full divide-y divide-stone-200 text-sm">
+          <thead class="bg-stone-50 text-stone-600">
+            <tr>
+              <th class="px-5 py-3 text-left text-[11px] uppercase tracking-[0.15em] font-semibold">Business</th>
+              <th class="px-5 py-3 text-left text-[11px] uppercase tracking-[0.15em] font-semibold">Claimer</th>
+              <th class="px-5 py-3 text-left text-[11px] uppercase tracking-[0.15em] font-semibold">Contact</th>
+              <th class="px-5 py-3 text-left text-[11px] uppercase tracking-[0.15em] font-semibold">Submitted</th>
+              <th class="px-5 py-3 text-left text-[11px] uppercase tracking-[0.15em] font-semibold">Notes</th>
+              <th class="px-5 py-3 text-right text-[11px] uppercase tracking-[0.15em] font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-stone-100">
+            {% for claim in claims %}
+              {% set business = businesses_by_id.get(claim.business_id) %}
+              <tr data-claim-id="{{ claim._id }}" class="align-top">
+                <td class="px-5 py-4">
+                  {% if business %}
+                    <a href="/b/{{ business.slug }}" target="_blank" rel="noopener"
+                       class="font-medium text-stone-900 hover:text-rose-600 underline decoration-stone-300 hover:decoration-rose-400">
+                      {{ business.name }}
+                    </a>
+                    {# Defensive .get — older imported business docs may
+                       not have a full address dict, and a missing key
+                       would otherwise render an UndefinedError. #}
+                    {% set addr = business.get('address') or {} %}
+                    <p class="text-xs text-stone-500 mt-0.5">
+                      {{ addr.get('city') or '' }}{% if addr.get('state') %}, {{ addr.get('state') }}{% endif %}
+                    </p>
+                  {% else %}
+                    <span class="text-stone-500 italic">Business not found</span>
+                    <p class="text-xs text-stone-400 mt-0.5 font-mono">{{ claim.business_id }}</p>
+                  {% endif %}
+                </td>
+                <td class="px-5 py-4 text-stone-900">{{ claim.submitter_name or '—' }}</td>
+                <td class="px-5 py-4 text-stone-700">
+                  {% if claim.submitter_email %}
+                    <a href="mailto:{{ claim.submitter_email }}" class="underline decoration-stone-300 hover:decoration-stone-700">{{ claim.submitter_email }}</a>
+                  {% endif %}
+                  {% if claim.submitter_phone %}
+                    <p class="text-xs text-stone-500 mt-0.5">{{ claim.submitter_phone }}</p>
+                  {% endif %}
+                </td>
+                <td class="px-5 py-4 text-stone-700 whitespace-nowrap">
+                  <time datetime="{{ claim.submitted_at.isoformat() if claim.submitted_at else '' }}">
+                    {{ claim.submitted_at.strftime('%b %-d, %Y %-I:%M %p') if claim.submitted_at else '—' }}
+                  </time>
+                </td>
+                <td class="px-5 py-4 text-stone-700 max-w-xs">
+                  {% if claim.notes %}
+                    <p class="line-clamp-3" title="{{ claim.notes }}">{{ claim.notes }}</p>
+                  {% else %}
+                    <span class="text-stone-400">—</span>
+                  {% endif %}
+                  {% if claim.relationship %}
+                    <p class="text-xs text-stone-500 mt-1">Relationship: {{ claim.relationship }}</p>
+                  {% endif %}
+                </td>
+                <td class="px-5 py-4 text-right whitespace-nowrap">
+                  <div class="inline-flex items-center gap-2">
+                    <button type="button"
+                            data-action="verify"
+                            class="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-1.5 text-xs transition">
+                      Verify
+                    </button>
+                    <button type="button"
+                            data-action="reject"
+                            class="inline-flex items-center gap-1.5 rounded-full bg-white hover:bg-stone-50 border border-stone-300 text-stone-700 font-medium px-4 py-1.5 text-xs transition">
+                      Reject
+                    </button>
+                  </div>
+                  <p class="row-status text-xs text-stone-500 mt-2 hidden" aria-live="polite"></p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{# WHY: Plain delegated click handler — no framework. Submits to the existing
+   verify/reject JSON endpoints. The admin cookie set at /admin/login means
+   credentials: 'same-origin' is enough for the browser to attach it; we
+   never put the raw key in JavaScript. #}
+<script>
+  (function () {
+    var table = document.getElementById('claims-table');
+    if (!table) return;
+    table.addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      var row = btn.closest('tr');
+      if (!row) return;
+      var claimId = row.getAttribute('data-claim-id');
+      if (!claimId) return;
+      var action = btn.getAttribute('data-action');
+      if (action !== 'verify' && action !== 'reject') return;
+
+      if (action === 'reject') {
+        if (!window.confirm('Reject this claim and open the business back up for someone else to claim?')) {
+          return;
+        }
+      }
+
+      // Disable both buttons in this row while the request is in flight,
+      // so a double-click can't fire it twice.
+      var buttons = row.querySelectorAll('button[data-action]');
+      buttons.forEach(function (b) { b.disabled = true; b.classList.add('opacity-50'); });
+      var statusEl = row.querySelector('.row-status');
+      if (statusEl) { statusEl.classList.add('hidden'); statusEl.textContent = ''; }
+
+      fetch('/api/v1/claims/' + encodeURIComponent(claimId) + '/' + action, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' },
+      })
+        .then(function (resp) {
+          if (!resp.ok) {
+            return resp.text().then(function (body) {
+              throw new Error('HTTP ' + resp.status + (body ? ' — ' + body : ''));
+            });
+          }
+          // Remove the row from the table; if it was the last row, reload
+          // the page so the empty-state message appears.
+          var tbody = row.parentNode;
+          row.remove();
+          if (tbody && tbody.children.length === 0) {
+            location.reload();
+          }
+        })
+        .catch(function (err) {
+          buttons.forEach(function (b) { b.disabled = false; b.classList.remove('opacity-50'); });
+          if (statusEl) {
+            statusEl.textContent = 'Failed: ' + (err && err.message ? err.message : 'unknown error');
+            statusEl.classList.remove('hidden');
+            statusEl.classList.add('text-rose-600');
+          }
+        });
+    });
+  })();
+</script>
+{% endblock %}
