@@ -27,8 +27,11 @@ def test_miami_beauty_home(client):
     assert "Miami" in body
     # Hero headline pulled from city/editorial defaults
     assert "best-kept beauty" in body.lower() or "knows beauty" in body.lower()
-    # Featured Beauty businesses from the reference content should appear.
-    assert "Beauty Bar Sunny" in body or "Palmera Hair House" in body
+    # Featured Beauty businesses from the seed should appear. These two are in
+    # the Miami Beauty trending list, so the home page renders them.
+    # If this fails later, swap in another real Miami business currently in
+    # the seed — see backend/seed/_real_businesses.json.
+    assert "Rossano Ferretti Hair Spa" in body or "Warren-Tricomi Salon" in body
     # The Issue eyebrow comes from copy_blocks.
     assert "ISSUE NO. 01" in body
 
@@ -36,7 +39,11 @@ def test_miami_beauty_home(client):
 def test_miami_beauty_category(client):
     r = client.get("/c/nails", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
-    assert "Isla Nail Society" in r.text
+    # Vanity Projects Miami is a real nail studio in the seed (Design District,
+    # category 'nails'), so it appears on the /c/nails category page.
+    # If this fails later, swap in another real Miami business currently in
+    # the seed — see backend/seed/_real_businesses.json.
+    assert "Vanity Projects Miami" in r.text
 
 
 def test_miami_beauty_neighborhood(client):
@@ -46,11 +53,15 @@ def test_miami_beauty_neighborhood(client):
 
 
 def test_miami_beauty_business(client):
+    # Blow Dry Bar Brickell is a real Brickell salon in the seed; its detail
+    # page returns 200 and renders both the salon name and "Brickell".
+    # If this fails later, swap in another real Miami business currently in
+    # the seed — see backend/seed/_real_businesses.json.
     r = client.get(
-        "/b/isla-nail-society", headers={"host": "miami.knowsbeauty.localhost"}
+        "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
     )
     assert r.status_code == 200, r.text
-    assert "Isla Nail Society" in r.text
+    assert "Blow Dry Bar Brickell" in r.text
     assert "Brickell" in r.text
 
 
@@ -126,7 +137,12 @@ def test_unknown_city_renders_404(client):
 def test_sitemap_includes_business(client):
     r = client.get("/sitemap.xml", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200
-    assert "isla-nail-society" in r.text
+    # The sitemap lists every live business in Miami. Blow Dry Bar Brickell is
+    # one of the real salons currently in the seed, so its detail URL belongs
+    # in the sitemap.
+    # If this fails later, swap in another real Miami business currently in
+    # the seed — see backend/seed/_real_businesses.json.
+    assert "blow-dry-bar-brickell" in r.text
 
 
 def test_api_lists_networks(client):
@@ -160,3 +176,42 @@ def test_copy_block_override(client, seeded_db):
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200
     assert "An editors&#39; guide for Miami" in r.text or "An editors' guide for Miami" in r.text
+
+
+def test_founding_partner_badge_on_business_detail(client):
+    """A business that's been flagged as a Founding Partner shows the
+    badge label on its detail page. Ayesha Beauty Studio in Wynwood is
+    one of the five mock founding partners seeded for the design-partner
+    outreach demo — if this fails, check `is_founding_partner` is still
+    set on it in `_real_businesses.json`."""
+    r = client.get(
+        "/b/ayesha-beauty-studio-wynwood",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "Founding Partner" in r.text
+    # Tooltip should reference the publication name.
+    assert "Founding member of Miami Knows Beauty" in r.text
+
+
+def test_founding_partner_badge_on_trending_row(client):
+    """The home page's trending row also surfaces the Founding Partner
+    badge for any business that has the flag. Three of the five mock
+    founding partners are in the Miami Beauty trending list
+    (Ayesha, Vanity Projects, IGK), so the badge text should appear on
+    the home page."""
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "Founding Partner" in r.text
+
+
+def test_non_founding_partner_does_not_show_badge(client):
+    """A salon NOT flagged as a Founding Partner doesn't render the
+    badge on its detail page. Drybar Miami Beach is a real, non-founding
+    business in the seed, so its page should NOT mention the badge."""
+    r = client.get(
+        "/b/drybar-miami-beach",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "Founding Partner" not in r.text
