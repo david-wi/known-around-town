@@ -289,7 +289,6 @@ async def _render_network_landing(request: Request, tenant: TenantContext) -> HT
             "live_cities": live_cities,
             "planned_cities": planned,
             "landing_eyebrow": f"{network.get('name', '').upper()} — A LOCAL GUIDE NETWORK",
-            "landing_headline": network.get("tagline") or network.get("name", ""),
             "landing_subhead": (
                 network.get("description")
                 or f"A curated guide to the best {vertical.lower()} in every city we cover."
@@ -332,6 +331,8 @@ async def home(request: Request) -> HTMLResponse:
     tenant = await _require_tenant(request)
 
     if not tenant.city:
+        if tenant.city_slug:
+            raise HTTPException(404, "City not found")
         return await _render_network_landing(request, tenant)
 
     city = tenant.city

@@ -376,9 +376,16 @@ def test_bare_apex_wellness_and_health_also_render(client):
 def test_unknown_city_renders_404(client):
     """Network is known but the city slug isn't in the database."""
     r = client.get("/", headers={"host": "atlantis.knowsbeauty.localhost"})
-    # The tenant resolver returns no city, so the home route currently 404s on the city pages.
-    # The network home template still renders 200 — verify both behaviors are not 500s.
-    assert r.status_code in (200, 404)
+    assert r.status_code == 404
+
+
+def test_bare_network_host_renders_city_landing(client):
+    r = client.get("/", headers={"host": "knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "KNOWS BEAUTY" in r.text
+    assert "Miami" in r.text
+    assert "http://miami.knowsbeauty.localhost/" in r.text
+    assert "Austin" in r.text
 
 
 def test_sitemap_includes_business(client):

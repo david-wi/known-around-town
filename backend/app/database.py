@@ -38,6 +38,12 @@ async def ensure_indexes() -> None:
     await db.businesses.create_index([("city_id", 1), ("neighborhood_slugs", 1)])
     await db.businesses.create_index([("city_id", 1), ("featured.enabled", 1)])
     await db.businesses.create_index([("city_id", 1), ("editors_pick", 1)])
+    # WHY: Stripe webhooks and billing-portal creation identify the listing by
+    # Stripe ids, and sparse unique indexes keep one Stripe object from being
+    # accidentally attached to multiple businesses while allowing unsubscribed
+    # businesses to leave the fields unset.
+    await db.businesses.create_index("stripe_customer_id", unique=True, sparse=True)
+    await db.businesses.create_index("stripe_subscription_id", unique=True, sparse=True)
 
     await db.copy_blocks.create_index(
         [("scope_type", 1), ("scope_ref", 1), ("key", 1), ("locale", 1)],

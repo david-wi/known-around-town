@@ -280,6 +280,11 @@ class Business(BaseModel):
     import_source: Optional[str] = None
     import_data: Optional[Dict[str, Any]] = None
     quality_score: int = 0
+    # WHY: Stripe identifiers live on the business document so billing
+    # webhooks and owner billing-portal links can find the listing without
+    # a second lookup table. Both stay null until the owner subscribes.
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
     status: PublishStatus = PublishStatus.draft
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
