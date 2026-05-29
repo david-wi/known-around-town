@@ -36,6 +36,9 @@ case "$DEPLOY_TARGET" in
     # stage service in docker-compose.prod.yml is gated by `profiles:
     # ["stage"]`, so it stays dormant on a normal production deploy.
     COMPOSE_PROFILE_ARGS=()
+    # WHY: target the production service explicitly so future compose
+    # profiles cannot accidentally start or recreate preview services.
+    COMPOSE_SERVICE="backend"
     SEED_AFTER_DEPLOY="true"
     ;;
   stage)
@@ -46,6 +49,10 @@ case "$DEPLOY_TARGET" in
     # because Compose only stops/recreates the services it can see in
     # the active profile set.
     COMPOSE_PROFILE_ARGS=(--profile stage)
+    # WHY: Compose includes unprofiled services whenever any profile is
+    # enabled. Targeting backend-stage prevents a stage deploy from
+    # restarting the production backend.
+    COMPOSE_SERVICE="backend-stage"
     # WHY: Stage shares the production MongoDB, so re-seeding from the
     # stage branch is unnecessary and risks rewriting prod content if
     # the stage branch carries seed changes we haven't approved yet.
@@ -65,8 +72,11 @@ git reset --hard "origin/$BRANCH"
 # Build the image locally — this server doesn't use a registry pipeline yet.
 docker build -t "ghcr.io/david-wi/known-around-town:$IMAGE_TAG" ./backend
 
+# WHY: the image tag is stable (:latest or :stage). Without force-recreate,
+# Compose may keep the old container running after a code-only rebuild
+# because the service config did not change.
 docker compose -p known-around-town "${COMPOSE_PROFILE_ARGS[@]}" \
-  -f docker-compose.prod.yml up -d
+  -f docker-compose.prod.yml up -d --force-recreate "$COMPOSE_SERVICE"
 
 # WHY: Compose appends `-N` (replica index) to the container name, so the
 # real container names are `known-around-town-backend-1` and

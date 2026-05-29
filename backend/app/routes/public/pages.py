@@ -7,16 +7,18 @@ template only receives plain data — no DB access from the template.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import markdown2
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app.database import get_db
 from app.services import content as content_svc
 from app.services.copy import CopyResolver
+from app.services.owner_auth import SESSION_COOKIE_NAME, verify_session
 from app.services.tenant import TenantContext, resolve_tenant
 
 router = APIRouter()
@@ -93,6 +95,7 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "owners_blob_a":            "bg-rose-300",
         "owners_blob_b":            "bg-amber-300",
         "owners_eyebrow_color":     "text-rose-700",
+        "highlight_border":         "border-rose-300",
     },
     "wellness": {
         "accent_text":              "text-emerald-600",
@@ -112,6 +115,7 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "owners_blob_a":            "bg-emerald-300",
         "owners_blob_b":            "bg-teal-300",
         "owners_eyebrow_color":     "text-emerald-700",
+        "highlight_border":         "border-emerald-300",
     },
     "health": {
         "accent_text":              "text-sky-700",
@@ -131,6 +135,7 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "owners_blob_a":            "bg-sky-300",
         "owners_blob_b":            "bg-amber-300",
         "owners_eyebrow_color":     "text-sky-800",
+        "highlight_border":         "border-sky-300",
     },
 }
 
@@ -173,6 +178,15 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "copy": copy,
         "theme": _network_theme(network),
         "vertical_word": _vertical_word(network),
+        # WHY: A short human label like "Miami Knows Beauty" used inside
+        # the Founding Partner tooltip ("Founding member of <tenant_label>").
+        # Falls back to the network name on the network-home page where
+        # there's no city in context (e.g. the landing page before a city
+        # has been picked).
+        "tenant_label": (
+            f"{city['name']} Knows {_vertical_word(network)}"
+            if city else network.get("name", "this publication")
+        ),
         # Word for one (or many) listings on this network. Beauty uses "Salons"/"salon",
         # Wellness "Studios"/"studio", Health "Clinics"/"clinic". Stored on the
         # city doc by the seed, with sensible fallbacks for older data.
@@ -275,7 +289,6 @@ async def _render_network_landing(request: Request, tenant: TenantContext) -> HT
             "live_cities": live_cities,
             "planned_cities": planned,
             "landing_eyebrow": f"{network.get('name', '').upper()} — A LOCAL GUIDE NETWORK",
-            "landing_headline": network.get("tagline") or network.get("name", ""),
             "landing_subhead": (
                 network.get("description")
                 or f"A curated guide to the best {vertical.lower()} in every city we cover."
@@ -318,6 +331,8 @@ async def home(request: Request) -> HTMLResponse:
     tenant = await _require_tenant(request)
 
     if not tenant.city:
+        if tenant.city_slug:
+            raise HTTPException(404, "City not found")
         return await _render_network_landing(request, tenant)
 
     city = tenant.city
@@ -723,7 +738,10 @@ async def expertly_voice_page(request: Request) -> HTMLResponse:
 
 
 @router.get("/owners", response_class=HTMLResponse)
-async def owners_page(request: Request) -> HTMLResponse:
+async def owners_page(
+    request: Request,
+    slug: Optional[str] = None,
+) -> HTMLResponse:
     tenant = await _require_tenant(request)
     ctx = await _base_context(request, tenant)
     city_name = tenant.city.get("name", "") if tenant.city else ""
@@ -733,7 +751,277 @@ async def owners_page(request: Request) -> HTMLResponse:
         f"Run a business in {city_name}? Your listing's already in {city_name} Knows "
         f"{vertical}. Claim it, upgrade it, and get found by people searching tonight."
     )
+
+    # WHY: The claim form needs a real business_id to submit against the
+    # existing POST /api/v1/claims endpoint (it rejects unknown business ids
+    # with 404). We give the page two paths to resolve that id:
+    #   1. A direct prefill when the visitor arrived via `?slug=<biz-slug>`
+    #      (e.g. from a "Claim this listing" link on a business detail page).
+    #   2. A lightweight client-side directory of {id, name, slug} for every
+    #      live business in the city, so a free-text business-name typer can
+    #      be matched against an existing record without a new endpoint.
+    prefill: Optional[Dict[str, Any]] = None
+    directory: List[Dict[str, Any]] = []
+    if tenant.city:
+        city_id = tenant.city["_id"]
+        if slug:
+            biz = await content_svc.get_business(city_id, slug)
+            if biz:
+                prefill = {
+                    "id": biz["_id"],
+                    "name": biz.get("name", ""),
+                    "slug": biz.get("slug", ""),
+                }
+        # WHY: 500 keeps the embedded JSON small. Miami has well under 100
+        # live businesses today; 500 leaves comfortable headroom before
+        # we'd want a real server-side search endpoint instead.
+        live = await content_svc.list_businesses(city_id, limit=500)
+        directory = [
+            {"id": b["_id"], "name": b.get("name", ""), "slug": b.get("slug", "")}
+            for b in live
+            if b.get("name")
+        ]
+
+    ctx["claim_prefill"] = prefill
+    ctx["claim_directory"] = directory
     return _templates.TemplateResponse("owners.html", ctx)
+
+
+# Preferred sample salons for the preview dashboard. The first one that
+# exists in the current city's seed is used. Rossano Ferretti is the first
+# choice because it's an Editor's Pick on the reference site and reads as
+# plausibly high-tier in the mockup; the others are real Miami salons
+# included as fallbacks in case the priority slug ever leaves the seed.
+_OWNER_DASHBOARD_SAMPLE_SLUGS: List[str] = [
+    "rossano-ferretti-hair-spa-miami",
+    "warren-tricomi-salon-miami-beach",
+    "elia-spa-ritz-carlton-south-beach",
+]
+
+
+@router.get("/owner/dashboard", response_class=HTMLResponse)
+async def owner_dashboard_preview(request: Request) -> HTMLResponse:
+    """Static, unauthenticated preview of the owner dashboard.
+
+    This is a UX mockup — the real claim-and-pay flow is being built on a
+    separate workstream. We render a real seeded business as if its owner
+    had just signed up for Featured, with every interactive control wired
+    to a "Coming soon" toast instead of a backend action. A clearly visible
+    preview banner at the top makes it obvious to any reviewer that the
+    page is not live functionality.
+    """
+    tenant = await _require_tenant(request)
+    if not tenant.city:
+        raise HTTPException(404, "City required")
+    city = tenant.city
+
+    business: Optional[Dict[str, Any]] = None
+    for slug in _OWNER_DASHBOARD_SAMPLE_SLUGS:
+        business = await content_svc.get_business(city["_id"], slug)
+        if business:
+            break
+    # Final fallback: any live business in this city. The preview is
+    # supposed to be visually intact even if the slug list above gets stale
+    # or the city's seed changes — we'd rather show *some* salon than 404.
+    if not business:
+        live = await content_svc.list_businesses(city["_id"], limit=1)
+        business = live[0] if live else None
+    if not business:
+        raise HTTPException(404, "No businesses available for preview")
+
+    primary_nb_slug = (business.get("neighborhood_slugs") or [None])[0]
+    neighborhood = None
+    if primary_nb_slug:
+        neighborhood = await content_svc.get_neighborhood(
+            city["_id"], primary_nb_slug
+        )
+
+    photos = business.get("photos") or []
+    hero_photo = next((p for p in photos if p.get("is_hero")), None) or (
+        photos[0] if photos else None
+    )
+
+    ctx = await _base_context(request, tenant)
+    ctx.update(
+        {
+            "business": business,
+            "neighborhood": neighborhood,
+            "hero_photo": hero_photo,
+            # Fake-but-plausible numbers so reviewers see realistic shapes.
+            # Stat values are illustrative only and are not derived from
+            # the seed or any live traffic data.
+            "stat_views_this_week": 127,
+            "stat_views_this_month": 482,
+            "stat_claims_since_launch": 38,
+            # Trial billing date — chosen as ~23 days out from "now" so
+            # the date is always in the future relative to the page
+            # render, and roughly matches the 30-day-free-trial promise
+            # on the /owners page.
+            "next_billing_date": (
+                datetime.now(timezone.utc) + timedelta(days=23)
+            ).strftime("%B %-d, %Y"),
+            "seo_title": "Owner Dashboard Preview",
+            "meta_description": (
+                "Preview of the owner dashboard for the Featured tier — "
+                "this is a mockup, not the live claim-and-pay flow."
+            ),
+        }
+    )
+    return _templates.TemplateResponse("owner_dashboard.html", ctx)
+
+@router.get("/owners/preview/caption", response_class=HTMLResponse)
+async def owners_caption_preview(request: Request) -> HTMLResponse:
+    """Standalone preview of the Featured-tier Instagram caption generator.
+
+    Why this route exists separately from the full owner dashboard:
+
+    * The dashboard is being built in a parallel workstream and isn't
+      live on stage yet. Reviewers (David, Posey) need to play with the
+      caption panel right now to react to wording, length, and the
+      copy/regenerate UX before the dashboard ships.
+    * The panel is fully self-contained — it picks a business from the
+      seed data and renders the panel pointed at that business. When
+      the dashboard merges, the same JavaScript and the same backend
+      endpoint power it; only the page wrapper changes.
+
+    The route returns 404 when the marketing-AI feature flag is off so
+    that production (which keeps the flag off) does not expose this
+    surface even by URL guessing.
+    """
+    from app.services import ai_caption  # local import to avoid module cycles at startup
+
+    if not ai_caption.feature_enabled():
+        raise HTTPException(404, "Not found")
+
+    tenant = await _require_tenant(request)
+    ctx = await _base_context(request, tenant)
+    city = tenant.city
+    if not city:
+        raise HTTPException(404, "Caption preview requires a known city")
+
+    # Pick a Featured business if any exist, else the first business in the city.
+    # Either way we get a real, recognizable business name in the preview so
+    # the generated captions don't sound made-up.
+    db = get_db()
+    business_doc = await db.businesses.find_one(
+        {"city_id": city["_id"], "featured.enabled": True}
+    )
+    if not business_doc:
+        business_doc = await db.businesses.find_one({"city_id": city["_id"]})
+    if not business_doc:
+        raise HTTPException(404, "No businesses found for caption preview")
+
+    # Resolve display-friendly neighborhood label
+    neighborhood_name: Optional[str] = None
+    neighborhood_slugs = business_doc.get("neighborhood_slugs") or []
+    if neighborhood_slugs:
+        nb = await db.neighborhoods.find_one(
+            {"city_id": city["_id"], "slug": neighborhood_slugs[0]}
+        )
+        if nb:
+            neighborhood_name = nb.get("name")
+
+    category_slug = (business_doc.get("category_slugs") or [None])[0]
+    category_name: Optional[str] = None
+    if category_slug:
+        cat = await db.categories.find_one(
+            {"city_id": city["_id"], "slug": category_slug}
+        )
+        if cat:
+            category_name = cat.get("name")
+
+    ctx.update(
+        {
+            "seo_title": f"Caption generator preview — {business_doc.get('name')}",
+            "meta_description": (
+                "Featured-tier Instagram caption generator preview "
+                f"for {business_doc.get('name')}."
+            ),
+            "preview_business": {
+                "id": business_doc.get("_id"),
+                "name": business_doc.get("name"),
+                "slug": business_doc.get("slug"),
+                "category_name": category_name,
+                "neighborhood_name": neighborhood_name,
+            },
+        }
+    )
+    return _templates.TemplateResponse("owners_caption_preview.html", ctx)
+
+
+@router.get("/pricing", response_class=HTMLResponse)
+async def pricing_page(request: Request) -> HTMLResponse:
+    tenant = await _require_tenant(request)
+    ctx = await _base_context(request, tenant)
+    city_name = tenant.city.get("name", "") if tenant.city else ""
+    vertical = _vertical_word(tenant.network)
+    ctx["seo_title"] = f"Pricing — {city_name} Knows {vertical}".strip(" —")
+    ctx["meta_description"] = (
+        f"Three ways to show up on {city_name} Knows {vertical}. "
+        f"Free listing, $29/month Featured, or $299/month Concierge with an AI phone "
+        f"receptionist. First month free on Featured, cancel anytime."
+    ).strip()
+    return _templates.TemplateResponse("pricing.html", ctx)
+
+
+@router.get("/owners/login", response_class=HTMLResponse)
+async def owners_login_page(request: Request) -> HTMLResponse:
+    """The two-step sign-in form for salon owners.
+
+    Step 1 collects the email; step 2 collects the code. Both steps live
+    on the same page — the JS in the template swaps which one is
+    visible without a full reload.
+    """
+    tenant = await _require_tenant(request)
+    ctx = await _base_context(request, tenant)
+    ctx["seo_title"] = "Sign in for owners"
+    ctx["meta_description"] = (
+        "Sign in to manage your Knows Beauty listing. Enter your email and we'll "
+        "send you a one-time code."
+    )
+    # If the visitor is already signed in, send them to the placeholder
+    # dashboard rather than asking for an email they don't need.
+    cookie = request.cookies.get(SESSION_COOKIE_NAME)
+    if cookie and verify_session(cookie):
+        return RedirectResponse(url="/owners/me", status_code=303)
+    return _templates.TemplateResponse("owner_login.html", ctx)
+
+
+@router.get("/owners/me", response_class=HTMLResponse)
+async def owners_me_page(request: Request) -> HTMLResponse:
+    """Placeholder 'you're signed in' page.
+
+    This is the dashboard stub: it confirms the cookie works end-to-end
+    and gives the owner a logout button. The actual dashboard will
+    replace this template in a follow-up change.
+    """
+    tenant = await _require_tenant(request)
+    cookie = request.cookies.get(SESSION_COOKIE_NAME)
+    session = verify_session(cookie) if cookie else None
+    if not session:
+        return RedirectResponse(url="/owners/login", status_code=303)
+
+    ctx = await _base_context(request, tenant)
+    ctx["owner_email"] = session["email"]
+    ctx["seo_title"] = "Your account"
+    ctx["meta_description"] = "Your Knows Beauty owner account."
+    response = _templates.TemplateResponse("owner_me.html", ctx)
+    # WHY: rolling 30-day expiry. Reissue the cookie on every successful
+    # visit so an active owner never has to sign in again. The freshly
+    # signed cookie carries a new issued_at, so the 30-day clock starts
+    # over from this hit.
+    from app.services.owner_auth import SESSION_LIFETIME, sign_session
+    is_secure = request.url.scheme == "https"
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=sign_session(session["email"]),
+        max_age=int(SESSION_LIFETIME.total_seconds()),
+        httponly=True,
+        secure=is_secure,
+        samesite="lax",
+        path="/",
+    )
+    return response
 
 
 @router.get("/robots.txt")

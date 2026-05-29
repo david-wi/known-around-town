@@ -366,6 +366,10 @@ def _load_real_businesses() -> Dict[str, List[Dict[str, Any]]]:
                 "price_cues":         it.get("price_cues"),
                 "editors_pick":       bool(it.get("editors_pick")),
                 "premium":            bool(it.get("premium")),
+                # WHY: mock "Founding Partner" flag for the design-partner
+                # outreach demo. Stays false unless the source JSON explicitly
+                # opts a business in.
+                "is_founding_partner": bool(it.get("is_founding_partner")),
                 "short_description":  it.get("short_description"),
                 "phone":              it.get("phone"),
                 "website":            it.get("website"),
@@ -553,6 +557,9 @@ async def seed_network(network_slug: str) -> None:
             "price_cues": biz.get("price_cues"),
             "featured": featured,
             "editors_pick": biz.get("editors_pick", False),
+            # WHY: persists the mock founding-partner flag so the home and
+            # detail templates can render the badge from a single field.
+            "is_founding_partner": biz.get("is_founding_partner", False),
             "claim_status": "verified" if biz.get("editors_pick") or biz.get("premium") else "unclaimed",
             "schema_org_type": biz.get("schema_org_type", "LocalBusiness"),
             "data_source": "editorial",

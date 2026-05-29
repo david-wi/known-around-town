@@ -19,6 +19,17 @@ def test_health(client):
     assert r.json() == {"status": "ok"}
 
 
+def test_favicon_routes_do_not_404(client):
+    for path in ("/favicon.ico", "/favicon.png"):
+        r = client.get(path, follow_redirects=False)
+        assert r.status_code == 308
+        assert r.headers["location"] == "/assets/favicon.svg"
+
+    r = client.get("/assets/favicon.svg")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/svg+xml")
+
+
 def test_miami_beauty_home(client):
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
@@ -103,6 +114,199 @@ def test_owners_page(client):
         assert tier in r.text
 
 
+def test_owners_page_has_claim_form_not_mailto(client):
+    """The owners page used to be two `mailto:hello@expertly.ai` links.
+    Both have been replaced by a real claim form that posts to the
+    existing /api/v1/claims endpoint. If this assertion ever fails, an
+    edit accidentally reintroduced an email-based CTA."""
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # No mailto CTA anywhere on the page.
+    assert "mailto:hello@expertly.ai" not in r.text
+    # A real form, with the required fields, posting to the existing endpoint.
+    assert 'id="claim-form__form"' in r.text
+    assert "/api/v1/claims" in r.text
+    for field_id in (
+        "claim-form__business-name",
+        "claim-form__your-name",
+        "claim-form__your-email",
+        "claim-form__your-phone",
+        "claim-form__notes",
+    ):
+        assert field_id in r.text
+
+
+def test_owners_page_prefills_from_slug(client, seeded_db):
+    """When the visitor lands at /owners?slug=<biz>, the form shows the
+    listing as a read-only confirmation and locks the business name to it.
+    Without ?slug, the field is editable."""
+    # With ?slug: pre-filled. Use a real seeded Miami salon (see
+    # backend/seed/_real_businesses.json) so the route can resolve it.
+    r = client.get(
+        "/owners?slug=blow-dry-bar-brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "Blow Dry Bar Brickell" in r.text
+    assert "readonly" in r.text
+    assert "Claiming" in r.text
+
+    # Without ?slug: editable, no prefill banner.
+    r2 = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r2.status_code == 200, r2.text
+    # The "Claiming" prefill banner is only rendered when prefilled.
+    assert ">Claiming<" not in r2.text
+
+
+def test_owners_page_embeds_business_directory(client, seeded_db):
+    """The form needs a client-side directory of {id, name, slug} so a
+    visitor who types a business name can be matched to a real listing
+    record without a new endpoint. Confirm the directory is in the page."""
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "var DIRECTORY" in r.text
+    assert "Blow Dry Bar Brickell" in r.text
+
+
+def test_claim_endpoint_accepts_payload_from_form(client, seeded_db):
+    """End-to-end: the JSON payload our form posts must be accepted by the
+    existing POST /api/v1/claims endpoint. If the model schema ever changes
+    (e.g. a field is renamed), this test breaks early."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    biz = asyncio.run(
+        seeded_db.businesses.find_one(
+            {"city_id": city["_id"], "slug": "blow-dry-bar-brickell"}
+        )
+    )
+    assert biz is not None, "test seed missing blow-dry-bar-brickell"
+
+    payload = {
+        "business_id": biz["_id"],
+        "submitter_name": "Jane Owner",
+        "submitter_email": "jane@example.com",
+        "submitter_phone": "(305) 555-0142",
+        "notes": "I run the front desk.",
+    }
+    r = client.post("/api/v1/claims", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["business_id"] == biz["_id"]
+    assert body["submitter_email"] == "jane@example.com"
+    assert body["status"] == "pending"
+
+    # The business itself should now show as claim_status=pending.
+    updated = asyncio.run(seeded_db.businesses.find_one({"_id": biz["_id"]}))
+    assert updated["claim_status"] == "pending"
+
+
+def test_claim_endpoint_rejects_unknown_business(client, seeded_db):
+    """Defense-in-depth: if the embedded directory drifts and the form
+    submits a stale id, the server must return 404 rather than create an
+    orphan claim. The form's JS handles 404 with a friendly inline error."""
+    r = client.post(
+        "/api/v1/claims",
+        json={
+            "business_id": "00000000-0000-0000-0000-000000000000",
+            "submitter_name": "X",
+            "submitter_email": "x@example.com",
+        },
+    )
+    assert r.status_code == 404
+
+
+def test_owner_dashboard_preview(client):
+    """The owner-dashboard preview page must render with the amber preview
+    banner, the Featured-tier badge, the three Marketing AI cards, the
+    billing summary, and a real seeded salon name. It's a static mockup,
+    so the goal here is to confirm every section the spec calls for is
+    actually in the HTML — not to test live functionality, which doesn't
+    exist yet."""
+    r = client.get(
+        "/owner/dashboard", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    body = r.text
+    # Preview banner must be present so reviewers know this isn't live.
+    assert "Preview" in body
+    assert "mockup" in body
+    # Tier badge and section headings.
+    assert "Tier: Featured" in body
+    assert "Owner Dashboard" in body
+    assert "How your listing is doing" in body
+    assert "Marketing AI" in body
+    assert "Billing" in body
+    # The three Marketing AI cards.
+    assert "Generate caption" in body
+    assert "Generate ad copy" in body
+    assert "Sync Google Business" in body
+    # Fake stats and billing copy.
+    assert "127" in body  # weekly visits stat
+    assert "$29" in body
+    # A real seeded Miami salon should be the sample. The route picks the
+    # first available from a short priority list — Rossano Ferretti is the
+    # default, with two real-Miami fallbacks if that ever drops from the
+    # seed.
+    assert (
+        "Rossano Ferretti" in body
+        or "Warren-Tricomi" in body
+        or "Eli" in body  # "Eliá Spa" without the accent
+    )
+    # The "Coming soon" controls must be present and disabled.
+    assert "Coming soon" in body
+    assert "data-coming-soon" in body
+
+
+def test_owner_dashboard_links_back_to_public_listing(client):
+    """The dashboard should link to the public listing of whatever sample
+    salon it's showing, so reviewers can compare the owner view to the
+    public view in one click."""
+    r = client.get(
+        "/owner/dashboard", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    # The public listing URL pattern is /b/<slug>. The route falls through
+    # a short priority list of slugs, so we just check that *some* /b/
+    # link exists in the rendered HTML.
+    assert "/b/" in r.text
+
+
+def test_pricing_page(client):
+    """The dedicated /pricing page shows the three tiers side-by-side
+    with prices, FAQs, and conversion CTAs. This is the page that converts
+    a "thinking about it" owner into a "claim my listing" click."""
+    r = client.get("/pricing", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # All three tier names appear
+    for tier in ("Free", "Featured", "Concierge"):
+        assert tier in r.text
+    # Prices are present and unambiguous
+    assert "$29" in r.text
+    assert "$290" in r.text  # annual
+    assert "$299" in r.text
+    # Featured is positioned as the recommended tier
+    assert "Most popular" in r.text
+    # Trial / cancel terms appear (must align with owners.html copy)
+    assert "first month free" in r.text.lower()
+    # At least one FAQ question is rendered
+    assert "How do I claim" in r.text
+    # Conversion CTA points to the claim form anchor on the owners page
+    assert "/owners#claim" in r.text
+
+
+def test_pricing_link_in_header_nav(client):
+    """The pricing page must be discoverable from the global nav so owners
+    can find it without knowing the URL."""
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert 'href="/pricing"' in r.text
+    assert ">Pricing<" in r.text
+
+
 def test_stage_hostname_resolves_to_underlying_city(client):
     """`stage-miami.knowsbeauty.localhost` should render Miami content,
     so a reviewer can compare a preview deployment to the live miami.knows...
@@ -172,9 +376,16 @@ def test_bare_apex_wellness_and_health_also_render(client):
 def test_unknown_city_renders_404(client):
     """Network is known but the city slug isn't in the database."""
     r = client.get("/", headers={"host": "atlantis.knowsbeauty.localhost"})
-    # The tenant resolver returns no city, so the home route currently 404s on the city pages.
-    # The network home template still renders 200 — verify both behaviors are not 500s.
-    assert r.status_code in (200, 404)
+    assert r.status_code == 404
+
+
+def test_bare_network_host_renders_city_landing(client):
+    r = client.get("/", headers={"host": "knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "KNOWS BEAUTY" in r.text
+    assert "Miami" in r.text
+    assert "http://miami.knowsbeauty.localhost/" in r.text
+    assert "Austin" in r.text
 
 
 def test_sitemap_includes_business(client):
@@ -219,3 +430,42 @@ def test_copy_block_override(client, seeded_db):
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200
     assert "An editors&#39; guide for Miami" in r.text or "An editors' guide for Miami" in r.text
+
+
+def test_founding_partner_badge_on_business_detail(client):
+    """A business that's been flagged as a Founding Partner shows the
+    badge label on its detail page. Ayesha Beauty Studio in Wynwood is
+    one of the five mock founding partners seeded for the design-partner
+    outreach demo — if this fails, check `is_founding_partner` is still
+    set on it in `_real_businesses.json`."""
+    r = client.get(
+        "/b/ayesha-beauty-studio-wynwood",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "Founding Partner" in r.text
+    # Tooltip should reference the publication name.
+    assert "Founding member of Miami Knows Beauty" in r.text
+
+
+def test_founding_partner_badge_on_trending_row(client):
+    """The home page's trending row also surfaces the Founding Partner
+    badge for any business that has the flag. Three of the five mock
+    founding partners are in the Miami Beauty trending list
+    (Ayesha, Vanity Projects, IGK), so the badge text should appear on
+    the home page."""
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "Founding Partner" in r.text
+
+
+def test_non_founding_partner_does_not_show_badge(client):
+    """A salon NOT flagged as a Founding Partner doesn't render the
+    badge on its detail page. Drybar Miami Beach is a real, non-founding
+    business in the seed, so its page should NOT mention the badge."""
+    r = client.get(
+        "/b/drybar-miami-beach",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "Founding Partner" not in r.text

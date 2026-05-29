@@ -22,6 +22,12 @@ os.environ["NETWORK_DOMAINS"] = (
 )
 os.environ["MONGODB_URL"] = "mongodb://test"
 os.environ["MONGODB_DATABASE"] = "wkl_test"
+# WHY: owner-login tests intentionally use the dev log fallback to read
+# one-time codes. Developer shells may have real Resend credentials set,
+# but tests must never call the live email provider.
+os.environ.pop("RESEND_API_KEY", None)
+os.environ.pop("OWNER_EMAIL_FROM_NAME", None)
+os.environ.pop("OWNER_EMAIL_FROM_ADDRESS", None)
 
 
 @pytest.fixture

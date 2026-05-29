@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -20,7 +20,10 @@ from app.routes.api.v1 import (
     editorial as api_editorial,
     claims as api_claims,
     inquiries as api_inquiries,
+    marketing_ai as api_marketing_ai,
+    owner_login as api_owner_login,
 )
+from app.routes.admin import claims_admin
 from app.routes.public import pages as public_pages
 
 settings = get_settings()
@@ -44,6 +47,14 @@ async def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+@app.get("/favicon.png", include_in_schema=False)
+async def favicon() -> RedirectResponse:
+    # WHY: browsers still probe these root paths even when the page points
+    # at the SVG favicon; redirecting avoids noisy 404 console errors.
+    return RedirectResponse(url="/assets/favicon.svg", status_code=308)
+
+
 # Static assets are served at /assets so it doesn't conflict with /api or
 # tenant-specific URL patterns.
 app.mount("/assets", StaticFiles(directory=str(BASE_DIR / "static")), name="assets")
@@ -59,9 +70,18 @@ app.include_router(api_copy_blocks.router, prefix="/api/v1")
 app.include_router(api_editorial.router, prefix="/api/v1")
 app.include_router(api_claims.router, prefix="/api/v1")
 app.include_router(api_inquiries.router, prefix="/api/v1")
+app.include_router(api_marketing_ai.router, prefix="/api/v1")
+# Owner login (passwordless code-by-email). Public — no admin key required.
+app.include_router(api_owner_login.router, prefix="/api/v1")
 
 
 public_pages.attach_templates(templates)
+claims_admin.attach_templates(templates)
+
+# Admin HTML pages — registered BEFORE the public SSR catch-all so /admin/*
+# resolves to the admin router rather than being swallowed by the public
+# tenant-aware not-found handler.
+app.include_router(claims_admin.router)
 
 # Public SSR routes (last, since they catch broad URL patterns).
 app.include_router(public_pages.router)

@@ -266,6 +266,11 @@ class Business(BaseModel):
     verified_at: Optional[datetime] = None
     featured: Featured = Field(default_factory=Featured)
     editors_pick: bool = False
+    # WHY: First 8-10 salons to come aboard as design partners receive a
+    # "Founding Partner" badge on their listing. Stored as a plain boolean
+    # so it survives a normal upsert and so the home/detail templates can
+    # render the badge with a single boolean check, no join needed.
+    is_founding_partner: bool = False
     index_status: IndexStatus = IndexStatus.thin
     index_override: IndexOverride = IndexOverride.auto
     meta_title_override: Optional[str] = None
@@ -275,6 +280,11 @@ class Business(BaseModel):
     import_source: Optional[str] = None
     import_data: Optional[Dict[str, Any]] = None
     quality_score: int = 0
+    # WHY: Stripe identifiers live on the business document so billing
+    # webhooks and owner billing-portal links can find the listing without
+    # a second lookup table. Both stay null until the owner subscribes.
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
     status: PublishStatus = PublishStatus.draft
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
@@ -354,5 +364,87 @@ class BusinessInquiry(BaseModel):
     message: str
     referrer_url: Optional[str] = None
     submitted_at: datetime = Field(default_factory=_now)
+
+    model_config = {"populate_by_name": True}
+
+
+class OwnerMagicCode(BaseModel):
+    """A short-lived verification code emailed to a salon owner who wants to sign in.
+
+    One row per code we send. The cleartext six-character code lives in the
+    email itself; we keep only a SHA-256 hash so a database leak cannot let
+    anyone impersonate an owner. The row also doubles as the rate-limit
+    ledger: by counting recent rows for the same email we can refuse to
+    flood the inbox.
+
+    `used_at` going from None to a timestamp marks the code as consumed —
+    a successfully verified code cannot be replayed.
+    """
+    id: str = Field(default_factory=_id, alias="_id")
+    # WHY: stored lowercase so we don't need a case-insensitive index for
+    # the rate-limit and lookup queries.
+    email: str
+    # SHA-256 hex digest of the six-character code. Cleartext never lands
+    # in the database — only in the email body.
+    code_hash: str
+    created_at: datetime = Field(default_factory=_now)
+    # WHY: 15 minutes is short enough to limit replay risk if the email is
+    # intercepted, and long enough that an owner walking from inbox to
+    # browser still succeeds on the first try.
+    expires_at: datetime
+    # Set the moment a code is successfully verified. Once non-null, the
+    # row is kept as an audit trail but can no longer be redeemed.
+    used_at: Optional[datetime] = None
+    # WHY: hard cap on entry retries so a guesser can't sweep the keyspace
+    # one code at a time. After this many failures we refuse the row.
+    attempts: int = 0
+
+    model_config = {"populate_by_name": True}
+
+
+# --- claim-and-pay foundation models (from stashed WIP) ---
+
+
+class OwnerSession(BaseModel):
+    """One row per active-or-pending owner login.
+
+    The same document threads through the three steps of the magic-link
+    flow: a request creates it with a hashed one-time code, the code
+    exchange clears the code and stores a hashed long-lived session
+    token, and subsequent requests look the session up by that token.
+
+    We store hashes (never the cleartext code or token) so that read
+    access to this collection cannot impersonate an owner.
+    """
+    id: str = Field(default_factory=_id, alias="_id")
+    email: str  # WHY: always lowercased on write; lookups assume lowercase
+    business_id: Optional[str] = None  # bound after the first successful claim
+    # One-time login code, hashed (sha256). Cleared once exchanged.
+    code_hash: Optional[str] = None
+    code_expires_at: Optional[datetime] = None  # 15 min from creation
+    # Long-lived session token, hashed (sha256). Set on successful exchange.
+    session_token_hash: Optional[str] = None
+    session_expires_at: Optional[datetime] = None  # 30 days from exchange
+    # WHY: hard cap on code-entry retries so a guessing attack against
+    # a 6-digit code can't brute-force more than 5 attempts per row.
+    attempts: int = 0
+    created_at: datetime = Field(default_factory=_now)
+    last_used_at: Optional[datetime] = None
+
+    model_config = {"populate_by_name": True}
+
+
+class StripeEvent(BaseModel):
+    """A record of a Stripe webhook we've already processed.
+
+    Stripe will retry a webhook delivery on any non-2xx response and
+    will occasionally redeliver successful events. We persist the
+    Stripe event id with a unique index so a second delivery of the
+    same event is a no-op rather than re-applying the side effect.
+    """
+    # WHY: Stripe's own event id (evt_...) doubles as the primary key.
+    id: str = Field(alias="_id")
+    event_type: str
+    received_at: datetime = Field(default_factory=_now)
 
     model_config = {"populate_by_name": True}

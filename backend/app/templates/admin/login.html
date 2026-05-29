@@ -1,0 +1,44 @@
+{#-
+  Admin login — a single-input form that swaps the admin key for an
+  HttpOnly cookie. There is intentionally no "remember me" or user
+  account; this whole tier is "one shared admin key" until we wire
+  up real per-user owner auth.
+-#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Admin login · Known Around Town</title>
+  <link rel="stylesheet" href="/assets/css/reference.css">
+</head>
+<body class="min-h-screen bg-stone-50/40 text-stone-900 antialiased flex items-center justify-center px-6">
+  <div class="w-full max-w-sm bg-white border border-stone-200 rounded-2xl p-8 shadow-sm">
+    <p class="text-[11px] uppercase tracking-[0.3em] text-rose-600 font-semibold mb-3">Admin</p>
+    <h1 class="font-light text-stone-900 leading-tight tracking-tight mb-6"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: 1.625rem; font-weight: 300;'>
+      Sign in
+    </h1>
+    {% if error %}
+    <div class="mb-5 rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-800">
+      That key doesn't match. Try again.
+    </div>
+    {% endif %}
+    <form action="/admin/login" method="post" class="space-y-4">
+      <div>
+        <label for="api_key" class="block text-[11px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-2">Admin key</label>
+        <input id="api_key" name="api_key" type="password" autocomplete="current-password" required autofocus
+               class="w-full rounded-xl border border-stone-300 px-4 py-2.5 text-stone-900 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent">
+      </div>
+      <button type="submit"
+              class="w-full inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-5 py-2.5 rounded-full transition text-sm">
+        Sign in <span aria-hidden="true">&rarr;</span>
+      </button>
+    </form>
+    <p class="text-xs text-stone-500 mt-6 leading-relaxed">
+      The key is the one set as <code class="bg-stone-100 px-1 rounded">ADMIN_API_KEY</code> on the server.
+    </p>
+  </div>
+</body>
+</html>

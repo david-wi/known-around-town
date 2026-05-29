@@ -24,6 +24,25 @@ services:
         wellness:knowswellness.com,
         health:knowshealth.com
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      # WHY: Marketing AI surfaces stay off in production until the
+      # full owner dashboard ships. Setting this here (even empty)
+      # documents the wiring; stage's override is in the backend-stage
+      # service block below.
+      MARKETING_AI_ENABLED: ${MARKETING_AI_ENABLED_PROD:-}
+      AI_GATEWAY_KEY: ${KAT_AI_GATEWAY_KEY:-}
+      # WHY: owner sign-in codes need the same Resend credentials already
+      # used by Identity; without these, production logs the code instead
+      # of emailing it to the owner.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # WHY: signed session cookie for owner login. Without a stable
+      # value here, every container restart logs every signed-in
+      # owner out (the auth module falls back to a process-lifetime
+      # random key, which dies with each redeploy).
+      OWNER_SESSION_SECRET: ${OWNER_SESSION_SECRET:-}
+      # WHY: defaults match the current single-brand email template until
+      # the owner email copy is made network-aware.
+      OWNER_EMAIL_FROM_NAME: ${OWNER_EMAIL_FROM_NAME:-Knows Beauty}
+      OWNER_EMAIL_FROM_ADDRESS: ${OWNER_EMAIL_FROM_ADDRESS:-noreply@knowsbeauty.ai.devintensive.com}
       LOG_LEVEL: INFO
     networks:
       - traefik
@@ -99,6 +118,25 @@ services:
         wellness:knowswellness.ai.devintensive.com,
         health:knowshealth.ai.devintensive.com
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      # WHY: Marketing AI (Instagram captions, ad copy, etc.) is on
+      # by default in stage so reviewers can try it without flipping
+      # a separate switch. Production keeps it off until the broader
+      # owner dashboard ships — see MARKETING_AI_ENABLED on the prod
+      # `backend` service (absent = disabled).
+      MARKETING_AI_ENABLED: ${MARKETING_AI_ENABLED:-true}
+      AI_GATEWAY_KEY: ${KAT_AI_GATEWAY_KEY:-}
+      # WHY: stage exercises the owner sign-in flow before launch; missing
+      # credentials caused codes to be logged instead of sent.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # WHY: signed session cookie for owner login. Without a stable
+      # value here, every container restart logs every signed-in
+      # owner out (the auth module falls back to a process-lifetime
+      # random key, which dies with each redeploy).
+      OWNER_SESSION_SECRET: ${OWNER_SESSION_SECRET:-}
+      # WHY: defaults match the current single-brand email template until
+      # the owner email copy is made network-aware.
+      OWNER_EMAIL_FROM_NAME: ${OWNER_EMAIL_FROM_NAME:-Knows Beauty}
+      OWNER_EMAIL_FROM_ADDRESS: ${OWNER_EMAIL_FROM_ADDRESS:-noreply@knowsbeauty.ai.devintensive.com}
       LOG_LEVEL: INFO
     networks:
       - traefik
