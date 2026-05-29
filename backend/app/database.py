@@ -86,6 +86,7 @@ async def ensure_indexes() -> None:
     )
 
     # --- claim-and-pay: StripeEvent indexes (from stashed WIP) ---
-    # WHY: webhook idempotency — second delivery of the same event id is
-    # a duplicate-key insert error and we treat that as "already handled".
-    await db.stripe_events.create_index("_id", unique=True)
+    # WHY: webhook idempotency — we store the Stripe event id as _id.
+    # Second delivery of the same event id causes a duplicate-key insert
+    # error and we treat that as "already handled". No explicit index
+    # needed — MongoDB's built-in _id index is already unique.
