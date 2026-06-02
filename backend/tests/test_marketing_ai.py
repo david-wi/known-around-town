@@ -205,6 +205,7 @@ def test_generate_caption_happy_path_sends_expected_body(monkeypatch):
     out = asyncio.run(run())
 
     assert out == "Caption text 💅\n#test"
+    assert captured["url"] == "https://admin-api.ai.devintensive.com/api/public/ai-config/call"
     # Ensure all the expected fields flowed through
     body = captured["body"]
     assert body["use_case"] == "marketing_caption"
@@ -419,7 +420,7 @@ def test_live_caption_generation_against_real_gateway(seeded_db, monkeypatch):
         KAT_INSTAGRAM_CAPTION_LIVE=1 \\
             pytest backend/tests/test_marketing_ai.py -k live -s
 
-    Verifies the full path: prompt building -> gateway -> Anthropic -> text.
+    Verifies the full path: prompt building -> gateway -> configured provider -> text.
     """
     monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
     # Caller must have set AI_GATEWAY_KEY in the env that pytest sees.

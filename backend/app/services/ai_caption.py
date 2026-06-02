@@ -39,21 +39,20 @@ import httpx
 log = logging.getLogger(__name__)
 
 # WHY: Public AI Gateway URL is hardcoded because there is exactly one
-# gateway across all Expertly environments (admin.ai.devintensive.com).
+# gateway across all Expertly environments (admin-api.ai.devintensive.com).
 # Override via env for local development where staff might want to point
 # at a fake responder during tests.
-DEFAULT_GATEWAY_URL = "https://admin.ai.devintensive.com/api/public/ai-config/call"
+DEFAULT_GATEWAY_URL = "https://admin-api.ai.devintensive.com/api/public/ai-config/call"
 
-# WHY: 30s is generous enough for Claude Sonnet to produce 2-3 sentences
+# WHY: 30s is generous enough for the configured caption model to produce 2-3 sentences
 # plus hashtags (typically completes in 3-8s) while still failing fast
 # if the gateway is unreachable. The owner sits and watches the spinner,
 # so anything longer feels broken.
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
-# WHY: The use case is registered in Admin AI Config and pins the model
-# (Claude Sonnet 4.5 with GPT-5.4-mini fallback) and max_output_tokens
-# (300). Changing this string would orphan the central config — keep
-# them in lockstep.
+# WHY: The use case is registered in Admin AI Config and owns the model,
+# fallback sequence, and max_output_tokens (300). Changing this string
+# would orphan the central config — keep them in lockstep.
 USE_CASE = "marketing_caption"
 
 # WHY: We send max_output_tokens=300 because the use case is already
