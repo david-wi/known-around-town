@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote_plus
 
 import markdown2
 from fastapi import APIRouter, HTTPException, Request
@@ -662,12 +663,39 @@ async def business_page(request: Request, business_slug: str) -> HTMLResponse:
             {"_id": {"$in": business["nearby_business_ids"]}}
         )
         nearby = await nearby_cur.to_list(length=12)
+    else:
+        # WHY: When no editorial nearby list is set, auto-suggest businesses
+        # from the same category in the same city so the "You might also love"
+        # section is always populated. Visitors browsing hair salons should
+        # see more hair salons, not nothing.
+        primary_cat = (business.get("category_slugs") or [None])[0]
+        auto_q: Dict[str, Any] = {
+            "_id": {"$ne": business["_id"]},
+            "city_id": city["_id"],
+            "status": "live",
+        }
+        if primary_cat:
+            auto_q["category_slugs"] = primary_cat
+        nearby_cur = content_svc.get_db().businesses.find(auto_q).limit(3)
+        nearby = await nearby_cur.to_list(length=3)
+
+    # WHY: Build a real Google Maps URL from the address so the template has
+    # a proper href for the "Get directions" link. The CopyResolver only
+    # supplies human-readable labels (e.g. "Get directions") — not URLs.
+    addr = business.get("address") or {}
+    _map_query = addr.get("street") or business.get("name", "")
+    directions_url = (
+        f"https://maps.google.com/?q={quote_plus(_map_query)}"
+        if _map_query
+        else ""
+    )
 
     ctx = await _base_context(request, tenant)
     ctx.update(
         {
             "business": business,
             "nearby_businesses": nearby,
+            "directions_url": directions_url,
             "cta_book": await copy.get("business.cta.book", business_id=business["_id"]),
             "cta_call": await copy.get("business.cta.call", business_id=business["_id"]),
             "cta_website": await copy.get("business.cta.website", business_id=business["_id"]),
