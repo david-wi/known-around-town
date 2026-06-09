@@ -151,6 +151,16 @@
       <div id="about">
         <h2 class="font-serif text-3xl text-stone-900 mb-5" style="font-family: Georgia, serif;">The Story</h2>
         <p class="text-stone-700 text-lg leading-relaxed">{{ business.description or business.known_for or business.short_description or 'No description available yet.' }}</p>
+        {#- WHY: Show known_for as a distinct "what they're celebrated for" pull-
+            quote only when it differs from the description already shown above.
+            When they match (common in seeded data) showing it twice looks wrong. #}
+        {% set _shown_desc = business.description or business.known_for or business.short_description %}
+        {% if business.known_for and business.known_for != _shown_desc %}
+        <div class="mt-8 border-l-4 border-rose-200 pl-5">
+          <p class="text-xs uppercase tracking-[0.2em] text-rose-600 font-semibold mb-1">{{ section_known_for or 'Known for' }}</p>
+          <p class="text-stone-700 text-base leading-relaxed italic">{{ business.known_for }}</p>
+        </div>
+        {% endif %}
         {% if business.tags %}
         <div class="mt-8 flex flex-wrap gap-2">
           {% for tag in business.tags %}<span class="text-sm text-stone-700 bg-stone-100 px-3 py-1.5 rounded-full">{{ tag }}</span>{% endfor %}
@@ -232,8 +242,11 @@
           {% if business.address %}
           <div>
             <div class="text-xs uppercase tracking-wide text-stone-500 font-semibold mb-1">Address</div>
-            <div class="text-sm text-stone-900">{{ business.address.street }}{% if business.address.city %}, {{ business.address.city }}{% endif %}{% if business.address.region %}, {{ business.address.region }}{% endif %}{% if business.address.postal %} {{ business.address.postal }}{% endif %}</div>
-            {% if cta_directions %}<a href="{{ cta_directions }}" target="_blank" rel="noreferrer" class="text-xs {{ theme.accent_text_strong }} hover:opacity-80 font-medium">Get directions →</a>{% endif %}
+            {#- WHY: Show only address.street because seeded data stores the
+                full human-readable address (street, city, state, zip) in one
+                string. Appending address.city separately would duplicate it. #}
+            <div class="text-sm text-stone-900">{{ business.address.street }}</div>
+            {% if directions_url %}<a href="{{ directions_url }}" target="_blank" rel="noreferrer" class="text-xs {{ theme.accent_text_strong }} hover:opacity-80 font-medium">{{ cta_directions or 'Get directions' }} →</a>{% endif %}
           </div>
           {% endif %}
           {% if business.phone %}
