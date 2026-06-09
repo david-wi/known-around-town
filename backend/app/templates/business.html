@@ -124,6 +124,27 @@
   </div>
 </section>
 
+{# ── Claim CTA ───────────────────────────────────────────────────── #}
+{# WHY: shown for listings that have no active claim so owners who Google
+   their salon see an obvious path to take ownership. Hidden for 'verified'
+   (claim approved) and 'claimed' (claim pending admin review — a second
+   submission would create a confusing duplicate). The ?slug= param tells
+   /owners to pre-fill the claim form for this specific business. #}
+{% if business.claim_status not in ('verified', 'claimed') %}
+<section class="bg-amber-50/60 border-b border-amber-200/50">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10 py-5 flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <p class="text-sm font-semibold text-amber-900">{{ claim_title or 'Is this your business?' }}</p>
+      <p class="text-sm text-amber-800 mt-0.5">{{ claim_body or 'Claim your free listing to update your hours, photos, and details.' }}</p>
+    </div>
+    <a href="/owners?slug={{ business.slug }}#claim-form"
+       class="inline-flex items-center gap-2 bg-amber-700 hover:bg-amber-800 text-white font-medium px-5 py-2.5 rounded-full text-sm transition whitespace-nowrap shrink-0">
+      {{ claim_cta or 'Claim this listing' }} <span aria-hidden="true">→</span>
+    </a>
+  </div>
+</section>
+{% endif %}
+
 <section class="max-w-7xl mx-auto px-6 lg:px-10 py-16">
   <div class="grid lg:grid-cols-12 gap-12">
     <div class="lg:col-span-8 space-y-16">
