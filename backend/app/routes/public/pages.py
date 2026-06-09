@@ -1007,6 +1007,10 @@ async def owners_me_page(request: Request) -> HTMLResponse:
     business = await db.businesses.find_one({"claimed_email": session["email"]})
     ctx["owner_business"] = business
     if business:
+        # WHY: Pass the ID as a plain string so JavaScript in the template
+        # can embed it in an API request body without ObjectId serialisation
+        # concerns. str() on a Mongo ObjectId returns the 24-char hex string.
+        ctx["owner_business_id"] = str(business["_id"])
         ctx["seo_title"] = business.get("name", "Your account")
         ctx["meta_description"] = (
             f"Manage your {business.get('name', 'salon')} listing on Knows Beauty."

@@ -82,6 +82,35 @@
         </p>
       </div>
 
+      {# ── Hours ──────────────────────────────────────────────────── #}
+      {# WHY: Structured hours are stored as [{day, hours}] so we can
+         display "Monday 9 am–6 pm" rather than an unstructured blob.
+         The JS below builds the array from dynamic rows so the PATCH
+         payload matches the OwnerProfileUpdate.hours schema exactly. #}
+      <div>
+        <label class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Hours</label>
+        <div id="op-hours-rows" class="space-y-2">
+          {% for h in (owner_business.hours or []) %}
+          <div class="op-hours-row flex items-center gap-2">
+            <input type="text" data-role="day"
+                   value="{{ h.get('day','') if h is mapping else (h.day or '') }}"
+                   placeholder="e.g. Monday" maxlength="30"
+                   class="w-32 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition" />
+            <input type="text" data-role="hours"
+                   value="{{ h.get('hours','') if h is mapping else (h.hours or '') }}"
+                   placeholder="e.g. 9 am – 6 pm" maxlength="60"
+                   class="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition" />
+            <button type="button" data-role="remove-row" aria-label="Remove this hours row"
+                    class="shrink-0 text-stone-400 hover:text-rose-600 transition text-lg leading-none px-1">×</button>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="button" id="op-add-hours"
+                class="mt-2 text-xs text-stone-500 hover:text-stone-900 underline decoration-stone-300 hover:decoration-stone-600 transition">
+          + Add row
+        </button>
+      </div>
+
       <div class="flex items-center gap-4 pt-2">
         <button type="submit" id="op-save-btn"
                 class="inline-flex items-center justify-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-2.5 rounded-full text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
@@ -111,6 +140,52 @@
 
   </div>
 </section>
+
+{# ── Instagram caption generator ─────────────────────────────────── #}
+{# WHY: Only shown in the dashboard (owner_business is set). Requires
+   MARKETING_AI_ENABLED=true on the server — when disabled the API
+   returns 404 and the JS shows a friendly "not enabled yet" message
+   rather than an error, so this section is always safe to render. #}
+{% if owner_business %}
+<section class="bg-stone-50/40 border-t border-stone-100">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
+    <h2 class="text-base font-semibold text-stone-900 mb-1">Instagram caption generator</h2>
+    <p class="text-sm text-stone-500 mb-6">
+      Describe what you want to post about and we&rsquo;ll write a caption tailored to your salon and neighborhood.
+    </p>
+    <div id="caption-panel" class="rounded-2xl border border-stone-200 bg-white p-6 space-y-4">
+      <textarea id="caption-prompt" rows="3" maxlength="600"
+                placeholder="e.g. fall hair color promo, 20% off balayage this weekend"
+                class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition resize-none"></textarea>
+      <div class="flex flex-wrap items-center gap-3">
+        <button id="caption-generate" type="button"
+                class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-5 py-2.5 rounded-full text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
+          <span id="caption-generate-label">Generate caption</span>
+          <svg id="caption-generate-spinner" class="hidden w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+        </button>
+        <button id="caption-regenerate" type="button"
+                class="hidden text-sm text-stone-500 hover:text-stone-900 underline decoration-stone-300 hover:decoration-stone-600 transition">
+          Generate another
+        </button>
+      </div>
+      <p id="caption-error" class="hidden text-sm text-rose-700" role="alert" aria-live="polite"></p>
+      <div id="caption-result-wrap" class="hidden rounded-xl bg-stone-50 border border-stone-200 p-4 space-y-3">
+        <p id="caption-result" class="text-sm text-stone-800 whitespace-pre-wrap leading-relaxed"></p>
+        <div class="flex items-center gap-3">
+          <button id="caption-copy" type="button"
+                  class="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600 hover:text-stone-900 border border-stone-200 hover:border-stone-400 rounded-full px-3 py-1.5 transition">
+            ⎘ Copy
+          </button>
+          <span id="caption-copied" class="hidden text-xs text-emerald-700 font-medium">Copied!</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {% else %}
 
@@ -174,17 +249,69 @@
   var form = document.getElementById('owner-profile-form');
   if (!form) return;
 
-  var saveBtn   = document.getElementById('op-save-btn');
-  var successEl = document.getElementById('op-success');
-  var errorEl   = document.getElementById('op-error');
-  var descEl    = document.getElementById('op-description');
-  var countEl   = document.getElementById('op-desc-count');
+  var saveBtn     = document.getElementById('op-save-btn');
+  var successEl   = document.getElementById('op-success');
+  var errorEl     = document.getElementById('op-error');
+  var descEl      = document.getElementById('op-description');
+  var countEl     = document.getElementById('op-desc-count');
+  var hoursRows   = document.getElementById('op-hours-rows');
+  var addHoursBtn = document.getElementById('op-add-hours');
 
   /* Live character count */
   if (descEl && countEl) {
     descEl.addEventListener('input', function () {
       countEl.textContent = descEl.value.length + '/1000';
     });
+  }
+
+  /* ── Hours row management ──────────────────────────────────── */
+  function makeHoursRow(dayVal, hoursVal) {
+    var inputCls = 'rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:border-transparent transition';
+    var row = document.createElement('div');
+    row.className = 'op-hours-row flex items-center gap-2';
+    row.innerHTML =
+      '<input type="text" data-role="day" maxlength="30" ' +
+        'placeholder="e.g. Monday" value="' + (dayVal || '').replace(/"/g, '&quot;') + '" ' +
+        'class="w-32 shrink-0 ' + inputCls + '" />' +
+      '<input type="text" data-role="hours" maxlength="60" ' +
+        'placeholder="e.g. 9 am – 6 pm" value="' + (hoursVal || '').replace(/"/g, '&quot;') + '" ' +
+        'class="flex-1 ' + inputCls + '" />' +
+      '<button type="button" data-role="remove-row" aria-label="Remove row" ' +
+        'class="shrink-0 text-stone-400 hover:text-rose-600 transition text-lg leading-none px-1">\xd7</button>';
+    row.querySelector('[data-role="remove-row"]').addEventListener('click', function () {
+      row.remove();
+    });
+    return row;
+  }
+
+  /* Wire remove buttons on server-rendered rows */
+  if (hoursRows) {
+    hoursRows.querySelectorAll('[data-role="remove-row"]').forEach(function (btn) {
+      btn.addEventListener('click', function () { btn.closest('.op-hours-row').remove(); });
+    });
+  }
+
+  if (addHoursBtn && hoursRows) {
+    addHoursBtn.addEventListener('click', function () {
+      var row = makeHoursRow('', '');
+      hoursRows.appendChild(row);
+      row.querySelector('[data-role="day"]').focus();
+    });
+  }
+
+  function collectHours() {
+    if (!hoursRows) return undefined;
+    var entries = [];
+    hoursRows.querySelectorAll('.op-hours-row').forEach(function (row) {
+      var day   = (row.querySelector('[data-role="day"]').value || '').trim();
+      var hours = (row.querySelector('[data-role="hours"]').value || '').trim();
+      if (day || hours) entries.push({ day: day, hours: hours });
+    });
+    /* WHY: undefined means "no change" — backend uses exclude_none=True so
+       omitting hours leaves existing hours untouched. An empty array would
+       clear all hours, which shouldn't happen silently on a Save click that
+       didn't touch the hours section (e.g. the owner just updated their bio). */
+    return entries.length ? entries : undefined;
   }
 
   function setSubmitting(on) {
@@ -199,16 +326,16 @@
     errorEl.classList.add('hidden');
     setSubmitting(true);
 
-    /* Always send all four fields, including empty strings.
-       An empty string means "clear this field" — the backend writes it
-       as-is so the owner can blank out a phone number or website they
-       previously set. Only truly-null/absent fields are excluded. */
+    /* Send all text fields (including empty strings = "clear this field").
+       Hours uses undefined to mean "don't touch" vs an array of entries. */
     var payload = {
       phone:       form.querySelector('[name=phone]').value.trim(),
       website:     form.querySelector('[name=website]').value.trim(),
       email:       form.querySelector('[name=email]').value.trim(),
       description: form.querySelector('[name=description]').value.trim(),
     };
+    var hours = collectHours();
+    if (hours !== undefined) payload.hours = hours;
 
     try {
       var r = await fetch('/api/v1/owner/profile', {
@@ -221,13 +348,106 @@
         throw new Error(body.detail || ('Error ' + r.status));
       }
       successEl.classList.remove('hidden');
-      /* Auto-hide the confirmation after 3 s */
       setTimeout(function () { successEl.classList.add('hidden'); }, 3000);
     } catch (err) {
       errorEl.textContent = err.message || 'Could not save. Please try again.';
       errorEl.classList.remove('hidden');
     } finally {
       setSubmitting(false);
+    }
+  });
+
+  /* ── Instagram caption panel ───────────────────────────────── */
+  var BUSINESS_ID = "{{ owner_business_id|default('')|e }}";
+
+  var promptEl   = document.getElementById('caption-prompt');
+  var genBtn     = document.getElementById('caption-generate');
+  var genLabel   = document.getElementById('caption-generate-label');
+  var genSpin    = document.getElementById('caption-generate-spinner');
+  var regenBtn   = document.getElementById('caption-regenerate');
+  var capErrEl   = document.getElementById('caption-error');
+  var resultWrap = document.getElementById('caption-result-wrap');
+  var resultEl   = document.getElementById('caption-result');
+  var copyBtn    = document.getElementById('caption-copy');
+  var copiedTag  = document.getElementById('caption-copied');
+
+  if (!genBtn) return;
+
+  function setCaptionBusy(busy) {
+    genBtn.disabled = busy;
+    genLabel.textContent = busy ? 'Generating…' : 'Generate caption';
+    genSpin.classList.toggle('hidden', !busy);
+  }
+
+  async function generateCaption() {
+    capErrEl.classList.add('hidden');
+    copiedTag.classList.add('hidden');
+    var prompt = (promptEl.value || '').trim();
+    if (!prompt) {
+      capErrEl.textContent = 'Describe what the post is about first.';
+      capErrEl.classList.remove('hidden');
+      promptEl.focus();
+      return;
+    }
+    setCaptionBusy(true);
+    try {
+      var resp = await fetch('/api/v1/marketing-ai/instagram-caption', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: BUSINESS_ID, prompt: prompt }),
+      });
+      if (!resp.ok) {
+        var detail = '';
+        try { detail = (await resp.json()).detail || ''; } catch (ex) {}
+        capErrEl.textContent = resp.status === 404
+          ? "Caption tool isn’t enabled yet — check back soon."
+          : (detail || 'Something went wrong. Please try again.');
+        capErrEl.classList.remove('hidden');
+        return;
+      }
+      var data = await resp.json();
+      resultEl.textContent = data.caption || '';
+      resultWrap.classList.remove('hidden');
+      regenBtn.classList.remove('hidden');
+    } catch (err) {
+      capErrEl.textContent = 'Network error. Please try again.';
+      capErrEl.classList.remove('hidden');
+    } finally {
+      setCaptionBusy(false);
+    }
+  }
+
+  async function copyCaption() {
+    var text = resultEl.textContent || '';
+    if (!text) return;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      copiedTag.classList.remove('hidden');
+      setTimeout(function () { copiedTag.classList.add('hidden'); }, 2500);
+    } catch (err) {
+      capErrEl.textContent = "Couldn’t copy — select and copy manually.";
+      capErrEl.classList.remove('hidden');
+    }
+  }
+
+  genBtn.addEventListener('click', generateCaption);
+  regenBtn.addEventListener('click', generateCaption);
+  copyBtn.addEventListener('click', copyCaption);
+  promptEl.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      generateCaption();
     }
   });
 })();

@@ -199,8 +199,13 @@ def _gateway_key() -> Optional[str]:
 
     Returns None when unset so the route layer can distinguish
     misconfiguration from an actual model failure.
+
+    WHY: Checks KAT_AI_GATEWAY_KEY first (the app-scoped name used in
+    the server's .env to avoid collisions with other Expertly apps on
+    the same host), then falls back to the generic AI_GATEWAY_KEY so
+    both naming conventions work.
     """
-    return os.environ.get("AI_GATEWAY_KEY")
+    return os.environ.get("KAT_AI_GATEWAY_KEY") or os.environ.get("AI_GATEWAY_KEY")
 
 
 def feature_enabled() -> bool:
@@ -246,7 +251,7 @@ async def generate_caption(
     if not key:
         # WHY: This is operator misconfiguration, not user error.
         # Surface clearly so an SRE sees it in logs immediately.
-        log.error("AI_GATEWAY_KEY env var is not set; caption generation cannot proceed")
+        log.error("Neither KAT_AI_GATEWAY_KEY nor AI_GATEWAY_KEY is set; caption generation cannot proceed")
         raise CaptionGenerationError("gateway not configured")
 
     body: Dict[str, Any] = {
