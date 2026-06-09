@@ -44,6 +44,11 @@ async def ensure_indexes() -> None:
     # businesses to leave the fields unset.
     await db.businesses.create_index("stripe_customer_id", unique=True, sparse=True)
     await db.businesses.create_index("stripe_subscription_id", unique=True, sparse=True)
+    # WHY: owner portal looks up the business by the verified owner's email on
+    # every page load and every profile-edit save. sparse=True because only
+    # claimed+verified listings have this field; a non-sparse index would waste
+    # space for the majority of documents.
+    await db.businesses.create_index("claimed_email", sparse=True)
 
     await db.copy_blocks.create_index(
         [("scope_type", 1), ("scope_ref", 1), ("key", 1), ("locale", 1)],

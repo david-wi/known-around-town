@@ -60,6 +60,11 @@ async def verify_claim(claim_id: str) -> Dict[str, Any]:
                 "claimed_at": now,
                 "verified_at": now,
                 "updated_at": now,
+                # WHY: stored lowercase so the owner-portal lookup
+                # (`find_one({"claimed_email": email.lower()})`) matches
+                # regardless of how the owner capitalises their email at
+                # sign-in.
+                "claimed_email": (claim["submitter_email"] or "").lower(),
             }
         },
     )

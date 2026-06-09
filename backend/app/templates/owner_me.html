@@ -1,15 +1,120 @@
 {#-
-  Placeholder "you're signed in" page.
+  Owner portal — /owners/me
 
-  Confirms the cookie works end-to-end and gives the owner a way to
-  log out. The real dashboard replaces this template in a follow-up
-  change — for now we just show their email and a single log-out
-  button.
+  Two states:
+  1. owner_business is set  → real dashboard: show listing details + edit form
+  2. owner_business is None → "claim pending" holding page (claim submitted but
+     admin hasn't verified it yet, or owner signed in with a different email)
 -#}
 {% extends 'base.html' %}
 {% set header_variant = 'sticky' %}
 
 {% block content %}
+
+{% if owner_business %}
+
+{# ── REAL DASHBOARD ─────────────────────────────────────────────── #}
+
+<section class="bg-stone-50/60 border-b border-stone-200/60">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12 lg:py-16">
+    <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-4">
+      Your listing
+    </p>
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 class="font-light text-stone-900 leading-[1.1] tracking-tight mb-2"
+            style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 300;'>
+          {{ owner_business.name }}
+        </h1>
+        <a href="/b/{{ owner_business.slug }}"
+           class="text-sm text-stone-500 underline decoration-stone-300 hover:decoration-stone-600 hover:text-stone-800 transition">
+          View your public listing &rarr;
+        </a>
+      </div>
+      <span class="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white text-stone-600 px-3 py-1 text-xs font-medium">
+        Signed in as {{ owner_email }}
+      </span>
+    </div>
+  </div>
+</section>
+
+{# ── Edit form ─────────────────────────────────────────────────── #}
+<section class="bg-white">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
+
+    <h2 class="text-base font-semibold text-stone-900 mb-1">Edit your details</h2>
+    <p class="text-sm text-stone-500 mb-8">Changes go live on your public listing right away.</p>
+
+    <form id="owner-profile-form" class="space-y-6">
+
+      <div class="grid sm:grid-cols-2 gap-6">
+        <div>
+          <label for="op-phone" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Phone</label>
+          <input id="op-phone" name="phone" type="tel"
+                 value="{{ owner_business.phone or '' }}"
+                 placeholder="(305) 555-0100"
+                 class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition" />
+        </div>
+        <div>
+          <label for="op-website" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Website</label>
+          <input id="op-website" name="website" type="url"
+                 value="{{ owner_business.website or '' }}"
+                 placeholder="https://yoursalon.com"
+                 class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition" />
+        </div>
+      </div>
+
+      <div>
+        <label for="op-email" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Public email <span class="text-stone-400 normal-case">(optional)</span></label>
+        <input id="op-email" name="email" type="email"
+               value="{{ owner_business.email or '' }}"
+               placeholder="hello@yoursalon.com"
+               class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition" />
+      </div>
+
+      <div>
+        <label for="op-description" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">About your salon</label>
+        <textarea id="op-description" name="description" rows="4" maxlength="1000"
+                  placeholder="Tell visitors what makes your salon special…"
+                  class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition resize-none">{{ owner_business.description or '' }}</textarea>
+        <p class="text-xs text-stone-400 mt-1 text-right" id="op-desc-count">
+          {{ (owner_business.description or '') | length }}/1000
+        </p>
+      </div>
+
+      <div class="flex items-center gap-4 pt-2">
+        <button type="submit" id="op-save-btn"
+                class="inline-flex items-center justify-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-2.5 rounded-full text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
+          <span data-label-default>Save changes</span>
+          <span data-label-saving class="hidden">Saving…</span>
+        </button>
+        <p id="op-success" class="text-sm text-emerald-700 hidden" role="status" aria-live="polite">Saved.</p>
+        <p id="op-error" class="text-sm text-rose-700 hidden" role="alert" aria-live="polite"></p>
+      </div>
+
+    </form>
+
+    <hr class="my-10 border-stone-100" />
+
+    {# ── Logout ──────────────────────────────────────────────────── #}
+    <div>
+      <p class="text-sm text-stone-500 mb-4">
+        Signed in as <strong class="text-stone-700">{{ owner_email }}</strong>.
+      </p>
+      <button type="button" id="owner-logout"
+              class="inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-900 underline decoration-stone-300 hover:decoration-stone-700 transition disabled:opacity-50">
+        <span data-label-default>Sign out</span>
+        <span data-label-loading class="hidden">Signing out…</span>
+      </button>
+      <p id="owner-logout-error" class="text-sm text-rose-700 hidden mt-3" role="alert" aria-live="polite"></p>
+    </div>
+
+  </div>
+</section>
+
+{% else %}
+
+{# ── CLAIM PENDING / NO BUSINESS FOUND ──────────────────────────── #}
 
 <section class="bg-stone-50/60 border-b border-stone-200/60 min-h-[70vh]">
   <div class="max-w-md mx-auto px-6 lg:px-10 py-16 lg:py-24">
@@ -18,56 +123,111 @@
     </p>
     <h1 class="font-light text-stone-900 leading-[1.1] tracking-tight mb-6"
         style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2rem, 4vw, 3rem); font-weight: 300;'>
-      You're <em class="italic text-stone-500">signed in.</em>
+      Your claim is <em class="italic text-stone-500">being reviewed.</em>
     </h1>
     <p class="text-base text-stone-600 leading-relaxed mb-2">
-      Signed in as
-      <strong id="owner-me-email" class="text-stone-900">{{ owner_email }}</strong>.
+      Signed in as <strong class="text-stone-900">{{ owner_email }}</strong>.
     </p>
     <p class="text-base text-stone-600 leading-relaxed mb-8">
-      Your dashboard is coming soon — this is the stub page that confirms your sign-in works.
+      We&rsquo;re verifying your listing — you&rsquo;ll have access to your dashboard within one business day.
+      Questions? Email <a href="mailto:hello@knowsbeauty.com" class="underline decoration-stone-400 hover:decoration-stone-700">hello@knowsbeauty.com</a>.
     </p>
-
-    <button type="button"
-            id="owner-logout"
+    <button type="button" id="owner-logout"
             class="inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm disabled:opacity-60 disabled:cursor-not-allowed">
-      <span data-label-default>Log out</span>
-      <span data-label-loading class="hidden">Logging out…</span>
+      <span data-label-default>Sign out</span>
+      <span data-label-loading class="hidden">Signing out…</span>
     </button>
-    <p id="owner-logout-error"
-       class="text-sm text-rose-700 hidden mt-4"
-       role="alert"
-       aria-live="polite"></p>
+    <p id="owner-logout-error" class="text-sm text-rose-700 hidden mt-4" role="alert" aria-live="polite"></p>
   </div>
 </section>
 
-<script>
-(function() {
-  var btn = document.getElementById('owner-logout');
-  var err = document.getElementById('owner-logout-error');
+{% endif %}
 
-  function setLoading(loading) {
-    btn.disabled = loading;
-    btn.querySelector('[data-label-default]').classList.toggle('hidden', loading);
-    btn.querySelector('[data-label-loading]').classList.toggle('hidden', !loading);
+<script>
+(function () {
+  /* ── Logout (shared between both states) ──────────────────── */
+  var logoutBtn = document.getElementById('owner-logout');
+  var logoutErr = document.getElementById('owner-logout-error');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async function () {
+      if (logoutErr) logoutErr.classList.add('hidden');
+      logoutBtn.disabled = true;
+      logoutBtn.querySelector('[data-label-default]').classList.add('hidden');
+      logoutBtn.querySelector('[data-label-loading]').classList.remove('hidden');
+      try {
+        var r = await fetch('/api/v1/owner/logout', { method: 'POST' });
+        if (!r.ok) throw new Error('bad response');
+        window.location.href = '/owners/login';
+      } catch (e) {
+        logoutBtn.disabled = false;
+        logoutBtn.querySelector('[data-label-default]').classList.remove('hidden');
+        logoutBtn.querySelector('[data-label-loading]').classList.add('hidden');
+        if (logoutErr) {
+          logoutErr.textContent = 'Could not sign out. Please try again.';
+          logoutErr.classList.remove('hidden');
+        }
+      }
+    });
   }
 
-  btn.addEventListener('click', async function() {
-    err.classList.add('hidden');
-    setLoading(true);
+  /* ── Profile edit form (dashboard state only) ─────────────── */
+  var form = document.getElementById('owner-profile-form');
+  if (!form) return;
+
+  var saveBtn   = document.getElementById('op-save-btn');
+  var successEl = document.getElementById('op-success');
+  var errorEl   = document.getElementById('op-error');
+  var descEl    = document.getElementById('op-description');
+  var countEl   = document.getElementById('op-desc-count');
+
+  /* Live character count */
+  if (descEl && countEl) {
+    descEl.addEventListener('input', function () {
+      countEl.textContent = descEl.value.length + '/1000';
+    });
+  }
+
+  function setSubmitting(on) {
+    saveBtn.disabled = on;
+    saveBtn.querySelector('[data-label-default]').classList.toggle('hidden', on);
+    saveBtn.querySelector('[data-label-saving]').classList.toggle('hidden', !on);
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    successEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+    setSubmitting(true);
+
+    /* Always send all four fields, including empty strings.
+       An empty string means "clear this field" — the backend writes it
+       as-is so the owner can blank out a phone number or website they
+       previously set. Only truly-null/absent fields are excluded. */
+    var payload = {
+      phone:       form.querySelector('[name=phone]').value.trim(),
+      website:     form.querySelector('[name=website]').value.trim(),
+      email:       form.querySelector('[name=email]').value.trim(),
+      description: form.querySelector('[name=description]').value.trim(),
+    };
+
     try {
-      var r = await fetch('/api/v1/owner/logout', {method: 'POST'});
+      var r = await fetch('/api/v1/owner/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
       if (!r.ok) {
-        err.textContent = 'Could not log out. Please try again.';
-        err.classList.remove('hidden');
-        setLoading(false);
-        return;
+        var body = await r.json().catch(function () { return {}; });
+        throw new Error(body.detail || ('Error ' + r.status));
       }
-      window.location.href = '/owners/login';
-    } catch (e) {
-      err.textContent = 'Network error. Please try again.';
-      err.classList.remove('hidden');
-      setLoading(false);
+      successEl.classList.remove('hidden');
+      /* Auto-hide the confirmation after 3 s */
+      setTimeout(function () { successEl.classList.add('hidden'); }, 3000);
+    } catch (err) {
+      errorEl.textContent = err.message || 'Could not save. Please try again.';
+      errorEl.classList.remove('hidden');
+    } finally {
+      setSubmitting(false);
     }
   });
 })();

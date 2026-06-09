@@ -1003,8 +1003,17 @@ async def owners_me_page(request: Request) -> HTMLResponse:
 
     ctx = await _base_context(request, tenant)
     ctx["owner_email"] = session["email"]
-    ctx["seo_title"] = "Your account"
-    ctx["meta_description"] = "Your Knows Beauty owner account."
+    db = get_db()
+    business = await db.businesses.find_one({"claimed_email": session["email"]})
+    ctx["owner_business"] = business
+    if business:
+        ctx["seo_title"] = business.get("name", "Your account")
+        ctx["meta_description"] = (
+            f"Manage your {business.get('name', 'salon')} listing on Knows Beauty."
+        )
+    else:
+        ctx["seo_title"] = "Your account"
+        ctx["meta_description"] = "Your Knows Beauty owner account."
     response = _templates.TemplateResponse("owner_me.html", ctx)
     # WHY: rolling 30-day expiry. Reissue the cookie on every successful
     # visit so an active owner never has to sign in again. The freshly
