@@ -1,5 +1,5 @@
 """Smoke tests that exercise the full request -> template path."""
-
+# Tests for the Miami Knows Beauty public-facing pages.
 from __future__ import annotations
 
 import pytest
@@ -1749,3 +1749,22 @@ def test_home_page_has_organization_jsonld(client):
     )
     # url must be a full https URL
     assert org["url"].startswith("http"), "Organization url must be an absolute URL"
+
+
+def test_neighborhood_category_page_has_meta_description(client):
+    """Neighborhood+category pages (e.g. /n/wynwood/c/hair) must include a
+    meta description so Google shows a meaningful snippet in search results
+    instead of a random excerpt from the page body.
+
+    WHY: 'hair salons in Wynwood' queries are the highest-intent local searches
+    on the site. A blank or random-excerpt description wastes the opportunity to
+    show 'The best hair salons in Wynwood, Miami — browse Miami Knows Beauty.'
+    in search results, which meaningfully increases click-through rate."""
+    r = client.get("/n/wynwood/c/hair", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert 'meta name="description"' in r.text, (
+        "/n/wynwood/c/hair is missing a <meta name='description'> tag"
+    )
+    # The description should reference both the category and neighborhood.
+    text_lower = r.text.lower()
+    assert "wynwood" in text_lower, "Meta description should mention the neighborhood"
