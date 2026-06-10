@@ -1,5 +1,5 @@
 """Smoke tests that exercise the full request -> template path."""
-
+# Tests for the Miami Knows Beauty public-facing pages.
 from __future__ import annotations
 
 import pytest
