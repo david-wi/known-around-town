@@ -1069,3 +1069,20 @@ def test_owners_page_has_email_capture_form(client):
     assert "owner-lead-thanks" in body
     # The prompt copy is present
     assert "Not ready to claim" in body
+
+
+def test_mobile_nav_drawer_present_on_all_pages(client):
+    """The mobile navigation drawer must be present on every page so phone
+    visitors can reach categories, Pricing, and the owner claim page.
+    Previously the hamburger button existed but had no associated menu — it
+    clicked with no visible effect on screens under 640 px wide."""
+    for path in ("/", "/owners", "/pricing", "/search"):
+        r = client.get(path, headers={"host": "miami.knowsbeauty.localhost"})
+        assert r.status_code == 200, f"{path} returned {r.status_code}"
+        body = r.text
+        assert "mobile-nav-drawer" in body, f"Mobile nav drawer missing from {path}"
+        assert "mobile-nav-btn" in body, f"Mobile nav button missing from {path}"
+        assert "aria-expanded" in body, f"aria-expanded missing from {path}"
+        # Drawer must contain the For Salon Owners link so mobile visitors
+        # can reach the claim flow without a working desktop browser
+        assert "/owners" in body, f"/owners link missing from {path}"
