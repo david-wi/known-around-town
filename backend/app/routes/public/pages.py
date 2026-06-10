@@ -7,6 +7,7 @@ template only receives plain data — no DB access from the template.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus
@@ -216,6 +217,12 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "footer_owners_items": footer_owners_items,
         "page_featured_disclosure": await copy.get("page.featured_disclosure"),
         "owners_header_cta": await copy.get("header.owners_cta") or "For Owners",
+        # WHY: GA4 is injected here (the shared base context) so every page
+        # gets the tracking script without duplicating the env-var read in
+        # each individual route handler.  An empty or absent var means the
+        # {% if ga_measurement_id %} guard in base.html emits no script at
+        # all — no dead snippet, no console noise on dev.
+        "ga_measurement_id": os.environ.get("GA_MEASUREMENT_ID", ""),
     }
 
 

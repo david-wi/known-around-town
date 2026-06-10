@@ -55,6 +55,10 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRICE_ID_PRO: ${STRIPE_PRICE_ID_PRO:-}
+      # WHY: GA4 Measurement ID must be threaded through explicitly so the
+      # container sees it. Empty default means no script is emitted until the
+      # ID is configured — safe to deploy before GA is set up.
+      GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
       LOG_LEVEL: INFO
     networks:
       - traefik
@@ -155,6 +159,7 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRICE_ID_PRO: ${STRIPE_PRICE_ID_PRO:-}
+      GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
       LOG_LEVEL: INFO
     networks:
       - traefik

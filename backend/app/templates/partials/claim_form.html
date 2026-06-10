@@ -287,6 +287,14 @@
       node.getElementById('claim-form__success-business').textContent = businessName;
       node.getElementById('claim-form__success-email').textContent = email;
       wrapper.replaceWith(node.firstElementChild);
+      // WHY: fire a GA4 conversion event so we can measure how many owners
+      // complete the claim form — the key funnel metric for the site.  Guard
+      // with typeof check so the event is silently skipped when GA4 is not
+      // loaded (dev environments, adblockers, pages rendered without the
+      // GA_MEASUREMENT_ID env var).
+      if (typeof gtag !== 'undefined') {
+        gtag('event', 'claim_submitted', { event_category: 'owner_conversion' });
+      }
     }
 
     form.addEventListener('submit', function (event) {
