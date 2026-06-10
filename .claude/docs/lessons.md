@@ -105,6 +105,14 @@ All public-facing pages now have og:image. Base template also renders twitter:im
 - **Test for neighborhood+category must handle absent block:** if the seed has no businesses at an intersection (e.g. Wynwood+hair could be empty), the route correctly returns `None` and no block is emitted. The smoke test for this page type skips structural assertions in that case.
 - As of PR #86 there are **88 tests** in `test_smoke.py`.
 
+## Organization JSON-LD (PR #87, 2026-06-10)
+
+- Home page now has an Organization JSON-LD block alongside the existing WebSite block.
+- WebSite describes the site; Organization describes the brand entity behind it. Both together are the prerequisite for Google to consider the site for a Knowledge Panel.
+- `@id` uses `canonical_url + "/#organization"` (canonical_url already has trailing slash stripped, so the result is `https://domain.com/#organization`).
+- `name`, `logo`, and `description` come from city config; the whole block is skipped when `canonical_url` is unavailable (e.g. localhost non-HTTP).
+- As of PR #87 there are **89 tests** in `test_smoke.py`.
+
 ## Pending — Blocked on David
 
 - **Stripe keys** needed to activate the payment flow (`stripe_billing.py` is fully built): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PRO`
