@@ -134,3 +134,10 @@ All public-facing pages now have og:image and twitter:image. Base template rende
 - **GA4 Measurement ID** needed to activate analytics (tracking code already in base template)
 - **`www.knowsbeauty.com` DNS** currently returns 410 — needs to point at the correct server
 - **Design-partner outreach**: 10 draft DMs/emails ready; need per-message approval before sending
+
+## Sitemap — Neighborhood+Category Intersection Pages (PR #91, 2026-06-10)
+
+- The sitemap listed individual neighborhood pages (`/n/wynwood`) and category pages (`/c/hair`) but was missing the intersection pages (`/n/wynwood/c/hair`). 92 pages with real businesses were invisible to Google's sitemap crawler.
+- Fix: collect `(neighborhood_slug, category_slug)` pairs during the existing business cursor loop, then append sorted intersection URLs. Zero extra DB queries.
+- **Rule**: when a new page type is added to the site, add it to the sitemap generator in the same PR.
+- As of PR #91 there are **91 tests** in `test_smoke.py`.
