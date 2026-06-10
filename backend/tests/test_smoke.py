@@ -1,5 +1,5 @@
 """Smoke tests that exercise the full request -> template path."""
-# Tests for the Miami Knows Beauty public-facing pages. Updated alongside PR #90 docs.
+# Tests for the Miami Knows Beauty public-facing pages. Updated alongside PR #92 docs.
 from __future__ import annotations
 
 import pytest
