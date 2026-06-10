@@ -497,6 +497,15 @@ async def home(request: Request) -> HTMLResponse:
     return _templates.TemplateResponse("home.html", ctx)
 
 
+# WHY: /c/hair-salon is a common mis-hit — dozens of requests per hour arrive
+# at this path from a monitoring tool or stale bookmark. The correct slug is
+# /c/hair. A permanent (301) redirect fixes the 404 for these callers and
+# preserves any SEO equity accumulated on the incorrect URL.
+@router.get("/c/hair-salon")
+async def redirect_hair_salon() -> RedirectResponse:
+    return RedirectResponse(url="/c/hair", status_code=301)
+
+
 @router.get("/c/{category_slug}", response_class=HTMLResponse)
 async def category_page(request: Request, category_slug: str) -> HTMLResponse:
     tenant = await _require_tenant(request)
