@@ -1085,25 +1085,49 @@ async def sitemap(request: Request) -> HTMLResponse:
     scheme = request.url.scheme
     base = f"{scheme}://{host}"
 
-    urls: List[str] = [base + "/"]
+    # WHY: today's date is used for pages that don't carry per-record
+    # timestamps (static pages, category pages, neighborhood pages). Google
+    # uses lastmod to decide how frequently to re-crawl; stale dates cause
+    # under-crawling, so a live "today" value on structural pages is the
+    # right signal — those pages do change whenever new businesses are added.
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # List of (url, lastmod_str) tuples. Business pages carry per-record
+    # updated_at when available; everything else uses today's date.
+    entries: List[tuple[str, str]] = [(base + "/", today_str)]
+
     if tenant.city:
         city_id = tenant.city["_id"]
         for cat in await content_svc.list_categories(city_id):
-            urls.append(f"{base}/c/{cat['slug']}")
+            entries.append((f"{base}/c/{cat['slug']}", today_str))
         for nb in await content_svc.list_neighborhoods(city_id):
-            urls.append(f"{base}/n/{nb['slug']}")
+            entries.append((f"{base}/n/{nb['slug']}", today_str))
         cur = content_svc.get_db().businesses.find(
             {"city_id": city_id, "status": "live", "index_status": {"$ne": "noindex"}}
         )
         async for b in cur:
-            urls.append(f"{base}/b/{b['slug']}")
+            # WHY: prefer the business's own updated_at timestamp so Google
+            # knows when the listing content last changed — a hair salon that
+            # updated its hours last week should be re-crawled sooner than one
+            # that hasn't changed since the site launched.
+            raw_ts = b.get("updated_at")
+            if isinstance(raw_ts, datetime):
+                lastmod = raw_ts.strftime("%Y-%m-%d")
+            elif isinstance(raw_ts, str) and len(raw_ts) >= 10:
+                lastmod = raw_ts[:10]  # accept ISO strings like "2025-03-01T..."
+            else:
+                lastmod = today_str
+            entries.append((f"{base}/b/{b['slug']}", lastmod))
         for g in await content_svc.list_editorial_guides(city_id, limit=500):
-            urls.append(f"{base}/guides/{g['slug']}")
+            entries.append((f"{base}/guides/{g['slug']}", today_str))
+
+    def _url_tag(loc: str, lastmod: str) -> str:
+        return f"  <url><loc>{loc}</loc><lastmod>{lastmod}</lastmod></url>\n"
 
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        + "".join(f"  <url><loc>{u}</loc></url>\n" for u in urls)
+        + "".join(_url_tag(loc, lm) for loc, lm in entries)
         + "</urlset>\n"
     )
     return HTMLResponse(body, media_type="application/xml")
