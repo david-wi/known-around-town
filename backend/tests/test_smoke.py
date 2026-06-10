@@ -1789,3 +1789,33 @@ def test_sitemap_includes_neighborhood_category_pages(client):
         f"No /n/<nb>/c/<cat> URLs found in sitemap. Found /n/ entries: "
         f"{re.findall(r'/n/[^<]+', r.text)[:5]}"
     )
+
+def test_search_results_page_is_noindexed(client):
+    """Search result pages must have a noindex robots meta tag so Google does not
+    index /search?q=hair, /search?q=salon, etc. as separate pages. Each of those
+    would be thin, query-specific content that competes with the richer category
+    and neighborhood landing pages that are designed for search discovery."""
+    r = client.get("/search?q=hair", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert 'content="noindex,follow"' in r.text, (
+        "Search results page is missing <meta name='robots' content='noindex,follow'>. "
+        "Without it, Google may index hundreds of near-duplicate query pages."
+    )
+
+
+def test_robots_txt_disallows_owner_auth_routes(client):
+    """The robots.txt must disallow the owner login and dashboard routes so
+    Google does not waste crawl budget on pages that always redirect to a login
+    wall. Public content pages (/, /b/*, /c/*, /n/*) remain crawlable."""
+    r = client.get("/robots.txt", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200
+    body = r.text
+    assert "Disallow: /owners/login" in body, (
+        "robots.txt should disallow /owners/login (always redirects to auth)"
+    )
+    assert "Disallow: /owners/me" in body, (
+        "robots.txt should disallow /owners/me (authenticated dashboard)"
+    )
+    assert "Sitemap:" in body, (
+        "robots.txt must still include the Sitemap: directive"
+    )

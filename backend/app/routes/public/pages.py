@@ -1319,8 +1319,19 @@ async def robots_txt(request: Request) -> HTMLResponse:
         return HTMLResponse("User-agent: *\nDisallow: /\n", media_type="text/plain")
     host = request.headers.get("host", "")
     scheme = request.url.scheme
+    # WHY: disallow the auth and owner-dashboard routes so Google doesn't spend crawl
+    # budget on pages that always redirect to login or require authentication. The
+    # public-facing content pages (/, /b/*, /c/*, /n/*, /owners, /pricing) remain
+    # fully crawlable — only the private account flow is excluded.
+    disallowed = "\n".join(
+        [
+            "Disallow: /owners/login",
+            "Disallow: /owners/me",
+            "Disallow: /owners/verify",
+        ]
+    )
     return HTMLResponse(
-        f"User-agent: *\nAllow: /\nSitemap: {scheme}://{host}/sitemap.xml\n",
+        f"User-agent: *\nAllow: /\n{disallowed}\nSitemap: {scheme}://{host}/sitemap.xml\n",
         media_type="text/plain",
     )
 

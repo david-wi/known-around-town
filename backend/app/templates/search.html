@@ -7,6 +7,14 @@
     3. No results — friendly zero-state with browse-by-category links
 -#}
 
+{% block head_extra %}
+{# WHY: search result pages change with every query, so Google would index hundreds of
+   near-duplicate thin pages (/search?q=hair, /search?q=salon, etc.) that compete with
+   the richer /c/<category> and /n/<nb>/c/<cat> pages. noindex keeps crawl budget on
+   the canonical landing pages; follow lets Googlebot still traverse any links here. #}
+<meta name="robots" content="noindex,follow">
+{% endblock %}
+
 {% set header_variant = 'sticky' %}
 
 {% block content %}
