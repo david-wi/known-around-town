@@ -340,6 +340,50 @@ def _resolve_by_slug(records: List[Dict[str, Any]], slugs: List[str]) -> List[Di
     return [by_slug[s] for s in (slugs or []) if s in by_slug]
 
 
+def _build_item_list_jsonld(
+    businesses: List[Dict[str, Any]],
+    list_name: str,
+    list_url: str,
+    base_url: str,
+) -> Optional[Dict[str, Any]]:
+    """Build an ItemList JSON-LD dict for a page that lists businesses.
+
+    WHY: extracted as a helper so the three route handlers (category, neighborhood,
+    neighborhood+category) share identical logic rather than duplicating the list
+    comprehension. Also centralises the slug/name guard — a business without a slug
+    would produce '@id: .../b/' which resolves to the home page and would be
+    misinterpreted by Google as associating the business name with the home URL.
+    Returns None when there are no valid businesses so the template guard
+    ({% if item_list_jsonld %}) suppresses the script block entirely.
+    """
+    # WHY: filter out businesses missing a slug or name — they would produce
+    # malformed @id URLs (".../b/") or empty name strings, both of which
+    # cause Google's structured-data parser to flag the block as invalid.
+    valid = [b for b in businesses if b.get("slug") and b.get("name")]
+    if not valid:
+        return None
+    return {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": list_name,
+        "url": list_url,
+        "numberOfItems": len(valid),
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": i + 1,
+                "item": {
+                    "@type": "LocalBusiness",
+                    "@id": f"{base_url}/b/{b['slug']}",
+                    "name": b["name"],
+                    "url": f"{base_url}/b/{b['slug']}",
+                },
+            }
+            for i, b in enumerate(valid)
+        ],
+    }
+
+
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
     tenant = await _require_tenant(request)
@@ -592,6 +636,18 @@ async def category_page(request: Request, category_slug: str) -> HTMLResponse:
                 (b["photos"][0]["url"] for b in businesses if b.get("photos")),
                 city.get("hero_photo_url"),
             ),
+            # WHY: ItemList JSON-LD gives Google a machine-readable enumeration
+            # of the businesses on this page. Without it Google can only infer
+            # the list from crawled HTML. With it, Google can surface individual
+            # business names as rich results for category-level queries like
+            # "hair salons Miami", increasing click-through before users even
+            # reach the page.
+            "item_list_jsonld": _build_item_list_jsonld(
+                businesses,
+                list_name=f"{category.get('name', '')} in {city.get('name', '')}",
+                list_url=str(request.url).split("?")[0],
+                base_url=str(request.base_url).rstrip("/"),
+            ),
         }
     )
     return _templates.TemplateResponse("category.html", ctx)
@@ -644,6 +700,15 @@ async def neighborhood_page(request: Request, neighborhood_slug: str) -> HTMLRes
             "og_image": next(
                 (b["photos"][0]["url"] for b in businesses if b.get("photos")),
                 city.get("hero_photo_url"),
+            ),
+            # WHY: ItemList JSON-LD enumerates the businesses in this neighborhood
+            # so Google can surface them as rich results for neighborhood-level
+            # queries like "salons in Wynwood Miami".
+            "item_list_jsonld": _build_item_list_jsonld(
+                businesses,
+                list_name=f"{tenant.network.get('name', '')} in {nb.get('name', '')}, {city.get('name', '')}",
+                list_url=str(request.url).split("?")[0],
+                base_url=str(request.base_url).rstrip("/"),
             ),
         }
     )
@@ -701,6 +766,16 @@ async def neighborhood_category_page(
             "og_image": next(
                 (b["photos"][0]["url"] for b in businesses if b.get("photos")),
                 city.get("hero_photo_url"),
+            ),
+            # WHY: most specific ItemList — businesses in both this neighborhood
+            # AND this category (e.g. "Hair salons in Wynwood, Miami"). High-intent
+            # queries like "hair salon wynwood" are exactly what a tourist or local
+            # types; this helps Google surface individual salon names in results.
+            "item_list_jsonld": _build_item_list_jsonld(
+                businesses,
+                list_name=f"{category.get('name', '')} in {nb.get('name', '')}, {city.get('name', '')}",
+                list_url=str(request.url).split("?")[0],
+                base_url=str(request.base_url).rstrip("/"),
             ),
         }
     )

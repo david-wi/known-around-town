@@ -36,6 +36,9 @@
 }
 </script>
 {% endif %}
+{% if item_list_jsonld %}
+<script type="application/ld+json">{{ item_list_jsonld | tojson }}</script>
+{% endif %}
 {% endblock %}
 
 {% block content %}
