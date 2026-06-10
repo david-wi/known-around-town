@@ -22,8 +22,8 @@
   <div class="max-w-5xl mx-auto px-6 lg:px-10 py-3 flex items-start gap-3">
     <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-200 text-amber-900 text-[11px] font-semibold mt-0.5">!</span>
     <p class="text-sm text-amber-900 leading-relaxed">
-      <strong class="font-semibold">Preview</strong> &mdash; this is a mockup of the owner dashboard.
-      The real claim-and-pay flow is in progress; nothing on this page is wired up yet.
+      <strong class="font-semibold">Preview</strong> &mdash; this is a sample of the owner dashboard.
+      <a class="underline font-medium" href="/owners#claim-form">Claim your listing</a> to get the real one.
       Sample data is drawn from <span class="font-medium">{{ business.name }}</span>.
     </p>
   </div>
@@ -169,7 +169,7 @@
       Bring people to the door.
     </h2>
     <p class="text-stone-600 leading-relaxed mb-8 max-w-2xl">
-      Three tools that draft on-brand marketing for you, included in Featured. We&rsquo;re finishing each one now.
+      Three tools that draft on-brand marketing for you, included in Featured. Instagram captions and ad copy are live now &mdash; Google Business sync is on the way.
     </p>
     <div class="grid md:grid-cols-3 gap-6">
       <div class="rounded-2xl p-6 bg-gradient-to-br {{ theme.owners_gradient or 'from-stone-100 via-stone-50 to-white' }} border border-stone-200">
@@ -178,12 +178,10 @@
         <p class="text-sm text-stone-600 leading-relaxed mb-5">
           Drop a photo, pick a vibe, get four captions in your salon&rsquo;s voice.
         </p>
-        <button type="button" data-coming-soon="Generate Instagram captions"
-                class="w-full rounded-full bg-stone-200 hover:bg-stone-300 text-stone-600 px-4 py-2 text-sm font-medium transition"
-                aria-disabled="true"
-                title="Coming soon">
-          Coming soon
-        </button>
+        <a href="/owners#claim-form"
+           class="w-full rounded-full {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white px-4 py-2 text-sm font-medium transition text-center block">
+          Available with Featured &rarr;
+        </a>
       </div>
       <div class="rounded-2xl p-6 bg-gradient-to-br {{ theme.owners_gradient or 'from-stone-100 via-stone-50 to-white' }} border border-stone-200">
         <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-3">Ads</p>
@@ -191,12 +189,10 @@
         <p class="text-sm text-stone-600 leading-relaxed mb-5">
           Google and Meta ad drafts, tuned to your services and your tone.
         </p>
-        <button type="button" data-coming-soon="Generate ad copy"
-                class="w-full rounded-full bg-stone-200 hover:bg-stone-300 text-stone-600 px-4 py-2 text-sm font-medium transition"
-                aria-disabled="true"
-                title="Coming soon">
-          Coming soon
-        </button>
+        <a href="/owners#claim-form"
+           class="w-full rounded-full {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white px-4 py-2 text-sm font-medium transition text-center block">
+          Available with Featured &rarr;
+        </a>
       </div>
       <div class="rounded-2xl p-6 bg-gradient-to-br {{ theme.owners_gradient or 'from-stone-100 via-stone-50 to-white' }} border border-stone-200">
         <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-3">Google</p>
