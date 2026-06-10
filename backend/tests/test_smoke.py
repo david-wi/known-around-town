@@ -709,6 +709,35 @@ def test_unclaimed_business_detail_has_sticky_claim_bar(client):
     assert "/owners?slug=blow-dry-bar-brickell#claim-form" in body
 
 
+def test_neighborhood_page_shows_owner_acquisition_banner(client):
+    """Neighborhood listing pages must show an owner acquisition banner after
+    the business grid, so owners who find the directory by Googling their
+    neighborhood have a clear path to /owners without having to click through
+    to an individual listing first."""
+    r = client.get("/n/brickell", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # The "For Business Owners" eyebrow and the claim CTA must appear.
+    assert "For Business Owners" in r.text, (
+        "Neighborhood page missing owner acquisition banner — owners landing here "
+        "from search have no visible path to claim their listing"
+    )
+    assert "Claim your listing" in r.text
+    assert 'href="/owners"' in r.text
+
+
+def test_category_page_shows_owner_acquisition_banner(client):
+    """Category listing pages must show an owner acquisition banner after the
+    business grid. An owner searching 'nails Miami' lands here and should see
+    a direct prompt to claim without clicking through to a specific listing."""
+    r = client.get("/c/nails", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "For Business Owners" in r.text, (
+        "Category page missing owner acquisition banner"
+    )
+    assert "Claim your listing" in r.text
+    assert 'href="/owners"' in r.text
+
+
 def test_neighborhood_pages_have_editorial_descriptions(client):
     """Each Miami beauty neighborhood page must show a unique editorial
     paragraph below the vibe quote in the hero. Without it the page has
