@@ -606,3 +606,26 @@ def test_unclaimed_business_detail_has_sticky_claim_bar(client):
     assert "claim-sticky-dismiss" in body
     # The bar links to the right destination
     assert "/owners?slug=blow-dry-bar-brickell#claim-form" in body
+
+
+def test_neighborhood_pages_have_editorial_descriptions(client):
+    """Each Miami beauty neighborhood page must show a unique editorial
+    paragraph below the vibe quote in the hero. Without it the page has
+    only a grid of salons — no unique text for Google to index, so it
+    cannot rank for searches like 'best hair salon in Wynwood' or
+    'nail salons Brickell Miami'.
+
+    We test two neighborhoods to confirm the copy is distinct per page,
+    not a shared fallback."""
+    # Wynwood — "canvas" is a distinctive word from the Wynwood description
+    r = client.get("/n/wynwood", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    body = r.text
+    assert "canvas" in body, "Wynwood editorial description missing (check hero_description seed)"
+    # Brickell — "boardroom" is a distinctive word from the Brickell description
+    r2 = client.get("/n/brickell", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r2.status_code == 200, r2.text
+    body2 = r2.text
+    assert "boardroom" in body2, "Brickell editorial description missing"
+    # The two pages must differ — different neighborhoods, different copy
+    assert body != body2
