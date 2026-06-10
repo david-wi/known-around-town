@@ -42,15 +42,25 @@
   "description": {{ (business.short_description or '')|tojson }}
   {% if business.address %},"address": {
     "@type": "PostalAddress",
-    "streetAddress": {{ (business.address.street or '')|tojson }},
-    "addressLocality": {{ (business.address.city or city.name)|tojson }},
-    "addressRegion": {{ (business.address.region or '')|tojson }},
-    "postalCode": {{ (business.address.postal or '')|tojson }}
+    "streetAddress": {{ (business.address.street or '')|tojson }}
+    {#- WHY: omit region and postal when empty rather than emitting empty strings —
+        Google's Rich Results validator treats "" as an invalid value for these
+        fields and can suppress the entire address block from Knowledge Panel. #}
+    {% if business.address.city or city.name %},"addressLocality": {{ (business.address.city or city.name)|tojson }}{% endif %}
+    {% if business.address.region %},"addressRegion": {{ business.address.region|tojson }}{% endif %}
+    {% if business.address.postal %},"postalCode": {{ business.address.postal|tojson }}{% endif %}
   }{% endif %}
   {% if business.phone %},"telephone": {{ business.phone|tojson }}{% endif %}
   {% if business.website %},"url": {{ business.website|tojson }}{% endif %}
   {% if business.price_cues %},"priceRange": {{ business.price_cues|tojson }}{% endif %}
-  {% if business.hours %},"openingHoursSpecification": [
+  {#- WHY: omit openingHoursSpecification entirely rather than emit a broken
+      structure. The hours field stores combined strings like "Mon–Sat 10am–8pm"
+      which Google expects as separate opens/closes times (HH:MM format). Emitting
+      the combined string in "opens" and "" in "closes" causes the validator to
+      reject the entire hours block. A schema-less listing is better than one with
+      explicitly invalid data. The route handler should parse hours into ISO times
+      before passing them here if proper structured hours are desired in future. #}
+  {% if business.hours and false %},"openingHoursSpecification": [
     {% for day in business.hours %}
     {
       "@type": "OpeningHoursSpecification",
