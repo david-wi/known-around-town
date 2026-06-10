@@ -1426,3 +1426,69 @@ def test_owner_me_pending_state_has_feature_teaser_cards():
             f"Pending-state feature teaser card '{label}' missing from owner_me.html — "
             "owners in the pending state won't know what's coming after verification"
         )
+
+
+def test_category_page_title_uses_full_brand_name(client):
+    """Category page titles must include 'Miami Knows Beauty' — the full brand
+    name — not just 'Knows Beauty' (the network word without the city).
+
+    WHY: a title that reads 'Hair in Miami — Knows Beauty' is missing the
+    city prefix that makes the brand recognizable. Google shows the page title
+    as the blue clickable headline in search results; a title with the full brand
+    name ('Miami Knows Beauty') reinforces brand recognition and local relevance
+    for every impression, even when the user does not click."""
+    r = client.get("/c/hair", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    import re
+    m = re.search(r"<title>(.*?)</title>", r.text)
+    assert m, "Category page has no <title> tag"
+    title = m.group(1)
+    assert "Miami Knows Beauty" in title, (
+        f"Category page title '{title}' missing 'Miami Knows Beauty' — "
+        "was 'Knows Beauty' (city prefix dropped)"
+    )
+
+
+def test_neighborhood_page_title_uses_full_brand_name_in_correct_order(client):
+    """Neighborhood page titles must read 'Design District — Miami Knows Beauty',
+    not 'Design District — Knows Beauty Miami' (reversed).
+
+    WHY: the brand name 'Miami Knows Beauty' has a specific order. 'Knows Beauty
+    Miami' reads as gibberish to a first-time visitor scanning Google results —
+    it is not a recognizable phrase and undermines the brand's credibility in
+    the impression before any click happens."""
+    r = client.get("/n/design-district", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    import re
+    m = re.search(r"<title>(.*?)</title>", r.text)
+    assert m, "Neighborhood page has no <title> tag"
+    title = m.group(1)
+    assert "Miami Knows Beauty" in title, (
+        f"Neighborhood page title '{title}' missing 'Miami Knows Beauty' — "
+        "was 'Knows Beauty Miami' (city and network words reversed)"
+    )
+    assert "Knows Beauty Miami" not in title, (
+        f"Neighborhood page title '{title}' still has reversed brand name 'Knows Beauty Miami'"
+    )
+
+
+def test_neighborhood_category_page_title_uses_full_brand_name(client):
+    """The combined neighborhood + category page title must include the full
+    'Miami Knows Beauty' brand, not the reversed 'Knows Beauty Miami'.
+
+    WHY: this is the highest-intent landing page type ('Hair salons in Wynwood')
+    and is the most likely destination for Google Ads and high-value organic
+    queries. A garbled brand name on the most valuable page type is particularly
+    harmful to conversion."""
+    r = client.get("/n/wynwood/c/hair", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    import re
+    m = re.search(r"<title>(.*?)</title>", r.text)
+    assert m, "Neighborhood-category page has no <title> tag"
+    title = m.group(1)
+    assert "Miami Knows Beauty" in title, (
+        f"Neighborhood-category page title '{title}' missing 'Miami Knows Beauty'"
+    )
+    assert "Knows Beauty Miami" not in title, (
+        f"Neighborhood-category page title '{title}' has reversed brand name"
+    )
