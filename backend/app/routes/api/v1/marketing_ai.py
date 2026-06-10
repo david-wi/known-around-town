@@ -190,3 +190,97 @@ async def generate_instagram_caption(
         ) from exc
 
     return InstagramCaptionResponse(caption=caption, business_id=body.business_id)
+
+
+class AdCopyRequest(BaseModel):
+    """Input shape for the ad copy endpoint.
+
+    Mirrors InstagramCaptionRequest — same business_id + free-text prompt
+    pattern. The prompt here describes what the owner wants to promote
+    (e.g. "summer specials, 20% off color services through July").
+    """
+
+    business_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="The _id of the business the owner is generating ad copy for.",
+    )
+    prompt: str = Field(
+        ...,
+        min_length=1,
+        # WHY: Same 600-char cap as captions — enough for a promo description
+        # without letting the prompt balloon into a token-cost attack.
+        max_length=600,
+        description="What the owner wants to advertise.",
+    )
+
+
+class AdCopyResponse(BaseModel):
+    """Ad copy variations returned to the dashboard panel.
+
+    ``ad_copy`` is the raw text returned by the model: 3 variations,
+    each with a headline on line 1 and a description on line 2,
+    separated by blank lines. The dashboard displays this verbatim.
+    """
+
+    # WHY: Named "ad_copy" not "copy" — "copy" shadows BaseModel.copy(), a
+    # Pydantic method, which causes UserWarning and subtle behaviour in v2.
+    ad_copy: str
+    business_id: str
+
+
+@router.post(
+    "/ad-copy",
+    response_model=AdCopyResponse,
+    # WHY: Not admin-gated, same reasoning as /instagram-caption. The feature
+    # flag (MARKETING_AI_ENABLED) gates the surface; owner-auth ownership check
+    # is deferred until owner sessions ship. See the caption endpoint comment.
+)
+async def generate_ad_copy(
+    body: AdCopyRequest,
+) -> AdCopyResponse:
+    """Generate 3 short ad copy variations for a business.
+
+    Each variation includes a headline (under 30 chars) and a description
+    (under 90 chars) — ready to paste into Google Ads, Facebook, or
+    Instagram Ads. Returns 404 when the feature flag is off, 502 when the
+    AI gateway is unreachable.
+    """
+    _feature_required()
+
+    business = await _resolve_business(body.business_id)
+    city_id = business.get("city_id")
+    if not city_id:
+        raise HTTPException(status_code=409, detail="Business has no city")
+
+    city = await _resolve_city(city_id)
+    primary_category_slug = (business.get("category_slugs") or [None])[0]
+    neighborhood_name = await _resolve_neighborhood_name(
+        city_id, business.get("neighborhood_slugs")
+    )
+    vertical_word = (city or {}).get("listing_word_singular")
+
+    ctx = ai_caption.CaptionContext(
+        business_name=business.get("name", ""),
+        neighborhood_name=neighborhood_name,
+        city_name=(city or {}).get("name"),
+        primary_category=primary_category_slug,
+        vertical_word=vertical_word,
+        known_for=business.get("known_for"),
+        short_description=business.get("short_description"),
+        prompt=body.prompt.strip(),
+    )
+
+    try:
+        copy = await ai_caption.generate_ad_copy(ctx)
+    except ai_caption.CaptionFeatureDisabled:
+        raise HTTPException(status_code=404, detail="Not found")
+    except ai_caption.CaptionGenerationError as exc:
+        log.warning("Ad copy generation failed for business=%s: %s", body.business_id, exc)
+        raise HTTPException(
+            status_code=502,
+            detail="Couldn't reach the model right now. Please try again.",
+        ) from exc
+
+    return AdCopyResponse(ad_copy=copy, business_id=body.business_id)

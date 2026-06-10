@@ -133,6 +133,12 @@
           {% endif %}
         </div>
         {% if business.editors_pick %}<div class="text-xs font-semibold text-amber-700 bg-amber-50 rounded-full px-3 py-1 inline-flex items-center gap-1"><span>★</span> Editor's Pick</div>{% endif %}
+        {#- WHY: Featured badge signals to visitors that this owner has
+            invested in their listing — a stronger trust signal than
+            "Claimed by owner" alone. It also makes the upgrade tangible
+            for owners: they can see the badge on their own public page
+            after subscribing, which validates the spend. #}
+        {% if business.featured and business.featured.enabled %}<div class="text-xs font-semibold text-rose-700 bg-rose-50 rounded-full px-3 py-1 inline-flex items-center gap-1"><span>✦</span> Featured listing</div>{% endif %}
       </div>
     </div>
   </div>
