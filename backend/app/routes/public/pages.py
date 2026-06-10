@@ -686,6 +686,36 @@ async def neighborhood_category_page(
     return _templates.TemplateResponse("category.html", ctx)
 
 
+@router.get("/search", response_class=HTMLResponse)
+async def search_page(request: Request, q: Optional[str] = None) -> HTMLResponse:
+    tenant = await _require_tenant(request)
+    if not tenant.city:
+        raise HTTPException(404, "City required")
+    city = tenant.city
+
+    query = (q or "").strip()
+    businesses: List[Dict[str, Any]] = []
+    if query:
+        businesses = await content_svc.search_businesses(city["_id"], query)
+
+    ctx = await _base_context(request, tenant)
+    ctx.update(
+        {
+            "query": query,
+            "businesses": businesses,
+            "result_count": len(businesses),
+            "seo_title": f"Search{': ' + query if query else ''} — {tenant.network.get('name')}",
+            "meta_description": (
+                f"{len(businesses)} result{'s' if len(businesses) != 1 else ''} for '{query}' "
+                f"in {city.get('name')} — {tenant.network.get('name')}."
+                if query
+                else f"Search {tenant.network.get('name')} — find salons, spas, and beauty businesses in {city.get('name')}."
+            ),
+        }
+    )
+    return _templates.TemplateResponse("search.html", ctx)
+
+
 @router.get("/b/{business_slug}", response_class=HTMLResponse)
 async def business_page(request: Request, business_slug: str) -> HTMLResponse:
     tenant = await _require_tenant(request)
