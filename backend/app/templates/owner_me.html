@@ -13,6 +13,12 @@
 
 {% if owner_business %}
 
+{# Success toast — shown via JS when returning from Stripe checkout with ?subscribed=1 #}
+<div id="subscribed-toast"
+     class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-emerald-700 text-white text-sm font-medium px-6 py-3 rounded-full shadow-xl pointer-events-none">
+  Welcome to Pro! Your listing is now featured at the top.
+</div>
+
 {# ── REAL DASHBOARD ─────────────────────────────────────────────── #}
 
 <section class="bg-stone-50/60 border-b border-stone-200/60">
@@ -37,6 +43,53 @@
     </div>
   </div>
 </section>
+
+{# ── Pro subscription status ──────────────────────────────────────
+   WHY: show upgrade card for free-tier owners and a status badge for
+   Pro owners.  We check stripe_subscription_id (set by the webhook)
+   as the authoritative signal rather than featured.tier alone, so a
+   site admin who manually edits featured.tier still doesn't trigger
+   the checkout button if there's no Stripe subscription backing it.
+#}
+{% if owner_business.stripe_subscription_id %}
+{# ── Pro active badge ── #}
+<section class="bg-white border-b border-stone-100">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-5">
+    <div class="inline-flex items-center gap-2.5 rounded-full border border-amber-200 bg-amber-50 px-5 py-2.5">
+      <span class="text-amber-500 text-sm leading-none">★</span>
+      <span class="text-sm font-semibold text-stone-900">Pro listing active</span>
+      <span class="text-stone-300 mx-0.5">|</span>
+      <span class="text-xs text-stone-500">Your salon is featured at the top of search results.</span>
+    </div>
+  </div>
+</section>
+{% else %}
+{# ── Upgrade card ── #}
+<section class="bg-white border-b border-stone-100">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-8">
+    <div class="rounded-2xl border border-stone-200 bg-gradient-to-br from-amber-50/60 via-rose-50/30 to-white p-6 sm:p-8">
+      <div class="flex flex-wrap items-start justify-between gap-6">
+        <div class="min-w-0">
+          <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-2">Pro listing</p>
+          <h2 class="text-base font-semibold text-stone-900 mb-1.5">Stand out at the top of search results</h2>
+          <ul class="text-sm text-stone-600 space-y-1 leading-relaxed max-w-xs list-none">
+            <li>✓ Priority placement above all free listings</li>
+            <li>✓ Pro badge on your public listing page</li>
+            <li>✓ Featured first in your neighborhood category</li>
+          </ul>
+        </div>
+        <div class="flex flex-col items-start gap-2 shrink-0 pt-1">
+          <button id="upgrade-btn" type="button"
+                  class="inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-2.5 rounded-full text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
+            <span id="upgrade-btn-label">Upgrade to Pro — $99 / year</span>
+          </button>
+          <p id="upgrade-error" class="hidden text-xs text-rose-700 max-w-[14rem]" role="alert" aria-live="polite"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {# ── Edit form ─────────────────────────────────────────────────── #}
 <section class="bg-white">
@@ -448,6 +501,49 @@
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       generateCaption();
+    }
+  });
+})();
+
+/* ── Success toast after Stripe checkout redirect ──────────── */
+(function () {
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('subscribed') !== '1') return;
+  /* WHY: replaceState removes ?subscribed=1 before showing the toast
+     so a page refresh after success doesn't re-show the message. */
+  window.history.replaceState({}, '', window.location.pathname);
+  var toast = document.getElementById('subscribed-toast');
+  if (!toast) return;
+  toast.classList.remove('hidden');
+  setTimeout(function () {
+    toast.style.transition = 'opacity 0.7s';
+    toast.style.opacity = '0';
+    setTimeout(function () { toast.classList.add('hidden'); }, 800);
+  }, 3500);
+})();
+
+/* ── Upgrade to Pro button ─────────────────────────────────── */
+(function () {
+  var btn      = document.getElementById('upgrade-btn');
+  var labelEl  = document.getElementById('upgrade-btn-label');
+  var errEl    = document.getElementById('upgrade-error');
+  if (!btn) return;   /* Not rendered for Pro members */
+  btn.addEventListener('click', async function () {
+    if (errEl) errEl.classList.add('hidden');
+    btn.disabled = true;
+    labelEl.textContent = 'Redirecting to checkout…';
+    try {
+      var r = await fetch('/api/v1/billing/checkout', { method: 'POST' });
+      var body = await r.json().catch(function () { return {}; });
+      if (!r.ok) throw new Error(body.detail || 'Error ' + r.status);
+      window.location.href = body.url;
+    } catch (err) {
+      btn.disabled = false;
+      labelEl.textContent = 'Upgrade to Pro — $99 / year';
+      if (errEl) {
+        errEl.textContent = err.message || 'Could not start checkout. Please try again.';
+        errEl.classList.remove('hidden');
+      }
     }
   });
 })();

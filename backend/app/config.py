@@ -14,6 +14,17 @@ class Settings(BaseSettings):
 
     admin_api_key: str = ""
 
+    # Stripe billing.  All three must be set before the checkout and
+    # webhook endpoints become active.  Leaving them empty disables
+    # billing gracefully (the endpoints return 503) so the rest of
+    # the app stays functional during early development.
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    # WHY: price ID is the Stripe-assigned id for the Pro annual plan
+    # (price_...).  Stored in config rather than hard-coded so we can
+    # swap it between test mode and live mode without a code change.
+    stripe_price_id_pro: str = ""
+
     port: int = 8000
     log_level: str = "INFO"
 
