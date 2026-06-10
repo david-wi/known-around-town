@@ -898,6 +898,119 @@ def test_claim_rejected_email_function_exists_with_correct_content():
     assert "hello@knowsbeauty.com" in html, "Support email missing from rejection email HTML"
 
 
+def test_business_detail_jsonld_has_canonical_id(client):
+    """The LocalBusiness JSON-LD on every detail page must include an '@id' field
+    set to the page's canonical URL.
+
+    WHY: without '@id', Google can't reliably connect the LocalBusiness block to
+    the BreadcrumbList block on the same page — it may treat them as two unrelated
+    entities. With '@id', both blocks reference the same URL, so Google knows they
+    describe the same listing. This is what unlocks combined rich results (address
+    + breadcrumb path shown together under the search result).
+
+    Uses Rossano Ferretti as a well-seeded business with neighborhood, category,
+    instagram, and website — confirming all four new JSON-LD fields together."""
+    r = client.get(
+        "/b/rossano-ferretti-hair-spa-miami",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.text
+
+    # @id must appear in the LocalBusiness JSON-LD
+    assert '"@id"' in body, (
+        "Business detail page missing @id in JSON-LD — "
+        "Google cannot connect LocalBusiness to BreadcrumbList without it"
+    )
+    # The @id value must contain the business slug so it points at the right page
+    assert "rossano-ferretti-hair-spa-miami" in body
+
+
+def test_business_detail_jsonld_has_image_when_photos_exist(client, seeded_db):
+    """The LocalBusiness JSON-LD must include an 'image' field when the business
+    has photos. Google shows this image in the Knowledge Panel next to the business
+    name in search results — without it the entry is text-only and gets less
+    visual prominence.
+
+    WHY: this is the single highest-value structured-data addition for beauty
+    businesses. A photo appearing alongside the name in search results dramatically
+    increases click-through vs a text-only result."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    biz = asyncio.run(
+        seeded_db.businesses.find_one(
+            {"city_id": city["_id"], "photos": {"$elemMatch": {"url": {"$exists": True, "$ne": ""}}}}
+        )
+    )
+    if biz is None:
+        pytest.skip("No seeded businesses with photos — cannot test JSON-LD image field")
+
+    r = client.get(
+        f"/b/{biz['slug']}", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    assert '"image"' in r.text, (
+        f"JSON-LD missing 'image' field on /b/{biz['slug']} even though it has photos"
+    )
+
+
+def test_business_detail_jsonld_has_same_as_with_instagram_and_website(client):
+    """The LocalBusiness JSON-LD must include a 'sameAs' array linking to the
+    business's Instagram profile and website when those are present in the seed.
+
+    WHY: 'sameAs' tells Google's Knowledge Graph that this listing is the same
+    entity as the Instagram profile and official website it already knows about.
+    This strengthens the listing's entity recognition and improves ranking for
+    branded searches like 'Rossano Ferretti Miami'."""
+    r = client.get(
+        "/b/rossano-ferretti-hair-spa-miami",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.text
+
+    assert '"sameAs"' in body, "JSON-LD missing sameAs field for business with instagram + website"
+    # Instagram handle @rossanoferretti should become the full profile URL
+    assert "instagram.com/rossanoferretti" in body, (
+        "sameAs must include instagram.com URL derived from handle"
+    )
+    # Website URL must appear in sameAs
+    assert "rossanoferretti.com" in body, "sameAs must include the business website URL"
+
+
+def test_business_detail_has_breadcrumb_jsonld(client):
+    """Business detail pages must include a BreadcrumbList JSON-LD block so Google
+    can display the navigation path (e.g. 'Miami Knows Beauty › Design District ›
+    Hair Salons') under the search result.
+
+    WHY: this breadcrumb path appears in the search result snippet and tells
+    searchers exactly where the listing sits in the directory before they click —
+    increasing click-through rate by giving context Google's organic link alone
+    doesn't provide.
+
+    Uses Rossano Ferretti which has both a neighborhood (design-district) and a
+    category (hair), so we can verify all four breadcrumb positions are present."""
+    r = client.get(
+        "/b/rossano-ferretti-hair-spa-miami",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.text
+
+    assert '"@type": "BreadcrumbList"' in body, "Business detail page missing BreadcrumbList JSON-LD"
+    assert '"@type": "ListItem"' in body, "BreadcrumbList missing ListItem entries"
+    # Position 1: directory home
+    assert '"position": 1' in body, "BreadcrumbList missing position 1 (directory home)"
+    # Business name must appear as the final breadcrumb item
+    assert "Rossano Ferretti Hair Spa" in body  # already true for general page render
+    # The breadcrumb item URL for this business must match its canonical path
+    assert "rossano-ferretti-hair-spa-miami" in body
+
+
 def test_claim_verified_email_function_exists_with_correct_content():
     """The claim-verified email helper must exist and produce the right content.
 
