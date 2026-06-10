@@ -86,7 +86,13 @@
                        would otherwise render an UndefinedError. #}
                     {% set addr = business.get('address') or {} %}
                     <p class="text-xs text-stone-500 mt-0.5">
-                      {% if addr.get('street') %}{{ addr.get('street') }}, {% endif %}{{ addr.get('city') or '' }}{% if addr.get('state') %}, {{ addr.get('state') }}{% endif %}
+                      {#- WHY: street often contains the full formatted address
+                          ("900 S Miami Ave, Miami, FL 33130") because seed data
+                          copies the address_full field verbatim. Showing city+state
+                          separately would double them up. Show street alone when
+                          present; fall back to bare city/state for older docs that
+                          only have those fields. #}
+                      {% if addr.get('street') %}{{ addr.get('street') }}{% elif addr.get('city') %}{{ addr.get('city') }}{% if addr.get('state') %}, {{ addr.get('state') }}{% endif %}{% endif %}
                     </p>
                   {% else %}
                     <span class="text-stone-500 italic">Business not found</span>
