@@ -544,7 +544,15 @@ async def category_page(request: Request, category_slug: str) -> HTMLResponse:
             ),
             "seo_title": category.get("seo_title")
             or f"{category.get('name')} in {city.get('name')} — {tenant.network.get('name')}",
-            "meta_description": category.get("meta_description"),
+            # WHY: meta_description is rarely set in the DB; fall back to a
+            # constructed sentence so Google has compelling snippet copy to
+            # show in search results rather than a random page excerpt.
+            "meta_description": category.get("meta_description") or (
+                f"The best {category.get('name', '').lower()} in {city.get('name')} — "
+                f"{category.get('description')}. Browse {tenant.network.get('name')}."
+                if category.get("description")
+                else f"The best {category.get('name', '').lower()} in {city.get('name')} — browse {tenant.network.get('name')}."
+            ),
         }
     )
     return _templates.TemplateResponse("category.html", ctx)
@@ -588,7 +596,10 @@ async def neighborhood_page(request: Request, neighborhood_slug: str) -> HTMLRes
             "businesses": businesses,
             "seo_title": nb.get("seo_title")
             or f"{nb.get('name')} — {tenant.network.get('name')} {city.get('name')}",
-            "meta_description": nb.get("meta_description"),
+            # WHY: fall back to hero_description (the editorial paragraph added
+            # in PR #51) so neighborhood pages always have meaningful Google
+            # snippet copy — avoids a random page excerpt appearing in results.
+            "meta_description": nb.get("meta_description") or nb.get("hero_description"),
         }
     )
     return _templates.TemplateResponse("neighborhood.html", ctx)
