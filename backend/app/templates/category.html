@@ -7,6 +7,71 @@
 
 {% set header_variant = 'sticky' %}
 
+{#- WHY: BreadcrumbList JSON-LD is the machine-readable version of the visual
+    breadcrumb already on this page. Google treats structured breadcrumbs as a
+    ranking signal and uses them to generate the breadcrumb trail shown in
+    search results ("Miami Knows Beauty > Hair"), which increases click-through
+    rates. Without this, the visual breadcrumbs we already render are invisible
+    to Google's structured-data parser.
+
+    Two cases:
+      /c/<slug>              → 2-level:  Home > Category
+      /n/<nb>/c/<slug>       → 3-level:  Home > Neighborhood > Category
+    The `neighborhood` variable is only present on the nested route. #}
+{% block head_extra %}
+{% if canonical_url %}
+{% if neighborhood %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": {{ (city.name ~ ' Knows ' ~ vertical_word)|tojson }},
+      "item": {{ (canonical_url|replace('/n/' ~ neighborhood.slug ~ '/c/' ~ category.slug, ''))|tojson }}
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": {{ neighborhood.name|tojson }},
+      "item": {{ (canonical_url|replace('/c/' ~ category.slug, ''))|tojson }}
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": {{ category.name|tojson }},
+      "item": {{ canonical_url|tojson }}
+    }
+  ]
+}
+</script>
+{% else %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": {{ (city.name ~ ' Knows ' ~ vertical_word)|tojson }},
+      "item": {{ (canonical_url|replace('/c/' ~ category.slug, ''))|tojson }}
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": {{ category.name|tojson }},
+      "item": {{ canonical_url|tojson }}
+    }
+  ]
+}
+</script>
+{% endif %}
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <section class="relative bg-gradient-to-br {{ theme.category_banner_gradient }} border-b border-stone-200/70">
   <div class="max-w-7xl mx-auto px-6 lg:px-10 pt-14 pb-12">
