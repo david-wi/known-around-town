@@ -7,7 +7,11 @@ from app.database import get_db
 from app.models import BusinessClaim
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import now_utc, to_doc
-from app.services.owner_email import send_claim_confirmation_email, send_claim_verified_email
+from app.services.owner_email import (
+    send_claim_confirmation_email,
+    send_claim_rejected_email,
+    send_claim_verified_email,
+)
 
 router = APIRouter(prefix="/claims", tags=["claims"])
 
@@ -127,4 +131,16 @@ async def reject_claim(claim_id: str) -> Dict[str, Any]:
             {"_id": claim["business_id"]},
             {"$set": {"claim_status": "unclaimed", "updated_at": now}},
         )
+    # Notify the submitter that their claim wasn't approved.
+    # WHY: without this they submit, wait one business day, and then hear
+    # nothing — no idea the answer was no, no way to follow up or correct
+    # a mistake. Fire-and-forget so a slow email never blocks the admin
+    # reject response.
+    asyncio.create_task(
+        send_claim_rejected_email(
+            email=claim.get("submitter_email", ""),
+            submitter_name=claim.get("submitter_name", ""),
+            business_name=(business or {}).get("name", "your business"),
+        )
+    )
     return {"status": "rejected"}

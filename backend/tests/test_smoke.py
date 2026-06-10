@@ -717,6 +717,29 @@ def test_owners_page_has_faq_section_with_schema(client):
     assert '"@type": "Question"' in body, "FAQPage JSON-LD missing Question entities"
 
 
+def test_claim_rejected_email_function_exists_with_correct_content():
+    """The claim-rejected email helper must exist and produce the right content.
+
+    WHY: when an admin rejects a claim, the submitter currently hears nothing
+    — they submitted, got a confirmation, waited, and then received silence.
+    No indication the answer was no, no way to follow up or correct a mistake.
+    This test verifies the rejection email body is honest, kind, and gives
+    the support address so the submitter has a path forward."""
+    from app.services.owner_email import _claim_rejected_text, _claim_rejected_html
+
+    text = _claim_rejected_text("Carlos Mendez", "Salon Palma Brickell")
+    assert "Salon Palma Brickell" in text, "Business name missing from rejection email text"
+    assert "hello@knowsbeauty.com" in text, "Support email missing from rejection email text"
+    # Must not be hostile — give the submitter a path to follow up
+    assert "mistake" in text.lower() or "review" in text.lower(), (
+        "Rejection email must acknowledge the submitter may have a valid claim"
+    )
+
+    html = _claim_rejected_html("Carlos Mendez", "Salon Palma Brickell")
+    assert "Salon Palma Brickell" in html, "Business name missing from rejection email HTML"
+    assert "hello@knowsbeauty.com" in html, "Support email missing from rejection email HTML"
+
+
 def test_claim_verified_email_function_exists_with_correct_content():
     """The claim-verified email helper must exist and produce the right content.
 
