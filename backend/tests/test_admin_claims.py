@@ -337,6 +337,16 @@ def test_admin_claims_page_shows_street_address(client, seeded_db):
     street = (business.get("address") or {}).get("street")
     if street:
         assert street in r.text
+        # The city/state must NOT be duplicated — the street field already
+        # contains the full formatted address (e.g. "900 S Miami Ave, Miami,
+        # FL 33130"), so appending ", Miami, FL" again would look broken.
+        city = (business.get("address") or {}).get("city", "")
+        state = (business.get("address") or {}).get("state", "")
+        if city and state:
+            duplicate_suffix = f"{street}, {city}, {state}"
+            assert duplicate_suffix not in r.text, (
+                "City/state should not be appended when street already contains full address"
+            )
 
 
 # ---- existing verify still works ---------------------------------------
