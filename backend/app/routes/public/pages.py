@@ -732,6 +732,14 @@ async def search_page(request: Request, q: Optional[str] = None) -> HTMLResponse
                 if query
                 else f"Search {tenant.network.get('name')} — find salons, spas, and beauty businesses in {city.get('name')}."
             ),
+            # WHY: og:image controls the preview card when someone copies and shares a
+            # search-results URL. Prefer a business photo from the results (shows a real
+            # Miami salon matching the query) and fall back to the city hero so the card
+            # is never blank — a blank preview kills click-through on social.
+            "og_image": next(
+                (b["photos"][0]["url"] for b in businesses if b.get("photos")),
+                city.get("hero_photo_url"),
+            ),
         }
     )
     return _templates.TemplateResponse("search.html", ctx)
@@ -909,6 +917,11 @@ async def owners_page(
 
     ctx["claim_prefill"] = prefill
     ctx["claim_directory"] = directory
+    # WHY: og:image controls the preview card when this page is shared (e.g. David
+    # pastes the link in a conversation with a prospective partner). The city hero
+    # is the right image for an owner-acquisition landing page — it sets the Miami
+    # beauty scene rather than spotlighting one business.
+    ctx["og_image"] = tenant.city.get("hero_photo_url") if tenant.city else None
     return _templates.TemplateResponse("owners.html", ctx)
 
 
@@ -1086,6 +1099,10 @@ async def pricing_page(request: Request) -> HTMLResponse:
         f"Free listing, $29/month Featured, or $299/month Concierge with an AI phone "
         f"receptionist. First month free on Featured, cancel anytime."
     ).strip()
+    # WHY: og:image controls the preview card when this page is shared with a potential
+    # customer or partner. The city hero is the right image for a pricing page — it
+    # represents the Miami beauty market we're selling into.
+    ctx["og_image"] = tenant.city.get("hero_photo_url") if tenant.city else None
     return _templates.TemplateResponse("pricing.html", ctx)
 
 
