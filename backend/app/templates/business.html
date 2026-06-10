@@ -62,6 +62,14 @@
   ]{% endif %}
 }
 </script>
+{#- WHY: og:image drives the preview card when an owner or client shares this
+    listing page via WhatsApp/iMessage/Slack — without it the card renders as
+    a blank grey box, which looks unfinished and kills trust. The hero photo is
+    the canonical visual for this listing. Computed here rather than reusing the
+    `hero_photo` variable from {% block content %} because that block renders
+    after head_extra in Jinja2's block-inheritance order. #}
+{% set _og_hero = (business.photos|selectattr('is_hero')|list|first) or (business.photos|first if business.photos else None) %}
+{% if _og_hero %}<meta property="og:image" content="{{ _og_hero.url }}">{% endif %}
 {% endblock %}
 
 {% block content %}

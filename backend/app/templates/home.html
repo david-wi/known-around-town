@@ -44,6 +44,12 @@
   }
 }
 </script>
+{#- WHY: og:image for the homepage uses the hero photo that already dominates
+    the above-the-fold experience. Without it, shares of the homepage produce
+    a blank grey preview card — particularly bad since owners often share the
+    directory with other business owners via WhatsApp. hero_photo_url is
+    already resolved by the route handler. #}
+{% if hero_photo_url %}<meta property="og:image" content="{{ hero_photo_url }}">{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -86,6 +92,15 @@
         {% endfor %}
       </div>
       {% endif %}
+      {#- WHY: Owners who arrive from Google see only a consumer search bar
+          above the fold — the Owners CTA section is far below. This one-line
+          nudge surfaces the path to /owners without competing visually with
+          the primary consumer search. #}
+      <p class="mt-5 text-[11px] text-white/50">
+        Own a {{ listing_word_singular or 'salon' }} in {{ city.name if city else 'Miami' }}?
+        <a class="underline decoration-white/25 hover:text-white/80 hover:decoration-white/50 transition"
+           href="/owners">Claim your listing →</a>
+      </p>
     </div>
   </div>
 
