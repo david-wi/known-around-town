@@ -1,13 +1,13 @@
 import asyncio
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.database import get_db
 from app.models import BusinessClaim
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import now_utc, to_doc
-from app.services.owner_email import send_claim_confirmation_email
+from app.services.owner_email import send_claim_confirmation_email, send_claim_verified_email
 
 router = APIRouter(prefix="/claims", tags=["claims"])
 
@@ -53,7 +53,7 @@ async def list_claims(
 
 
 @router.post("/{claim_id}/verify", dependencies=[Depends(require_admin)])
-async def verify_claim(claim_id: str) -> Dict[str, Any]:
+async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
     db = get_db()
     claim = await db.business_claims.find_one({"_id": claim_id})
     if not claim:
@@ -78,6 +78,20 @@ async def verify_claim(claim_id: str) -> Dict[str, Any]:
                 "claimed_email": (claim["submitter_email"] or "").lower(),
             }
         },
+    )
+    # Notify the owner that their claim was approved and they can log in.
+    # WHY: without this the owner has no way to know they've been verified —
+    # they submitted, got a confirmation, and then heard nothing.  Fire-and-
+    # forget so a slow email never blocks the admin verification response.
+    business = await db.businesses.find_one({"_id": claim["business_id"]})
+    login_url = str(request.base_url).rstrip("/") + "/owners/login"
+    asyncio.create_task(
+        send_claim_verified_email(
+            email=claim.get("submitter_email", ""),
+            submitter_name=claim.get("submitter_name", ""),
+            business_name=(business or {}).get("name", "your business"),
+            login_url=login_url,
+        )
     )
     return {"status": "verified"}
 
