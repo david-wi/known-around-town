@@ -1768,3 +1768,24 @@ def test_neighborhood_category_page_has_meta_description(client):
     # The description should reference both the category and neighborhood.
     text_lower = r.text.lower()
     assert "wynwood" in text_lower, "Meta description should mention the neighborhood"
+
+def test_sitemap_includes_neighborhood_category_pages(client):
+    """The sitemap must include neighborhood+category intersection pages
+    (e.g. /n/wynwood/c/hair) so Google can discover high-value long-tail
+    landing pages. These 90+ pages were previously missing from the sitemap,
+    meaning Google had no way to find 'hair salons in Wynwood' pages through
+    the sitemap index."""
+    r = client.get("/sitemap.xml", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200
+    # The seed has businesses with neighborhood_slugs and category_slugs, so
+    # at least one /n/<nb>/c/<cat> combo should appear.
+    assert "/n/" in r.text and "/c/" in r.text, (
+        "Sitemap is missing neighborhood+category intersection URLs like /n/wynwood/c/hair"
+    )
+    # Verify the pattern matches a real intersection URL shape, not just any /n/ or /c/
+    import re
+    matches = re.findall(r"/n/[\w-]+/c/[\w-]+", r.text)
+    assert len(matches) > 0, (
+        f"No /n/<nb>/c/<cat> URLs found in sitemap. Found /n/ entries: "
+        f"{re.findall(r'/n/[^<]+', r.text)[:5]}"
+    )

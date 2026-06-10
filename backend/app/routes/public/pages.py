@@ -1352,6 +1352,9 @@ async def sitemap(request: Request) -> HTMLResponse:
         cur = content_svc.get_db().businesses.find(
             {"city_id": city_id, "status": "live", "index_status": {"$ne": "noindex"}}
         )
+        # WHY: collect nb+cat pairs during the business loop so we can add
+        # /n/<nb>/c/<cat> intersection pages without a second DB query.
+        nb_cat_pairs: set[tuple[str, str]] = set()
         async for b in cur:
             # WHY: prefer the business's own updated_at timestamp so Google
             # knows when the listing content last changed — a hair salon that
@@ -1365,6 +1368,16 @@ async def sitemap(request: Request) -> HTMLResponse:
             else:
                 lastmod = today_str
             entries.append((f"{base}/b/{b['slug']}", lastmod))
+            for nb_slug in b.get("neighborhood_slugs") or []:
+                for cat_slug in b.get("category_slugs") or []:
+                    nb_cat_pairs.add((nb_slug, cat_slug))
+        # WHY: neighborhood+category intersection pages (/n/wynwood/c/hair) are
+        # high-value long-tail landing pages but were missing from the sitemap,
+        # so Google couldn't discover them through crawl. Adding all combos that
+        # actually have businesses ensures they get indexed without cluttering
+        # the sitemap with empty pages.
+        for nb_slug, cat_slug in sorted(nb_cat_pairs):
+            entries.append((f"{base}/n/{nb_slug}/c/{cat_slug}", today_str))
         for g in await content_svc.list_editorial_guides(city_id, limit=500):
             entries.append((f"{base}/guides/{g['slug']}", today_str))
 
