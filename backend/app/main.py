@@ -22,6 +22,7 @@ from app.routes.api.v1 import (
     inquiries as api_inquiries,
     marketing_ai as api_marketing_ai,
     owner_login as api_owner_login,
+    owner_leads as api_owner_leads,
     owner_profile as api_owner_profile,
     stripe_billing as api_stripe_billing,
 )
@@ -72,6 +73,7 @@ app.include_router(api_copy_blocks.router, prefix="/api/v1")
 app.include_router(api_editorial.router, prefix="/api/v1")
 app.include_router(api_claims.router, prefix="/api/v1")
 app.include_router(api_inquiries.router, prefix="/api/v1")
+app.include_router(api_owner_leads.router, prefix="/api/v1")
 app.include_router(api_marketing_ai.router, prefix="/api/v1")
 # Owner login (passwordless code-by-email). Public — no admin key required.
 app.include_router(api_owner_login.router, prefix="/api/v1")

@@ -151,6 +151,58 @@
   </div>
 </section>
 
+{#- WHY: Visitors who leave /owners without claiming are the most qualified
+    leads we have — they found the page, read it, and still didn't convert.
+    An email capture at the bottom of the "what happens next" section gives
+    them a low-commitment exit ramp: they can get nurture tips without
+    immediately committing to a claim. Placed before the FAQ so it's visible
+    to anyone who scrolled past the hero claim form but paused on the process
+    explanation. The amber palette ties it to the pricing tier cards above
+    without using the rose accent (reserved for primary CTAs like the claim
+    form submit button) so there's no visual competition between the two
+    conversion paths. #}
+<section class="bg-amber-50 border-t border-amber-100 py-10">
+  <div class="max-w-xl mx-auto px-6 text-center">
+    <p class="text-lg font-semibold text-stone-900 mb-1">Not ready to claim yet?</p>
+    <p class="text-stone-600 text-sm mb-4">Drop your email — we'll send tips for getting your Miami salon found online.</p>
+    <form id="owner-lead-form" class="flex gap-2 max-w-sm mx-auto">
+      <input type="email" id="owner-lead-email" required placeholder="your@email.com"
+        class="flex-1 border border-stone-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+      <button type="submit" class="bg-amber-400 hover:bg-amber-500 text-stone-900 font-semibold text-sm rounded-full px-5 py-2 transition">
+        Send it
+      </button>
+    </form>
+    <p id="owner-lead-thanks" class="hidden text-emerald-700 text-sm font-medium mt-3">&#10003; Got it — we'll be in touch.</p>
+  </div>
+  <script>
+    (function() {
+      var form = document.getElementById('owner-lead-form');
+      var thanks = document.getElementById('owner-lead-thanks');
+      if (!form) return;
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var email = document.getElementById('owner-lead-email').value;
+        fetch('/api/v1/owner-leads', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({email: email})
+        }).then(function(r) {
+          if (r.ok) {
+            form.style.display = 'none';
+            if (thanks) thanks.classList.remove('hidden');
+            // WHY: GA4 event fires only when the server accepted the lead,
+            // not on every submit click, so the conversion count stays
+            // accurate even if someone enters an invalid email first.
+            if (typeof gtag !== 'undefined') {
+              gtag('event', 'owner_lead_captured', {event_category: 'owner_conversion'});
+            }
+          }
+        });
+      });
+    })();
+  </script>
+</section>
+
 {#- WHY: FAQ section answers the six hesitation questions that most often stop
     a salon owner from completing the claim form. The FAQPage JSON-LD below
     lets Google surface these Q&As as expandable rich results for owner-intent

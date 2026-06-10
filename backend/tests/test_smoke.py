@@ -927,3 +927,52 @@ def test_claim_form_does_not_reference_expertly_ai_email(client):
         "The owners page references hello@expertly.ai — this must be "
         "hello@knowsbeauty.com so owners reach the right support address."
     )
+
+
+def test_owner_lead_capture_endpoint_exists(client):
+    """Owner email capture endpoint accepts valid email and returns ok."""
+    r = client.post("/api/v1/owner-leads", json={"email": "test@example.com"})
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+
+def test_owner_lead_capture_deduplicates(client):
+    """Submitting the same email twice does not create duplicate records —
+    the second call returns ok with already_captured=True instead of an error.
+    WHY: an owner who double-clicks the submit button or refreshes the page
+    should not hit an error or pollute the lead list with duplicates."""
+    email = "dedupetest@example.com"
+    r1 = client.post("/api/v1/owner-leads", json={"email": email})
+    assert r1.status_code == 200
+    assert r1.json()["ok"] is True
+
+    r2 = client.post("/api/v1/owner-leads", json={"email": email})
+    assert r2.status_code == 200
+    data = r2.json()
+    assert data["ok"] is True
+    assert data.get("already_captured") is True
+
+
+def test_owner_lead_capture_rejects_invalid_email(client):
+    """The endpoint must reject strings that are not valid email addresses.
+    WHY: garbage addresses are useless for follow-up and would inflate the
+    lead count — Pydantic's EmailStr validator catches these at the API layer."""
+    r = client.post("/api/v1/owner-leads", json={"email": "not-an-email"})
+    assert r.status_code == 422
+
+
+def test_owners_page_has_email_capture_form(client):
+    """The /owners page must include the email capture form for owners who
+    are not yet ready to claim. The form posts to /api/v1/owner-leads and
+    shows a thank-you message after submission."""
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    body = r.text
+    # The form and its key elements must be present
+    assert "owner-lead-form" in body
+    assert "owner-lead-email" in body
+    assert "/api/v1/owner-leads" in body
+    # The thank-you message exists (hidden by default, shown after submit)
+    assert "owner-lead-thanks" in body
+    # The prompt copy is present
+    assert "Not ready to claim" in body
