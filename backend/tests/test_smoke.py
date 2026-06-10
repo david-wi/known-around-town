@@ -1162,3 +1162,99 @@ def test_business_jsonld_omits_empty_address_fields(client):
             assert addr.get("postalCode") != "", (
                 "postalCode is an empty string in JSON-LD — must be omitted when unknown"
             )
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _extract_jsonld_blocks(html: str):
+    """Return parsed JSON-LD dicts from all <script type='application/ld+json'> blocks."""
+    import json, re
+    blocks = re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL
+    )
+    result = []
+    for b in blocks:
+        try:
+            result.append(json.loads(b.strip()))
+        except json.JSONDecodeError:
+            pass
+    return result
+
+
+def test_category_page_has_breadcrumblist_jsonld(client):
+    """Category pages must include BreadcrumbList structured data so Google
+    can display the breadcrumb trail ("Miami Knows Beauty > Hair") in search
+    results, which increases click-through rates.
+
+    WHY: the visual breadcrumb already exists on category pages. Without the
+    JSON-LD version Google falls back to guessing the site hierarchy — often
+    wrong — so the search result snippet shows the full raw URL instead of
+    a clean breadcrumb trail."""
+    r = client.get("/c/hair", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, f"/c/hair returned {r.status_code}"
+    blocks = _extract_jsonld_blocks(r.text)
+    breadcrumb_blocks = [b for b in blocks if b.get("@type") == "BreadcrumbList"]
+    assert breadcrumb_blocks, (
+        "/c/hair is missing BreadcrumbList JSON-LD — "
+        "Google cannot show breadcrumbs in search results for this category page"
+    )
+    items = breadcrumb_blocks[0].get("itemListElement", [])
+    assert len(items) == 2, (
+        f"Expected 2 breadcrumb items for /c/<slug> (Home > Category), got {len(items)}"
+    )
+    assert items[0]["position"] == 1
+    assert items[1]["position"] == 2
+    # Second item should link to the category page itself
+    assert "/c/hair" in items[1]["item"], (
+        f"Second breadcrumb item should point to the category page; got {items[1].get('item')}"
+    )
+
+
+def test_neighborhood_page_has_breadcrumblist_jsonld(client):
+    """Neighborhood pages must include BreadcrumbList structured data for the
+    same reason as category pages. Queries like 'Wynwood hair salons' are
+    high-intent local searches that land on neighborhood pages — a breadcrumb
+    rich result signals topical relevance and site structure to Google's
+    local ranking algorithm.
+
+    WHY: neighborhood pages are often the first entry point for locals
+    searching by area. The visual breadcrumb is already rendered; this adds
+    the machine-readable version Google uses for search result presentation."""
+    r = client.get("/n/brickell", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, f"/n/brickell returned {r.status_code}"
+    blocks = _extract_jsonld_blocks(r.text)
+    breadcrumb_blocks = [b for b in blocks if b.get("@type") == "BreadcrumbList"]
+    assert breadcrumb_blocks, (
+        "/n/brickell is missing BreadcrumbList JSON-LD — "
+        "Google cannot show breadcrumbs in search results for this neighborhood page"
+    )
+    items = breadcrumb_blocks[0].get("itemListElement", [])
+    assert len(items) == 2, (
+        f"Expected 2 breadcrumb items for /n/<slug> (Home > Neighborhood), got {len(items)}"
+    )
+    assert "/n/brickell" in items[1]["item"], (
+        f"Second breadcrumb item should point to the neighborhood page; got {items[1].get('item')}"
+    )
+
+
+def test_claim_form_browse_hint_present_in_dom(client):
+    """The owners/claim page must include the 'Browse the full directory' hint
+    element in the HTML so JavaScript can reveal it when a business name does
+    not match any listing.
+
+    WHY: without this element, salon owners who mistype their business name
+    hit a dead end — they see an error message ("We couldn't find a listing
+    matching...") but have no link to find their listing and come back to
+    claim it. The hint gives them a one-click path to the directory browse
+    view so the claim journey doesn't end in frustration."""
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, f"/owners returned {r.status_code}"
+    assert 'id="claim-form__browse-hint"' in r.text, (
+        "/owners is missing the claim-form__browse-hint element — "
+        "owners who can't find their listing by name have no path forward"
+    )
+    assert "Browse the full directory" in r.text, (
+        "'Browse the full directory' link text missing from the claim form"
+    )

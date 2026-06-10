@@ -153,6 +153,18 @@
            role="alert"
            aria-live="polite"
            class="hidden rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-800"></div>
+      {#- WHY: when the typed business name doesn't match the directory, the owner
+          may have used a different spelling. We tell them to "find your listing on
+          the site first" in the error text, but without a link they have to navigate
+          manually. This hint only appears on no-match errors and gives them a direct
+          path. Using a separate element (not innerHTML on the error div) avoids any
+          XSS risk since the error text uses textContent. #}
+      <p id="claim-form__browse-hint"
+         class="hidden text-xs text-stone-600 mt-2">
+        <a href="/"
+           class="underline hover:text-stone-900 font-medium">Browse the full directory</a>
+        to find your exact listing name, then use the Claim link on the listing page.
+      </p>
 
       {#- WHY: use the site's rose accent color here (theme.button_bg) rather than
           the stone-900 dark gray used elsewhere for secondary/ghost actions.
@@ -237,6 +249,7 @@
     var notes        = document.getElementById('claim-form__notes');
     var notesCount   = document.getElementById('claim-form__notes-count');
     var errorEl      = document.getElementById('claim-form__error');
+    var browseHintEl = document.getElementById('claim-form__browse-hint');
     var submitBtn    = document.getElementById('claim-form__submit');
     var submitLabel  = document.getElementById('claim-form__submit-label');
     var bizMatch     = document.getElementById('claim-form__biz-match');
@@ -288,14 +301,22 @@
       updateMatchIndicator();
     }
 
-    function showError(message) {
+    function showError(message, showBrowse) {
       errorEl.textContent = message;
       errorEl.classList.remove('hidden');
+      // Show the "Browse directory" hint only for no-match errors where the
+      // owner needs a path to find their exact listing name.
+      if (showBrowse) {
+        browseHintEl.classList.remove('hidden');
+      } else {
+        browseHintEl.classList.add('hidden');
+      }
     }
 
     function clearError() {
       errorEl.textContent = '';
       errorEl.classList.add('hidden');
+      browseHintEl.classList.add('hidden');
     }
 
     function resolveBusinessId(typedName) {
@@ -388,8 +409,8 @@
       if (!businessId) {
         showError(
           "We couldn't find a listing matching “" + businessName +
-          "”. Try the exact name as it appears in your storefront, or " +
-          "find your listing on the site first and use the Claim link there."
+          "”. Try the exact name as it appears in your storefront.",
+          true  // show "Browse directory" link so they can find the right name
         );
         bizNameInput.focus();
         return;
