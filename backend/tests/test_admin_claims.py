@@ -359,3 +359,11 @@ def test_verify_claim_still_works(client, seeded_db):
     assert r.json() == {"status": "verified"}
     b_after = asyncio.run(seeded_db.businesses.find_one({"_id": business["_id"]}))
     assert b_after["claim_status"] == "verified"
+    # WHY: the owners page promises "Founding Partner" status to every early
+    # claimer. Without this assertion the badge could silently stop being set
+    # and the broken promise would go undetected until an owner checked their
+    # own listing and found it missing.
+    assert b_after.get("is_founding_partner") is True, (
+        "Verified claimers must receive Founding Partner status — "
+        "it is explicitly promised on the owners page."
+    )

@@ -89,6 +89,12 @@ async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
                 # regardless of how the owner capitalises their email at
                 # sign-in.
                 "claimed_email": (claim["submitter_email"] or "").lower(),
+                # WHY: the owners page explicitly promises "Founding Partner"
+                # status to early claimers ("while it lasts"). Without this,
+                # every verified owner would see the badge promised but never
+                # appear on their own listing — a broken promise on the very
+                # first thing they check after verification.
+                "is_founding_partner": True,
             }
         },
     )
