@@ -1582,3 +1582,53 @@ def test_neighborhood_category_page_has_og_image(client):
     assert m.group(1).startswith("http"), (
         f"og:image value '{m.group(1)}' is not a valid URL"
     )
+
+
+def test_search_page_has_og_image(client):
+    """Search result pages must include an og:image so when someone copies and
+    shares a search URL (e.g. 'hair salons in Miami'), the social card shows
+    an actual salon photo rather than a blank grey box."""
+    import re as _re
+    r = client.get("/search?q=hair", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200
+    m = _re.search(r'<meta property="og:image" content="([^"]+)"', r.text)
+    assert m is not None, (
+        "Search page /search?q=hair is missing og:image meta tag — "
+        "social share cards will be blank"
+    )
+    assert m.group(1).startswith("http"), (
+        f"og:image value '{m.group(1)}' is not a valid URL"
+    )
+
+
+def test_owners_page_has_og_image(client):
+    """The owner acquisition page must include og:image so when it's shared with
+    a prospective partner the social card shows the Miami beauty scene rather
+    than a blank preview."""
+    import re as _re
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200
+    m = _re.search(r'<meta property="og:image" content="([^"]+)"', r.text)
+    assert m is not None, (
+        "Owners page /owners is missing og:image meta tag — "
+        "social share cards will be blank"
+    )
+    assert m.group(1).startswith("http"), (
+        f"og:image value '{m.group(1)}' is not a valid URL"
+    )
+
+
+def test_pricing_page_has_og_image(client):
+    """The pricing page must include og:image so when it's shared with a
+    potential customer or partner the social card shows the Miami beauty scene."""
+    import re as _re
+    r = client.get("/pricing", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200
+    m = _re.search(r'<meta property="og:image" content="([^"]+)"', r.text)
+    assert m is not None, (
+        "Pricing page /pricing is missing og:image meta tag — "
+        "social share cards will be blank"
+    )
+    assert m.group(1).startswith("http"), (
+        f"og:image value '{m.group(1)}' is not a valid URL"
+    )
