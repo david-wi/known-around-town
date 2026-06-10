@@ -584,6 +584,14 @@ async def category_page(request: Request, category_slug: str) -> HTMLResponse:
                 if category.get("description")
                 else f"The best {category.get('name', '').lower()} in {city.get('name', '')} — browse {city.get('name', '')} {tenant.network.get('name', '')}."
             ),
+            # WHY: og:image controls the preview card when someone shares this
+            # category page on social media. Prefer a real business photo from
+            # the page (shows an actual Miami salon) and fall back to the city
+            # hero so the card is never blank — a blank preview kills click-through.
+            "og_image": next(
+                (b["photos"][0]["url"] for b in businesses if b.get("photos")),
+                city.get("hero_photo_url"),
+            ),
         }
     )
     return _templates.TemplateResponse("category.html", ctx)
@@ -631,6 +639,12 @@ async def neighborhood_page(request: Request, neighborhood_slug: str) -> HTMLRes
             # in PR #51) so neighborhood pages always have meaningful Google
             # snippet copy — avoids a random page excerpt appearing in results.
             "meta_description": nb.get("meta_description") or nb.get("hero_description"),
+            # WHY: same pattern as category pages — first business photo or
+            # city hero fallback so social share cards always show an image.
+            "og_image": next(
+                (b["photos"][0]["url"] for b in businesses if b.get("photos")),
+                city.get("hero_photo_url"),
+            ),
         }
     )
     return _templates.TemplateResponse("neighborhood.html", ctx)
@@ -683,6 +697,11 @@ async def neighborhood_category_page(
                 category_name=category.get("name"),
             ),
             "seo_title": f"{category.get('name', '')} in {nb.get('name', '')} — {city.get('name', '')} {tenant.network.get('name', '')}",
+            # WHY: same pattern as category and neighborhood pages.
+            "og_image": next(
+                (b["photos"][0]["url"] for b in businesses if b.get("photos")),
+                city.get("hero_photo_url"),
+            ),
         }
     )
     return _templates.TemplateResponse("category.html", ctx)
