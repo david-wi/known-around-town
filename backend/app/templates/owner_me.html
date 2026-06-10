@@ -70,12 +70,17 @@
     <div class="rounded-2xl border border-stone-200 bg-gradient-to-br from-amber-50/60 via-rose-50/30 to-white p-6 sm:p-8">
       <div class="flex flex-wrap items-start justify-between gap-6">
         <div class="min-w-0">
-          <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-2">Pro listing</p>
-          <h2 class="text-base font-semibold text-stone-900 mb-1.5">Stand out at the top of search results</h2>
+          {#- WHY: "Founding Partner" framing creates genuine urgency —
+              early adopters lock in launch-day pricing before rates increase
+              as the directory grows.  More compelling than generic "upgrade"
+              copy for owners who just got verified and are deciding right now. #}
+          <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-2">Founding Partner offer</p>
+          <h2 class="text-base font-semibold text-stone-900 mb-1.5">Be the first {{ listing_word_singular or 'salon' }} visitors see in your neighborhood</h2>
           <ul class="text-sm text-stone-600 space-y-1 leading-relaxed max-w-xs list-none">
-            <li>✓ Priority placement above all free listings</li>
-            <li>✓ Pro badge on your public listing page</li>
-            <li>✓ Featured first in your neighborhood category</li>
+            <li>✓ Featured first in every category and neighborhood search</li>
+            <li>✓ Pro badge on your public listing</li>
+            <li>✓ Instagram caption generator — AI-written posts for your salon</li>
+            <li>✓ Lock in Founding Partner pricing before rates increase</li>
           </ul>
         </div>
         <div class="flex flex-col items-start gap-2 shrink-0 pt-1">
@@ -83,6 +88,7 @@
                   class="inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-2.5 rounded-full text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
             <span id="upgrade-btn-label">Upgrade to Pro — $99 / year</span>
           </button>
+          <p class="text-xs text-stone-400">That&rsquo;s $8.25 / month &middot; cancel anytime</p>
           <p id="upgrade-error" class="hidden text-xs text-rose-700 max-w-[14rem]" role="alert" aria-live="polite"></p>
         </div>
       </div>

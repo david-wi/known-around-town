@@ -62,16 +62,31 @@
               <tr data-claim-id="{{ claim._id }}" class="align-top">
                 <td class="px-5 py-4">
                   {% if business %}
-                    <a href="/b/{{ business.slug }}" target="_blank" rel="noopener"
-                       class="font-medium text-stone-900 hover:text-rose-600 underline decoration-stone-300 hover:decoration-rose-400">
-                      {{ business.name }}
-                    </a>
+                    <div class="flex items-start gap-1.5">
+                      <a href="/b/{{ business.slug }}" target="_blank" rel="noopener"
+                         class="font-medium text-stone-900 hover:text-rose-600 underline decoration-stone-300 hover:decoration-rose-400">
+                        {{ business.name }}
+                      </a>
+                      {#- WHY: Google search link lets David verify the business is real in
+                          one click — without it he has to open a new tab, type the name,
+                          and search manually, which slows down the "approve/reject in a
+                          minute" workflow the notification email promises. #}
+                      <a href="https://www.google.com/search?q={{ (business.name ~ ' ' ~ (business.get('address') or {}).get('city', 'Miami')) | urlencode }}"
+                         target="_blank" rel="noopener noreferrer"
+                         title="Search Google to verify this business"
+                         class="shrink-0 mt-0.5 text-stone-400 hover:text-rose-600 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+                          <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+                        </svg>
+                      </a>
+                    </div>
                     {# Defensive .get — older imported business docs may
                        not have a full address dict, and a missing key
                        would otherwise render an UndefinedError. #}
                     {% set addr = business.get('address') or {} %}
                     <p class="text-xs text-stone-500 mt-0.5">
-                      {{ addr.get('city') or '' }}{% if addr.get('state') %}, {{ addr.get('state') }}{% endif %}
+                      {% if addr.get('street') %}{{ addr.get('street') }}, {% endif %}{{ addr.get('city') or '' }}{% if addr.get('state') %}, {{ addr.get('state') }}{% endif %}
                     </p>
                   {% else %}
                     <span class="text-stone-500 italic">Business not found</span>

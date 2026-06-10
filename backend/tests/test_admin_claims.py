@@ -307,6 +307,38 @@ def test_reject_claim_requires_admin_when_key_set(seeded_db, monkeypatch):
         get_settings.cache_clear()
 
 
+# ---- admin claims UX: Google search link + street address --------------
+
+def test_admin_claims_page_shows_google_search_link(client, seeded_db):
+    """A Google search shortcut appears in the business cell so David can
+    verify a business is real with one click instead of typing the name
+    into a new tab manually."""
+    business = _first_business(seeded_db)
+    _submit_claim(client, business["_id"])
+    r = client.get("/admin/claims")
+    assert r.status_code == 200, r.text
+    # The Google search URL must appear in the page.  We don't assert the
+    # exact encoded query because encoding details are Jinja internals, but
+    # google.com/search is the reliable anchor.
+    assert "google.com/search" in r.text
+    # The icon link must carry the accessibility title so David knows what it does.
+    assert "Search Google to verify this business" in r.text
+
+
+def test_admin_claims_page_shows_street_address(client, seeded_db):
+    """The full street address appears under the business name so David
+    can cross-reference physical location without leaving the page."""
+    business = _first_business(seeded_db)
+    _submit_claim(client, business["_id"])
+    r = client.get("/admin/claims")
+    assert r.status_code == 200, r.text
+    # Every seeded business has a street address (from _real_businesses.json
+    # address_full).  The template renders it in a <p> below the business name.
+    street = (business.get("address") or {}).get("street")
+    if street:
+        assert street in r.text
+
+
 # ---- existing verify still works ---------------------------------------
 
 def test_verify_claim_still_works(client, seeded_db):
