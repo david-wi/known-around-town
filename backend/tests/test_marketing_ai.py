@@ -406,6 +406,266 @@ def test_preview_page_404_when_flag_off(client, monkeypatch):
 # --- Optional live integration test (skipped in CI) ---
 
 
+# --- Ad copy: unit tests for service helpers ---
+
+
+def test_build_ad_copy_system_prompt_includes_format_spec():
+    from app.services.ai_caption import CaptionContext, build_ad_copy_system_prompt
+
+    ctx = CaptionContext(
+        business_name="Brickell Balayage",
+        neighborhood_name="Brickell",
+        city_name="Miami",
+        primary_category="hair",
+        vertical_word="salon",
+        known_for=None,
+        short_description=None,
+        prompt="summer specials",
+    )
+    out = build_ad_copy_system_prompt(ctx)
+    # Must describe the exact output format so the model is unambiguous.
+    assert "3 variations" in out or "3" in out
+    assert "headline" in out
+    assert "description" in out
+    # Should embed the vertical word so copy feels on-brand.
+    assert "salon" in out
+
+
+def test_build_ad_copy_system_prompt_fallback_vertical():
+    from app.services.ai_caption import CaptionContext, build_ad_copy_system_prompt
+
+    ctx = CaptionContext(
+        business_name="No Vertical",
+        neighborhood_name=None,
+        city_name=None,
+        primary_category=None,
+        vertical_word=None,
+        known_for=None,
+        short_description=None,
+        prompt="sale",
+    )
+    out = build_ad_copy_system_prompt(ctx)
+    assert "local business" in out
+
+
+# --- Ad copy: service-level HTTP behaviour against a mocked gateway ---
+
+
+def test_generate_ad_copy_disabled_raises(monkeypatch):
+    from app.services.ai_caption import CaptionContext, CaptionFeatureDisabled, generate_ad_copy
+
+    monkeypatch.delenv("MARKETING_AI_ENABLED", raising=False)
+    ctx = CaptionContext(
+        business_name="X",
+        neighborhood_name=None,
+        city_name=None,
+        primary_category=None,
+        vertical_word=None,
+        known_for=None,
+        short_description=None,
+        prompt="hi",
+    )
+    with pytest.raises(CaptionFeatureDisabled):
+        asyncio.run(generate_ad_copy(ctx))
+
+
+def test_generate_ad_copy_missing_key_raises(monkeypatch):
+    from app.services.ai_caption import CaptionContext, CaptionGenerationError, generate_ad_copy
+
+    monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.delenv("AI_GATEWAY_KEY", raising=False)
+    monkeypatch.delenv("KAT_AI_GATEWAY_KEY", raising=False)
+    ctx = CaptionContext(
+        business_name="X",
+        neighborhood_name=None,
+        city_name=None,
+        primary_category=None,
+        vertical_word=None,
+        known_for=None,
+        short_description=None,
+        prompt="hi",
+    )
+    with pytest.raises(CaptionGenerationError):
+        asyncio.run(generate_ad_copy(ctx))
+
+
+def test_generate_ad_copy_happy_path_sends_expected_body(monkeypatch):
+    from app.services import ai_caption
+
+    monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.setenv("AI_GATEWAY_KEY", "test-key-abc")
+    ad_text = "Get the Look\nBook your fall balayage today — limited spots.\n\nFall Into Color\nWarm tones, expert hands. New clients welcome.\n\nYear-Round Gorgeous\nBalayage that grows out beautifully. Book now."
+    transport, captured = _ok_transport(ad_text)
+
+    ctx = ai_caption.CaptionContext(
+        business_name="Brickell Balayage",
+        neighborhood_name="Brickell",
+        city_name="Miami",
+        primary_category="hair",
+        vertical_word="salon",
+        known_for="lived-in color",
+        short_description="Balayage specialists in Brickell.",
+        prompt="fall balayage promo",
+    )
+
+    async def run():
+        async with httpx.AsyncClient(transport=transport) as client:
+            return await ai_caption.generate_ad_copy(ctx, http_client=client)
+
+    out = asyncio.run(run())
+
+    assert out == ad_text
+    assert captured["url"] == "https://admin-api.ai.devintensive.com/api/public/ai-config/call"
+    body = captured["body"]
+    # Must use the ad-copy-specific cost tag, not the caption one.
+    assert body["cost_tags"]["feature"] == "owners.ad_copy"
+    assert "Brickell Balayage" in body["user_content"]
+    assert "fall balayage promo" in body["user_content"]
+    # Token budget must be the ad copy budget (450), not the caption budget (300).
+    assert body["max_tokens_override"] == 450
+    assert captured["headers"]["x-api-key"] == "test-key-abc"
+
+
+def test_generate_ad_copy_gateway_error_raises(monkeypatch):
+    from app.services import ai_caption
+
+    monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.setenv("AI_GATEWAY_KEY", "test-key-abc")
+    transport = _status_transport(500, {"detail": "boom"})
+
+    ctx = ai_caption.CaptionContext(
+        business_name="X",
+        neighborhood_name=None,
+        city_name=None,
+        primary_category=None,
+        vertical_word=None,
+        known_for=None,
+        short_description=None,
+        prompt="hi",
+    )
+
+    async def go():
+        async with httpx.AsyncClient(transport=transport) as client:
+            await ai_caption.generate_ad_copy(ctx, http_client=client)
+
+    with pytest.raises(ai_caption.CaptionGenerationError):
+        asyncio.run(go())
+
+
+def test_generate_ad_copy_empty_text_raises(monkeypatch):
+    from app.services import ai_caption
+
+    monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.setenv("AI_GATEWAY_KEY", "test-key-abc")
+    transport, _ = _ok_transport(text="   ")  # whitespace-only
+
+    ctx = ai_caption.CaptionContext(
+        business_name="X",
+        neighborhood_name=None,
+        city_name=None,
+        primary_category=None,
+        vertical_word=None,
+        known_for=None,
+        short_description=None,
+        prompt="hi",
+    )
+
+    async def go():
+        async with httpx.AsyncClient(transport=transport) as client:
+            await ai_caption.generate_ad_copy(ctx, http_client=client)
+
+    with pytest.raises(ai_caption.CaptionGenerationError):
+        asyncio.run(go())
+
+
+# --- Ad copy: endpoint tests through the FastAPI app ---
+
+
+def _patch_generate_ad_copy(
+    monkeypatch, *, raises: Exception | None = None, returns: str | None = None
+):
+    """Patch the ad-copy service function the endpoint calls.
+
+    Mirrors _patch_generate — keeps endpoint tests independent of gateway.
+    """
+    from app.services import ai_caption
+
+    async def fake_generate(ctx, http_client=None):
+        if raises is not None:
+            raise raises
+        return returns or "Mock Headline\nMock description for this ad.\n\nSecond Headline\nAnother mock description here.\n\nThird Headline\nYet another mock description text."
+
+    monkeypatch.setattr(ai_caption, "generate_ad_copy", fake_generate)
+
+
+def test_ad_copy_endpoint_returns_copy_on_success(client, seeded_db, monkeypatch):
+    biz = _pick_seeded_business(seeded_db)
+    assert biz is not None
+    _patch_generate_ad_copy(monkeypatch, returns="Headline One\nDesc one.\n\nHeadline Two\nDesc two.\n\nHeadline Three\nDesc three.")
+
+    resp = client.post(
+        "/api/v1/marketing-ai/ad-copy",
+        json={"business_id": biz["_id"], "prompt": "summer specials"},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["ad_copy"] == "Headline One\nDesc one.\n\nHeadline Two\nDesc two.\n\nHeadline Three\nDesc three."
+    assert data["business_id"] == biz["_id"]
+
+
+def test_ad_copy_endpoint_404_when_feature_disabled(client, seeded_db, monkeypatch):
+    biz = _pick_seeded_business(seeded_db)
+    monkeypatch.delenv("MARKETING_AI_ENABLED", raising=False)
+    resp = client.post(
+        "/api/v1/marketing-ai/ad-copy",
+        json={"business_id": biz["_id"], "prompt": "x"},
+    )
+    assert resp.status_code == 404
+
+
+def test_ad_copy_endpoint_404_when_business_not_found(client, monkeypatch):
+    _patch_generate_ad_copy(monkeypatch)
+    resp = client.post(
+        "/api/v1/marketing-ai/ad-copy",
+        json={"business_id": "does-not-exist", "prompt": "x"},
+    )
+    assert resp.status_code == 404
+
+
+def test_ad_copy_endpoint_422_on_empty_prompt(client, seeded_db):
+    biz = _pick_seeded_business(seeded_db)
+    resp = client.post(
+        "/api/v1/marketing-ai/ad-copy",
+        json={"business_id": biz["_id"], "prompt": ""},
+    )
+    assert resp.status_code == 422
+
+
+def test_ad_copy_endpoint_422_on_overlong_prompt(client, seeded_db):
+    biz = _pick_seeded_business(seeded_db)
+    resp = client.post(
+        "/api/v1/marketing-ai/ad-copy",
+        json={"business_id": biz["_id"], "prompt": "x" * 601},
+    )
+    assert resp.status_code == 422
+
+
+def test_ad_copy_endpoint_502_on_gateway_error(client, seeded_db, monkeypatch):
+    from app.services.ai_caption import CaptionGenerationError
+
+    biz = _pick_seeded_business(seeded_db)
+    _patch_generate_ad_copy(monkeypatch, raises=CaptionGenerationError("unreachable"))
+    resp = client.post(
+        "/api/v1/marketing-ai/ad-copy",
+        json={"business_id": biz["_id"], "prompt": "x"},
+    )
+    assert resp.status_code == 502
+    assert "try again" in resp.json()["detail"].lower()
+
+
+# --- Optional live integration test (skipped in CI) ---
+
+
 @pytest.mark.skipif(
     os.environ.get("KAT_INSTAGRAM_CAPTION_LIVE") != "1",
     reason="Set KAT_INSTAGRAM_CAPTION_LIVE=1 to hit the real LLM (spends tokens).",

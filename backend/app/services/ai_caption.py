@@ -316,3 +316,119 @@ async def generate_caption(
         log.warning("AI gateway returned empty caption text: %s", json_data)
         raise CaptionGenerationError("gateway returned empty caption")
     return text
+
+
+# WHY: Ad copy uses a separate cost tag so gateway analytics can
+# show Instagram caption spend vs ad copy spend independently.
+COST_TAG_FEATURE_AD_COPY = "owners.ad_copy"
+
+# WHY: 450 tokens is ~3× the minimum needed for 3 × (headline + description) to
+# leave room for the model's natural phrasing and any leading/trailing whitespace
+# the format requires. Keeps per-call cost bounded while preventing truncation.
+MAX_OUTPUT_TOKENS_AD_COPY = 450
+
+# WHY: Separate use case from marketing_caption so a future Admin AI Config update
+# can tune the model, token budget, or temperature for ad copy independently.
+# Currently points to the same use case as captions; register "marketing_ad_copy"
+# in Admin AI Config to route ad copy requests to a dedicated configuration.
+USE_CASE_AD_COPY = "marketing_caption"
+
+
+def build_ad_copy_system_prompt(ctx: CaptionContext) -> str:
+    """System prompt for the ad copy generator.
+
+    Produces 3 short, punchy variations — each has a headline (under 30
+    chars) and a single-sentence description (under 90 chars). The format
+    is plain text so the dashboard can display it verbatim; the owner can
+    pick the version they like and adapt it for Google, Facebook, or
+    Instagram Ads.
+    """
+    style = style_note_for_category(ctx.primary_category)
+    vertical = ctx.vertical_word or "local business"
+    return (
+        f"You write short ad copy for {vertical}s. "
+        f"Tone: {style}. "
+        "Return EXACTLY 3 variations. "
+        "Each variation is on 2 lines: line 1 is a headline (under 30 characters), "
+        "line 2 is a description (under 90 characters). "
+        "Separate variations with a blank line. "
+        "No labels, no numbering, no preamble — just the 3 variations."
+    )
+
+
+async def generate_ad_copy(
+    ctx: CaptionContext,
+    *,
+    http_client: Optional[httpx.AsyncClient] = None,
+) -> str:
+    """Generate short ad copy variations via the centralized AI gateway.
+
+    Returns 3 variations as raw text (headline on line 1, description on
+    line 2, blank line between them). Raises the same exception classes
+    as generate_caption so the route layer handles both the same way.
+    """
+    if not feature_enabled():
+        raise CaptionFeatureDisabled("marketing AI is disabled in this environment")
+
+    key = _gateway_key()
+    if not key:
+        log.error("Neither KAT_AI_GATEWAY_KEY nor AI_GATEWAY_KEY is set; ad copy generation cannot proceed")
+        raise CaptionGenerationError("gateway not configured")
+
+    body: Dict[str, Any] = {
+        "use_case": USE_CASE_AD_COPY,
+        "system_prompt": build_ad_copy_system_prompt(ctx),
+        "user_content": build_user_prompt(ctx),
+        "max_tokens_override": MAX_OUTPUT_TOKENS_AD_COPY,
+        "cost_tags": {
+            "product": COST_TAG_PRODUCT,
+            "feature": COST_TAG_FEATURE_AD_COPY,
+            "call": f"{COST_TAG_FEATURE_AD_COPY}.generate",
+        },
+    }
+    headers = {
+        "X-API-Key": key,
+        "Content-Type": "application/json",
+    }
+
+    # WHY: When the caller didn't inject a client (production path),
+    # we own the lifecycle and must close it. When the caller passed
+    # one (test path), they manage it. Using a sentinel keeps both
+    # paths in one block instead of duplicating the POST logic.
+    own_client = http_client is None
+    client = http_client or httpx.AsyncClient(timeout=DEFAULT_TIMEOUT_SECONDS)
+    try:
+        try:
+            resp = await client.post(_gateway_url(), json=body, headers=headers)
+        except httpx.RequestError as exc:
+            log.warning("AI gateway unreachable: %s", exc)
+            raise CaptionGenerationError("gateway unreachable") from exc
+
+        status = resp.status_code
+        raw_text_snippet = resp.text[:500]
+        json_data: Optional[Dict[str, Any]] = None
+        json_error: Optional[Exception] = None
+        if status < 400:
+            try:
+                json_data = resp.json()
+            except ValueError as exc:
+                json_error = exc
+                raw_text_snippet = resp.text[:500]
+    finally:
+        if own_client:
+            await client.aclose()
+
+    if status >= 400:
+        log.warning("AI gateway returned HTTP %s: %s", status, raw_text_snippet)
+        raise CaptionGenerationError(f"gateway returned HTTP {status}")
+
+    if json_error is not None:
+        log.warning("AI gateway returned non-JSON: %s", raw_text_snippet)
+        raise CaptionGenerationError("gateway returned invalid JSON") from json_error
+    assert json_data is not None  # WHY: status<400 and no json_error means we have data
+
+    text = (json_data.get("text") or "").strip()
+    if not text:
+        log.warning("AI gateway returned empty ad copy text: %s", json_data)
+        raise CaptionGenerationError("gateway returned empty ad copy")
+    return text
