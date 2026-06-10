@@ -488,3 +488,56 @@ def test_non_founding_partner_does_not_show_badge(client):
     )
     assert r.status_code == 200, r.text
     assert "Founding Partner" not in r.text
+
+
+def test_home_hero_has_owner_entry_point(client):
+    """The homepage hero must contain a subtle one-line prompt for salon
+    owners — "Own a salon in Miami? Claim your listing →". Without this,
+    owners who land from a Google search see only the consumer search bar
+    above the fold and typically bounce before reaching the Owners CTA
+    section far below.
+
+    WHY: anchor must use href="/owners" (not a #hash) so clicking
+    navigates to the full owners page. The arrow character → distinguishes
+    this from other "Claim your listing" CTAs that appear in other sections."""
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    body = r.text
+    # "Own a" is the start of "Own a salon in Miami?" — the owner nudge phrase
+    assert "Own a" in body
+    # The link arrow "→" distinguishes the hero micro-CTA from other claim
+    # buttons on the page, which render without an arrow character.
+    assert "Claim your listing →" in body
+
+
+def test_business_detail_has_og_image_when_photos_exist(client, seeded_db):
+    """When a salon's detail page has photos, the og:image meta tag must
+    be present so WhatsApp/iMessage/Slack previews show the salon photo
+    instead of a blank grey box. The tag is critical for owner referrals —
+    owners frequently share their newly-claimed listing with friends.
+
+    WHY: without og:image the Open Graph spec says apps may pick any image
+    from the page (or show nothing). Explicitly setting it guarantees the
+    hero photo appears in every social share."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    # Find any Miami business that has at least one photo in the seed.
+    biz = asyncio.run(
+        seeded_db.businesses.find_one(
+            {"city_id": city["_id"], "photos": {"$elemMatch": {"url": {"$exists": True, "$ne": ""}}}}
+        )
+    )
+    if biz is None:
+        pytest.skip("No seeded businesses with photos — cannot test og:image tag")
+
+    r = client.get(
+        f"/b/{biz['slug']}", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    assert 'property="og:image"' in r.text, (
+        f"og:image meta tag missing on /b/{biz['slug']} even though it has photos"
+    )

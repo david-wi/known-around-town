@@ -21,6 +21,12 @@
   <meta property="og:title" content="{{ seo_title or ((city.name ~ ' Knows ' ~ vertical_word) if city else network.name) }}">
   {% if meta_description %}<meta property="og:description" content="{{ meta_description }}">{% endif %}
   <meta property="og:type" content="website">
+  {#- WHY: og:image controls the preview card when anyone shares a page via
+      WhatsApp/iMessage/Slack/LinkedIn — without it the card shows a blank
+      grey box that looks unfinished. Child templates set this via their own
+      head_extra block (preferred), or the route handler can pass og_image
+      directly for a fallback. #}
+  {% if og_image %}<meta property="og:image" content="{{ og_image }}">{% endif %}
   {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
   <link rel="stylesheet" href="/assets/css/reference.css">
   {% block head_extra %}{% endblock %}
