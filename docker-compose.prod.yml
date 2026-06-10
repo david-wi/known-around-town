@@ -43,6 +43,13 @@ services:
       # the owner email copy is made network-aware.
       OWNER_EMAIL_FROM_NAME: ${OWNER_EMAIL_FROM_NAME:-Knows Beauty}
       OWNER_EMAIL_FROM_ADDRESS: ${OWNER_EMAIL_FROM_ADDRESS:-noreply@knowsbeauty.ai.devintensive.com}
+      # WHY: Stripe keys must be threaded through here explicitly — without
+      # these lines the container never sees them even if they are set in
+      # the host .env file.  Empty defaults keep the app functional (billing
+      # disabled) until the keys are configured on the server.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_ID_PRO: ${STRIPE_PRICE_ID_PRO:-}
       LOG_LEVEL: INFO
     networks:
       - traefik
@@ -137,6 +144,11 @@ services:
       # the owner email copy is made network-aware.
       OWNER_EMAIL_FROM_NAME: ${OWNER_EMAIL_FROM_NAME:-Knows Beauty}
       OWNER_EMAIL_FROM_ADDRESS: ${OWNER_EMAIL_FROM_ADDRESS:-noreply@knowsbeauty.ai.devintensive.com}
+      # WHY: same rationale as the production service above — these must be
+      # listed explicitly or they never reach the container.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_ID_PRO: ${STRIPE_PRICE_ID_PRO:-}
       LOG_LEVEL: INFO
     networks:
       - traefik
