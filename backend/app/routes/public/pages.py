@@ -782,6 +782,13 @@ async def neighborhood_category_page(
                 category_name=category.get("name"),
             ),
             "seo_title": f"{category.get('name', '')} in {nb.get('name', '')} — {city.get('name', '')} {tenant.network.get('name', '')}",
+            # WHY: without meta_description Google picks a random excerpt from the page.
+            # A constructed sentence ("The best hair salons in Wynwood, Miami") gives
+            # Google compelling snippet copy and helps the page stand out in search results.
+            "meta_description": (
+                f"The best {category.get('name', '').lower()} in {nb.get('name', '')}, {city.get('name', '')} — "
+                f"browse {city.get('name', '')} {tenant.network.get('name', '')}."
+            ),
             # WHY: same pattern as category and neighborhood pages.
             "og_image": next(
                 (b["photos"][0]["url"] for b in businesses if b.get("photos")),
@@ -890,12 +897,25 @@ async def business_page(request: Request, business_slug: str) -> HTMLResponse:
         else ""
     )
 
+    # WHY: og_image is computed here rather than in the template so base.html
+    # can emit both og:image AND twitter:image from a single source. Previously
+    # the template set og:image directly but never set twitter:image, leaving
+    # Twitter/X cards with no photo when a salon page was shared.
+    _biz_photos = business.get("photos") or []
+    _hero = next((p for p in _biz_photos if isinstance(p, dict) and p.get("is_hero")), None)
+    if not _hero and _biz_photos:
+        _hero = _biz_photos[0]
+    _hero_url = (_hero["url"] if isinstance(_hero, dict) else _hero) if _hero else None
+
     ctx = await _base_context(request, tenant)
     ctx.update(
         {
             "business": business,
             "nearby_businesses": nearby,
             "directions_url": directions_url,
+            # WHY: prefer the salon's own photo over the city hero — it's more accurate
+            # for sharing. Fall back to city hero so cards are never blank.
+            "og_image": _hero_url or city.get("hero_photo_url"),
             "cta_book": await copy.get("business.cta.book", business_id=business["_id"]),
             "cta_call": await copy.get("business.cta.call", business_id=business["_id"]),
             "cta_website": await copy.get("business.cta.website", business_id=business["_id"]),

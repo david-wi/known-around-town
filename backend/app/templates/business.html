@@ -133,12 +133,11 @@
 }
 </script>
 {% endif %}
-{#- WHY: og:image drives the preview card when an owner or client shares this
-    listing page via WhatsApp/iMessage/Slack — without it the card renders as
-    a blank grey box, which looks unfinished and kills trust. The hero photo is
-    the canonical visual for this listing. _og_hero_url is computed before the
-    JSON-LD block above so it can also be reused for the image field there. #}
-{% if _og_hero_url %}<meta property="og:image" content="{{ _og_hero_url }}">{% endif %}
+{#- WHY: og:image and twitter:image are now set by base.html from the og_image
+    context variable, which the business_page route handler computes and passes
+    in. Removing the local tag here prevents duplicate og:image entries and
+    ensures twitter:image is also populated (base.html emits both tags together
+    from the same source). #}
 {% endblock %}
 
 {% block content %}
