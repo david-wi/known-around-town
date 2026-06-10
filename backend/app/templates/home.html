@@ -50,6 +50,14 @@
     directory with other business owners via WhatsApp. hero_photo_url is
     already resolved by the route handler. #}
 {% if hero_photo_url %}<meta property="og:image" content="{{ hero_photo_url }}">{% endif %}
+{#- WHY: Organization JSON-LD tells Google this is a named legal/business entity —
+    the prerequisite for a Google Knowledge Panel (the info box shown in search
+    results for recognized brands). The WebSite block above describes the website;
+    this block describes WHO operates it. Both blocks together give Google what it
+    needs to confidently associate a brand name with this domain. -#}
+{% if org_jsonld %}
+<script type="application/ld+json">{{ org_jsonld | tojson }}</script>
+{% endif %}
 {% endblock %}
 
 {% block content %}

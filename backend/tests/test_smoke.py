@@ -1729,3 +1729,23 @@ def test_neighborhood_category_page_has_itemlist_jsonld(client):
         assert first.get("position") == 1, "First ItemList element must have position 1"
         assert first.get("item", {}).get("name"), "ItemList elements must include a business name"
         assert first.get("item", {}).get("url"), "ItemList elements must include a business URL"
+
+
+def test_home_page_has_organization_jsonld(client):
+    """Home page must include an Organization JSON-LD block for brand entity recognition."""
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+
+    blocks = _extract_jsonld_blocks(r.text)
+    org_blocks = [b for b in blocks if b.get("@type") == "Organization"]
+    assert org_blocks, "Home page must have at least one Organization JSON-LD block"
+
+    org = org_blocks[0]
+    assert org.get("name"), "Organization block must have a name"
+    assert org.get("url"), "Organization block must have a url"
+    assert org.get("@id"), "Organization block must have an @id"
+    assert org["@id"].endswith("/#organization"), (
+        f"Organization @id should end with /#organization, got: {org['@id']}"
+    )
+    # url must be a full https URL
+    assert org["url"].startswith("http"), "Organization url must be an absolute URL"
