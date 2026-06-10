@@ -367,4 +367,66 @@
   </div>
 </section>
 {% endif %}
+
+{#- WHY: A single static claim banner at the top of the page gets scrolled past
+    once and forgotten. Owners who land on their own listing via Google often read
+    the whole page — photos, services, hours — before deciding to claim. By the
+    time they've decided "I should take control of this", the banner is long gone.
+    This sticky bar stays visible throughout the scroll, slides up only after they
+    pass the static banner (so it doesn't double up), and can be dismissed so it
+    doesn't annoy visitors who aren't the owner. SessionStorage remembers the
+    dismiss so refreshing the page doesn't re-surface it on the same browser tab. #}
+{% if business.claim_status not in ('verified', 'claimed') %}
+<div id="claim-sticky-bar"
+     class="fixed bottom-0 left-0 right-0 z-50 transform translate-y-full transition-transform duration-300 ease-in-out"
+     role="complementary"
+     aria-label="Claim this business">
+  <div class="bg-amber-700 border-t border-amber-600">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+      <p class="text-white text-sm font-medium leading-snug">
+        <span class="hidden sm:inline">Own {{ business.name }}? </span>
+        <span class="sm:hidden">Is this your business? </span>
+        Claim your listing free — first month on us.
+      </p>
+      <div class="flex items-center gap-3 shrink-0">
+        <a href="/owners?slug={{ business.slug }}#claim-form"
+           class="inline-flex items-center gap-1.5 bg-white text-amber-800 font-semibold px-4 py-1.5 rounded-full text-sm hover:bg-amber-50 transition whitespace-nowrap">
+          Claim free <span aria-hidden="true">→</span>
+        </a>
+        <button id="claim-sticky-dismiss"
+                title="Dismiss"
+                aria-label="Dismiss this banner"
+                class="text-white/70 hover:text-white transition p-1 rounded"
+                onclick="(function(){
+                  var bar = document.getElementById('claim-sticky-bar');
+                  bar.classList.add('translate-y-full');
+                  try { sessionStorage.setItem('claim-bar-dismissed-{{ business.slug }}', '1'); } catch(e){}
+                })()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+  var bar = document.getElementById('claim-sticky-bar');
+  if (!bar) return;
+  // Don't show if dismissed this session
+  try {
+    if (sessionStorage.getItem('claim-bar-dismissed-{{ business.slug }}')) return;
+  } catch(e) {}
+  // Slide up after user scrolls past the static banner (~250px)
+  var shown = false;
+  function onScroll() {
+    if (!shown && window.scrollY > 250) {
+      shown = true;
+      bar.classList.remove('translate-y-full');
+      window.removeEventListener('scroll', onScroll);
+    }
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
+</script>
+{% endif %}
 {% endblock %}
