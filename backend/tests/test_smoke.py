@@ -581,3 +581,28 @@ def test_business_detail_has_share_button(client):
     # The Share button must be present and labelled
     assert "share-btn" in r.text or 'id="share-btn"' in r.text
     assert ">Share<" in r.text or "> Share<" in r.text or "Share\n" in r.text
+
+
+def test_unclaimed_business_detail_has_sticky_claim_bar(client):
+    """An unclaimed salon page must include the sticky claim bar so owners
+    who scroll past the static amber banner still see the claim prompt
+    throughout their visit. Without it the conversion hook disappears after
+    the first scroll and owners who read the whole page before deciding
+    have no obvious call to action.
+
+    The bar contains a 'Claim free' CTA and a dismiss button; both must be
+    present. It is only shown for businesses whose claim_status is not
+    'verified' or 'claimed', so we use a known unclaimed salon."""
+    r = client.get(
+        "/b/blow-dry-bar-brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.text
+    # Sticky bar container
+    assert "claim-sticky-bar" in body
+    # CTA and dismiss are present
+    assert "Claim free" in body
+    assert "claim-sticky-dismiss" in body
+    # The bar links to the right destination
+    assert "/owners?slug=blow-dry-bar-brickell#claim-form" in body
