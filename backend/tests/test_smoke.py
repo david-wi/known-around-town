@@ -650,3 +650,32 @@ def test_neighborhood_pages_have_meta_descriptions(client):
     assert 'meta name="description"' in r.text, "Wynwood missing meta description tag"
     # The editorial hero_description text should be the fallback
     assert "canvas" in r.text, "Wynwood meta description should include editorial text"
+
+
+def test_owners_page_has_faq_section_with_schema(client):
+    """The owners page must include a visible FAQ accordion and FAQPage
+    structured data so Google can show expandable Q&A rich results for
+    owner-intent searches like 'how do I list my salon on Miami Knows Beauty'.
+
+    The FAQ answers the hesitation questions that stop owners from claiming:
+    cost, review time, what Featured includes, and whether an account is needed.
+
+    WHY: FAQPage JSON-LD with matching visible Q&A is what Google requires
+    to show rich result snippets — having one without the other (schema only,
+    no visible text, or vice versa) causes Google to ignore both."""
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    body = r.text
+
+    # Visible FAQ section — key questions must appear in the HTML
+    assert "Is it really free" in body, "FAQ question about cost missing"
+    assert "How long does" in body, "FAQ question about review time missing"
+    assert "What does Featured" in body, "FAQ question about Featured plan missing"
+    assert "Do I need" in body, "FAQ question about account creation missing"
+
+    # FAQ accordion must use aria-expanded for keyboard accessibility
+    assert "aria-expanded" in body, "FAQ accordion missing aria-expanded attribute"
+
+    # FAQPage JSON-LD must be present so Google can show rich results
+    assert '"@type": "FAQPage"' in body, "FAQPage JSON-LD missing"
+    assert '"@type": "Question"' in body, "FAQPage JSON-LD missing Question entities"
