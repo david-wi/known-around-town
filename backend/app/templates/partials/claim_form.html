@@ -120,9 +120,13 @@
            aria-live="polite"
            class="hidden rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-800"></div>
 
+      {#- WHY: use the site's rose accent color here (theme.button_bg) rather than
+          the stone-900 dark gray used elsewhere for secondary/ghost actions.
+          This is the single most important button on the owners page and was
+          reading as a secondary action due to the color mismatch. #}
       <button type="submit"
               id="claim-form__submit"
-              class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-700 disabled:bg-stone-400 disabled:cursor-not-allowed text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm">
+              class="inline-flex items-center gap-2 {{ theme.button_bg or 'bg-stone-900' }} {{ theme.button_bg_hover or 'hover:bg-stone-700' }} disabled:bg-stone-400 disabled:cursor-not-allowed text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm">
         <span id="claim-form__submit-label">Claim my listing</span>
         <span aria-hidden="true">→</span>
       </button>

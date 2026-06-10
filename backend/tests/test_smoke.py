@@ -81,6 +81,12 @@ def test_miami_beauty_business(client):
     assert r.status_code == 200, r.text
     assert "Blow Dry Bar Brickell" in r.text
     assert "Brickell" in r.text
+    # Claim banner copy: growth-focused message for unclaimed listings
+    # (Blow Dry Bar Brickell may or may not be unclaimed in seed data;
+    # only check copy if the claim banner is present)
+    if "Claim free to add photos" in r.text:
+        assert "searching for salons in Miami" in r.text
+        assert "first month free" in r.text
 
 
 def test_miami_wellness_home(client):
@@ -119,6 +125,9 @@ def test_owners_page(client):
     # Three-tier explainer must mention all three tier names.
     for tier in ("Free", "Featured", "Concierge"):
         assert tier in r.text
+    # Social proof + Founding Partner mention in hero section
+    assert "already listed" in r.text
+    assert "Founding Partner" in r.text
 
 
 def test_owners_page_has_claim_form_not_mailto(client):
