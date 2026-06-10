@@ -77,7 +77,10 @@
       <div class="rounded-2xl p-8 bg-gradient-to-br {{ theme.owners_gradient or 'from-stone-100 via-stone-50 to-white' }} border border-stone-200">
         <p class="text-[11px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-3">Featured</p>
         <p class="text-3xl font-light text-stone-900 mb-1">$29<span class="text-base text-stone-500">/month</span></p>
-        <p class="text-sm text-stone-500 mb-6">or $290/year &middot; first month free</p>
+        {#- WHY: same monthly-equivalent framing as pricing.html — owners compare on
+            a monthly basis, so translating $290/year to $24/month removes
+            sticker shock before they do the math themselves. #}
+        <p class="text-sm text-stone-500 mb-6">or $290/year — that's $24/month &middot; first month free</p>
         <ul class="space-y-3 text-sm text-stone-700 leading-relaxed">
           <li>• Owner dashboard — edit your profile, photos, services, hours, menu.</li>
           <li>• Editor's Pick eligibility, neighborhood-spotlight rotation, premium search positioning.</li>
@@ -123,7 +126,11 @@
       <div class="text-center">
         <div class="w-10 h-10 rounded-full bg-stone-100 text-stone-700 font-semibold text-lg flex items-center justify-center mx-auto mb-4">1</div>
         <h3 class="font-semibold text-stone-900 mb-2">We review your claim</h3>
-        <p class="text-sm text-stone-600 leading-relaxed">Typically within one business day. We confirm the business is in our directory and that your contact details look right.</p>
+        {#- WHY: owners who submit and hear nothing have no fallback — the silent
+            wait becomes a reason to assume it failed and give up. A direct
+            email address removes that drop-off by giving them somewhere to go
+            if the confirmation email doesn't land. #}
+        <p class="text-sm text-stone-600 leading-relaxed">Typically within one business day. We confirm the business is in our directory and that your contact details look right. Questions? Email <a href="mailto:hello@knowsbeauty.com" class="underline decoration-stone-400 hover:decoration-stone-700">hello@knowsbeauty.com</a>.</p>
       </div>
 
       <div class="text-center">

@@ -541,3 +541,43 @@ def test_business_detail_has_og_image_when_photos_exist(client, seeded_db):
     assert 'property="og:image"' in r.text, (
         f"og:image meta tag missing on /b/{biz['slug']} even though it has photos"
     )
+
+
+def test_pricing_shows_monthly_equivalent_for_annual_plan(client):
+    """The Featured annual price must show the per-month cost breakdown so
+    owners comparing monthly subscription tools don't miscalculate the
+    annual price as expensive. '$24/month' alongside '$290/year' makes the
+    annual deal feel cheap rather than large."""
+    r = client.get("/pricing", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # The monthly equivalent must appear near the annual price
+    assert "$24/month" in r.text or "that&#39;s $24/month" in r.text or "that's $24/month" in r.text
+
+
+def test_owners_page_shows_monthly_equivalent_and_support_email(client):
+    """The owners page pricing strip must (a) show the monthly cost breakdown
+    for the annual Featured plan, and (b) include a support email address in
+    the 'what happens next' section so owners who submit and hear nothing have
+    somewhere to follow up."""
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    body = r.text
+    # Monthly equivalent makes the annual plan feel affordable
+    assert "$24/month" in body or "that's $24/month" in body or "$24" in body
+    # Support email removes the silent-wait drop-off point
+    assert "hello@knowsbeauty.com" in body
+
+
+def test_business_detail_has_share_button(client):
+    """The sticky nav on business detail pages must include a Share button so
+    clients can forward a favorite salon via WhatsApp, iMessage, or any other
+    native share target. Without it the impulse to share fades before the
+    person finds a URL to copy."""
+    r = client.get(
+        "/b/blow-dry-bar-brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    # The Share button must be present and labelled
+    assert "share-btn" in r.text or 'id="share-btn"' in r.text
+    assert ">Share<" in r.text or "> Share<" in r.text or "Share\n" in r.text
