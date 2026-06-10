@@ -12,3 +12,7 @@ pytest==8.3.3
 pytest-asyncio==0.24.0
 mongomock-motor==0.0.34
 stripe==11.4.1
+# WHY: EmailStr in owner_leads.py requires pydantic's email validation
+# extra, which in turn requires this package. Without it the app crashes
+# at startup before handling any request (including /pricing).
+email-validator==2.2.0

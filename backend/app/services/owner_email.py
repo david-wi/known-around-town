@@ -357,6 +357,9 @@ def _claim_verified_text(submitter_name: str, business_name: str, login_url: str
         f"Great news — your claim for {business_name} has been verified.\n\n"
         f"Log in to your owner dashboard here:\n{login_url}\n\n"
         "From your dashboard you can update your listing, add photos, and manage your profile.\n\n"
+        "Want to stand out? Once you're in, you can upgrade to Featured — priority placement, "
+        "a Pro badge, and our Instagram caption generator. "
+        "See pricing: https://miamiknowsbeauty.com/pricing\n\n"
         "Questions? Email hello@knowsbeauty.com.\n\n"
         "— The Miami Knows Beauty team\n"
     )
@@ -390,6 +393,11 @@ def _claim_verified_html(submitter_name: str, business_name: str, login_url: str
     </a>
     <p style="font-size: 14px; color: #57534e; line-height: 1.6; margin: 0 0 16px;">
       From your dashboard you can update your listing, add photos, set your hours, and manage your profile.
+    </p>
+    <p style="margin: 20px 0 8px; font-size: 15px; color: #57534e;">
+      <strong>Want to stand out more?</strong> Once you're in your dashboard, you can upgrade to a Featured listing —
+      priority placement at the top of every category and neighborhood page, a Pro badge, and our
+      Instagram caption generator. <a href="https://miamiknowsbeauty.com/pricing" style="color: #f43f5e;">See pricing →</a>
     </p>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
       Questions? Email <a href="mailto:hello@knowsbeauty.com" style="color: #be185d;">hello@knowsbeauty.com</a>.
