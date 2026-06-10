@@ -65,9 +65,22 @@
 - Business detail pages already had the correct order. Category, neighborhood, and neighborhood-category pages had the wrong order — fixed in PR #82 (2026-06-10).
 - Always include `''` empty-string defaults (`city.get('name', '')`) so a missing DB field renders blank rather than the literal word "None" in a page title.
 
+## Robots.txt — Disallow Auth Routes
+
+- The `robots.txt` handler in `pages.py` disallows `/owners/login`, `/owners/me`, and `/owners/verify` so Google doesn't waste crawl budget on auth redirect chains.
+- Public content pages (`/`, `/b/*`, `/c/*`, `/n/*`, `/owners`, `/pricing`) remain fully crawlable.
+- When adding new authenticated/private routes, add them to the `disallowed` list in the `robots_txt` handler.
+
+## Search Results Page — noindex
+
+- The search results template (`search.html`) has `<meta name="robots" content="noindex,follow">`.
+- This stops Google from indexing `/search?q=hair` as a separate page that would compete with the canonical `/c/hair` category page.
+- `follow` (not `noindex,nofollow`) lets Google still traverse any links on the page — useful if a search result links to a business page Google hasn't found yet.
+- Rule: any page generated from user input/parameters that duplicates content available via a clean URL should be noindexed.
+
 ## GitHub Actions CI
 
-- CI runs smoke tests on every push to `main` and every PR. As of PR #89 there are **90 tests** in `test_smoke.py`.
+- CI runs smoke tests on every push to `main` and every PR. As of PR #93 there are **93 tests** in `test_smoke.py`.
 - `gh pr checks --watch` works correctly to wait for CI before confirming merge.
 - Post-merge CI run also runs (on the squash commit to main) — both the PR check and the merge check show "pass".
 - **Deploy is fast** — container restarts within ~8 seconds of a merge to main (webhook fires almost immediately). The container start time after a fresh deploy is very close to the merge timestamp.
