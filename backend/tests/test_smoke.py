@@ -310,8 +310,11 @@ def test_pricing_page(client):
     assert "first month free" in r.text.lower()
     # At least one FAQ question is rendered
     assert "How do I claim" in r.text
-    # Conversion CTA points to the claim form anchor on the owners page
-    assert "/owners#claim" in r.text
+    # WHY: anchor must point to #claim-form (the actual div id), not #claim —
+    # the old #claim anchor doesn't exist and silently drops visitors at the
+    # top of the page instead of scrolling them to the form.
+    assert "/owners#claim-form" in r.text
+    assert "/owners#claim'" not in r.text  # ensure the broken anchor is gone
 
 
 def test_pricing_link_in_header_nav(client):

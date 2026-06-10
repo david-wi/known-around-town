@@ -94,7 +94,7 @@
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Email support (~1 business day).</span></li>
         </ul>
         <a class="inline-flex items-center justify-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
-           href="/owners#claim">
+           href="/owners#claim-form">
           Claim your listing <span aria-hidden="true">→</span>
         </a>
       </div>
@@ -214,8 +214,11 @@
     <p class="text-stone-600 leading-relaxed mb-8">
       It takes about a minute. First month's on us.
     </p>
+    {#- WHY: anchor must match the actual id="claim-form" div in claim_form.html —
+        previously pointed to #claim (nonexistent), so pricing-page visitors
+        landed at the top of /owners instead of scrolling to the form. #}
     <a class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
-       href="/owners#claim">
+       href="/owners#claim-form">
       Claim your listing <span aria-hidden="true">→</span>
     </a>
   </div>
