@@ -1428,6 +1428,34 @@ def test_owner_me_pending_state_has_feature_teaser_cards():
         )
 
 
+def test_owner_me_upgrade_button_shows_correct_price():
+    """The upgrade button on the owner dashboard pending state must show the
+    same price as the pricing page ($29/month) — not the old stale price ($99/year).
+
+    WHY: an owner who lands on /pricing sees '$29/month', then hits /owners/me
+    and sees '$99/year' on the upgrade button. The mismatch destroys trust
+    ('which price is real?') and increases churn at the highest-intent moment
+    in the funnel. The pricing page is the source of truth; the dashboard must
+    match it exactly."""
+    import pathlib
+    template = (
+        pathlib.Path(__file__).parent.parent
+        / "app" / "templates" / "owner_me.html"
+    )
+    content = template.read_text()
+    assert "$29" in content, (
+        "owner_me.html upgrade button must show $29/month to match the pricing page — "
+        "stale price ($99/year) destroys trust when owner navigates from /pricing to /owners/me"
+    )
+    assert "$99" not in content, (
+        "owner_me.html still contains the old '$99' price — "
+        "must be updated to match pricing page ($29/month or $290/year)"
+    )
+    assert "$290" in content, (
+        "owner_me.html must show the annual option ($290/year) to match the pricing page"
+    )
+
+
 def test_category_page_title_uses_full_brand_name(client):
     """Category page titles must include 'Miami Knows Beauty' — the full brand
     name — not just 'Knows Beauty' (the network word without the city).

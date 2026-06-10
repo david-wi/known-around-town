@@ -86,9 +86,9 @@
         <div class="flex flex-col items-start gap-2 shrink-0 pt-1">
           <button id="upgrade-btn" type="button"
                   class="inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-2.5 rounded-full text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
-            <span id="upgrade-btn-label">Upgrade to Pro — $99 / year</span>
+            <span id="upgrade-btn-label">Upgrade to Pro — $29/month</span>
           </button>
-          <p class="text-xs text-stone-400">That&rsquo;s $8.25 / month &middot; cancel anytime</p>
+          <p class="text-xs text-stone-400">or $290/year &mdash; that&rsquo;s $24/month &middot; first month free</p>
           <p id="upgrade-error" class="hidden text-xs text-rose-700 max-w-[14rem]" role="alert" aria-live="polite"></p>
         </div>
       </div>
@@ -725,7 +725,7 @@
       window.location.href = body.url;
     } catch (err) {
       btn.disabled = false;
-      labelEl.textContent = 'Upgrade to Pro — $99 / year';
+      labelEl.textContent = 'Upgrade to Pro — $29/month';
       if (errEl) {
         errEl.textContent = err.message || 'Could not start checkout. Please try again.';
         errEl.classList.remove('hidden');
