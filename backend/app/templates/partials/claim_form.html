@@ -165,6 +165,16 @@
            class="underline hover:text-stone-900 font-medium">Browse the full directory</a>
         to find your exact listing name, then use the Claim link on the listing page.
       </p>
+      {#- WHY: when a salon owner misspells their business name we now score every
+          directory entry by word-overlap (not just substring) and show the top 3
+          as clickable "Did you mean?" buttons. This keeps the owner in the form
+          without a page-leave to find their listing. The container is hidden until
+          a no-match error fires; JS populates the buttons dynamically. #}
+      <div id="claim-form__suggestions"
+           class="hidden mt-2">
+        <p class="text-xs text-stone-500 mb-2">Did you mean one of these?</p>
+        <div id="claim-form__suggestion-list" class="flex flex-wrap gap-2"></div>
+      </div>
 
       {#- WHY: use the site's rose accent color here (theme.button_bg) rather than
           the stone-900 dark gray used elsewhere for secondary/ghost actions.
@@ -252,9 +262,11 @@
     var browseHintEl = document.getElementById('claim-form__browse-hint');
     var submitBtn    = document.getElementById('claim-form__submit');
     var submitLabel  = document.getElementById('claim-form__submit-label');
-    var bizMatch     = document.getElementById('claim-form__biz-match');
-    var bizMatchName = document.getElementById('claim-form__biz-match-name');
-    var bizHint      = document.getElementById('claim-form__biz-hint');
+    var bizMatch         = document.getElementById('claim-form__biz-match');
+    var bizMatchName     = document.getElementById('claim-form__biz-match-name');
+    var bizHint          = document.getElementById('claim-form__biz-hint');
+    var suggestionsEl    = document.getElementById('claim-form__suggestions');
+    var suggestionListEl = document.getElementById('claim-form__suggestion-list');
 
     // WHY: A very permissive email regex — we just want to catch obvious
     // typos like missing @ or domain. The server has the real validation
@@ -290,6 +302,12 @@
         bizMatchName.textContent = matchedName;
         bizMatch.classList.remove('hidden');
         if (bizHint) bizHint.classList.add('hidden');
+        // WHY: dismiss the "did you mean?" suggestions and any error message
+        // as soon as the owner types their way to a real match — the
+        // error + suggestions are no longer relevant and would look odd
+        // sitting below a green "Found:" confirmation.
+        hideSuggestions();
+        clearError();
       } else {
         bizMatch.classList.add('hidden');
         if (bizHint) bizHint.classList.remove('hidden');
@@ -301,6 +319,74 @@
       updateMatchIndicator();
     }
 
+    // WHY: word-overlap scoring rather than substring matching gives better
+    // "did you mean?" suggestions. "Rossano Ferretti Hair Spa" scores higher
+    // for "Rossano Feretti" (one word exact + one typo) than a listing whose
+    // name merely contains "Feretti" as a substring. We don't use edit-distance
+    // (too slow for 150 entries in a keypress handler, and overkill for names).
+    // Scoring: +2 for each word that appears verbatim in the target name,
+    // +1 for each word that is a prefix of a target word (catches truncation).
+    // WHY top 3: more than 3 choices creates decision fatigue; fewer than 3
+    // may miss the right one when names are long or have common words.
+    var TOP_N_SUGGESTIONS = 3; // WHY: 3 balances discoverability vs decision fatigue
+    function scoreSuggestion(queryWords, targetName) {
+      var t = targetName.toLowerCase();
+      var score = 0;
+      for (var k = 0; k < queryWords.length; k++) {
+        var w = queryWords[k];
+        if (!w) continue;
+        // Verbatim word in target → strong signal
+        var wordRe = new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        if (wordRe.test(t)) { score += 2; continue; }
+        // Prefix match → weaker signal (catches "Bliss" matching "Bliss-")
+        if (t.indexOf(w) !== -1) { score += 1; }
+      }
+      return score;
+    }
+
+    function showSuggestions(typedName) {
+      if (!suggestionsEl || !suggestionListEl) return;
+      var query = typedName.trim().toLowerCase();
+      if (!query || query.length < 3) {
+        hideSuggestions();
+        return;
+      }
+      var queryWords = query.split(/\s+/);
+      // Score every entry; keep those with score > 0
+      var scored = [];
+      for (var i = 0; i < DIRECTORY.length; i++) {
+        var s = scoreSuggestion(queryWords, DIRECTORY[i].name);
+        if (s > 0) scored.push({ entry: DIRECTORY[i], score: s });
+      }
+      scored.sort(function(a, b) { return b.score - a.score; });
+      var top = scored.slice(0, TOP_N_SUGGESTIONS);
+      if (!top.length) { hideSuggestions(); return; }
+      // Rebuild suggestion buttons
+      suggestionListEl.innerHTML = '';
+      top.forEach(function(item) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'text-xs bg-white border border-stone-300 hover:border-stone-500 hover:bg-stone-50 text-stone-800 rounded-full px-3 py-1.5 transition';
+        btn.textContent = item.entry.name;
+        btn.addEventListener('click', function() {
+          // Fill the name field and the hidden id, then re-validate
+          bizNameInput.value = item.entry.name;
+          bizIdInput.value   = item.entry.id;
+          window._claimBusinessSlug = item.entry.slug || '';
+          hideSuggestions();
+          clearError();
+          updateMatchIndicator();
+        });
+        suggestionListEl.appendChild(btn);
+      });
+      suggestionsEl.classList.remove('hidden');
+    }
+
+    function hideSuggestions() {
+      if (suggestionsEl) suggestionsEl.classList.add('hidden');
+      if (suggestionListEl) suggestionListEl.innerHTML = '';
+    }
+
     function showError(message, showBrowse) {
       errorEl.textContent = message;
       errorEl.classList.remove('hidden');
@@ -308,8 +394,10 @@
       // owner needs a path to find their exact listing name.
       if (showBrowse) {
         browseHintEl.classList.remove('hidden');
+        showSuggestions(bizNameInput ? bizNameInput.value : '');
       } else {
         browseHintEl.classList.add('hidden');
+        hideSuggestions();
       }
     }
 
@@ -317,6 +405,7 @@
       errorEl.textContent = '';
       errorEl.classList.add('hidden');
       browseHintEl.classList.add('hidden');
+      hideSuggestions();
     }
 
     function resolveBusinessId(typedName) {

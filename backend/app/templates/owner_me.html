@@ -323,9 +323,28 @@
       </a>
     </p>
     {% endif %}
-    <p class="text-sm text-stone-500 mb-8">
-      Once verified, you&rsquo;ll be able to update your listing, add photos, and access your full dashboard.
-    </p>
+    {#- WHY: The vague "update your listing, add photos" sentence gave owners no
+        reason to look forward to verification. These three cards show the specific
+        tools they're about to unlock — concrete and desirable — so the wait feels
+        purposeful rather than like a dead end. Each card uses a checkmark glyph
+        instead of a Lucide SVG so there's zero JS dependency here. #}
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+      <div class="bg-white border border-stone-200 rounded-xl px-4 py-4">
+        <div class="text-lg mb-2">✏️</div>
+        <p class="text-sm font-semibold text-stone-900 mb-1">Edit your listing</p>
+        <p class="text-xs text-stone-500 leading-relaxed">Update photos, hours, address, and service description.</p>
+      </div>
+      <div class="bg-white border border-stone-200 rounded-xl px-4 py-4">
+        <div class="text-lg mb-2">✨</div>
+        <p class="text-sm font-semibold text-stone-900 mb-1">AI marketing tools</p>
+        <p class="text-xs text-stone-500 leading-relaxed">Generate Instagram captions and ad copy in seconds.</p>
+      </div>
+      <div class="bg-white border border-stone-200 rounded-xl px-4 py-4">
+        <div class="text-lg mb-2">⭐</div>
+        <p class="text-sm font-semibold text-stone-900 mb-1">Featured upgrade</p>
+        <p class="text-xs text-stone-500 leading-relaxed">Rank higher in search and get priority placement.</p>
+      </div>
+    </div>
     <button type="button" id="owner-logout"
             class="inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm disabled:opacity-60 disabled:cursor-not-allowed">
       <span data-label-default>Sign out</span>
