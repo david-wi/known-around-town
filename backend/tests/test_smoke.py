@@ -1520,3 +1520,65 @@ def test_neighborhood_category_page_title_uses_full_brand_name(client):
     assert "Knows Beauty Miami" not in title, (
         f"Neighborhood-category page title '{title}' has reversed brand name"
     )
+
+
+def test_category_page_has_og_image(client):
+    """Category pages must include an og:image meta tag so social share cards
+    show a photo instead of a blank grey box.
+
+    WHY: when a Miami Knows Beauty link is shared on Instagram, iMessage, or
+    Slack, the platform fetches og:image to build the preview card. A blank
+    card looks broken and gets far fewer clicks than one showing a real Miami
+    salon photo. Before this fix, all category and neighborhood pages were
+    missing og:image entirely."""
+    r = client.get("/c/hair", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    import re
+    m = re.search(r'<meta property="og:image" content="([^"]+)"', r.text)
+    assert m, (
+        "Category page /c/hair is missing og:image meta tag — "
+        "social share cards will be blank"
+    )
+    assert m.group(1).startswith("http"), (
+        f"og:image value '{m.group(1)}' is not a valid URL"
+    )
+
+
+def test_neighborhood_page_has_og_image(client):
+    """Neighborhood pages must include an og:image meta tag.
+
+    WHY: same reason as category pages — blank social previews hurt click-through.
+    Neighborhood pages like 'Wynwood' or 'Design District' are high-value landing
+    pages that locals share; a photo card drives significantly more engagement."""
+    r = client.get("/n/wynwood", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    import re
+    m = re.search(r'<meta property="og:image" content="([^"]+)"', r.text)
+    assert m, (
+        "Neighborhood page /n/wynwood is missing og:image meta tag — "
+        "social share cards will be blank"
+    )
+    assert m.group(1).startswith("http"), (
+        f"og:image value '{m.group(1)}' is not a valid URL"
+    )
+
+
+def test_neighborhood_category_page_has_og_image(client):
+    """Neighborhood+category pages must include an og:image meta tag.
+
+    WHY: 'Hair salons in Wynwood' is the highest-intent page type — someone
+    actively looking for a specific service in a specific neighborhood. These
+    pages are also the most likely to be shared by local bloggers or on
+    neighborhood Facebook groups. A visual preview card dramatically increases
+    the chance of a click."""
+    r = client.get("/n/wynwood/c/hair", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    import re
+    m = re.search(r'<meta property="og:image" content="([^"]+)"', r.text)
+    assert m, (
+        "Neighborhood+category page /n/wynwood/c/hair is missing og:image meta tag — "
+        "social share cards will be blank"
+    )
+    assert m.group(1).startswith("http"), (
+        f"og:image value '{m.group(1)}' is not a valid URL"
+    )
