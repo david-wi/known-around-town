@@ -69,7 +69,11 @@
     `hero_photo` variable from {% block content %} because that block renders
     after head_extra in Jinja2's block-inheritance order. #}
 {% set _og_hero = (business.photos|selectattr('is_hero')|list|first) or (business.photos|first if business.photos else None) %}
-{% if _og_hero %}<meta property="og:image" content="{{ _og_hero.url }}">{% endif %}
+{#- WHY: same dual-format guard as business_card.html — photos may be stored as
+    plain URL strings or as {"url": "..."} dicts. Resolve once here so the meta
+    tag is correct regardless of which format is in the database. #}
+{% set _og_hero_url = _og_hero.url if (_og_hero and _og_hero is mapping) else _og_hero %}
+{% if _og_hero_url %}<meta property="og:image" content="{{ _og_hero_url }}">{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -79,6 +83,9 @@
 {% set neighborhood_obj = (nav_neighborhoods|selectattr('slug', 'eq', primary_nb)|list|first) if primary_nb else None %}
 {% set photos = business.photos or [] %}
 {% set hero_photo = (photos|selectattr('is_hero')|list|first) or (photos|first if photos else None) %}
+{#- WHY: resolve the photo URL once here rather than at every use site,
+    so both string and dict formats work without touching downstream markup. #}
+{% set hero_photo_url = hero_photo.url if (hero_photo and hero_photo is mapping) else hero_photo %}
 
 <div class="max-w-7xl mx-auto px-6 lg:px-10 pt-8 pb-2 text-sm text-stone-500">
   <a class="hover:text-stone-900" href="/">{{ city.name }}</a>
@@ -134,11 +141,13 @@
 {% if photos %}
 <section class="max-w-7xl mx-auto px-6 lg:px-10">
   <div class="grid grid-cols-12 gap-3 rounded-3xl overflow-hidden h-[460px] lg:h-[540px]">
-    <div class="col-span-12 lg:col-span-7 bg-cover bg-center bg-stone-100" style='background-image: url("{{ hero_photo.url }}");'></div>
+    <div class="col-span-12 lg:col-span-7 bg-cover bg-center bg-stone-100" style='background-image: url("{{ hero_photo_url }}");'></div>
     {% if photos|length > 1 %}
     <div class="hidden lg:grid col-span-5 grid-cols-2 grid-rows-2 gap-3">
       {% for p in photos[:4] %}
-      <div class="bg-cover bg-center bg-stone-100 transition {% if loop.first %}opacity-100 ring-2 {{ theme.ring_accent }}{% else %}opacity-80 hover:opacity-100{% endif %}" style='background-image: url("{{ p.url }}");'></div>
+      {#- WHY: same dual-format guard — resolve p to a URL whether it is a string or dict #}
+      {% set p_url = p.url if (p and p is mapping) else p %}
+      <div class="bg-cover bg-center bg-stone-100 transition {% if loop.first %}opacity-100 ring-2 {{ theme.ring_accent }}{% else %}opacity-80 hover:opacity-100{% endif %}" style='background-image: url("{{ p_url }}");'></div>
       {% endfor %}
     </div>
     {% endif %}
@@ -309,7 +318,7 @@
             mobile) and removes the "Map preview" dead-end label. #}
         {% if directions_url %}<a href="{{ directions_url }}" target="_blank" rel="noreferrer" aria-label="Open in Google Maps">{% endif %}
         <div class="aspect-[16/10] bg-gradient-to-br from-rose-100 via-amber-50 to-orange-100 relative {% if directions_url %}hover:opacity-90 transition-opacity cursor-pointer{% endif %}">
-          <div class="absolute inset-0 opacity-30 bg-cover bg-center" style='background-image: url("{{ hero_photo.url }}");'></div>
+          <div class="absolute inset-0 opacity-30 bg-cover bg-center" style='background-image: url("{{ hero_photo_url }}");'></div>
           <div class="absolute inset-0 flex items-end p-5">
             <div class="bg-white/90 backdrop-blur px-3 py-1.5 rounded-full text-xs font-semibold text-stone-900">{% if directions_url %}📍 Open in Maps{% else %}📍 {{ business.address.street if business.address else '' }}{% endif %}</div>
           </div>

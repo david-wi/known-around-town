@@ -543,6 +543,107 @@ def test_business_detail_has_og_image_when_photos_exist(client, seeded_db):
     )
 
 
+def test_photos_render_as_plain_string_urls(client, seeded_db):
+    """Photos stored as plain URL strings (not dicts) must still show up as
+    background images on both the listing card and the detail page.
+
+    WHY: the database can hold photos in two formats — either as a dict like
+    {"url": "https://..."} or as a bare string "https://...".  The templates
+    must handle both so no salon ends up with a grey placeholder regardless of
+    which format its photos are stored in.  This test injects a string-format
+    photo and confirms the rendered HTML still contains a usable image URL."""
+    import asyncio
+
+    PHOTO_URL = "https://images.unsplash.com/photo-test-string-format?w=800"
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+
+    # Insert a synthetic business whose photos are plain strings, not dicts.
+    # status="live" is required — list_businesses filters on it, so without it
+    # the business never appears in any page's card grid.
+    biz_doc = {
+        "slug": "test-string-photo-salon",
+        "name": "Test String Photo Salon",
+        "city_id": city["_id"],
+        "network_id": network["_id"],
+        # WHY: "hair" not "hair-salon" — the seed uses short slugs that match
+        # the categories collection (hair, nails, spa, etc.).
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": [],
+        "photos": [PHOTO_URL],  # plain string, not {"url": "..."}
+        "claim_status": "none",
+        "status": "live",
+        "editors_pick": True,
+    }
+    asyncio.run(seeded_db.businesses.insert_one(biz_doc))
+
+    # Detail page: photo must appear as a background-image and in og:image.
+    r = client.get("/b/test-string-photo-salon", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert PHOTO_URL in r.text, (
+        "String-format photo URL missing from detail page — template rendered "
+        "a grey placeholder instead of the actual photo"
+    )
+    assert 'property="og:image"' in r.text, (
+        "og:image meta tag missing even though the business has a string-format photo"
+    )
+
+    # Category page: the card partial (business_card.html) must also render the
+    # photo. Using /c/hair-salon rather than the home page because the home page
+    # caps editor picks at 8 and sorts by quality_score, so a synthetic test
+    # business would be pushed off the visible list. The category page lists all
+    # matching businesses without a display cap.
+    # WHY: "hair" matches the seed's category slugs (hair, nails, spa…).
+    r2 = client.get("/c/hair", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r2.status_code == 200, r2.text
+    assert PHOTO_URL in r2.text, (
+        "String-format photo URL missing from the category-page card — "
+        "business_card.html rendered a grey placeholder instead of the actual photo"
+    )
+
+
+def test_photos_render_as_dict_url_format(client, seeded_db):
+    """Photos stored as dicts with a url key must continue to render correctly
+    — this is the standard format used by the seed data and production database.
+
+    WHY: the dual-format guard added to the templates must not break the
+    existing dict format that every real business uses."""
+    import asyncio
+
+    PHOTO_URL = "https://images.unsplash.com/photo-test-dict-format?w=800"
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+
+    biz_doc = {
+        "slug": "test-dict-photo-salon",
+        "name": "Test Dict Photo Salon",
+        "city_id": city["_id"],
+        "network_id": network["_id"],
+        "category_slugs": ["hair"],  # WHY: seed uses short slugs (hair, nails, spa…)
+        "neighborhood_slugs": [],
+        "photos": [{"url": PHOTO_URL}],  # standard dict format
+        "claim_status": "none",
+        "is_active": True,
+    }
+    asyncio.run(seeded_db.businesses.insert_one(biz_doc))
+
+    r = client.get("/b/test-dict-photo-salon", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert PHOTO_URL in r.text, (
+        "Dict-format photo URL missing from detail page — the dual-format guard "
+        "broke the standard dict format"
+    )
+    assert 'property="og:image"' in r.text, (
+        "og:image meta tag missing for dict-format photo"
+    )
+
+
 def test_pricing_shows_monthly_equivalent_for_annual_plan(client):
     """The Featured annual price must show the per-month cost breakdown so
     owners comparing monthly subscription tools don't miscalculate the
