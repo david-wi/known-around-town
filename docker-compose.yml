@@ -13,6 +13,10 @@ services:
     env_file: .env
     environment:
       MONGODB_URL: mongodb://mongo:27017
+      # Stripe billing — set real values in .env (never commit secrets here).
+      # STRIPE_SECRET_KEY: sk_live_...        (or sk_test_... for dev)
+      # STRIPE_WEBHOOK_SECRET: whsec_...      (from Stripe Dashboard > Webhooks)
+      # STRIPE_PRICE_ID_PRO: price_...        (the annual Pro plan price id)
     depends_on:
       - mongo
     ports:

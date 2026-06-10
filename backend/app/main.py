@@ -23,6 +23,7 @@ from app.routes.api.v1 import (
     marketing_ai as api_marketing_ai,
     owner_login as api_owner_login,
     owner_profile as api_owner_profile,
+    stripe_billing as api_stripe_billing,
 )
 from app.routes.admin import claims_admin
 from app.routes.public import pages as public_pages
@@ -79,6 +80,8 @@ app.include_router(api_owner_login.router, prefix="/api/v1")
 # /api/v1/owner/profile prefix, unlike the other routers above which
 # only carry the resource path and rely on the include_router prefix.
 app.include_router(api_owner_profile.router)
+# Stripe billing: checkout session creation + webhook receiver.
+app.include_router(api_stripe_billing.router, prefix="/api/v1")
 
 
 public_pages.attach_templates(templates)
