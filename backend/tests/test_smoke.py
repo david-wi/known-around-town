@@ -46,6 +46,13 @@ def test_miami_beauty_home(client):
     # The Issue eyebrow comes from copy_blocks.
     assert "ISSUE NO. 01" in body
 
+    # SEO — canonical tag, WebSite JSON-LD, and owner-focused title
+    assert 'rel="canonical"' in body
+    assert '"@type": "WebSite"' in body
+    assert '"potentialAction"' in body
+    assert "Directory" in body          # title block includes "Directory"
+    assert "Claim Your Listing" in body  # title block includes owner-facing phrase
+
 
 def test_miami_beauty_category(client):
     r = client.get("/c/nails", headers={"host": "miami.knowsbeauty.localhost"})
