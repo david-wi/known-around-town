@@ -1258,3 +1258,58 @@ def test_claim_form_browse_hint_present_in_dom(client):
     assert "Browse the full directory" in r.text, (
         "'Browse the full directory' link text missing from the claim form"
     )
+
+
+def test_claim_form_suggestions_container_present_in_dom(client):
+    """The claim form must include the 'Did you mean?' suggestion container
+    and list elements in the HTML so JavaScript can populate them when a
+    business name does not exactly match any directory listing.
+
+    WHY: a plain 'not found' error leaves the owner stuck — they typed
+    something close to their salon name but not exact. The suggestion buttons
+    let them click their correct listing without leaving the form, which
+    keeps the claim funnel intact rather than forcing a page-leave to browse
+    the directory. The container is hidden by default; JS shows it with
+    word-overlap-scored matches when showBrowse=true fires."""
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, f"/owners returned {r.status_code}"
+    assert 'id="claim-form__suggestions"' in r.text, (
+        "/owners is missing the claim-form__suggestions container — "
+        "'Did you mean?' suggestions cannot appear on no-match errors"
+    )
+    assert 'id="claim-form__suggestion-list"' in r.text, (
+        "/owners is missing the claim-form__suggestion-list element — "
+        "suggestion buttons have no container to render into"
+    )
+    assert "Did you mean" in r.text, (
+        "'Did you mean' prompt text missing from claim form suggestions"
+    )
+
+
+def test_owner_me_pending_state_has_feature_teaser_cards():
+    """The pending-state section of the owner portal must show three
+    feature-preview cards so owners waiting for claim verification can see
+    exactly what tools they are about to unlock — making the wait feel
+    purposeful instead of like a dead end.
+
+    WHY: the previous copy said 'once verified, you'll be able to update
+    your listing' which is vague and gives no reason to look forward to
+    approval. The three cards ('Edit your listing', 'AI marketing tools',
+    'Featured upgrade') are concrete and desirable — they set expectations
+    and reduce the chance of an owner giving up before verification completes.
+
+    We test the template file directly because the /owners/me route is auth-
+    gated: rendering the pending state in an integration test would require
+    mocking an owner session, which tests the session middleware rather than
+    the feature. Checking the template text is the right scope here."""
+    import pathlib
+    template = (
+        pathlib.Path(__file__).parent.parent
+        / "app" / "templates" / "owner_me.html"
+    )
+    content = template.read_text()
+    for label in ("Edit your listing", "AI marketing tools", "Featured upgrade"):
+        assert label in content, (
+            f"Pending-state feature teaser card '{label}' missing from owner_me.html — "
+            "owners in the pending state won't know what's coming after verification"
+        )
