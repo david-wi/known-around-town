@@ -1042,6 +1042,18 @@ def test_search_page_shows_owner_banner_when_results(client, seeded_db):
     assert 'href="/owners"' in r.text
 
 
+def test_404_page_has_search_and_owner_cta(client):
+    """A 404 should not be a dead end. The page must include a search bar
+    (so a user can recover by searching) and an owner claim CTA (since many
+    404s come from business owners typing their salon's URL directly)."""
+    r = client.get("/this-page-definitely-does-not-exist", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 404
+    assert 'action="/search"' in r.text
+    assert 'name="q"' in r.text
+    assert "Claim your listing" in r.text
+    assert 'href="/owners"' in r.text
+
+
 def test_owners_page_has_email_capture_form(client):
     """The /owners page must include the email capture form for owners who
     are not yet ready to claim. The form posts to /api/v1/owner-leads and
