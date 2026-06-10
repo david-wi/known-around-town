@@ -171,6 +171,11 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
             if not c.get("parent_slug")
         ]
 
+    # WHY: strip query params so search pages (?q=...) don't create duplicate
+    # canonical URLs — the canonical always resolves to the bare page path.
+    page_url = str(request.url).split("?")[0].rstrip("/")
+    canonical_url: Optional[str] = page_url if page_url.startswith("http") else None
+
     return {
         "request": request,
         "tenant": tenant,
@@ -179,6 +184,7 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "copy": copy,
         "theme": _network_theme(network),
         "vertical_word": _vertical_word(network),
+        "canonical_url": canonical_url,
         # WHY: A short human label like "Miami Knows Beauty" used inside
         # the Founding Partner tooltip ("Founding member of <tenant_label>").
         # Falls back to the network name on the network-home page where

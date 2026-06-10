@@ -17,6 +17,35 @@
 
 {% set header_variant = 'over_hero' %}
 
+{# WHY: title explicitly mentions "Salon Directory" and "Claim Your Listing" so
+   salon owners Googling those phrases land on a page whose title matches — they
+   often search "Miami salon directory" or "claim my Miami salon listing". #}
+{% block title %}{{ seo_title }} — {{ vertical_word }} Directory · Claim Your Listing{% endblock %}
+
+{% block head_extra %}
+{# WHY: WebSite JSON-LD tells Google this is a directory site and registers the
+   sitelinks search box — the SearchAction points at our /search endpoint so
+   Google can offer direct on-SERP searching into this directory. #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": {{ ((canonical_url or (request.url.scheme ~ "://" ~ request.url.netloc)) ~ "/#website")|tojson }},
+  "name": {{ seo_title|tojson }},
+  "url": {{ canonical_url|tojson if canonical_url else (request.url.scheme ~ "://" ~ request.url.netloc)|tojson }},
+  {% if meta_description %}"description": {{ meta_description|tojson }},{% endif %}
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": {
+      "@type": "EntryPoint",
+      "urlTemplate": {{ ((canonical_url or (request.url.scheme ~ "://" ~ request.url.netloc)) ~ "/search?q={search_term_string}")|tojson }}
+    },
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+{% endblock %}
+
 {% block content %}
 {# ============= HERO ============= #}
 <section class="relative min-h-[92vh] flex items-end overflow-hidden bg-stone-950">
