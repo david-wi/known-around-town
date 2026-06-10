@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -6,14 +7,14 @@ from app.database import get_db
 from app.models import BusinessClaim
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import now_utc, to_doc
+from app.services.owner_email import send_claim_confirmation_email
 
 router = APIRouter(prefix="/claims", tags=["claims"])
 
 
 @router.post("")
 async def submit_claim(body: BusinessClaim) -> Dict[str, Any]:
-    """Public endpoint — anyone can submit a claim. Verification is manual or
-    via a separate verification step (out of scope for the initial build)."""
+    """Public endpoint — anyone can submit a claim. Verification is manual."""
     doc = to_doc(body)
     db = get_db()
     business = await db.businesses.find_one({"_id": doc["business_id"]})
@@ -23,6 +24,16 @@ async def submit_claim(body: BusinessClaim) -> Dict[str, Any]:
     await db.businesses.update_one(
         {"_id": doc["business_id"]},
         {"$set": {"claim_status": "pending", "updated_at": now_utc()}},
+    )
+    # WHY: fire-and-forget so a slow or failed email send never blocks the
+    # API response — the owner's claim is already saved; the confirmation
+    # is best-effort.  send_claim_confirmation_email swallows its own errors.
+    asyncio.create_task(
+        send_claim_confirmation_email(
+            email=doc.get("submitter_email", ""),
+            submitter_name=doc.get("submitter_name", ""),
+            business_name=business.get("name", "your business"),
+        )
     )
     return doc
 
