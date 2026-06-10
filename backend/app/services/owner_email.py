@@ -38,6 +38,63 @@ def _provider_api_key() -> Optional[str]:
     return key or None
 
 
+async def send_claim_confirmation_email(
+    *, email: str, submitter_name: str, business_name: str
+) -> bool:
+    """Send an immediate confirmation to an owner who just submitted a claim.
+
+    WHY: the claim form promises "We'll email you within one business day" but
+    without this call nothing was actually sent — owners would wait, assume the
+    form broke, and not follow up.  Sending instantly removes that doubt and
+    sets a clear expectation for the manual review step.
+
+    Returns True if accepted by the provider or logged in dev mode; False on
+    provider error.  Callers treat False as a no-op so a delivery failure does
+    not surface as an API error.
+    """
+    subject = f"We received your claim for {business_name}"
+    text_body = _claim_confirmation_text(submitter_name, business_name)
+    html_body = _claim_confirmation_html(submitter_name, business_name)
+
+    api_key = _provider_api_key()
+    if not api_key:
+        logger.warning(
+            "RESEND_API_KEY not configured — claim confirmation logged instead of emailed "
+            "for %s (%s).",
+            email,
+            business_name,
+        )
+        return True
+
+    try:
+        async with httpx.AsyncClient(timeout=_PROVIDER_TIMEOUT_SECONDS) as client:
+            response = await client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": _from_address(),
+                    "to": email,
+                    "subject": subject,
+                    "html": html_body,
+                    "text": text_body,
+                },
+            )
+        if response.status_code == 200:
+            logger.info("Claim confirmation sent to %s for %s", email, business_name)
+            return True
+        logger.error(
+            "Email provider returned status %s for claim confirmation",
+            response.status_code,
+        )
+        return False
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to send claim confirmation email: %s", type(exc).__name__)
+        return False
+
+
 async def send_owner_code_email(*, email: str, code: str) -> bool:
     """Send the verification code to the owner.
 
@@ -135,6 +192,48 @@ def _html_body(code: str) -> str:
     </p>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
       If you didn't ask to sign in, you can safely ignore this email.
+    </p>
+  </div>
+</body></html>"""
+
+
+def _claim_confirmation_text(submitter_name: str, business_name: str) -> str:
+    first = submitter_name.split()[0] if submitter_name else "there"
+    return (
+        f"Hi {first},\n\n"
+        f"We received your claim for {business_name} and will review it within one business day.\n\n"
+        "Once verified you'll get a one-click link to your owner dashboard — no password to set.\n\n"
+        "Questions while you wait? Email hello@knowsbeauty.com.\n\n"
+        "— The Miami Knows Beauty team\n"
+    )
+
+
+def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:
+    first = submitter_name.split()[0] if submitter_name else "there"
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+              background: #f8f5f2; padding: 32px; color: #1c1917;">
+  <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 16px;
+              padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+    <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
+              text-transform: uppercase; margin: 0 0 16px;">
+      Miami Knows Beauty
+    </p>
+    <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
+               font-size: 28px; line-height: 1.2; margin: 0 0 16px; color: #1c1917;">
+      We received your claim
+    </h1>
+    <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 24px;">
+      Hi {first} — we'll review your claim for <strong>{business_name}</strong>
+      within one business day.
+    </p>
+    <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 24px;">
+      Once verified, you'll receive a one-click link to your owner dashboard. No password to set.
+    </p>
+    <p style="font-size: 13px; color: #78716c; margin: 0;">
+      Questions while you wait?
+      Email <a href="mailto:hello@knowsbeauty.com" style="color: #be185d;">hello@knowsbeauty.com</a>.
     </p>
   </div>
 </body></html>"""

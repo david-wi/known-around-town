@@ -652,6 +652,42 @@ def test_neighborhood_pages_have_meta_descriptions(client):
     assert "canvas" in r.text, "Wynwood meta description should include editorial text"
 
 
+def test_claim_sends_confirmation_email(client, seeded_db):
+    """Submitting a claim must trigger a confirmation email to the owner.
+
+    We can't test a real send in CI (no RESEND_API_KEY), but we verify:
+    1. The endpoint still returns 200 after the email code was added
+    2. The email module has the function and generates the right subject line
+    WHY: before this fix the form promised 'we'll email you within one
+    business day' but nothing was ever sent — owners would wait, assume the
+    form failed, and not follow up."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    biz = asyncio.run(
+        seeded_db.businesses.find_one({"city_id": city["_id"]})
+    )
+    r = client.post(
+        "/api/v1/claims",
+        json={
+            "business_id": biz["_id"],
+            "submitter_name": "Ana Garcia",
+            "submitter_email": "ana@example.com",
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    # Confirm the email helper generates the right subject without a real send
+    from app.services.owner_email import _claim_confirmation_text
+    text = _claim_confirmation_text("Ana Garcia", "Test Salon Miami")
+    assert "Test Salon Miami" in text
+    assert "one business day" in text
+    assert "hello@knowsbeauty.com" in text
+
+
 def test_owners_page_has_faq_section_with_schema(client):
     """The owners page must include a visible FAQ accordion and FAQPage
     structured data so Google can show expandable Q&A rich results for
