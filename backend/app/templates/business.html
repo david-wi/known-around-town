@@ -157,6 +157,27 @@
     <div class="flex items-center gap-3 shrink-0">
       {% if business.phone %}<a href="tel:{{ business.phone }}" class="hidden sm:flex items-center gap-2 text-sm font-medium text-stone-700 hover:text-stone-900">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.37 1.9.71 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.58 2.81.71A2 2 0 0122 16.92z"></path></svg>{{ business.phone }}</a>{% endif %}
+      {#- WHY: a Share button in the sticky nav surfaces the action exactly when
+          a client thinks "I should send this to a friend" — without it there's
+          no obvious path and the impulse is lost. The Web Share API triggers the
+          native share sheet on mobile (the most natural way to share), with a
+          WhatsApp deep-link as the fallback for browsers that don't support it.
+          og:image is already set so the resulting card shows the salon's photo. #}
+      <button id="share-btn"
+              title="Share this salon"
+              onclick="(function(){
+                var url = window.location.href;
+                var text = {{ (business.name ~ ' — ' ~ (business.short_description or ('Found on ' ~ (city.name ~ ' Knows ' ~ vertical_word if city else network.name))))|tojson }};
+                if(navigator.share){
+                  navigator.share({title: {{ business.name|tojson }}, text: text, url: url});
+                } else {
+                  window.open('https://wa.me/?text=' + encodeURIComponent(text + ' ' + url), '_blank');
+                }
+              })()"
+              class="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 transition px-2 py-1 rounded-lg hover:bg-stone-100">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Share
+      </button>
       {% if business.booking_url or business.phone %}<a href="{{ business.booking_url or ('tel:' ~ business.phone) }}" class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-semibold px-5 py-2.5 rounded-full text-sm transition">{{ cta_book or 'Book now' }}</a>{% endif %}
     </div>
   </div>
