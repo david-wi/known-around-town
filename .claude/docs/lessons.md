@@ -67,7 +67,7 @@
 
 ## GitHub Actions CI
 
-- CI runs smoke tests on every push to `main` and every PR. As of PR #85 there are **85 tests** in `test_smoke.py`.
+- CI runs smoke tests on every push to `main` and every PR. As of PR #89 there are **90 tests** in `test_smoke.py`.
 - `gh pr checks --watch` works correctly to wait for CI before confirming merge.
 - Post-merge CI run also runs (on the squash commit to main) — both the PR check and the merge check show "pass".
 - **Deploy is fast** — container restarts within ~8 seconds of a merge to main (webhook fires almost immediately). The container start time after a fresh deploy is very close to the merge timestamp.
@@ -81,12 +81,12 @@
 - `sameAs` guard: check `'instagram.com' in business.instagram` before prefixing with the full URL — some records store handles (`@salon`) and some store full URLs. Both are valid inputs.
 - BreadcrumbList home URL derived with `canonical_url|replace('/b/' ~ business.slug, '')` — works because business page URLs always have the form `/b/<slug>` and slugs are alphanumeric-plus-hyphens with no `/b/` substring.
 
-## Social Share (og:image) Coverage
+## Social Share (og:image / twitter:image) Coverage
 
-All public-facing pages now have og:image. Base template also renders twitter:image from the same value.
+All public-facing pages now have og:image and twitter:image. Base template renders both from the same `og_image` context variable.
 
 - Home page: `hero_photo_url` from city record ✓
-- Business detail pages: first photo from `business.photos[]` ✓ (PR #81)
+- Business detail pages: hero photo (first `is_hero: True`, else first photo) → city hero fallback ✓ (PR #89)
 - Category pages: first business photo → city hero fallback ✓ (PR #84)
 - Neighborhood pages: same pattern ✓ (PR #84)
 - Neighborhood+category pages: same pattern ✓ (PR #84)
@@ -95,6 +95,21 @@ All public-facing pages now have og:image. Base template also renders twitter:im
 - Pricing page: city hero photo ✓ (PR #85) — same rationale
 - Pattern for listing pages: `next((b["photos"][0]["url"] for b in businesses if b.get("photos")), city.get("hero_photo_url"))`
 - Base template renders `og:image` only when `og_image` is truthy — safe to omit from routes that don't have a sensible image (owner dashboard, login, admin pages)
+
+## twitter:image Gap — Set og_image in Route Handler, Not in Template (PR #89, 2026-06-10)
+
+- `base.html` emits BOTH `<meta property="og:image">` AND `<meta name="twitter:image">` from the single `og_image` context variable.
+- **The failure mode**: `business.html` was setting `og:image` inline as a template `<meta>` tag in `{% block content %}`, but never passing `og_image` in the route handler context. Result: Facebook/LinkedIn got an image (from the inline tag), but Twitter/X got nothing (the base template's `twitter:image` was never rendered because `og_image` was falsy).
+- **The fix**: compute `og_image` in the Python route handler and pass it in `ctx.update({})`. Remove the inline template `og:image` tag — let base.html handle both tags together.
+- **Rule**: never set og:image inline in a child template. Always set `og_image` in the route context so both tags stay in sync.
+- Photos may be dicts (`{"url": "...", "is_hero": True}`) or plain strings — guard with `isinstance(p, dict)`.
+
+## meta_description Pattern for All Listing Pages (PR #89, 2026-06-10)
+
+- Neighborhood+category pages (`/n/<nb>/c/<cat>`) had `seo_title` and `og_image` but no `meta_description`. Google was picking a random excerpt from the page body as the search snippet.
+- Fix: add a constructed sentence in the route handler: `f"The best {category['name'].lower()} in {nb['name']}, {city['name']} — browse {city['name']} {network['name']}."`.
+- This matches the pattern already used in category-only and neighborhood-only handlers.
+- **Rule**: every listing-page route handler should set all three: `seo_title`, `meta_description`, `og_image`.
 
 ## ItemList JSON-LD (PR #86, 2026-06-10)
 
