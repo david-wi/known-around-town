@@ -536,6 +536,26 @@ async def home(request: Request) -> HTMLResponse:
             # SEO
             "seo_title": city.get("seo_title") or f"{tenant.network.get('name')} {city.get('name')}",
             "meta_description": city.get("meta_description") or city.get("hero_description"),
+            # WHY: Organization JSON-LD tells Google this is a named entity (a real
+            # organization, not just a web page) and is how Google Knowledge Panels
+            # are populated. Adding it alongside the existing WebSite block gives
+            # Google two complementary signals: what the site IS and who OWNS it.
+            "org_jsonld": {
+                "@context": "https://schema.org",
+                "@type": "Organization",
+                "@id": f"{ctx.get('canonical_url')}/#organization",
+                "name": city.get("seo_title") or f"{city.get('name', '')} {tenant.network.get('name', '')}",
+                "url": ctx.get("canonical_url"),
+                **({
+                    "logo": {
+                        "@type": "ImageObject",
+                        "url": city.get("hero_photo_url"),
+                    }
+                } if city.get("hero_photo_url") else {}),
+                **({
+                    "description": city.get("meta_description") or city.get("hero_description")
+                } if (city.get("meta_description") or city.get("hero_description")) else {}),
+            } if ctx.get("canonical_url") else None,
         }
     )
     return _templates.TemplateResponse("home.html", ctx)
