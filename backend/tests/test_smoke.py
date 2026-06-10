@@ -990,6 +990,58 @@ def test_owner_lead_capture_rejects_invalid_email(client):
     assert r.status_code == 422
 
 
+def test_search_page_no_query(client):
+    """GET /search with no query renders a browse prompt, not a 404."""
+    r = client.get("/search", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # A search bar should be present so the user can type their query.
+    assert 'action="/search"' in r.text
+    assert 'name="q"' in r.text
+
+
+def test_search_page_with_results(client, seeded_db):
+    """GET /search?q=<term> returns matching businesses in a grid."""
+    r = client.get(
+        "/search?q=brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    # Results header must show the query.
+    assert "brickell" in r.text.lower()
+    # The search bar must be pre-filled with the query so the user can refine.
+    assert 'value="brickell"' in r.text
+
+
+def test_search_page_zero_results(client):
+    """GET /search?q=<no-match> renders a helpful empty state, not an error."""
+    r = client.get(
+        "/search?q=xyzzy-no-such-business",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    # Zero-state copy must be shown.
+    assert "Nothing found" in r.text
+    # Owner banner in zero-state — someone searching for their own business.
+    assert "Claim your listing" in r.text
+    assert 'href="/owners"' in r.text
+
+
+def test_search_page_shows_owner_banner_when_results(client, seeded_db):
+    """When search returns results, the owner acquisition banner must appear.
+
+    Owners often search for their own business name or service type.
+    Without a banner here they'd see the results and leave without
+    knowing they can claim their listing."""
+    r = client.get(
+        "/search?q=brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "For Business Owners" in r.text
+    assert "Claim your listing" in r.text
+    assert 'href="/owners"' in r.text
+
+
 def test_owners_page_has_email_capture_form(client):
     """The /owners page must include the email capture form for owners who
     are not yet ready to claim. The form posts to /api/v1/owner-leads and

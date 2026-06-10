@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional
 
 from app.database import get_db
@@ -80,6 +81,41 @@ async def list_businesses(
         ]
     )
     cur = cur.skip(offset).limit(limit)
+    return await cur.to_list(length=limit)
+
+
+async def search_businesses(
+    city_id: str, query: str, *, limit: int = 40
+) -> List[Dict[str, Any]]:
+    """Full-text-style search across business name and description.
+
+    Uses case-insensitive regex because Atlas free-tier clusters do not
+    guarantee a $text index is available. Regex on name + short_description
+    covers the vast majority of real search intent ("lash bar", "curly hair",
+    "nail art").
+    """
+    # WHY: re.escape prevents a query like "a.b" from being treated as a
+    # regex wildcard and matching "a<any-char>b" — user input must be literal.
+    pattern = re.escape(query.strip())
+    if not pattern:
+        return []
+    q: Dict[str, Any] = {
+        "city_id": city_id,
+        "status": "live",
+        "$or": [
+            {"name": {"$regex": pattern, "$options": "i"}},
+            {"short_description": {"$regex": pattern, "$options": "i"}},
+            {"tags": {"$regex": pattern, "$options": "i"}},
+        ],
+    }
+    db = get_db()
+    cur = db.businesses.find(q)
+    # WHY: featured + editor's pick first — so the best listings surface when
+    # the query matches multiple businesses (e.g. "balayage" could match 8).
+    cur = cur.sort(
+        [("featured.enabled", -1), ("editors_pick", -1), ("quality_score", -1), ("name", 1)]
+    )
+    cur = cur.limit(limit)
     return await cur.to_list(length=limit)
 
 

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{#-
+  Search results page (/search?q=<term>).
+  Three states:
+    1. No query  — shows a prompt to type something with popular browse links
+    2. Has results — header with count, 3-col card grid, owner banner at bottom
+    3. No results — friendly zero-state with browse-by-category links
+-#}
+
+{% set header_variant = 'sticky' %}
+
+{% block content %}
+{# ============= SEARCH HEADER ============= #}
+<section class="relative bg-gradient-to-br {{ theme.category_banner_gradient }} border-b border-stone-200/70">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10 pt-14 pb-12">
+    <div class="text-sm text-stone-500 mb-6">
+      <a class="hover:text-stone-900" href="/">{{ city.name }}</a> · <span class="text-stone-700">Search</span>
+    </div>
+    <h1 class="font-serif text-4xl md:text-5xl font-light text-stone-900 leading-[0.95] mb-6"
+        style='font-family: Georgia, "Times New Roman", serif;'>
+      {% if query %}
+        Results for <em class="italic {{ theme.accent_text_strong }}">{{ query }}</em>
+      {% else %}
+        Search {{ city.name }}
+      {% endif %}
+    </h1>
+    {# Persistent search bar so users can refine their query without scrolling #}
+    <form class="bg-white ring-1 ring-stone-200 shadow-sm flex items-center max-w-xl" method="get" action="/search">
+      <div class="flex items-center pl-5 pr-3 text-stone-400">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="M21 21l-4.35-4.35" stroke-linecap="round"></path>
+        </svg>
+      </div>
+      <input type="text" name="q" value="{{ query }}" placeholder="Try 'lash bar', 'balayage', 'nail art'…"
+             autofocus
+             class="flex-1 py-4 px-1 bg-transparent text-stone-900 placeholder-stone-400 focus:outline-none text-sm">
+      <button type="submit"
+              class="bg-stone-950 hover:bg-stone-800 text-white font-medium px-7 py-4 text-xs uppercase tracking-[0.2em] transition">
+        Find
+      </button>
+    </form>
+    {% if query and result_count %}
+    <p class="mt-4 text-sm text-stone-500">
+      {{ result_count }} listing{{ 's' if result_count != 1 else '' }} found
+    </p>
+    {% endif %}
+  </div>
+</section>
+
+{# ============= RESULTS GRID ============= #}
+{% if businesses %}
+<section class="max-w-7xl mx-auto px-6 lg:px-10 py-12">
+  <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for b in businesses %}
+      {% include 'partials/business_card.html' %}
+    {% endfor %}
+  </div>
+</section>
+
+{# WHY: Same owner banner pattern as neighborhood/category pages — owners who
+   search for their own business type land here and should have a direct path
+   to claim their listing without having to navigate back to the home page. #}
+<section class="border-t border-stone-200/60 bg-stone-50/60">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10 py-10 flex flex-wrap items-center justify-between gap-6">
+    <div>
+      <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-1">For Business Owners</p>
+      <p class="font-serif text-xl text-stone-900 mb-1" style='font-family: Georgia, "Times New Roman", serif;'>Own a {{ listing_word_singular }} in {{ city.name }}?</p>
+      <p class="text-stone-600 text-sm">Claim your listing and get found by people already searching here.</p>
+    </div>
+    <a href="/owners"
+       class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-800 text-white font-semibold px-6 py-3 rounded-full transition whitespace-nowrap">
+      Claim your listing →
+    </a>
+  </div>
+</section>
+
+{% elif query %}
+{# ============= ZERO-STATE (searched but no results) ============= #}
+<section class="max-w-3xl mx-auto px-6 lg:px-10 py-20 text-center">
+  <p class="text-5xl mb-6">🔍</p>
+  <h2 class="font-serif text-3xl font-light text-stone-900 mb-3"
+      style="font-family: Georgia, serif;">Nothing found for "{{ query }}"</h2>
+  <p class="text-stone-600 mb-10 text-lg">
+    Try a shorter term or browse by category below.
+  </p>
+  {% if nav_categories %}
+  <div class="flex flex-wrap justify-center gap-3">
+    {% for c in nav_categories %}
+    {% if not c.parent_slug %}
+    <a href="/c/{{ c.slug }}"
+       class="inline-flex items-center gap-2 text-sm bg-stone-100 hover:bg-stone-200 text-stone-800 font-medium px-5 py-2.5 rounded-full transition">
+      {% if c.emoji %}{{ c.emoji }}{% endif %} {{ c.name }}
+    </a>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {# Owner nudge in empty state — someone searching for a specific business they own #}
+  <div class="mt-16 pt-10 border-t border-stone-200">
+    <p class="text-stone-500 text-sm mb-3">Looking for your own business?</p>
+    <a href="/owners"
+       class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-800 text-white font-semibold px-6 py-3 rounded-full transition">
+      Claim your listing →
+    </a>
+  </div>
+</section>
+
+{% else %}
+{# ============= NO-QUERY STATE (arrived at /search directly) ============= #}
+<section class="max-w-3xl mx-auto px-6 lg:px-10 py-16 text-center">
+  <p class="text-stone-600 mb-8 text-lg">Browse by category to explore everything in {{ city.name }}.</p>
+  {% if nav_categories %}
+  <div class="flex flex-wrap justify-center gap-3">
+    {% for c in nav_categories %}
+    {% if not c.parent_slug %}
+    <a href="/c/{{ c.slug }}"
+       class="inline-flex items-center gap-2 text-sm bg-stone-100 hover:bg-stone-200 text-stone-800 font-medium px-5 py-2.5 rounded-full transition">
+      {% if c.emoji %}{{ c.emoji }}{% endif %} {{ c.name }}
+    </a>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% endblock %}
