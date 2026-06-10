@@ -92,6 +92,74 @@ NEIGHBORHOODS = {
 }
 
 
+#: WHY: Each neighborhood page currently shows only a grid of salons with no
+#  unique text — Google has nothing to index and no reason to rank the page for
+#  searches like "best hair salon in Wynwood" or "nail salons Brickell Miami".
+#  These editorial paragraphs give each page its own voice and search signal.
+#  They render in the hero section via `neighborhood.hero_description`.
+#  Only "beauty" is populated for launch; wellness/health get their own copy
+#  when those networks go live.
+NEIGHBORHOOD_DESCRIPTIONS: Dict[str, Dict[str, str]] = {
+    "beauty": {
+        "wynwood": (
+            "Where street-art studios and concept salons share the same blocks. "
+            "Wynwood's beauty scene is experimental by nature — expect colorists who "
+            "treat your hair like a canvas and nail artists whose work ends up on Instagram."
+        ),
+        "brickell": (
+            "Miami's finance district runs on precision, and its salons match. "
+            "Brickell is where the city's professionals book sharp cuts and efficient "
+            "appointments that hold up in a boardroom and on a rooftop the same night."
+        ),
+        "south-beach": (
+            "Sun-bleached, camera-ready, and international. South Beach salons know how "
+            "to make balayage that survives a week of ocean spray — and lashes that "
+            "handle a late night without losing their shape."
+        ),
+        "coral-gables": (
+            "Under the banyan trees and behind the limestone facades, Coral Gables holds "
+            "some of Miami's most established salons. Quietly expert, long-standing, and "
+            "often busier than their subdued storefronts suggest."
+        ),
+        "design-district": (
+            "The same blocks that house Dior and Hermès are home to Miami's most editorial "
+            "beauty studios. Expect avant-garde cuts, precision color techniques, and a "
+            "level of finish you won't find most other places in the city."
+        ),
+        "edgewater": (
+            "The bay views are new and so are the studios. Edgewater's emerging salon scene "
+            "attracts stylists who left established shops to do things on their own terms — "
+            "worth getting in with before the rest of Miami figures it out."
+        ),
+        "coconut-grove": (
+            "Shaded by some of Miami's oldest trees, the Grove's salons have a relaxed "
+            "confidence that matches the neighborhood. Unhurried appointments, long client "
+            "relationships, and real local character."
+        ),
+        "little-havana": (
+            "Beauty culture runs deep in Little Havana. The salons here are part neighborhood "
+            "anchor, part creative outlet — and the best ones have been doing it for decades, "
+            "long before the rest of Miami started paying attention."
+        ),
+        "sunny-isles-beach": (
+            "With one of the most multilingual client bases in Miami, Sunny Isles salons are "
+            "fluent in global beauty standards — Russian, Portuguese, Spanish, and the "
+            "universal language of a great blowout with ocean light coming through the window."
+        ),
+        "aventura": (
+            "Polished, efficient, and close to the mall. Aventura's salon corridor serves a "
+            "busy, well-heeled clientele who know exactly what they want and don't like to "
+            "wait — the booking flow here tends to be tight."
+        ),
+        "bal-harbour": (
+            "A short walk from the most exclusive boutiques in Florida, Bal Harbour's salons "
+            "set the standard for luxury treatments in Miami. Availability is limited — "
+            "these are the appointments people plan around."
+        ),
+    },
+}
+
+
 # Handcrafted-showcase business arrays were removed in favor of real,
 # verifiable Miami businesses loaded from _real_businesses.json. The empty
 # lists below are kept so the merge helper still finds expected names.
@@ -479,6 +547,13 @@ async def seed_network(network_slug: str) -> None:
             "slug": slug,
             "name": name,
             "description": vibe,
+            #: WHY: hero_description is the editorial paragraph that appears below
+            #  the italic vibe quote in the neighborhood hero section. Without it the
+            #  page has no unique text for Google to index, so it can't rank for
+            #  "best [service] in [neighborhood]" searches. Populated from
+            #  NEIGHBORHOOD_DESCRIPTIONS above; None for networks/neighborhoods not
+            #  yet written.
+            "hero_description": NEIGHBORHOOD_DESCRIPTIONS.get(network_slug, {}).get(slug),
             "listed_count": listed_count,
             "photo_url": nb_photos.get(slug),
             "order": i,
