@@ -72,4 +72,24 @@
   </div>
   {% endif %}
 </section>
+
+{# WHY: Business owners often search for their category + city and land here before
+   they ever think to look for a "claim" flow. A direct prompt at the end of the
+   results grid gives them an immediate path without having to click through to a
+   specific listing page to find the claim CTA. #}
+{% if businesses %}
+<section class="border-t border-stone-200/60 bg-stone-50/60">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10 py-10 flex flex-wrap items-center justify-between gap-6">
+    <div>
+      <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-1">For Business Owners</p>
+      <p class="font-serif text-xl text-stone-900 mb-1" style='font-family: Georgia, "Times New Roman", serif;'>Own a {{ category.name|lower }} {{ listing_word_singular }} in {{ city.name }}?</p>
+      <p class="text-stone-600 text-sm">Claim your listing and get found by people searching for exactly what you offer.</p>
+    </div>
+    <a href="/owners"
+       class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-800 text-white font-semibold px-6 py-3 rounded-full transition whitespace-nowrap">
+      Claim your listing →
+    </a>
+  </div>
+</section>
+{% endif %}
 {% endblock %}
