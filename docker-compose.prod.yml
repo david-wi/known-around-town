@@ -43,6 +43,11 @@ services:
       # the owner email copy is made network-aware.
       OWNER_EMAIL_FROM_NAME: ${OWNER_EMAIL_FROM_NAME:-Knows Beauty}
       OWNER_EMAIL_FROM_ADDRESS: ${OWNER_EMAIL_FROM_ADDRESS:-noreply@knowsbeauty.ai.devintensive.com}
+      # WHY: claim submission triggers an admin alert email; this controls
+      # which inbox receives it.  Default routes to the public support
+      # address David already monitors, so the feature works without any
+      # extra config.
+      ADMIN_NOTIFY_EMAIL: ${ADMIN_NOTIFY_EMAIL:-hello@knowsbeauty.com}
       # WHY: Stripe keys must be threaded through here explicitly — without
       # these lines the container never sees them even if they are set in
       # the host .env file.  Empty defaults keep the app functional (billing
@@ -144,6 +149,7 @@ services:
       # the owner email copy is made network-aware.
       OWNER_EMAIL_FROM_NAME: ${OWNER_EMAIL_FROM_NAME:-Knows Beauty}
       OWNER_EMAIL_FROM_ADDRESS: ${OWNER_EMAIL_FROM_ADDRESS:-noreply@knowsbeauty.ai.devintensive.com}
+      ADMIN_NOTIFY_EMAIL: ${ADMIN_NOTIFY_EMAIL:-hello@knowsbeauty.com}
       # WHY: same rationale as the production service above — these must be
       # listed explicitly or they never reach the container.
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
