@@ -19,14 +19,46 @@ from seed._helpers import category_groups, run, upsert
 # home page).
 
 BEAUTY_CATEGORIES = [
-    {"slug": "hair",      "name": "Hair",      "description": "Color, cuts, blowouts, extensions"},
-    {"slug": "nails",     "name": "Nails",     "description": "Manicures, pedicures, nail art"},
-    {"slug": "spa",       "name": "Spa",       "description": "Facials, massage, body treatments"},
-    {"slug": "lash-brow", "name": "Lash & Brow","description": "Extensions, lifts, lamination"},
-    {"slug": "med-spa",   "name": "Med Spa",   "description": "Botox, fillers, laser, microneedling"},
-    {"slug": "barber",    "name": "Barber",    "description": "Mens cuts, fades, hot shaves"},
-    {"slug": "makeup",    "name": "Makeup",    "description": "Bridal, editorial, lessons"},
-    {"slug": "waxing",    "name": "Waxing",    "description": "Brazilian, body waxing, threading"},
+    {
+        "slug": "hair", "name": "Hair",
+        "description": "Color, cuts, blowouts, extensions",
+        "meta_description": "The best hair salons in Miami — color, cuts, blowouts, and extensions from Wynwood to Brickell. Browse Miami Knows Beauty.",
+    },
+    {
+        "slug": "nails", "name": "Nails",
+        "description": "Manicures, pedicures, nail art",
+        "meta_description": "The best nail salons in Miami — manicures, pedicures, and nail art across every neighborhood. Browse Miami Knows Beauty.",
+    },
+    {
+        "slug": "spa", "name": "Spa",
+        "description": "Facials, massage, body treatments",
+        "meta_description": "The best spas in Miami — facials, massage, and body treatments from luxury hotel spas to neighborhood favorites. Browse Miami Knows Beauty.",
+    },
+    {
+        "slug": "lash-brow", "name": "Lash & Brow",
+        "description": "Extensions, lifts, lamination",
+        "meta_description": "The best lash and brow studios in Miami — extensions, lifts, and lamination by Miami's top technicians. Browse Miami Knows Beauty.",
+    },
+    {
+        "slug": "med-spa", "name": "Med Spa",
+        "description": "Botox, fillers, laser, microneedling",
+        "meta_description": "The best medical spas in Miami — Botox, fillers, laser treatments, and microneedling from board-certified providers. Browse Miami Knows Beauty.",
+    },
+    {
+        "slug": "barber", "name": "Barber",
+        "description": "Mens cuts, fades, hot shaves",
+        "meta_description": "The best barber shops in Miami — men's cuts, fades, and hot shaves from Wynwood to Brickell. Browse Miami Knows Beauty.",
+    },
+    {
+        "slug": "makeup", "name": "Makeup",
+        "description": "Bridal, editorial, lessons",
+        "meta_description": "The best makeup artists in Miami — bridal, editorial, and private lessons from Miami's top professionals. Browse Miami Knows Beauty.",
+    },
+    {
+        "slug": "waxing", "name": "Waxing",
+        "description": "Brazilian, body waxing, threading",
+        "meta_description": "The best waxing salons in Miami — Brazilian, full body waxing, and threading in every neighborhood. Browse Miami Knows Beauty.",
+    },
 ]
 
 WELLNESS_CATEGORIES = [

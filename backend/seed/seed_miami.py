@@ -578,6 +578,7 @@ async def seed_network(network_slug: str) -> None:
             "parent_slug": None,
             "name": group["name"],
             "description": group.get("description"),
+            "meta_description": group.get("meta_description"),
             "examples": group.get("examples", []),
             "order": order,
             "status": "live",

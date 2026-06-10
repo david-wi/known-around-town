@@ -629,3 +629,24 @@ def test_neighborhood_pages_have_editorial_descriptions(client):
     assert "boardroom" in body2, "Brickell editorial description missing"
     # The two pages must differ — different neighborhoods, different copy
     assert body != body2
+
+
+def test_category_pages_have_meta_descriptions(client):
+    """Category pages (hair, nails, spa, etc.) must have a <meta name="description">
+    tag. Without one Google shows a random excerpt in search results instead of
+    compelling copy — hurting click-through for searches like 'hair salons Miami'."""
+    for slug, distinctive_word in [("hair", "color"), ("nails", "pedicure"), ("spa", "massage")]:
+        r = client.get(f"/c/{slug}", headers={"host": "miami.knowsbeauty.localhost"})
+        assert r.status_code == 200, f"/c/{slug} returned {r.status_code}"
+        assert 'meta name="description"' in r.text, f"/c/{slug} missing meta description tag"
+        assert distinctive_word in r.text.lower(), f"/c/{slug} meta description missing '{distinctive_word}'"
+
+
+def test_neighborhood_pages_have_meta_descriptions(client):
+    """Neighborhood pages must have a <meta name="description"> tag so Google
+    shows meaningful copy in search results for 'best salons in Wynwood'-style queries."""
+    r = client.get("/n/wynwood", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert 'meta name="description"' in r.text, "Wynwood missing meta description tag"
+    # The editorial hero_description text should be the fallback
+    assert "canvas" in r.text, "Wynwood meta description should include editorial text"
