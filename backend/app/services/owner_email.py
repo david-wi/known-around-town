@@ -310,6 +310,110 @@ def _claim_verified_html(submitter_name: str, business_name: str, login_url: str
 </body></html>"""
 
 
+async def send_claim_rejected_email(
+    *, email: str, submitter_name: str, business_name: str
+) -> bool:
+    """Notify the submitter that their claim could not be verified.
+
+    WHY: without this email the submitter has no idea what happened —
+    they get the initial confirmation, wait, and then simply never hear
+    back. No indication that the answer was no, no way to follow up or
+    correct a mistake. This closes the loop on the rejection path the
+    same way send_claim_verified_email closes the approval path.
+    """
+    subject = f"Update on your claim for {business_name}"
+    text_body = _claim_rejected_text(submitter_name, business_name)
+    html_body = _claim_rejected_html(submitter_name, business_name)
+
+    api_key = _provider_api_key()
+    if not api_key:
+        logger.warning(
+            "RESEND_API_KEY not configured — claim rejection notification logged instead "
+            "of emailed for %s (%s).",
+            email,
+            business_name,
+        )
+        return True
+
+    try:
+        async with httpx.AsyncClient(timeout=_PROVIDER_TIMEOUT_SECONDS) as client:
+            response = await client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": _from_address(),
+                    "to": email,
+                    "subject": subject,
+                    "html": html_body,
+                    "text": text_body,
+                },
+            )
+        if response.status_code == 200:
+            logger.info("Claim rejection notification sent to %s for %s", email, business_name)
+            return True
+        logger.error(
+            "Email provider returned status %s for claim rejection notification",
+            response.status_code,
+        )
+        return False
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to send claim rejection email: %s", type(exc).__name__)
+        return False
+
+
+def _claim_rejected_text(submitter_name: str, business_name: str) -> str:
+    first = submitter_name.split()[0] if submitter_name else "there"
+    return (
+        f"Hi {first},\n\n"
+        f"Thank you for claiming {business_name} on Miami Knows Beauty.\n\n"
+        "After reviewing your submission we weren't able to verify the claim at this time. "
+        "This sometimes happens when we can't confirm the connection between the submitter "
+        "and the business — it doesn't necessarily mean your claim is wrong.\n\n"
+        "If you think this is a mistake or want to provide more information, please email "
+        "hello@knowsbeauty.com and we'll take another look.\n\n"
+        "— The Miami Knows Beauty team\n"
+    )
+
+
+def _claim_rejected_html(submitter_name: str, business_name: str) -> str:
+    first = submitter_name.split()[0] if submitter_name else "there"
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+              background: #f8f5f2; padding: 32px; color: #1c1917;">
+  <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 16px;
+              padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+    <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
+              text-transform: uppercase; margin: 0 0 16px;">
+      Miami Knows Beauty
+    </p>
+    <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
+               font-size: 28px; line-height: 1.2; margin: 0 0 16px; color: #1c1917;">
+      Update on your claim
+    </h1>
+    <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 16px;">
+      Hi {first} — thank you for submitting a claim for <strong>{business_name}</strong>.
+    </p>
+    <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 16px;">
+      After reviewing your submission, we weren't able to verify the claim at this time.
+      This sometimes happens when we can't confirm the connection between the submitter
+      and the business — it doesn't necessarily mean your claim is incorrect.
+    </p>
+    <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 24px;">
+      If you believe this is a mistake or can provide more information, we'd be happy to
+      take another look.
+    </p>
+    <p style="font-size: 13px; color: #78716c; margin: 0;">
+      Email us at <a href="mailto:hello@knowsbeauty.com" style="color: #be185d;">hello@knowsbeauty.com</a>
+      and we'll review it together.
+    </p>
+  </div>
+</body></html>"""
+
+
 def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
     return f"""<!DOCTYPE html>
