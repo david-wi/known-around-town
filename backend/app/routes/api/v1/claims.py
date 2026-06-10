@@ -8,6 +8,7 @@ from app.models import BusinessClaim
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import now_utc, to_doc
 from app.services.owner_email import (
+    send_admin_new_claim_email,
     send_claim_confirmation_email,
     send_claim_rejected_email,
     send_claim_verified_email,
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/claims", tags=["claims"])
 
 
 @router.post("")
-async def submit_claim(body: BusinessClaim) -> Dict[str, Any]:
+async def submit_claim(body: BusinessClaim, request: Request) -> Dict[str, Any]:
     """Public endpoint — anyone can submit a claim. Verification is manual."""
     doc = to_doc(body)
     db = get_db()
@@ -29,14 +30,22 @@ async def submit_claim(body: BusinessClaim) -> Dict[str, Any]:
         {"_id": doc["business_id"]},
         {"$set": {"claim_status": "pending", "updated_at": now_utc()}},
     )
-    # WHY: fire-and-forget so a slow or failed email send never blocks the
-    # API response — the owner's claim is already saved; the confirmation
-    # is best-effort.  send_claim_confirmation_email swallows its own errors.
+    admin_url = str(request.base_url).rstrip("/") + "/admin/claims"
+    # WHY: fire-and-forget so slow or failed email sends never block the
+    # API response — the claim is already saved.  Both emails swallow errors.
     asyncio.create_task(
         send_claim_confirmation_email(
             email=doc.get("submitter_email", ""),
             submitter_name=doc.get("submitter_name", ""),
             business_name=business.get("name", "your business"),
+        )
+    )
+    asyncio.create_task(
+        send_admin_new_claim_email(
+            submitter_name=doc.get("submitter_name", ""),
+            submitter_email=doc.get("submitter_email", ""),
+            business_name=business.get("name", "your business"),
+            admin_url=admin_url,
         )
     )
     return doc

@@ -38,6 +38,94 @@ def _provider_api_key() -> Optional[str]:
     return key or None
 
 
+def _admin_notify_address() -> str:
+    # WHY: ADMIN_NOTIFY_EMAIL lets the operator route claim alerts to any
+    # inbox without a code change.  Defaults to the public support address
+    # which David monitors, so the feature works out-of-the-box.
+    return os.environ.get("ADMIN_NOTIFY_EMAIL", "hello@knowsbeauty.com").strip()
+
+
+async def send_admin_new_claim_email(
+    *, submitter_name: str, submitter_email: str, business_name: str, admin_url: str
+) -> bool:
+    """Alert the admin team when a new ownership claim is submitted.
+
+    WHY: without this David has to check the admin panel daily to notice new
+    claims — if he misses a day the "within one business day" promise breaks
+    and the owner assumes they were ignored.  This makes claims zero-latency.
+    """
+    recipient = _admin_notify_address()
+    subject = f"New claim: {business_name}"
+    text_body = (
+        f"A new ownership claim was submitted on Miami Knows Beauty.\n\n"
+        f"Business: {business_name}\n"
+        f"Submitted by: {submitter_name} <{submitter_email}>\n\n"
+        f"Review and approve or reject at:\n{admin_url}\n\n"
+        "— Miami Knows Beauty notifications\n"
+    )
+    html_body = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+              background: #f8f5f2; padding: 32px; color: #1c1917;">
+  <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 16px;
+              padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+    <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
+              text-transform: uppercase; margin: 0 0 16px;">
+      Miami Knows Beauty · Admin
+    </p>
+    <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
+               font-size: 28px; line-height: 1.2; margin: 0 0 16px; color: #1c1917;">
+      New claim submitted
+    </h1>
+    <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 8px;">
+      <strong>{business_name}</strong>
+    </p>
+    <p style="font-size: 14px; color: #78716c; margin: 0 0 24px;">
+      Submitted by {submitter_name}
+      &lt;<a href="mailto:{submitter_email}" style="color: #be185d;">{submitter_email}</a>&gt;
+    </p>
+    <a href="{admin_url}"
+       style="display: inline-block; background: #be185d; color: #ffffff; font-size: 14px;
+              font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">
+      Review claim →
+    </a>
+  </div>
+</body></html>"""
+
+    api_key = _provider_api_key()
+    if not api_key:
+        logger.warning(
+            "RESEND_API_KEY not configured — admin claim alert logged instead of emailed "
+            "for %s (%s).",
+            business_name,
+            submitter_email,
+        )
+        return True
+
+    try:
+        async with httpx.AsyncClient(timeout=_PROVIDER_TIMEOUT_SECONDS) as client:
+            resp = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "from": _from_address(),
+                    "to": [recipient],
+                    "subject": subject,
+                    "text": text_body,
+                    "html": html_body,
+                },
+            )
+            resp.raise_for_status()
+            return True
+    except Exception:
+        logger.exception(
+            "Failed to send admin new-claim alert for %s (%s).",
+            business_name,
+            submitter_email,
+        )
+        return False
+
+
 async def send_claim_confirmation_email(
     *, email: str, submitter_name: str, business_name: str
 ) -> bool:
