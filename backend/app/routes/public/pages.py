@@ -506,6 +506,19 @@ async def redirect_hair_salon() -> RedirectResponse:
     return RedirectResponse(url="/c/hair", status_code=301)
 
 
+# WHY: /c/nail-salon is the intuitive plural form people type or link; the
+# actual category slug is /c/nails. 301 so search engines update their index.
+@router.get("/c/nail-salon")
+async def redirect_nail_salon() -> RedirectResponse:
+    return RedirectResponse(url="/c/nails", status_code=301)
+
+
+# WHY: /c/nail-salons (with trailing s) is another common variant.
+@router.get("/c/nail-salons")
+async def redirect_nail_salons() -> RedirectResponse:
+    return RedirectResponse(url="/c/nails", status_code=301)
+
+
 @router.get("/c/{category_slug}", response_class=HTMLResponse)
 async def category_page(request: Request, category_slug: str) -> HTMLResponse:
     tenant = await _require_tenant(request)
