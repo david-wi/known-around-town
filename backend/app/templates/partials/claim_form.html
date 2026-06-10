@@ -15,6 +15,33 @@
   <div id="claim-form__wrapper"
        class="rounded-2xl bg-white border border-stone-200 shadow-sm p-6 lg:p-8">
 
+    {#- WHY: Benefit strip is inside the card so visitors who deep-link directly
+        to #claim-form (e.g., from the "Available with Featured →" buttons on
+        the preview dashboard or individual listing pages) always see what they're
+        claiming — they may have skipped the hero section's social proof entirely.
+        Four items in a 2×2 grid: visible on scan, doesn't slow the form down. #}
+    <div class="mb-6 pb-5 border-b border-stone-100">
+      <p class="text-[10px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-3">What&rsquo;s included with Featured</p>
+      <div class="grid sm:grid-cols-2 gap-x-6 gap-y-2">
+        <p class="flex items-start gap-1.5 text-xs text-stone-600 leading-snug">
+          <span class="{{ theme.accent_text_full }}" aria-hidden="true">✦</span>
+          Featured badge on every search result
+        </p>
+        <p class="flex items-start gap-1.5 text-xs text-stone-600 leading-snug">
+          <span class="{{ theme.accent_text_full }}" aria-hidden="true">✦</span>
+          12 photos + hero image
+        </p>
+        <p class="flex items-start gap-1.5 text-xs text-stone-600 leading-snug">
+          <span class="{{ theme.accent_text_full }}" aria-hidden="true">✦</span>
+          AI Instagram captions &amp; ad copy &mdash; live now
+        </p>
+        <p class="flex items-start gap-1.5 text-xs text-stone-600 leading-snug">
+          <span class="{{ theme.accent_text_full }}" aria-hidden="true">✦</span>
+          First month free &middot; cancel anytime
+        </p>
+      </div>
+    </div>
+
     {# Pre-fill banner — only when ?slug=<biz> resolved to a real listing #}
     {% if claim_prefill %}
       <div class="mb-5 px-4 py-3 rounded-lg bg-stone-50 border border-stone-200">
