@@ -15,6 +15,11 @@
 {% set header_variant = 'sticky' %}
 
 {% block head_extra %}
+{#- WHY: computed before the JSON-LD block so _og_hero_url is available for the
+    "image" field. Also reused for the og:image meta tag below. Photos may be
+    plain URL strings or {"url":"..."} dicts — resolve once here. #}
+{% set _og_hero = (business.photos|selectattr('is_hero')|list|first) or (business.photos|first if business.photos else None) %}
+{% set _og_hero_url = _og_hero.url if (_og_hero and _og_hero is mapping) else _og_hero %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -53,6 +58,33 @@
   {% if business.phone %},"telephone": {{ business.phone|tojson }}{% endif %}
   {% if business.website %},"url": {{ business.website|tojson }}{% endif %}
   {% if business.price_cues %},"priceRange": {{ business.price_cues|tojson }}{% endif %}
+  {#- WHY: @id pins this JSON-LD node to the listing's canonical URL so Google
+      can unambiguously connect multiple structured-data blocks (the LocalBusiness
+      node here and the BreadcrumbList below) to the same entity. Without it,
+      Google treats the two blocks as potentially separate things. #}
+  {% if canonical_url %},"@id": {{ canonical_url|tojson }}{% endif %}
+  {#- WHY: image is the single highest-value addition to LocalBusiness schema
+      for visibility. Google's Knowledge Panel shows the photo next to the
+      business name in search results when an image URL is present. Without it
+      the Knowledge Panel entry is text-only. The hero photo is already computed
+      above for og:image so we reuse it at zero cost. #}
+  {% if _og_hero_url %},"image": {{ _og_hero_url|tojson }}{% endif %}
+  {#- WHY: sameAs lets Google connect this listing to the business's known
+      external profiles (Instagram, website). It strengthens entity recognition
+      — Google's Knowledge Graph becomes more confident this listing IS the same
+      entity it already knows about, which improves ranking for branded searches. #}
+  {% set _same_as = [] %}
+  {#- WHY: guard against instagram being stored as a full URL vs a handle.
+      Some records may have "https://instagram.com/handle" rather than "@handle". #}
+  {% if business.instagram %}
+    {% if 'instagram.com' in business.instagram %}
+      {% set _ = _same_as.append(business.instagram) %}
+    {% else %}
+      {% set _ = _same_as.append('https://instagram.com/' ~ (business.instagram|replace('@',''))) %}
+    {% endif %}
+  {% endif %}
+  {% if business.website %}{% set _ = _same_as.append(business.website) %}{% endif %}
+  {% if _same_as %},"sameAs": {{ _same_as|tojson }}{% endif %}
   {#- WHY: omit openingHoursSpecification entirely rather than emit a broken
       structure. The hours field stores combined strings like "Mon–Sat 10am–8pm"
       which Google expects as separate opens/closes times (HH:MM format). Emitting
@@ -72,17 +104,40 @@
   ]{% endif %}
 }
 </script>
+{#- WHY: BreadcrumbList tells Google the navigation path from the directory home
+    to this listing (Home → Neighborhood → Category → Business Name). Google shows
+    this path under the search result ("Miami Knows Beauty › Brickell › Hair Salons"),
+    which increases click-through rate by showing users the listing's context before
+    they visit. The `@id` values must be real navigable URLs, not placeholder text.
+    We derive the home URL by stripping the `/b/<slug>` suffix from canonical_url,
+    which avoids needing an extra template variable for the root URL. #}
+{% if canonical_url %}
+{%- set _bc_cat_slug = business.category_slugs[0] if business.category_slugs else '' %}
+{%- set _bc_nb_slug = business.neighborhood_slugs[0] if business.neighborhood_slugs else '' %}
+{%- set _bc_cat = (nav_categories|selectattr('slug','eq',_bc_cat_slug)|list|first) if _bc_cat_slug else None %}
+{%- set _bc_nb = (nav_neighborhoods|selectattr('slug','eq',_bc_nb_slug)|list|first) if _bc_nb_slug else None %}
+{#- WHY: derive home URL by stripping the /b/<slug> suffix; Jinja2 has no regex_replace
+    by default, so we use string replace with the known suffix format. #}
+{%- set _bc_home = canonical_url|replace('/b/' ~ business.slug, '') %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": {{ (tenant_label or city.name)|tojson }}, "item": {{ _bc_home|tojson }} }
+    {% set _bc_pos = namespace(n=2) %}
+    {% if _bc_nb %},{ "@type": "ListItem", "position": {{ _bc_pos.n }}, "name": {{ _bc_nb.name|tojson }}, "item": {{ (_bc_home ~ '/n/' ~ _bc_nb.slug)|tojson }} }{% set _bc_pos.n = _bc_pos.n + 1 %}{% endif %}
+    {% if _bc_cat %},{ "@type": "ListItem", "position": {{ _bc_pos.n }}, "name": {{ _bc_cat.name|tojson }}, "item": {{ (_bc_home ~ '/c/' ~ _bc_cat.slug)|tojson }} }{% set _bc_pos.n = _bc_pos.n + 1 %}{% endif %}
+    ,{ "@type": "ListItem", "position": {{ _bc_pos.n }}, "name": {{ business.name|tojson }}, "item": {{ canonical_url|tojson }} }
+  ]
+}
+</script>
+{% endif %}
 {#- WHY: og:image drives the preview card when an owner or client shares this
     listing page via WhatsApp/iMessage/Slack — without it the card renders as
     a blank grey box, which looks unfinished and kills trust. The hero photo is
-    the canonical visual for this listing. Computed here rather than reusing the
-    `hero_photo` variable from {% block content %} because that block renders
-    after head_extra in Jinja2's block-inheritance order. #}
-{% set _og_hero = (business.photos|selectattr('is_hero')|list|first) or (business.photos|first if business.photos else None) %}
-{#- WHY: same dual-format guard as business_card.html — photos may be stored as
-    plain URL strings or as {"url": "..."} dicts. Resolve once here so the meta
-    tag is correct regardless of which format is in the database. #}
-{% set _og_hero_url = _og_hero.url if (_og_hero and _og_hero is mapping) else _og_hero %}
+    the canonical visual for this listing. _og_hero_url is computed before the
+    JSON-LD block above so it can also be reused for the image field there. #}
 {% if _og_hero_url %}<meta property="og:image" content="{{ _og_hero_url }}">{% endif %}
 {% endblock %}
 
