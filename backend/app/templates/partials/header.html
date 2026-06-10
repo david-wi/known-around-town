@@ -57,11 +57,57 @@
       </div>
       <a class="hidden md:flex text-sm tracking-wide transition-colors {{ nav_link_color }} {{ nav_link_hover }}" href="/pricing">Pricing</a>
       <a class="hidden sm:inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-full border transition {{ cta_border }} {{ cta_text }} {{ cta_hover }}" href="/owners">{{ owners_header_cta }}</a>
-      <button class="md:hidden p-2 rounded-lg {{ brand_text_color }}" aria-label="Toggle navigation">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <button id="mobile-nav-btn" class="md:hidden p-2 rounded-lg {{ brand_text_color }}" aria-label="Toggle navigation" aria-expanded="false" aria-controls="mobile-nav-drawer">
+        {# WHY: two SVG paths — one for the hamburger lines, one for the X close icon.
+           JS toggles the hidden class on each so the button icon matches drawer state. #}
+        <svg id="mobile-nav-icon-open" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"></path>
+        </svg>
+        <svg id="mobile-nav-icon-close" class="hidden" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"></path>
         </svg>
       </button>
     </div>
   </div>
+  {# Mobile navigation drawer — hidden until hamburger is tapped.
+     z-40 keeps it below the sticky header (z-50) but above page content. #}
+  <div id="mobile-nav-drawer" class="hidden md:hidden bg-white border-t border-stone-200/60">
+    <nav class="max-w-7xl mx-auto px-6 py-4 flex flex-col gap-1">
+      {% if city and header_nav %}
+        <p class="text-[10px] uppercase tracking-[0.2em] text-stone-400 font-semibold mb-1">Browse by category</p>
+        {% for item in header_nav %}
+          {% set is_active = (active_category_slug == item.slug) %}
+          <a class="text-base py-2 border-b border-stone-100 transition-colors {% if is_active %}{{ theme.accent_text_full }} font-semibold{% else %}text-stone-700 {{ nav_link_hover }}{% endif %}" href="/c/{{ item.slug }}">{{ item.label }}</a>
+        {% endfor %}
+        <div class="mt-3"></div>
+      {% endif %}
+      <a class="text-base py-2 border-b border-stone-100 text-stone-700 hover:text-stone-900 transition-colors" href="/pricing">Pricing</a>
+      <a class="inline-flex items-center justify-center gap-2 mt-3 text-sm font-medium px-4 py-3 rounded-full border border-stone-900/30 text-stone-900 hover:bg-stone-900 hover:text-white transition" href="/owners">{{ owners_header_cta }}</a>
+    </nav>
+  </div>
 </header>
+<script>
+(function () {
+  var btn    = document.getElementById('mobile-nav-btn');
+  var drawer = document.getElementById('mobile-nav-drawer');
+  var iconOpen  = document.getElementById('mobile-nav-icon-open');
+  var iconClose = document.getElementById('mobile-nav-icon-close');
+  if (!btn || !drawer) return;
+  btn.addEventListener('click', function () {
+    var isOpen = !drawer.classList.contains('hidden');
+    drawer.classList.toggle('hidden', isOpen);
+    btn.setAttribute('aria-expanded', String(!isOpen));
+    iconOpen.classList.toggle('hidden', !isOpen);
+    iconClose.classList.toggle('hidden', isOpen);
+  });
+  // Close the drawer if the user resizes past the md breakpoint (768 px)
+  window.addEventListener('resize', function () {
+    if (window.innerWidth >= 768) {
+      drawer.classList.add('hidden');
+      btn.setAttribute('aria-expanded', 'false');
+      iconOpen.classList.remove('hidden');
+      iconClose.classList.add('hidden');
+    }
+  });
+}());
+</script>
