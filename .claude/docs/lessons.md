@@ -96,6 +96,15 @@ All public-facing pages now have og:image. Base template also renders twitter:im
 - Pattern for listing pages: `next((b["photos"][0]["url"] for b in businesses if b.get("photos")), city.get("hero_photo_url"))`
 - Base template renders `og:image` only when `og_image` is truthy — safe to omit from routes that don't have a sensible image (owner dashboard, login, admin pages)
 
+## ItemList JSON-LD (PR #86, 2026-06-10)
+
+- Category pages (`/c/<slug>`), neighborhood pages (`/n/<slug>`), and neighborhood+category pages now include an ItemList JSON-LD block enumerating the businesses shown on the page.
+- The block is emitted only when businesses are present (`item_list_jsonld=None` suppresses the script block entirely in the template).
+- Business list built via `_build_item_list_jsonld()` helper in `pages.py` — filters out businesses missing `slug` or `name` to avoid invalid entries. Deduplicates logic across all three route handlers.
+- Template uses `{{ item_list_jsonld | tojson }}` — the Jinja2 `tojson` filter HTML-escapes and marks output as safe, so no manual escaping needed.
+- **Test for neighborhood+category must handle absent block:** if the seed has no businesses at an intersection (e.g. Wynwood+hair could be empty), the route correctly returns `None` and no block is emitted. The smoke test for this page type skips structural assertions in that case.
+- As of PR #86 there are **88 tests** in `test_smoke.py`.
+
 ## Pending — Blocked on David
 
 - **Stripe keys** needed to activate the payment flow (`stripe_billing.py` is fully built): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PRO`
