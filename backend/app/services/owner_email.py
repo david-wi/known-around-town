@@ -197,6 +197,60 @@ def _html_body(code: str) -> str:
 </body></html>"""
 
 
+async def send_claim_verified_email(
+    *, email: str, submitter_name: str, business_name: str, login_url: str
+) -> bool:
+    """Notify the owner that their claim has been verified and they can now log in.
+
+    WHY: without this email the owner has no way to know their claim was
+    approved — they submitted, got a confirmation, and then heard nothing.
+    The only way in is to guess that they should go back to the site and
+    try logging in.  This email closes the loop and gives them a direct
+    link to the login page.
+    """
+    subject = f"Your listing for {business_name} is verified — log in now"
+    text_body = _claim_verified_text(submitter_name, business_name, login_url)
+    html_body = _claim_verified_html(submitter_name, business_name, login_url)
+
+    api_key = _provider_api_key()
+    if not api_key:
+        logger.warning(
+            "RESEND_API_KEY not configured — claim verified notification logged instead "
+            "of emailed for %s (%s).",
+            email,
+            business_name,
+        )
+        return True
+
+    try:
+        async with httpx.AsyncClient(timeout=_PROVIDER_TIMEOUT_SECONDS) as client:
+            response = await client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": _from_address(),
+                    "to": email,
+                    "subject": subject,
+                    "html": html_body,
+                    "text": text_body,
+                },
+            )
+        if response.status_code == 200:
+            logger.info("Claim verified notification sent to %s for %s", email, business_name)
+            return True
+        logger.error(
+            "Email provider returned status %s for claim verified notification",
+            response.status_code,
+        )
+        return False
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to send claim verified email: %s", type(exc).__name__)
+        return False
+
+
 def _claim_confirmation_text(submitter_name: str, business_name: str) -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
     return (
@@ -206,6 +260,54 @@ def _claim_confirmation_text(submitter_name: str, business_name: str) -> str:
         "Questions while you wait? Email hello@knowsbeauty.com.\n\n"
         "— The Miami Knows Beauty team\n"
     )
+
+
+def _claim_verified_text(submitter_name: str, business_name: str, login_url: str) -> str:
+    first = submitter_name.split()[0] if submitter_name else "there"
+    return (
+        f"Hi {first},\n\n"
+        f"Great news — your claim for {business_name} has been verified.\n\n"
+        f"Log in to your owner dashboard here:\n{login_url}\n\n"
+        "From your dashboard you can update your listing, add photos, and manage your profile.\n\n"
+        "Questions? Email hello@knowsbeauty.com.\n\n"
+        "— The Miami Knows Beauty team\n"
+    )
+
+
+def _claim_verified_html(submitter_name: str, business_name: str, login_url: str) -> str:
+    first = submitter_name.split()[0] if submitter_name else "there"
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+              background: #f8f5f2; padding: 32px; color: #1c1917;">
+  <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 16px;
+              padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+    <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
+              text-transform: uppercase; margin: 0 0 16px;">
+      Miami Knows Beauty
+    </p>
+    <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
+               font-size: 28px; line-height: 1.2; margin: 0 0 16px; color: #1c1917;">
+      Your listing is verified
+    </h1>
+    <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 24px;">
+      Hi {first} — your claim for <strong>{business_name}</strong> has been approved.
+      Your owner dashboard is ready.
+    </p>
+    <a href="{login_url}"
+       style="display: inline-block; background: #be185d; color: #ffffff; font-size: 15px;
+              font-weight: 600; text-decoration: none; padding: 14px 28px;
+              border-radius: 8px; margin: 0 0 24px;">
+      Log in to your dashboard →
+    </a>
+    <p style="font-size: 14px; color: #57534e; line-height: 1.6; margin: 0 0 16px;">
+      From your dashboard you can update your listing, add photos, set your hours, and manage your profile.
+    </p>
+    <p style="font-size: 13px; color: #78716c; margin: 0;">
+      Questions? Email <a href="mailto:hello@knowsbeauty.com" style="color: #be185d;">hello@knowsbeauty.com</a>.
+    </p>
+  </div>
+</body></html>"""
 
 
 def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:

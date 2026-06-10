@@ -715,3 +715,27 @@ def test_owners_page_has_faq_section_with_schema(client):
     # FAQPage JSON-LD must be present so Google can show rich results
     assert '"@type": "FAQPage"' in body, "FAQPage JSON-LD missing"
     assert '"@type": "Question"' in body, "FAQPage JSON-LD missing Question entities"
+
+
+def test_claim_verified_email_function_exists_with_correct_content():
+    """The claim-verified email helper must exist and produce the right content.
+
+    WHY: without this email the owner has no idea their claim was approved —
+    they submitted, got a confirmation, waited, and then heard nothing. They
+    have no way to know they can now log in. This test verifies the email
+    body names the business, links to the login page, and gives the support
+    address without hitting a real email provider."""
+    from app.services.owner_email import _claim_verified_text, _claim_verified_html
+
+    login_url = "https://miami.knowsbeauty.ai.devintensive.com/owners/login"
+
+    text = _claim_verified_text("Maria Lopez", "Salon Bliss Miami", login_url)
+    assert "Salon Bliss Miami" in text, "Business name missing from verified email text"
+    assert login_url in text, "Login URL missing from verified email text"
+    assert "hello@knowsbeauty.com" in text, "Support email missing from verified email text"
+    assert "verified" in text.lower(), "Email must state the claim has been verified"
+
+    html = _claim_verified_html("Maria Lopez", "Salon Bliss Miami", login_url)
+    assert "Salon Bliss Miami" in html, "Business name missing from verified email HTML"
+    assert login_url in html, "Login URL missing from verified email HTML"
+    assert "Log in to your dashboard" in html, "Login CTA missing from verified email HTML"
