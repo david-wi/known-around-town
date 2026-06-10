@@ -162,6 +162,14 @@
             We'll email you at <strong class="text-stone-800" id="claim-form__success-email"></strong>
             within one business day to verify ownership.
           </p>
+          {# WHY: Give the owner somewhere useful to go after submitting — without this the
+             success state is a dead end with no next action. The listing is already live
+             so linking to it is both true and helpful; the link is only shown when the
+             slug is known (prefill path or JS-matched directory path). #}
+          <p class="text-sm text-stone-500 mt-3">
+            Your listing is already live —
+            <a id="claim-success-listing-link" href="/b/" class="text-rose-500 underline hover:text-rose-700">view it now →</a>
+          </p>
         </div>
       </div>
     </div>
@@ -184,6 +192,12 @@
     // Without this, a business name containing an apostrophe would break
     // the JS parse.
     var DIRECTORY = {{ claim_directory | tojson | safe }};
+
+    // WHY: expose the resolved slug on window so the showSuccess() function
+    // can set the "view it now" link href after the form swaps to the
+    // success state. Pre-populated when the visitor arrived via ?slug=...;
+    // updated after a successful directory match on free-text input.
+    window._claimBusinessSlug = {{ (claim_prefill.slug if claim_prefill else '') | tojson | safe }};
 
     var form         = document.getElementById('claim-form__form');
     if (!form) return; // defensive: should always be present
@@ -286,6 +300,33 @@
       var node = tmpl.content.cloneNode(true);
       node.getElementById('claim-form__success-business').textContent = businessName;
       node.getElementById('claim-form__success-email').textContent = email;
+
+      // WHY: If the slug was resolved from the directory during the match
+      // phase (resolveBusinessId sets bizIdInput.value), capture it now so
+      // the "view it now" link points at the correct listing page.  We look
+      // up the slug from the DIRECTORY entry that matches the resolved id
+      // rather than trusting the free-text input directly.
+      if (!window._claimBusinessSlug) {
+        var resolvedId = (bizIdInput.value || '').trim();
+        if (resolvedId) {
+          for (var k = 0; k < DIRECTORY.length; k++) {
+            if (String(DIRECTORY[k].id) === resolvedId && DIRECTORY[k].slug) {
+              window._claimBusinessSlug = DIRECTORY[k].slug;
+              break;
+            }
+          }
+        }
+      }
+
+      var listingLink = node.getElementById('claim-success-listing-link');
+      if (listingLink && window._claimBusinessSlug) {
+        listingLink.href = '/b/' + window._claimBusinessSlug;
+      } else if (listingLink) {
+        // WHY: hide the link entirely when slug is unknown rather than
+        // linking to the bare /b/ path which 404s and confuses the owner.
+        listingLink.parentElement.style.display = 'none';
+      }
+
       wrapper.replaceWith(node.firstElementChild);
       // WHY: fire a GA4 conversion event so we can measure how many owners
       // complete the claim form — the key funnel metric for the site.  Guard

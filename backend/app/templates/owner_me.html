@@ -256,9 +256,28 @@
     <p class="text-base text-stone-600 leading-relaxed mb-2">
       Signed in as <strong class="text-stone-900">{{ owner_email }}</strong>.
     </p>
-    <p class="text-base text-stone-600 leading-relaxed mb-8">
+    <p class="text-base text-stone-600 leading-relaxed mb-4">
       We&rsquo;re verifying your listing — you&rsquo;ll have access to your dashboard within one business day.
       Questions? Email <a href="mailto:hello@knowsbeauty.com" class="underline decoration-stone-400 hover:decoration-stone-700">hello@knowsbeauty.com</a>.
+    </p>
+    {# WHY: Without these two lines the page is a dead end — the owner signed in,
+       sees "claim is being reviewed", and has nothing useful to click. Linking to
+       their live listing keeps them engaged (and reminds them the listing exists);
+       the teaser sets expectations for what they'll get once verified.
+       pending_business is resolved from the business_claims collection in the route
+       because claimed_email is only written at verification time — owner_business
+       is always None in the pending state. #}
+    {% if pending_business %}
+    <p class="text-sm text-stone-500 mb-2">
+      Your listing is already live in our directory while we review your claim —
+      <a href="/b/{{ pending_business.slug }}"
+         class="text-rose-500 underline decoration-rose-300 hover:decoration-rose-600 hover:text-rose-700 transition">
+        view it now →
+      </a>
+    </p>
+    {% endif %}
+    <p class="text-sm text-stone-500 mb-8">
+      Once verified, you&rsquo;ll be able to update your listing, add photos, and access your full dashboard.
     </p>
     <button type="button" id="owner-logout"
             class="inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm disabled:opacity-60 disabled:cursor-not-allowed">

@@ -1067,6 +1067,24 @@ async def owners_me_page(request: Request) -> HTMLResponse:
     db = get_db()
     business = await db.businesses.find_one({"claimed_email": session["email"]})
     ctx["owner_business"] = business
+
+    # WHY: When the claim is still pending, claimed_email hasn't been set yet
+    # (it's only written at verification time), so owner_business is None.
+    # We still want to show the owner a link to their live listing on the
+    # "claim pending" page so they have somewhere useful to go. Look up the
+    # most recent pending claim for this email and resolve the business slug.
+    if not business:
+        pending_claim = await db.business_claims.find_one(
+            {"submitter_email": session["email"], "status": {"$ne": "rejected"}},
+            sort=[("submitted_at", -1)],
+        )
+        if pending_claim and pending_claim.get("business_id"):
+            pending_business = await db.businesses.find_one(
+                {"_id": pending_claim["business_id"]},
+                projection={"slug": 1, "name": 1},
+            )
+            ctx["pending_business"] = pending_business
+
     if business:
         # WHY: Pass the ID as a plain string so JavaScript in the template
         # can embed it in an API request body without ObjectId serialisation
