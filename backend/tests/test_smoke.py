@@ -1086,3 +1086,79 @@ def test_mobile_nav_drawer_present_on_all_pages(client):
         # Drawer must contain the For Salon Owners link so mobile visitors
         # can reach the claim flow without a working desktop browser
         assert "/owners" in body, f"/owners link missing from {path}"
+
+
+def test_og_url_present_on_pages_with_canonical(client):
+    """When a page has a canonical URL it must also have og:url set to the same
+    value. Without og:url Facebook, LinkedIn, and Slack pick an arbitrary URL
+    to attach social activity to — likes and comments fragment across URL
+    variants instead of accumulating on the canonical page.
+
+    WHY: og:url is separate from <link rel='canonical'>. The canonical tag is
+    read by search engines; og:url is read by social crawlers. Both must be
+    present for a page to behave correctly in search AND social sharing."""
+    for path in ("/b/blow-dry-bar-brickell", "/", "/owners", "/pricing"):
+        r = client.get(path, headers={"host": "miami.knowsbeauty.localhost"})
+        assert r.status_code == 200, f"{path} returned {r.status_code}"
+        body = r.text
+        if 'rel="canonical"' in body:
+            assert 'property="og:url"' in body, (
+                f"{path} has a canonical tag but is missing og:url — "
+                "social shares on this page will not accumulate correctly"
+            )
+
+
+def test_twitter_card_meta_tags_present(client):
+    """Every page must include Twitter Card meta tags so links posted on
+    Twitter/X render with a large image and description instead of plain text.
+
+    Twitter/X does NOT fall back to og: tags — it requires its own twitter:
+    tags. Without twitter:card the shared URL shows only the page title with
+    no image or description, which looks unfinished and gets far fewer clicks.
+
+    WHY: salon owners and clients share listings on Twitter/X. A blank link
+    card makes the business look unprofessional."""
+    for path in ("/", "/b/blow-dry-bar-brickell", "/owners"):
+        r = client.get(path, headers={"host": "miami.knowsbeauty.localhost"})
+        assert r.status_code == 200, f"{path} returned {r.status_code}"
+        body = r.text
+        assert 'name="twitter:card"' in body, (
+            f"{path} missing twitter:card meta tag — Twitter/X will show a plain-text link"
+        )
+        assert 'name="twitter:title"' in body, (
+            f"{path} missing twitter:title meta tag"
+        )
+
+
+def test_business_jsonld_omits_empty_address_fields(client):
+    """The JSON-LD on a business page must not emit empty strings for
+    addressRegion or postalCode. Google's Rich Results validator treats
+    empty strings as invalid values and can suppress the whole address block
+    from the Knowledge Panel, reducing the chance of a rich result appearing.
+
+    WHY: the seed businesses may not have region/postal data. The template
+    must omit those fields when empty rather than emitting '\"addressRegion\": \"\"'
+    which looks valid to a human but fails structured-data validation."""
+    import json, re
+
+    r = client.get(
+        "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    # Extract JSON-LD blocks
+    blocks = re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>', r.text, re.DOTALL
+    )
+    for block in blocks:
+        try:
+            data = json.loads(block.strip())
+        except json.JSONDecodeError:
+            continue
+        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "LocalBusiness"):
+            addr = data.get("address", {})
+            assert addr.get("addressRegion") != "", (
+                "addressRegion is an empty string in JSON-LD — must be omitted when unknown"
+            )
+            assert addr.get("postalCode") != "", (
+                "postalCode is an empty string in JSON-LD — must be omitted when unknown"
+            )

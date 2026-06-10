@@ -21,12 +21,27 @@
   <meta property="og:title" content="{{ seo_title or ((city.name ~ ' Knows ' ~ vertical_word) if city else network.name) }}">
   {% if meta_description %}<meta property="og:description" content="{{ meta_description }}">{% endif %}
   <meta property="og:type" content="website">
+  {#- WHY: og:url tells Facebook, LinkedIn, and Slack which URL is canonical
+      for this page so shares accumulate likes/comments on one URL instead of
+      fragmenting across variants with different query strings. Without it
+      those platforms fall back to the current browser URL, which may include
+      UTM params or session state. We reuse canonical_url because it's already
+      the full absolute URL. #}
+  {% if canonical_url %}<meta property="og:url" content="{{ canonical_url }}">{% endif %}
   {#- WHY: og:image controls the preview card when anyone shares a page via
       WhatsApp/iMessage/Slack/LinkedIn — without it the card shows a blank
       grey box that looks unfinished. Child templates set this via their own
       head_extra block (preferred), or the route handler can pass og_image
       directly for a fallback. #}
   {% if og_image %}<meta property="og:image" content="{{ og_image }}">{% endif %}
+  {#- WHY: Twitter/X does not fall back to og: tags for its link preview cards —
+      it requires its own twitter: tags. Without twitter:card the shared URL
+      renders as plain text with no image or description. summary_large_image
+      is the right card type for directory listing pages (big hero photo). #}
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ seo_title or ((city.name ~ ' Knows ' ~ vertical_word) if city else network.name) }}">
+  {% if meta_description %}<meta name="twitter:description" content="{{ meta_description }}">{% endif %}
+  {% if og_image %}<meta name="twitter:image" content="{{ og_image }}">{% endif %}
   {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
   <link rel="stylesheet" href="/assets/css/reference.css">
   {% block head_extra %}{% endblock %}
