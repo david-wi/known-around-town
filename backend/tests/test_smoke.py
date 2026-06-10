@@ -790,3 +790,39 @@ def test_claim_verified_email_function_exists_with_correct_content():
     assert "Salon Bliss Miami" in html, "Business name missing from verified email HTML"
     assert login_url in html, "Login URL missing from verified email HTML"
     assert "Log in to your dashboard" in html, "Login CTA missing from verified email HTML"
+
+
+def test_business_card_does_not_expose_unclaimed_to_consumers(client):
+    """Listing cards shown to consumers must never say 'Unclaimed'.
+
+    'Unclaimed' signals abandonment to shoppers — it makes them think a
+    business doesn't care about its listing. Only owners and admins should
+    see that status. Consumer-facing cards should show 'Editorial selection'
+    (or the verified/claimed label) instead.
+    """
+    # The home page renders business cards in the editor's-picks and trending
+    # grids. No card on any consumer page should expose the word "Unclaimed".
+    for path in ("/", "/c/nails", "/n/brickell"):
+        r = client.get(path, headers={"host": "miami.knowsbeauty.localhost"})
+        assert r.status_code == 200, f"Page {path} returned {r.status_code}"
+        # The word "Unclaimed" should not appear at all in the rendered HTML
+        # (it would only be there if business_card.html still had the old
+        # `elif b.claim_status == 'unclaimed' %}Unclaimed{%` branch).
+        assert "Unclaimed" not in r.text, (
+            f"Page {path} exposes 'Unclaimed' status to consumers — "
+            "this label should only be shown in owner or admin views."
+        )
+
+
+def test_claim_form_does_not_reference_expertly_ai_email(client):
+    """The claim form error messages must use hello@knowsbeauty.com, not
+    hello@expertly.ai — the latter is an internal Expertly address that
+    has nothing to do with Miami Knows Beauty and would confuse owners who
+    hit a form error.
+    """
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "hello@expertly.ai" not in r.text, (
+        "The owners page references hello@expertly.ai — this must be "
+        "hello@knowsbeauty.com so owners reach the right support address."
+    )

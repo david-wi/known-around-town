@@ -301,12 +301,20 @@
       {% if business.address or business.phone or business.website or business.instagram %}
       <div class="bg-white border border-stone-200 rounded-2xl overflow-hidden">
         {% if hero_photo %}
-        <div class="aspect-[16/10] bg-gradient-to-br from-rose-100 via-amber-50 to-orange-100 relative">
+        {#- WHY: wrapping the photo in an <a> pointing to the Google Maps URL
+            turns the decorative placeholder into a useful tap target. The
+            directions_url is already calculated from the business address by
+            the route handler and used in the text link below. Making the
+            entire photo tappable is a much larger hit area (important on
+            mobile) and removes the "Map preview" dead-end label. #}
+        {% if directions_url %}<a href="{{ directions_url }}" target="_blank" rel="noreferrer" aria-label="Open in Google Maps">{% endif %}
+        <div class="aspect-[16/10] bg-gradient-to-br from-rose-100 via-amber-50 to-orange-100 relative {% if directions_url %}hover:opacity-90 transition-opacity cursor-pointer{% endif %}">
           <div class="absolute inset-0 opacity-30 bg-cover bg-center" style='background-image: url("{{ hero_photo.url }}");'></div>
           <div class="absolute inset-0 flex items-end p-5">
-            <div class="bg-white/90 backdrop-blur px-3 py-1.5 rounded-full text-xs font-semibold text-stone-900">📍 Map preview</div>
+            <div class="bg-white/90 backdrop-blur px-3 py-1.5 rounded-full text-xs font-semibold text-stone-900">{% if directions_url %}📍 Open in Maps{% else %}📍 {{ business.address.street if business.address else '' }}{% endif %}</div>
           </div>
         </div>
+        {% if directions_url %}</a>{% endif %}
         {% endif %}
         <div class="p-5 space-y-4">
           {% if business.address %}

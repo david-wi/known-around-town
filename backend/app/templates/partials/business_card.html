@@ -23,7 +23,7 @@
     </div>
     {% if b.short_description %}<p class="text-sm text-stone-600 line-clamp-2 mb-4 min-h-[2.5rem]">{{ b.short_description }}</p>{% endif %}
     <div class="flex items-center justify-between">
-      <span class="text-[10px] uppercase tracking-[0.18em] text-stone-500 font-medium">{% if b.claim_status == 'verified' %}Verified by editors{% elif b.claim_status == 'unclaimed' %}Unclaimed{% else %}Editor selection{% endif %}</span>
+      <span class="text-[10px] uppercase tracking-[0.18em] text-stone-500 font-medium">{% if b.claim_status == 'verified' %}Verified by editors{% elif b.claim_status == 'claimed' %}Claimed by owner{% else %}Editorial selection{% endif %}</span>
       <span class="{{ theme.accent_text_full }} font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity">View →</span>
     </div>
   </div>
