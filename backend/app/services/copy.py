@@ -39,7 +39,7 @@ DEFAULTS: Dict[str, str] = {
     "business.cta.website": "Visit website",
     "business.cta.directions": "Get directions",
     "business.claim.title": "Own this business?",
-    "business.claim.body": "Claim this profile to update details, add photos, and reach customers.",
+    "business.claim.body": "Claim free to add photos, respond to inquiries, and get found by people searching for salons in Miami. The first 25 owners to upgrade earn permanent Founding Partner status — gold badge and locked-in pricing.",
     "business.claim.cta": "Claim this listing",
     "business.section.known_for": "Known for",
     "business.section.best_for": "Best for",

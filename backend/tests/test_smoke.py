@@ -86,7 +86,7 @@ def test_miami_beauty_business(client):
     # only check copy if the claim banner is present)
     if "Claim free to add photos" in r.text:
         assert "searching for salons in Miami" in r.text
-        assert "first month free" in r.text
+        assert "Founding Partner status" in r.text
 
 
 def test_miami_wellness_home(client):
@@ -498,13 +498,18 @@ def test_founding_partner_badge_on_trending_row(client):
 def test_non_founding_partner_does_not_show_badge(client):
     """A salon NOT flagged as a Founding Partner doesn't render the
     badge on its detail page. Drybar Miami Beach is a real, non-founding
-    business in the seed, so its page should NOT mention the badge."""
+    business in the seed, so its page should NOT show the badge.
+
+    Note: the claim banner copy mentions 'Founding Partner' as the offer
+    text ('earn permanent Founding Partner status') — that's expected on all
+    unclaimed listings. What must be absent is the actual badge, identified by
+    its tooltip text 'Founding member of Miami Knows Beauty'."""
     r = client.get(
         "/b/drybar-miami-beach",
         headers={"host": "miami.knowsbeauty.localhost"},
     )
     assert r.status_code == 200, r.text
-    assert "Founding Partner" not in r.text
+    assert "Founding member of Miami Knows Beauty" not in r.text
 
 
 def test_home_hero_has_owner_entry_point(client):
