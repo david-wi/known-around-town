@@ -30,11 +30,16 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
-      - name: Run smoke tests
+      - name: Run tests
         # WHY: Tests use mongomock-motor (in-memory MongoDB mock) so no
         # database service is needed. The PYTHONPATH points to backend/
         # so app imports resolve correctly from the tests/ subdirectory.
+        # WHY the whole tests/ directory, not just test_smoke.py: safety
+        # guards like the seed/reset production guardrail
+        # (tests/test_seed_target_guard.py) and the MongoDB-URL startup guard
+        # (tests/test_config_mongo_guard.py) only protect us if CI actually
+        # runs them. Running smoke tests alone let those regressions through.
         working-directory: backend
         env:
           PYTHONPATH: .
-        run: python -m pytest tests/test_smoke.py -x -q --tb=short
+        run: python -m pytest tests/ -q --tb=short

@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from app.database import ensure_indexes, get_db
-from seed._helpers import run, upsert
+from seed._helpers import assert_seed_target_allowed, run, upsert
 
 
 # Photo URLs scraped from the reference pages (one hero photo per network,
@@ -738,6 +738,12 @@ async def seed_network(network_slug: str) -> None:
 
 
 async def main() -> None:
+    # WHY: this seed DELETES stale neighborhoods/categories/businesses as part
+    # of re-seeding (see the delete_many calls in seed_network). Refuse to run
+    # against a production database unless explicitly confirmed, before any DB
+    # access, so a wrong-database run aborts with nothing wiped. See
+    # seed._helpers.assert_seed_target_allowed.
+    assert_seed_target_allowed()
     await ensure_indexes()
     for slug in ("beauty", "wellness", "health"):
         print(f"== Seeding Miami for {slug} ==")

@@ -101,9 +101,20 @@ done
 
 # Seed (upsert) the catalog. Safe to re-run, but only for the production
 # target — see SEED_AFTER_DEPLOY rationale above.
+#
+# WHY KAT_ALLOW_PRODUCTION_RESET=true: the seed scripts now refuse to run
+# against a production database unless this explicit confirmation is set,
+# because they DELETE stale records as part of re-seeding and once wiped the
+# live database when run by mistake. This deploy step IS the intentional
+# production seed, so it sets the flag on purpose. A human running the seed by
+# hand from a laptop will not have it set, so their accidental run aborts
+# instead of wiping production. `-e` passes the flag into the container's
+# environment for that one exec only.
 if [ "$SEED_AFTER_DEPLOY" = "true" ]; then
-  docker compose -p known-around-town -f docker-compose.prod.yml exec -T backend python -m seed.seed_networks
-  docker compose -p known-around-town -f docker-compose.prod.yml exec -T backend python -m seed.seed_miami
+  docker compose -p known-around-town -f docker-compose.prod.yml exec -T \
+    -e KAT_ALLOW_PRODUCTION_RESET=true backend python -m seed.seed_networks
+  docker compose -p known-around-town -f docker-compose.prod.yml exec -T \
+    -e KAT_ALLOW_PRODUCTION_RESET=true backend python -m seed.seed_miami
 fi
 
 echo "Deploy complete ($DEPLOY_TARGET)."
