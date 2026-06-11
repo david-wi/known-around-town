@@ -285,6 +285,10 @@ class Business(BaseModel):
     # a second lookup table. Both stay null until the owner subscribes.
     stripe_customer_id: Optional[str] = None
     stripe_subscription_id: Optional[str] = None
+    # WHY: tracks cumulative real-human page views (bots excluded at the route
+    # layer). Gives owners a concrete ROI signal on their dashboard so they
+    # have a reason to renew their subscription.
+    page_view_count: int = 0
     status: PublishStatus = PublishStatus.draft
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)

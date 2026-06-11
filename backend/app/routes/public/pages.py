@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus
 
 import markdown2
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -851,8 +851,32 @@ async def search_page(request: Request, q: Optional[str] = None) -> HTMLResponse
     return _templates.TemplateResponse("search.html", ctx)
 
 
+_BOT_UA_FRAGMENTS = (
+    "bot", "crawler", "spider", "slurp", "facebookexternalhit",
+    "twitterbot", "linkedinbot", "whatsapp", "telegrambot", "applebot",
+    "semrushbot", "ahrefsbot", "mj12bot", "dotbot", "petalbot",
+)
+
+
+async def _increment_business_view(business_id: str) -> None:
+    """Atomically increment the page view counter for one business.
+
+    WHY: background task so the atomic DB write happens after the response
+    is sent — no added latency for the visitor. Using $inc on a single field
+    is safe under concurrent requests without a read-modify-write race.
+    """
+    from app.database import get_db as _get_db  # local import to avoid circular
+    db = _get_db()
+    await db.businesses.update_one(
+        {"_id": business_id},
+        {"$inc": {"page_view_count": 1}},
+    )
+
+
 @router.get("/b/{business_slug}", response_class=HTMLResponse)
-async def business_page(request: Request, business_slug: str) -> HTMLResponse:
+async def business_page(
+    request: Request, business_slug: str, background_tasks: BackgroundTasks
+) -> HTMLResponse:
     tenant = await _require_tenant(request)
     if not tenant.city:
         raise HTTPException(404, "City required")
@@ -959,6 +983,13 @@ async def business_page(request: Request, business_slug: str) -> HTMLResponse:
             or business.get("short_description"),
         }
     )
+    # WHY: count real visitor views (not bot/crawler traffic) so the owner
+    # sees a number that reflects actual human interest in their listing.
+    # Checking User-Agent before the $inc avoids inflating the counter with
+    # Googlebot and other automated traffic that visits multiple times a day.
+    ua = (request.headers.get("user-agent") or "").lower()
+    if not any(f in ua for f in _BOT_UA_FRAGMENTS):
+        background_tasks.add_task(_increment_business_view, str(business["_id"]))
     return _templates.TemplateResponse("business.html", ctx)
 
 

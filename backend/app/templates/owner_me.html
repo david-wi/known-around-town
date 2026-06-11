@@ -97,6 +97,30 @@
 </section>
 {% endif %}
 
+{# ── Listing performance stats ─────────────────────────────────── #}
+{#
+   WHY: owners need a concrete signal that the directory is working so
+   they renew their subscription. "Your page was viewed N times" is the
+   most direct proof we can show — it ties their spend to real visitor
+   attention. This section only makes sense when the owner has a claimed
+   listing (owner_business is set), so it's nested inside that block.
+#}
+{% if owner_business %}
+<section class="bg-stone-50 border-t border-stone-100">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-10">
+    <h2 class="text-base font-semibold text-stone-900 mb-1">Listing performance</h2>
+    <p class="text-sm text-stone-500 mb-6">How many times visitors have viewed your listing page.</p>
+    <div class="flex gap-8 flex-wrap">
+      <div class="bg-white rounded-2xl border border-stone-200 px-8 py-6 flex flex-col items-center min-w-[10rem]">
+        <span id="stat-views" class="text-4xl font-bold text-rose-600 tracking-tight">&hellip;</span>
+        <span class="mt-1 text-sm text-stone-500">page views</span>
+      </div>
+    </div>
+    <p id="stats-error" class="hidden mt-4 text-sm text-rose-700" role="alert" aria-live="polite"></p>
+  </div>
+</section>
+{% endif %}
+
 {# ── Edit form ─────────────────────────────────────────────────── #}
 <section class="bg-white">
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
@@ -812,6 +836,27 @@
 
     return div;
   }
+
+/* ── Listing performance stats ─────────────────────────────── */
+(function () {
+  var viewsEl = document.getElementById('stat-views');
+  var errEl   = document.getElementById('stats-error');
+  if (!viewsEl) return;   /* not rendered when owner has no listing */
+
+  fetch('/api/v1/owner/stats')
+    .then(function (r) {
+      if (!r.ok) throw new Error('Error ' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      viewsEl.textContent = (data.page_view_count || 0).toLocaleString();
+    })
+    .catch(function () {
+      viewsEl.textContent = '—';
+      errEl.textContent = 'Could not load stats. Please refresh the page.';
+      errEl.classList.remove('hidden');
+    });
+})();
 
   fetch('/api/v1/owner/inquiries')
     .then(function (r) {

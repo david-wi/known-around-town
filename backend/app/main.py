@@ -25,6 +25,7 @@ from app.routes.api.v1 import (
     owner_leads as api_owner_leads,
     owner_inquiries as api_owner_inquiries,
     owner_profile as api_owner_profile,
+    owner_stats as api_owner_stats,
     stripe_billing as api_stripe_billing,
 )
 from app.routes.admin import claims_admin
@@ -86,6 +87,8 @@ app.include_router(api_owner_profile.router)
 # WHY: same full-prefix pattern as owner_profile — the router carries
 # /api/v1/owner/inquiries internally so no prefix is passed here.
 app.include_router(api_owner_inquiries.router)
+# WHY: same full-prefix pattern — router carries /api/v1/owner/stats internally.
+app.include_router(api_owner_stats.router)
 # Stripe billing: checkout session creation + webhook receiver.
 app.include_router(api_stripe_billing.router, prefix="/api/v1")
 
