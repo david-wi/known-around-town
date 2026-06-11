@@ -636,7 +636,13 @@ async def seed_network(network_slug: str) -> None:
             # WHY: persists the mock founding-partner flag so the home and
             # detail templates can render the badge from a single field.
             "is_founding_partner": biz.get("is_founding_partner", False),
-            "claim_status": "verified" if biz.get("editors_pick") or biz.get("premium") else "unclaimed",
+            # WHY: editorial picks are our quality judgment about the listing,
+            # NOT confirmation that the owner has gone through the claim flow.
+            # Seeding as 'verified' hides the Claim CTA for every editors'-pick
+            # salon — exactly the owners we most want to onboard. All editorial
+            # listings start unclaimed; claim_status advances to 'claimed' or
+            # 'verified' only when a real owner completes the claim flow.
+            "claim_status": "unclaimed",
             "schema_org_type": biz.get("schema_org_type", "LocalBusiness"),
             "data_source": "editorial",
             "quality_score": 90 if biz.get("editors_pick") else 60,
