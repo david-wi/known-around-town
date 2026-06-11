@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% set header_variant = 'sticky' %}
+{% block content %}
+<section class="relative bg-stone-950 overflow-hidden">
+  <div class="absolute inset-0 bg-gradient-to-br from-stone-950 via-stone-900 to-amber-950/40"></div>
+  <div class="relative max-w-7xl mx-auto px-6 lg:px-10 pt-20 pb-16">
+    <div class="text-sm text-white/70 mb-8">
+      <a class="hover:text-white" href="/">{{ city.name }}</a> · <span class="text-white">Guides</span>
+    </div>
+    <div class="flex items-center gap-3 mb-5">
+      <div class="h-px w-10 bg-amber-300/80"></div>
+      <span class="text-[10px] uppercase tracking-[0.3em] text-amber-200 font-semibold">Editorial</span>
+    </div>
+    <h1 class="font-light text-white leading-tight mb-5"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.5rem, 6vw, 4.5rem);'>Beauty &amp; Wellness<br>Guides</h1>
+    <p class="text-white/60 text-lg max-w-xl">Expert recommendations for salons, spas, and beauty destinations across {{ city.name }}.</p>
+  </div>
+</section>
+
+<section class="py-20 lg:py-28 max-w-7xl mx-auto px-6 lg:px-10">
+  {% if guides %}
+  <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for guide in guides %}
+    <a href="/guides/{{ guide.slug }}" class="group block bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 border border-stone-100 hover:border-amber-200">
+      <div class="p-6">
+        <div class="text-[10px] uppercase tracking-[0.2em] text-amber-700 font-semibold mb-3">
+          {% if guide.neighborhood_slugs %}{{ guide.neighborhood_slugs[0]|replace('-', ' ')|title }}{% else %}Miami{% endif %}
+        </div>
+        <h2 class="font-serif text-xl font-light text-stone-900 mb-3 group-hover:text-amber-800 transition-colors leading-snug" style="font-family: Georgia, serif;">{{ guide.title }}</h2>
+        {% if guide.meta_description %}
+        <p class="text-sm text-stone-500 leading-relaxed line-clamp-3">{{ guide.meta_description }}</p>
+        {% endif %}
+        <div class="mt-4 flex items-center gap-1 text-xs font-medium text-amber-700 group-hover:gap-2 transition-all">
+          Read guide
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-stone-500 text-center py-20">Guides coming soon.</p>
+  {% endif %}
+</section>
+{% endblock %}
