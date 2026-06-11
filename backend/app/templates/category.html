@@ -78,21 +78,30 @@
 {% block content %}
 <section class="relative bg-gradient-to-br {{ theme.category_banner_gradient }} border-b border-stone-200/70">
   <div class="max-w-7xl mx-auto px-6 lg:px-10 pt-14 pb-12">
+    {# WHY: Breadcrumb shows the full path — on a cross-page (/n/south-beach/c/hair)
+       we show Miami › South Beach › Hair so both users and Google see the hierarchy.
+       On a plain category page (/c/hair) we just show Miami › Hair. #}
     <div class="text-sm text-stone-500 mb-6">
-      <a class="hover:text-stone-900" href="/">{{ city.name }}</a> · <span class="text-stone-700">{{ category.name }}</span>
+      <a class="hover:text-stone-900" href="/">{{ city.name }}</a>
+      {% if neighborhood %} · <a class="hover:text-stone-900" href="/n/{{ neighborhood.slug }}">{{ neighborhood.name }}</a>{% endif %}
+       · <span class="text-stone-700">{{ category.name }}</span>
     </div>
     <div class="grid md:grid-cols-12 gap-8 items-end">
       <div class="md:col-span-8">
         {% if category.emoji %}<div class="text-7xl mb-4">{{ category.emoji }}</div>{% endif %}
+        {# WHY: On cross-pages the H1 must name the neighborhood, not just the city.
+           "Hair Salons in South Beach, Miami" is the search intent Google needs to match;
+           "Hair Salons in Miami" (the old text) competes with the plain category page and
+           tells Google nothing about South Beach. #}
         <h1 class="font-serif text-5xl md:text-6xl lg:text-7xl font-light text-stone-900 leading-[0.95] mb-4"
-            style='font-family: Georgia, "Times New Roman", serif;'>{{ category.name }} {{ listing_word_plural }} in <em class="italic {{ theme.accent_text_strong }}">{{ city.name }}</em></h1>
+            style='font-family: Georgia, "Times New Roman", serif;'>{{ category.name }} {{ listing_word_plural }} in <em class="italic {{ theme.accent_text_strong }}">{% if neighborhood %}{{ neighborhood.name }}, {% endif %}{{ city.name }}</em></h1>
         {% set sub = category.description or hero_subhead %}
         {% if sub %}<p class="text-lg text-stone-700 max-w-2xl">{{ sub }}</p>{% endif %}
       </div>
       <div class="md:col-span-4 md:text-right">
         <div class="inline-flex items-center gap-2 text-sm text-stone-700 bg-white border border-stone-200 rounded-full px-4 py-2">
           <span class="font-semibold text-stone-900">{{ businesses|length }}</span>
-          <span>listed in {{ city.name }}</span>
+          <span>listed in {{ neighborhood.name if neighborhood else city.name }}</span>
         </div>
       </div>
     </div>
