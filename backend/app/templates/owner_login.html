@@ -130,6 +130,21 @@
     el.classList.add('hidden');
   }
 
+  // WHY: the claim-verified email sends a link like /owners/login?email=owner@example.com
+  // so verified owners skip the email-entry step and land straight on the code form.
+  // Without this, they'd have to retype the email they just received the email at.
+  (function autoFillFromUrl() {
+    try {
+      var params = new URL(window.location.href).searchParams;
+      var pre = (params.get('email') || '').trim();
+      if (!pre || pre.indexOf('@') < 0) return;
+      emailInput.value = pre;
+      // Auto-submit after a brief pause so the owner can see the address
+      // being filled in before the code form appears.
+      setTimeout(function() { emailForm.dispatchEvent(new Event('submit')); }, 400);
+    } catch (e) { /* URL API not available — skip silently */ }
+  })();
+
   emailForm.addEventListener('submit', async function(ev) {
     ev.preventDefault();
     clearError(emailError);

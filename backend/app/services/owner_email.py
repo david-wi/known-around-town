@@ -287,7 +287,8 @@ def _html_body(code: str) -> str:
 
 
 async def send_claim_verified_email(
-    *, email: str, submitter_name: str, business_name: str, login_url: str
+    *, email: str, submitter_name: str, business_name: str, login_url: str,
+    site_base_url: str = "https://miamiknowsbeauty.com",
 ) -> bool:
     """Notify the owner that their claim has been verified and they can now log in.
 
@@ -298,8 +299,9 @@ async def send_claim_verified_email(
     link to the login page.
     """
     subject = f"Your listing for {business_name} is verified — log in now"
-    text_body = _claim_verified_text(submitter_name, business_name, login_url)
-    html_body = _claim_verified_html(submitter_name, business_name, login_url)
+    pricing_url = site_base_url.rstrip("/") + "/pricing"
+    text_body = _claim_verified_text(submitter_name, business_name, login_url, pricing_url)
+    html_body = _claim_verified_html(submitter_name, business_name, login_url, pricing_url)
 
     api_key = _provider_api_key()
     if not api_key:
@@ -351,7 +353,9 @@ def _claim_confirmation_text(submitter_name: str, business_name: str) -> str:
     )
 
 
-def _claim_verified_text(submitter_name: str, business_name: str, login_url: str) -> str:
+def _claim_verified_text(
+    submitter_name: str, business_name: str, login_url: str, pricing_url: str
+) -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
     return (
         f"Hi {first},\n\n"
@@ -360,13 +364,15 @@ def _claim_verified_text(submitter_name: str, business_name: str, login_url: str
         "From your dashboard you can update your listing, add photos, and manage your profile.\n\n"
         "Want to stand out? Once you're in, you can upgrade to Featured — priority placement, "
         "a Pro badge, and our Instagram caption generator. "
-        "See pricing: https://miamiknowsbeauty.com/pricing\n\n"
+        f"See pricing: {pricing_url}\n\n"
         "Questions? Email hello@knowsbeauty.com.\n\n"
         "— The Miami Knows Beauty team\n"
     )
 
 
-def _claim_verified_html(submitter_name: str, business_name: str, login_url: str) -> str:
+def _claim_verified_html(
+    submitter_name: str, business_name: str, login_url: str, pricing_url: str
+) -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
@@ -398,7 +404,7 @@ def _claim_verified_html(submitter_name: str, business_name: str, login_url: str
     <p style="margin: 20px 0 8px; font-size: 15px; color: #57534e;">
       <strong>Want to stand out more?</strong> Once you're in your dashboard, you can upgrade to a Featured listing —
       priority placement at the top of every category and neighborhood page, a Pro badge, and our
-      Instagram caption generator. <a href="https://miamiknowsbeauty.com/pricing" style="color: #f43f5e;">See pricing →</a>
+      Instagram caption generator. <a href="{pricing_url}" style="color: #f43f5e;">See pricing →</a>
     </p>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
       Questions? Email <a href="mailto:hello@knowsbeauty.com" style="color: #be185d;">hello@knowsbeauty.com</a>.
