@@ -1,4 +1,8 @@
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from motor.motor_asyncio import (
+    AsyncIOMotorClient,
+    AsyncIOMotorDatabase,
+    AsyncIOMotorGridFSBucket,
+)
 
 from app.config import get_settings
 
@@ -22,6 +26,13 @@ def get_client() -> AsyncIOMotorClient:
 
 def get_db() -> AsyncIOMotorDatabase:
     return get_client()[get_settings().mongodb_database]
+
+
+def get_gridfs_bucket() -> AsyncIOMotorGridFSBucket:
+    # WHY: named bucket "business_photos" to keep owner photos isolated from
+    # any other GridFS usage. The default bucket name is "fs", which is too
+    # generic and could collide if GridFS is used elsewhere in the future.
+    return AsyncIOMotorGridFSBucket(get_db(), bucket_name="business_photos")
 
 
 async def ensure_indexes() -> None:
