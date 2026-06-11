@@ -39,6 +39,11 @@
 {% if item_list_jsonld %}
 <script type="application/ld+json">{{ item_list_jsonld | tojson }}</script>
 {% endif %}
+{# WHY: Neighborhood pages with no businesses are thin stubs — noindex them to
+   preserve crawl budget for pages with real content. #}
+{% if not businesses %}
+<meta name="robots" content="noindex, follow">
+{% endif %}
 {% endblock %}
 
 {% block content %}
