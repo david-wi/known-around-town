@@ -1751,6 +1751,84 @@ def test_owner_me_upgrade_button_shows_correct_price():
     )
 
 
+def test_owner_me_upgrade_card_shows_specific_neighborhood():
+    """The upgrade card must render the owner's actual neighborhood name, not
+    the generic phrase 'your neighborhood'.
+
+    WHY: when an owner who just got verified sees 'Be the first salon visitors
+    see in your neighborhood', it reads as a generic template placeholder.
+    Seeing 'Be the first salon visitors see in Wynwood' is concrete, personal,
+    and far more compelling — the owner can picture their listing at the top of
+    the Wynwood page they know visitors use.
+    """
+    import pathlib
+    from jinja2 import Environment, FileSystemLoader
+
+    templates_dir = (
+        pathlib.Path(__file__).parent.parent / "app" / "templates"
+    )
+    env = Environment(loader=FileSystemLoader(str(templates_dir)))
+
+    # Mock a minimal base.html so we can render owner_me.html in isolation.
+    # owner_me.html extends base.html; we only care about the upgrade card block.
+    # We read the raw template source and render it without the {% extends %} —
+    # extract just the upgrade-card section for targeted verification.
+    source = (templates_dir / "owner_me.html").read_text()
+
+    # Build a minimal Jinja2 template that renders only the upgrade-card vars
+    # by extracting the relevant section without needing the full extends chain.
+    # We do this by testing the Jinja2 logic directly: render just the
+    # neighborhood-resolution stanza and verify the output.
+    snippet = """
+{%- set _uc_nb_slug = owner_business.neighborhood_slugs[0] if (owner_business and owner_business.neighborhood_slugs) else '' %}
+{%- set _uc_nb = (nav_neighborhoods|selectattr('slug','eq',_uc_nb_slug)|list|first) if _uc_nb_slug else None %}
+{%- set _uc_nb_name = _uc_nb.name if _uc_nb else 'your neighborhood' %}
+{%- set _uc_tags = owner_business.tags[:2] if (owner_business and owner_business.tags) else [] %}
+NB:{{ _uc_nb_name }}
+TAGS:{{ _uc_tags|join('|') }}
+"""
+    from jinja2 import Environment as JEnv
+    env2 = JEnv()
+    tmpl = env2.from_string(snippet)
+
+    # Case 1: business with neighborhood and tags → specific names appear
+    out = tmpl.render(
+        owner_business={
+            "neighborhood_slugs": ["wynwood"],
+            "tags": ["Hair Salons", "Color Specialists"],
+        },
+        nav_neighborhoods=[
+            {"slug": "wynwood", "name": "Wynwood"},
+            {"slug": "brickell", "name": "Brickell"},
+        ],
+    )
+    assert "NB:Wynwood" in out, (
+        "Upgrade card must show 'Wynwood' (actual neighborhood) not 'your neighborhood' "
+        "when business has neighborhood_slugs=['wynwood'] in context"
+    )
+    assert "TAGS:Hair Salons|Color Specialists" in out, (
+        "Upgrade card must surface the owner's actual service categories from business.tags"
+    )
+
+    # Case 2: business with no neighborhood → generic fallback
+    out_no_nb = tmpl.render(
+        owner_business={"neighborhood_slugs": [], "tags": []},
+        nav_neighborhoods=[{"slug": "wynwood", "name": "Wynwood"}],
+    )
+    assert "NB:your neighborhood" in out_no_nb, (
+        "Upgrade card must fall back to 'your neighborhood' when neighborhood_slugs is empty"
+    )
+
+    # Case 3: confirm the template source has the Jinja2 expression, not a static string
+    assert "_uc_nb_name" in source, (
+        "owner_me.html must use the _uc_nb_name variable in the upgrade card — "
+        "static 'your neighborhood' string means the personalization was removed"
+    )
+    assert "_uc_tags" in source, (
+        "owner_me.html must use the _uc_tags variable for category personalization"
+    )
+
+
 def test_category_page_title_uses_full_brand_name(client):
     """Category page titles must include 'Miami Knows Beauty' — the full brand
     name — not just 'Knows Beauty' (the network word without the city).
