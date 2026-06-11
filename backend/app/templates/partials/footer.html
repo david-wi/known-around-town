@@ -52,6 +52,11 @@
             {% set is_pricing = (item | lower) == 'pricing' %}
             <li><a class="text-stone-300 hover:text-white" href="{{ '/pricing' if is_pricing else '/owners' }}">{{ item }}</a></li>
           {% endfor %}
+          {#- WHY: Owner login is a direct link rather than routing through /owners
+              because owners who click "login" already know they have an account
+              and should not be sent to the marketing landing page — they want
+              the actual login form at /owners/login. #}
+          <li><a class="text-stone-300 hover:text-white" href="/owners/login">Owner login</a></li>
           <li><a class="text-stone-300 hover:text-white" href="/expertly-voice.html">Voice for Salons</a></li>
         </ul>
       </div>
