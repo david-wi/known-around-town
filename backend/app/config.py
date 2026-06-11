@@ -70,6 +70,28 @@ class Settings(BaseSettings):
     # swap it between test mode and live mode without a code change.
     stripe_price_id_pro: str = ""
 
+    # WHY: read through pydantic-settings (same as all other config) rather
+    # than os.environ.get() directly, so the setting is documented in one
+    # place and works with .env files in dev. Empty string means the GA4
+    # script is not emitted — no dead snippet or console noise on dev.
+    ga_measurement_id: str = ""
+
+    # WHY: when both the custom domain (miami.knowsbeauty.com) and the
+    # dev subdomain (miami.knowsbeauty.ai.devintensive.com) serve the same
+    # content, search engines see duplicate pages at two addresses. Setting
+    # CANONICAL_BASE_URL=https://miami.knowsbeauty.com makes every page
+    # declare the .com URL as the authoritative one, concentrating ranking
+    # signals on the public-facing domain rather than splitting them. Leave
+    # empty to use the incoming request URL (safe while only one domain exists).
+    canonical_base_url: str = ""
+
+    # WHY: Google Search Console requires site ownership verification before
+    # it will show indexing reports or accept sitemap submissions. The easiest
+    # verification method is a <meta name="google-site-verification"> tag in
+    # the page <head>. Setting this env var adds the tag to every page so David
+    # can verify ownership in one config change without a code deploy.
+    google_site_verification: str = ""
+
     port: int = 8000
     log_level: str = "INFO"
 

@@ -43,6 +43,10 @@
   {% if meta_description %}<meta name="twitter:description" content="{{ meta_description }}">{% endif %}
   {% if og_image %}<meta name="twitter:image" content="{{ og_image }}">{% endif %}
   {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
+  {#- WHY: Google Search Console ownership verification. The tag is emitted
+      only when GOOGLE_SITE_VERIFICATION is set in the server env, so it has
+      zero effect on development and is invisible to non-Google crawlers. -#}
+  {% if google_site_verification %}<meta name="google-site-verification" content="{{ google_site_verification }}">{% endif %}
   <link rel="stylesheet" href="/assets/css/reference.css">
   {% block head_extra %}{% endblock %}
   {% if ga_measurement_id %}

@@ -2495,3 +2495,192 @@ def test_owner_login_page_loads_with_email_param(client):
     assert r.status_code == 200, f"Login page with ?email= returned {r.status_code}"
     # The JS block that reads the param must be present
     assert "autoFillFromUrl" in r.text, "autoFillFromUrl JS function missing from login page"
+
+
+# ---------------------------------------------------------------------------
+# CANONICAL_BASE_URL / GOOGLE_SITE_VERIFICATION / GA_MEASUREMENT_ID — env var tests
+# ---------------------------------------------------------------------------
+
+def test_canonical_base_url_overrides_canonical_tag(seeded_db, monkeypatch):
+    """When CANONICAL_BASE_URL is set to https://miami.knowsbeauty.com, every
+    page's <link rel='canonical'> and og:url must point at that domain, not the
+    incoming request hostname.
+
+    WHY: when both miami.knowsbeauty.com and the dev subdomain serve the same
+    pages, search engines see duplicate content at two addresses. CANONICAL_BASE_URL
+    forces all pages to declare the .com domain as authoritative so all ranking
+    signals concentrate on the public-facing domain instead of being split."""
+    from app.config import get_settings
+    from app.main import app
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("CANONICAL_BASE_URL", "https://miami.knowsbeauty.com")
+    try:
+        client = TestClient(app)
+        r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+        assert r.status_code == 200, r.text
+        assert 'href="https://miami.knowsbeauty.com/"' in r.text, (
+            "canonical tag not using CANONICAL_BASE_URL — "
+            "search engines see duplicate content when both domains serve the site"
+        )
+        assert 'content="https://miami.knowsbeauty.com/"' in r.text, (
+            "og:url not using CANONICAL_BASE_URL"
+        )
+        assert 'canonical" href="http://miami.knowsbeauty.localhost/' not in r.text, (
+            "canonical tag still uses request host despite CANONICAL_BASE_URL being set"
+        )
+    finally:
+        get_settings.cache_clear()
+
+
+def test_canonical_base_url_overrides_business_page_canonical(seeded_db, monkeypatch):
+    """CANONICAL_BASE_URL must be applied to business detail pages, not just home.
+
+    WHY: every page in the sitemap gets indexed. Without overriding detail page
+    canonicals, Google indexes all business pages at the dev subdomain address
+    even though CANONICAL_BASE_URL is set to the .com domain."""
+    from app.config import get_settings
+    from app.main import app
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("CANONICAL_BASE_URL", "https://miami.knowsbeauty.com")
+    try:
+        client = TestClient(app)
+        r = client.get(
+            "/b/blow-dry-bar-brickell",
+            headers={"host": "miami.knowsbeauty.localhost"},
+        )
+        assert r.status_code == 200, r.text
+        assert 'href="https://miami.knowsbeauty.com/b/blow-dry-bar-brickell"' in r.text, (
+            "Business page canonical not using CANONICAL_BASE_URL"
+        )
+    finally:
+        get_settings.cache_clear()
+
+
+def test_canonical_base_url_empty_uses_request_host(client):
+    """When CANONICAL_BASE_URL is not set (the default), the canonical tag must
+    use the incoming request host — the existing behaviour before this feature.
+
+    WHY: the env var is optional and empty by default. Existing deploys with no
+    CANONICAL_BASE_URL configured must behave exactly as before."""
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert 'rel="canonical"' in r.text, "canonical tag missing"
+    assert "knowsbeauty.localhost" in r.text
+
+
+def test_robots_txt_sitemap_uses_canonical_base_url(seeded_db, monkeypatch):
+    """When CANONICAL_BASE_URL is set, the Sitemap: line in robots.txt must
+    point at the canonical domain, not the incoming request hostname.
+
+    WHY: the sitemap URL in robots.txt is how Google discovers all pages for
+    crawling. If it points at the dev subdomain, Google indexes all pages at
+    the wrong address even if the canonical tags on each page say .com."""
+    from app.config import get_settings
+    from app.main import app
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("CANONICAL_BASE_URL", "https://miami.knowsbeauty.com")
+    try:
+        client = TestClient(app)
+        r = client.get("/robots.txt", headers={"host": "miami.knowsbeauty.localhost"})
+        assert r.status_code == 200, r.text
+        assert "Sitemap: https://miami.knowsbeauty.com/sitemap.xml" in r.text, (
+            f"robots.txt Sitemap: line not using CANONICAL_BASE_URL; got:\n{r.text}"
+        )
+    finally:
+        get_settings.cache_clear()
+
+
+def test_sitemap_loc_uses_canonical_base_url(seeded_db, monkeypatch):
+    """When CANONICAL_BASE_URL is set, all <loc> entries in sitemap.xml must
+    use that domain.
+
+    WHY: the sitemap is the authoritative list of URLs Google uses to crawl.
+    If <loc> entries say dev subdomain but canonical tags say .com, Google may
+    either skip the sitemap or treat the pages as separate from the canonical."""
+    from app.config import get_settings
+    from app.main import app
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("CANONICAL_BASE_URL", "https://miami.knowsbeauty.com")
+    try:
+        client = TestClient(app)
+        r = client.get("/sitemap.xml", headers={"host": "miami.knowsbeauty.localhost"})
+        assert r.status_code == 200, r.text
+        assert "<loc>https://miami.knowsbeauty.com/" in r.text, (
+            "sitemap <loc> entries not using CANONICAL_BASE_URL"
+        )
+        assert "<loc>http://miami.knowsbeauty.localhost/" not in r.text, (
+            "sitemap <loc> still uses request host despite CANONICAL_BASE_URL being set"
+        )
+    finally:
+        get_settings.cache_clear()
+
+
+def test_google_site_verification_tag_when_set(seeded_db, monkeypatch):
+    """When GOOGLE_SITE_VERIFICATION is configured, the page head must include
+    the <meta name='google-site-verification'> tag with the token value.
+
+    WHY: Google Search Console requires this tag to verify site ownership
+    before showing indexing reports or accepting sitemap submissions. Making
+    it an env var lets David enable verification with a config change instead
+    of a code deploy."""
+    from app.config import get_settings
+    from app.main import app
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("GOOGLE_SITE_VERIFICATION", "test-token-abc123")
+    try:
+        client = TestClient(app)
+        r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+        assert r.status_code == 200, r.text
+        assert 'name="google-site-verification"' in r.text, (
+            "google-site-verification meta tag missing even though env var is set"
+        )
+        assert 'content="test-token-abc123"' in r.text, (
+            "google-site-verification token value not rendered correctly"
+        )
+    finally:
+        get_settings.cache_clear()
+
+
+def test_google_site_verification_tag_absent_by_default(client):
+    """When GOOGLE_SITE_VERIFICATION is not set, the verification meta tag must
+    not appear — an empty or absent env var must be silent.
+
+    WHY: emitting a blank or invalid verification tag would look broken in the
+    page source and could confuse Google's verification system."""
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert 'name="google-site-verification"' not in r.text, (
+        "google-site-verification meta tag appears even though env var is not set"
+    )
+
+
+def test_ga_measurement_id_from_settings(seeded_db, monkeypatch):
+    """The GA4 measurement script must appear when GA_MEASUREMENT_ID is
+    configured, confirming the setting is read from pydantic-settings (not a
+    direct os.environ call, which would bypass .env file loading).
+
+    WHY: moving GA_MEASUREMENT_ID into Settings brings it in line with all
+    other config and makes it discoverable alongside the other env var docs."""
+    from app.config import get_settings
+    from app.main import app
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("GA_MEASUREMENT_ID", "G-TEST99999")
+    try:
+        client = TestClient(app)
+        r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+        assert r.status_code == 200, r.text
+        assert "G-TEST99999" in r.text, (
+            "GA measurement ID not rendered — ga_measurement_id may not be "
+            "reading from pydantic-settings correctly"
+        )
+        assert "googletagmanager.com" in r.text, (
+            "GA script tag missing even though GA_MEASUREMENT_ID is set"
+        )
+    finally:
+        get_settings.cache_clear()

@@ -59,6 +59,15 @@ services:
       # container sees it. Empty default means no script is emitted until the
       # ID is configured — safe to deploy before GA is set up.
       GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
+      # WHY: when both the custom domain and the dev subdomain serve the same
+      # content, setting CANONICAL_BASE_URL=https://miami.knowsbeauty.com
+      # makes every page point search engines at the clean public domain.
+      # Empty default is safe — pages use the request URL until this is set.
+      CANONICAL_BASE_URL: ${CANONICAL_BASE_URL:-}
+      # WHY: Google Search Console verification token. Set to the value from
+      # the "HTML tag" verification method in Search Console so David can
+      # verify site ownership without adding a file to the repo.
+      GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
       LOG_LEVEL: INFO
     networks:
       - traefik
@@ -162,6 +171,8 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRICE_ID_PRO: ${STRIPE_PRICE_ID_PRO:-}
       GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
+      CANONICAL_BASE_URL: ${CANONICAL_BASE_URL:-}
+      GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
       LOG_LEVEL: INFO
     networks:
       - traefik
