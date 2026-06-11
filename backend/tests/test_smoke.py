@@ -2310,3 +2310,48 @@ def test_editorial_guide_page_no_itemlist_when_no_featured(client, seeded_db):
     assert not item_list_blocks, (
         "Guide page with no featured businesses must not emit an ItemList JSON-LD block"
     )
+
+
+def test_business_page_view_counter_increments(seeded_db):
+    """Visiting a business listing page must increment page_view_count in MongoDB.
+
+    WHY: The counter fires via a FastAPI BackgroundTask. This test confirms the
+    full path works end to end: page request -> background task -> $inc in DB.
+    Business _id values are UUID strings (not ObjectIds), so {"_id": str_id} is
+    the correct query form. TestClient runs background tasks synchronously so we
+    can check the DB immediately after the request.
+    """
+    import asyncio
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+
+    biz = asyncio.run(seeded_db.businesses.find_one({"status": "live"}))
+    assert biz, "Need at least one live business in seeded_db"
+
+    slug = biz["slug"]
+    biz_id = biz["_id"]
+
+    # Reset so the test is deterministic regardless of other test runs
+    asyncio.run(seeded_db.businesses.update_one(
+        {"_id": biz_id},
+        {"$set": {"page_view_count": 0}},
+    ))
+
+    r = client.get(
+        f"/b/{slug}",
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            # WHY: the bot-filter checks user-agent; use a real browser UA so the counter fires
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        },
+    )
+    assert r.status_code == 200, f"Business page returned {r.status_code}"
+
+    updated = asyncio.run(seeded_db.businesses.find_one({"_id": biz_id}))
+    assert updated["page_view_count"] == 1, (
+        f"page_view_count should be 1 after one visit, got "
+        f"{updated.get('page_view_count', 'field missing')}. "
+        "Check that _increment_business_view is wired to the background task."
+    )
