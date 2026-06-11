@@ -361,7 +361,10 @@ def _claim_verified_text(
         f"Hi {first},\n\n"
         f"Great news — your claim for {business_name} has been verified.\n\n"
         f"Log in to your owner dashboard here:\n{login_url}\n\n"
-        "From your dashboard you can update your listing, add photos, and manage your profile.\n\n"
+        "Three things that take 5 minutes:\n"
+        "1. Add a cover photo — listings with photos get far more clicks\n"
+        "2. Set your hours — visitors decide whether to visit based on this\n"
+        "3. Write two sentences about what makes your salon special\n\n"
         "Want to stand out? Once you're in, you can upgrade to Featured — priority placement, "
         "a Pro badge, and our Instagram caption generator. "
         f"See pricing: {pricing_url}\n\n"
@@ -398,9 +401,21 @@ def _claim_verified_html(
               border-radius: 8px; margin: 0 0 24px;">
       Log in to your dashboard →
     </a>
-    <p style="font-size: 14px; color: #57534e; line-height: 1.6; margin: 0 0 16px;">
-      From your dashboard you can update your listing, add photos, set your hours, and manage your profile.
-    </p>
+    <div style="background: #fafaf9; border: 1px solid #e7e5e4; border-radius: 12px;
+                padding: 18px 20px; margin: 0 0 24px;">
+      <p style="font-size: 13px; font-weight: 600; color: #292524; margin: 0 0 10px;">
+        Three things that take 5 minutes:
+      </p>
+      <p style="font-size: 13px; color: #57534e; line-height: 1.5; margin: 0 0 7px;">
+        📸 <strong>Add a cover photo</strong> — listings with photos get far more clicks than text-only ones
+      </p>
+      <p style="font-size: 13px; color: #57534e; line-height: 1.5; margin: 0 0 7px;">
+        🕐 <strong>Set your hours</strong> — visitors decide whether to stop by based on this
+      </p>
+      <p style="font-size: 13px; color: #57534e; line-height: 1.5; margin: 0;">
+        ✏️ <strong>Write two sentences</strong> about what makes your salon special
+      </p>
+    </div>
     <p style="margin: 20px 0 8px; font-size: 15px; color: #57534e;">
       <strong>Want to stand out more?</strong> Once you're in your dashboard, you can upgrade to a Featured listing —
       priority placement at the top of every category and neighborhood page, a Pro badge, and our

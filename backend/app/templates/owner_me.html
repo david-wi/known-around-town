@@ -148,6 +148,46 @@
 </section>
 {% endif %}
 
+{# ── Getting started checklist ─────────────────────────────────── #}
+{# WHY: new owners land on the dashboard with no guidance about what
+   matters most. Photos are the single highest-leverage action —
+   they dramatically increase clicks vs text-only listings — but
+   there's no obvious signal to tell the owner that. Show this
+   checklist only when they haven't uploaded a photo yet; once
+   they have at least one, they're past the first hurdle and the
+   card disappears to keep the dashboard uncluttered. #}
+{% if not (owner_business.photos or []) %}
+<section class="bg-emerald-50 border-t border-emerald-100">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-8">
+    <h2 class="text-base font-semibold text-stone-900 mb-1">Getting started</h2>
+    <p class="text-sm text-stone-500 mb-5">Three things that take five minutes and make your listing stand out to visitors.</p>
+    <ol class="space-y-3 text-sm text-stone-700 list-none">
+      <li class="flex items-start gap-3">
+        <span class="text-lg leading-none mt-0.5">📸</span>
+        <div>
+          <strong class="font-semibold">Add a cover photo</strong>
+          <span class="text-stone-500"> — listings with photos get far more clicks than text-only ones. Scroll down to the Photos section to upload.</span>
+        </div>
+      </li>
+      <li class="flex items-start gap-3">
+        <span class="text-lg leading-none mt-0.5">🕐</span>
+        <div>
+          <strong class="font-semibold">Set your hours</strong>
+          <span class="text-stone-500"> — visitors decide whether to visit based on this. Fill in the Hours section in the edit form below.</span>
+        </div>
+      </li>
+      <li class="flex items-start gap-3">
+        <span class="text-lg leading-none mt-0.5">✏️</span>
+        <div>
+          <strong class="font-semibold">Describe your salon</strong>
+          <span class="text-stone-500"> — two sentences about what makes you special. The "About your salon" field in the edit form is a great place to start.</span>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+{% endif %}
+
 {# ── Listing performance stats ─────────────────────────────────── #}
 {#
    WHY: owners need a concrete signal that the directory is working so
@@ -327,11 +367,23 @@
         {{ (owner_business.photos or []) | length }} of 12 photos
       </span>
     </div>
+    {# WHY: show a stronger call to action when the owner has no photos yet —
+       the stat about clicks is the most persuasive nudge at this specific moment.
+       Once they have photos the generic description is sufficient. #}
+    {% if (owner_business.photos or []) | length == 0 %}
+    <p class="text-sm text-stone-500 mb-6">
+      Listings with photos get significantly more clicks than text-only listings.
+      Upload your first photo — it becomes your main listing image and the first
+      thing visitors see.
+      JPEG, PNG, or WebP &middot; up to 10&thinsp;MB each.
+    </p>
+    {% else %}
     <p class="text-sm text-stone-500 mb-6">
       Photos appear in the gallery on your public listing.
       The first photo is used as the main listing image.
       JPEG, PNG, or WebP &middot; up to 10&thinsp;MB each &middot; maximum 12 photos.
     </p>
+    {% endif %}
 
     <div id="photos-grid" class="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-5">
       {% for photo in (owner_business.photos or []) %}
