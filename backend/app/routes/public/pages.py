@@ -1344,10 +1344,17 @@ async def pricing_page(request: Request) -> HTMLResponse:
     # spots are left. Render-time count is accurate to within a few seconds
     # which is good enough — we don't need real-time precision for a "26 of
     # 25 spots claimed" edge case.
+    # WHY: filter by city_id — the database holds multiple directory networks
+    # (beauty, wellness, health) and each has its own founding-partner offer.
+    # Without the city filter, the beauty pricing page would count founding
+    # partners from wellness and health toward the beauty cap, showing fewer
+    # remaining spots than actually exist for beauty subscribers.
     cap = get_settings().founding_partner_cap
-    founding_count = await get_db().businesses.count_documents(
-        {"is_founding_partner": True}
-    )
+    city_id = str(tenant.city["_id"]) if tenant.city else None
+    founding_filter: dict = {"is_founding_partner": True}
+    if city_id:
+        founding_filter["city_id"] = city_id
+    founding_count = await get_db().businesses.count_documents(founding_filter)
     ctx["founding_partner_cap"] = cap
     ctx["founding_partner_count"] = founding_count
     ctx["founding_partner_spots_left"] = max(0, cap - founding_count)
