@@ -41,11 +41,17 @@ off in production, on in stage. Set in `/opt/known-around-town/.env` or as
 Use it to confirm CI before treating a merge as complete.
 `gh pr merge --squash --auto` also waits for CI before auto-merging.
 
-## MongoDB env var name
+## MongoDB env var name and database name
 
 The production MongoDB connection string env var is **`MONGODB_URL`** (NOT `MONGODB_URI`).
 This is set in `/opt/known-around-town/.env` on the server. Any scripts that query
 production MongoDB must use `os.environ['MONGODB_URL']` — `MONGODB_URI` is not set.
+
+**The production database name is `who_knows_local`** (set via `MONGODB_DATABASE` in `.env`).
+Any ad-hoc Python scripts that connect to MongoDB Atlas must use this database name —
+**NOT** `known_around_town` (a legacy name that does not reflect production data). Connecting
+to the wrong database name returns empty results with no error, making data fixes appear to
+succeed when they actually did nothing.
 
 ## Admin key for production
 
