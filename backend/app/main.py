@@ -25,11 +25,12 @@ from app.routes.api.v1 import (
     owner_leads as api_owner_leads,
     owner_inquiries as api_owner_inquiries,
     owner_profile as api_owner_profile,
+    owner_photos as api_owner_photos,
     owner_stats as api_owner_stats,
     stripe_billing as api_stripe_billing,
 )
 from app.routes.admin import claims_admin
-from app.routes.public import pages as public_pages
+from app.routes.public import pages as public_pages, media as public_media
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
@@ -92,6 +93,10 @@ app.include_router(api_owner_inquiries.router)
 app.include_router(api_owner_stats.router)
 # Stripe billing: checkout session creation + webhook receiver.
 app.include_router(api_stripe_billing.router, prefix="/api/v1")
+# Owner photo upload / delete — session-cookie-authenticated.
+# WHY: same full-prefix pattern as owner_profile — the router carries
+# /api/v1/owner/photos internally so no prefix is passed here.
+app.include_router(api_owner_photos.router)
 
 
 public_pages.attach_templates(templates)
@@ -101,6 +106,10 @@ claims_admin.attach_templates(templates)
 # resolves to the admin router rather than being swallowed by the public
 # tenant-aware not-found handler.
 app.include_router(claims_admin.router)
+
+# WHY: media route is registered before the public SSR catch-all so /media/{id}
+# is served by the GridFS streaming route and not handed to the 404 template.
+app.include_router(public_media.router)
 
 # Public SSR routes (last, since they catch broad URL patterns).
 app.include_router(public_pages.router)

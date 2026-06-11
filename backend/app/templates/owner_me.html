@@ -263,6 +263,75 @@
   </div>
 </section>
 
+{# ── Photos ──────────────────────────────────────────────────────── #}
+{# WHY: Listings with photos get far more clicks than text-only ones, so
+   making it easy to add them here directly increases the value of a paid
+   subscription. The initial grid is rendered server-side so photos show
+   immediately without a JS fetch on first load. #}
+<section class="bg-stone-50/40 border-t border-stone-100" id="photos-section">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="text-base font-semibold text-stone-900">Photos</h2>
+      <span id="photos-count-label" class="text-xs text-stone-400">
+        {{ (owner_business.photos or []) | length }} of 12 photos
+      </span>
+    </div>
+    <p class="text-sm text-stone-500 mb-6">
+      Photos appear in the gallery on your public listing.
+      The first photo is used as the main listing image.
+      JPEG, PNG, or WebP &middot; up to 10&thinsp;MB each &middot; maximum 12 photos.
+    </p>
+
+    <div id="photos-grid" class="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-5">
+      {% for photo in (owner_business.photos or []) %}
+      {%- set photo_url = photo.get('url','') if photo is mapping else (photo.url or '') %}
+      {%- set is_hero   = (photo.get('is_hero') if photo is mapping else photo.is_hero) or false %}
+      {#- WHY: slice [7:] rather than lstrip('/media/') because lstrip strips chars not a substring #}
+      {%- set photo_id  = photo_url[7:] if photo_url[:7] == '/media/' else photo_url %}
+      <div class="photo-thumb relative group rounded-xl overflow-hidden aspect-square bg-stone-100"
+           data-photo-id="{{ photo_id }}" data-url="{{ photo_url }}">
+        <img src="{{ photo_url }}"
+             alt="{{ (photo.get('alt','') if photo is mapping else (photo.alt or '')) or 'Salon photo' }}"
+             class="w-full h-full object-cover" loading="lazy" />
+        {% if is_hero %}
+        <span class="absolute top-1.5 left-1.5 text-[10px] font-semibold bg-white/90 text-stone-700 px-2 py-0.5 rounded-full shadow-sm">Main</span>
+        {% endif %}
+        <button type="button" data-role="delete-photo" data-photo-id="{{ photo_id }}"
+                aria-label="Delete photo"
+                class="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center rounded-full bg-white/90 text-stone-500 hover:text-rose-600 hover:bg-white shadow-sm opacity-0 group-hover:opacity-100 transition text-sm leading-none">
+          &times;
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      {# WHY: label wrapping the hidden file input lets us style the
+         upload trigger as a button without fighting browser file-input styling. #}
+      <label id="photo-upload-label"
+             class="inline-flex items-center gap-2 cursor-pointer bg-stone-900 hover:bg-stone-700 text-white font-medium px-5 py-2.5 rounded-full text-sm transition select-none"
+             role="button" tabindex="0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <span id="photo-upload-label-text">Upload photo</span>
+        <input id="photo-file-input" type="file" accept="image/jpeg,image/png,image/webp"
+               class="sr-only" aria-label="Upload a photo" />
+      </label>
+      <svg id="photo-upload-spinner" class="hidden w-5 h-5 animate-spin text-stone-500"
+           xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+    </div>
+    <p id="photo-error"   class="hidden text-sm text-rose-700 mt-3"   role="alert"  aria-live="polite"></p>
+    <p id="photo-success" class="hidden text-sm text-emerald-700 mt-3" role="status" aria-live="polite"></p>
+  </div>
+</section>
+
 {# ── Instagram caption generator ─────────────────────────────────── #}
 {# WHY: Always safe to render inside the dashboard — the feature flag check
    happens server-side and the API returns 404 when MARKETING_AI_ENABLED is
@@ -854,6 +923,154 @@
       }
     }
   });
+})();
+
+/* ── Photos section ────────────────────────────────────────── */
+(function () {
+  var grid        = document.getElementById('photos-grid');
+  var fileInput   = document.getElementById('photo-file-input');
+  var uploadLabel = document.getElementById('photo-upload-label');
+  var labelText   = document.getElementById('photo-upload-label-text');
+  var spinner     = document.getElementById('photo-upload-spinner');
+  var errEl       = document.getElementById('photo-error');
+  var successEl   = document.getElementById('photo-success');
+  var countLabel  = document.getElementById('photos-count-label');
+  var MAX_PHOTOS  = 12;
+
+  if (!grid || !fileInput) return;
+
+  function updateCountLabel() {
+    var n = grid.querySelectorAll('.photo-thumb').length;
+    if (countLabel) countLabel.textContent = n + ' of ' + MAX_PHOTOS + ' photos';
+    /* WHY: hide the upload button when at the limit so the owner sees the
+       count as the explanation rather than receiving a confusing 409 error. */
+    if (uploadLabel) uploadLabel.style.display = n >= MAX_PHOTOS ? 'none' : '';
+  }
+
+  function makeThumb(photo) {
+    var url     = photo.url || '';
+    var isHero  = photo.is_hero || false;
+    /* WHY: strip /media/ prefix to get the bare ObjectId for the DELETE call */
+    var photoId = url.replace(/^\/media\//, '');
+
+    var div = document.createElement('div');
+    div.className = 'photo-thumb relative group rounded-xl overflow-hidden aspect-square bg-stone-100';
+    div.dataset.photoId = photoId;
+    div.dataset.url     = url;
+
+    var img = document.createElement('img');
+    img.src       = url;
+    img.alt       = photo.alt || 'Salon photo';
+    img.className = 'w-full h-full object-cover';
+    img.loading   = 'lazy';
+    div.appendChild(img);
+
+    if (isHero) {
+      var badge = document.createElement('span');
+      badge.className = 'absolute top-1.5 left-1.5 text-[10px] font-semibold bg-white/90 text-stone-700 px-2 py-0.5 rounded-full shadow-sm';
+      badge.textContent = 'Main';
+      div.appendChild(badge);
+    }
+
+    var delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.dataset.role    = 'delete-photo';
+    delBtn.dataset.photoId = photoId;
+    delBtn.setAttribute('aria-label', 'Delete photo');
+    delBtn.className = 'absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center rounded-full bg-white/90 text-stone-500 hover:text-rose-600 hover:bg-white shadow-sm opacity-0 group-hover:opacity-100 transition text-sm leading-none';
+    delBtn.innerHTML = '&times;';
+    delBtn.addEventListener('click', function () { deletePhoto(photoId, div); });
+    div.appendChild(delBtn);
+
+    return div;
+  }
+
+  function refreshGrid(photos) {
+    grid.innerHTML = '';
+    (photos || []).forEach(function (p) { grid.appendChild(makeThumb(p)); });
+    updateCountLabel();
+  }
+
+  /* Wire delete buttons for the server-rendered initial thumbnails */
+  grid.querySelectorAll('[data-role="delete-photo"]').forEach(function (btn) {
+    var photoId = btn.dataset.photoId;
+    var thumb   = btn.closest('.photo-thumb');
+    btn.addEventListener('click', function () { deletePhoto(photoId, thumb); });
+  });
+
+  async function deletePhoto(photoId, thumbEl) {
+    if (!photoId) return;
+    if (!confirm('Remove this photo from your listing?')) return;
+    errEl.classList.add('hidden');
+    successEl.classList.add('hidden');
+    /* WHY: dim the thumb immediately so the owner sees instant feedback
+       while the API call completes in the background. */
+    if (thumbEl) thumbEl.style.opacity = '0.4';
+    try {
+      var r = await fetch('/api/v1/owner/photos/' + photoId, { method: 'DELETE' });
+      if (!r.ok) {
+        var body = await r.json().catch(function () { return {}; });
+        throw new Error(body.detail || 'Error ' + r.status);
+      }
+      var data = await r.json();
+      refreshGrid(data.photos);
+      successEl.textContent = 'Photo removed.';
+      successEl.classList.remove('hidden');
+      setTimeout(function () { successEl.classList.add('hidden'); }, 2500);
+    } catch (err) {
+      if (thumbEl) thumbEl.style.opacity = '';
+      errEl.textContent = err.message || 'Could not remove photo. Please try again.';
+      errEl.classList.remove('hidden');
+    }
+  }
+
+  function setUploading(busy) {
+    fileInput.disabled = busy;
+    uploadLabel.style.pointerEvents = busy ? 'none' : '';
+    if (labelText) labelText.textContent = busy ? 'Uploading…' : 'Upload photo';
+    spinner.classList.toggle('hidden', !busy);
+  }
+
+  fileInput.addEventListener('change', async function () {
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    /* WHY: clear the input value before the upload so re-selecting the same
+       file triggers the 'change' event a second time. */
+    fileInput.value = '';
+    errEl.classList.add('hidden');
+    successEl.classList.add('hidden');
+    setUploading(true);
+    var fd = new FormData();
+    fd.append('file', file);
+    try {
+      var r = await fetch('/api/v1/owner/photos', { method: 'POST', body: fd });
+      if (!r.ok) {
+        var body = await r.json().catch(function () { return {}; });
+        throw new Error(body.detail || 'Error ' + r.status);
+      }
+      var data = await r.json();
+      refreshGrid(data.photos);
+      successEl.textContent = 'Photo uploaded.';
+      successEl.classList.remove('hidden');
+      setTimeout(function () { successEl.classList.add('hidden'); }, 2500);
+    } catch (err) {
+      errEl.textContent = err.message || 'Could not upload photo. Please try again.';
+      errEl.classList.remove('hidden');
+    } finally {
+      setUploading(false);
+    }
+  });
+
+  /* WHY: keyboard handler on the label so keyboard users can trigger the
+     file picker by pressing Enter or Space, since a <label> doesn't respond
+     to those keys by default the way a <button> would. */
+  if (uploadLabel) {
+    uploadLabel.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
+  }
+
+  updateCountLabel();
 })();
 
 /* ── Visitor inquiries panel ───────────────────────────────── */
