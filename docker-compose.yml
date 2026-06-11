@@ -2,8 +2,10 @@ services:
   mongo:
     image: mongo:7
     restart: unless-stopped
-    ports:
-      - "27017:27017"
+    # WHY: no ports: mapping here — MongoDB must NOT be accessible from the
+    # internet. The backend reaches it via the internal Docker network name
+    # "mongo:27017". Exposing 27017 publicly led to a ransomware wipe on
+    # 2026-06-11 within hours of the server coming up.
     volumes:
       - mongo_data:/data/db
 
