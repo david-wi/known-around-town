@@ -46,25 +46,43 @@ async def analytics_page(request: Request) -> HTMLResponse:
 
     db = get_db()
 
+    # WHY: Resolve the beauty network's Miami city so every stat below counts
+    # only the salons on THIS site. Without this filter, count_documents({})
+    # returns 147 (beauty + wellness + health combined) — misleading because
+    # the beauty directory only has 50 listings. A David looking at "147
+    # businesses" would think the directory is three times larger than it is.
+    beauty_network = await db.networks.find_one({"slug": "beauty"})
+    beauty_city = (
+        await db.cities.find_one({"network_id": beauty_network["_id"], "slug": "miami"})
+        if beauty_network
+        else None
+    )
+    city_filter: Dict[str, Any] = (
+        {"city_id": beauty_city["_id"]} if beauty_city else {}
+    )
+
     # ── Page view stats ──────────────────────────────────────────────────────
-    # Total views across every business listing
-    pipeline_total = [{"$group": {"_id": None, "total": {"$sum": "$page_view_count"}}}]
+    # Total views across beauty listings only
+    pipeline_total = [
+        {"$match": city_filter},
+        {"$group": {"_id": None, "total": {"$sum": "$page_view_count"}}},
+    ]
     total_views_result = await db.businesses.aggregate(pipeline_total).to_list(1)
     total_views: int = total_views_result[0]["total"] if total_views_result else 0
 
     # Top 20 most-visited listings
     top_listings: List[Dict[str, Any]] = await db.businesses.find(
-        {"page_view_count": {"$gt": 0}},
+        {**city_filter, "page_view_count": {"$gt": 0}},
         {"name": 1, "slug": 1, "neighborhood": 1, "page_view_count": 1, "featured": 1},
     ).sort("page_view_count", -1).limit(20).to_list(20)
 
     # Businesses with zero or no page_view_count field (not yet visited)
-    total_biz: int = await db.businesses.count_documents({})
+    total_biz: int = await db.businesses.count_documents(city_filter)
 
     # WHY: $or handles documents where the field is explicitly 0 AND documents
     # where the field has never been set (created before the counter was added).
     unvisited: int = await db.businesses.count_documents(
-        {"$or": [{"page_view_count": {"$lte": 0}}, {"page_view_count": {"$exists": False}}]}
+        {**city_filter, "$or": [{"page_view_count": {"$lte": 0}}, {"page_view_count": {"$exists": False}}]}
     )
     visited: int = total_biz - unvisited
 
@@ -79,7 +97,7 @@ async def analytics_page(request: Request) -> HTMLResponse:
     total_owners: int = await db.owner_accounts.count_documents({})
 
     # ── Subscriptions ────────────────────────────────────────────────────────
-    pro_count: int = await db.businesses.count_documents({"featured.enabled": True})
+    pro_count: int = await db.businesses.count_documents({**city_filter, "featured.enabled": True})
 
     # ── Recent claims (last 10) ──────────────────────────────────────────────
     recent_claims: List[Dict[str, Any]] = await (
