@@ -7,16 +7,16 @@ template only receives plain data — no DB access from the template.
 
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
 import markdown2
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app.config import get_settings
 from app.database import get_db
 from app.services import content as content_svc
 from app.services.copy import CopyResolver
@@ -177,6 +177,19 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
     page_url = str(request.url).split("?")[0].rstrip("/")
     canonical_url: Optional[str] = page_url if page_url.startswith("http") else None
 
+    canonical_base = get_settings().canonical_base_url.rstrip("/")
+    if canonical_base and canonical_url:
+        # WHY: query params and fragments are never part of a canonical URL —
+        # the .split("?")[0] strip on page_url (above) already ensures
+        # canonical_url has no query string at this point. We use urlparse to
+        # extract the path cleanly regardless, without worrying about edge-case
+        # parse errors (urlparse never raises on any string input).
+        # Fragments are intentionally dropped: they are client-side anchor
+        # references, never sent to the server, and should not appear in
+        # canonical declarations per Google's guidance.
+        parsed = urlparse(canonical_url)
+        canonical_url = canonical_base + (parsed.path or "/")
+
     return {
         "request": request,
         "tenant": tenant,
@@ -222,7 +235,10 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         # each individual route handler.  An empty or absent var means the
         # {% if ga_measurement_id %} guard in base.html emits no script at
         # all — no dead snippet, no console noise on dev.
-        "ga_measurement_id": os.environ.get("GA_MEASUREMENT_ID", ""),
+        "ga_measurement_id": get_settings().ga_measurement_id,
+        # WHY: passed here (base context) so every page gets the tag without
+        # duplicating the settings read in each handler. Empty = tag absent.
+        "google_site_verification": get_settings().google_site_verification,
     }
 
 
@@ -1436,8 +1452,14 @@ async def robots_txt(request: Request) -> HTMLResponse:
             "Disallow: /owners/verify",
         ]
     )
+    canonical_base = get_settings().canonical_base_url.rstrip("/")
+    # WHY: use CANONICAL_BASE_URL for the Sitemap: directive so that when both
+    # the custom domain and the dev subdomain serve the site, the sitemap URL in
+    # robots.txt points at the authoritative domain — consistent with the
+    # <link rel="canonical"> tags on every page.
+    sitemap_base = canonical_base if canonical_base else f"{scheme}://{host}"
     return HTMLResponse(
-        f"User-agent: *\nAllow: /\n{disallowed}\nSitemap: {scheme}://{host}/sitemap.xml\n",
+        f"User-agent: *\nAllow: /\n{disallowed}\nSitemap: {sitemap_base}/sitemap.xml\n",
         media_type="text/plain",
     )
 
@@ -1447,7 +1469,12 @@ async def sitemap(request: Request) -> HTMLResponse:
     tenant = await _require_tenant(request)
     host = request.headers.get("host", "")
     scheme = request.url.scheme
-    base = f"{scheme}://{host}"
+    canonical_base = get_settings().canonical_base_url.rstrip("/")
+    # WHY: use CANONICAL_BASE_URL when set so all sitemap <loc> entries point at
+    # the authoritative domain. Without this, a sitemap fetched from the dev
+    # subdomain would list dev-subdomain URLs, causing Google to index the wrong
+    # set of addresses even after the .com domain is the canonical one.
+    base = canonical_base if canonical_base else f"{scheme}://{host}"
 
     # WHY: today's date is used for pages that don't carry per-record
     # timestamps (static pages, category pages, neighborhood pages). Google
