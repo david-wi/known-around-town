@@ -468,6 +468,11 @@ async def home(request: Request) -> HTMLResponse:
     category_names = {c["slug"]: c["name"] for c in ctx["nav_categories"]}
     neighborhood_names = {n["slug"]: n["name"] for n in ctx["nav_neighborhoods"]}
 
+    # WHY: load up to 6 guides for the homepage section; showing them here
+    # surfaces editorial content to visitors who land on the homepage directly
+    # and creates internal links that help Google discover the guide pages.
+    recent_guides = await content_svc.list_editorial_guides(city["_id"], limit=6)
+
     ctx.update(
         {
             # Hero
@@ -556,6 +561,8 @@ async def home(request: Request) -> HTMLResponse:
                     "description": city.get("meta_description") or city.get("hero_description")
                 } if (city.get("meta_description") or city.get("hero_description")) else {}),
             } if ctx.get("canonical_url") else None,
+            # Editorial guides for the homepage section
+            "recent_guides": recent_guides,
         }
     )
     return _templates.TemplateResponse("home.html", ctx)
@@ -991,6 +998,27 @@ async def business_page(
     if not any(f in ua for f in _BOT_UA_FRAGMENTS):
         background_tasks.add_task(_increment_business_view, str(business["_id"]))
     return _templates.TemplateResponse("business.html", ctx)
+
+
+@router.get("/guides", response_class=HTMLResponse)
+async def editorial_guides_index(request: Request) -> HTMLResponse:
+    tenant = await _require_tenant(request)
+    if not tenant.city:
+        raise HTTPException(404, "City required")
+    city = tenant.city
+    guides = await content_svc.list_editorial_guides(city["_id"], limit=50)
+    ctx = await _base_context(request, tenant)
+    ctx.update(
+        {
+            "guides": guides,
+            "seo_title": f"Beauty & Wellness Guides · {city.get('name', 'Miami')}",
+            "meta_description": (
+                f"Expert guides to the best salons, spas, and beauty destinations "
+                f"in {city.get('name', 'Miami')}."
+            ),
+        }
+    )
+    return _templates.TemplateResponse("editorial_guides_index.html", ctx)
 
 
 @router.get("/guides/{slug}", response_class=HTMLResponse)
