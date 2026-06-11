@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings
-from app.database import ensure_indexes
+from app.database import ensure_indexes, run_startup_migrations
 from app.routes.api.v1 import (
     networks as api_networks,
     cities as api_cities,
@@ -44,6 +44,7 @@ app = FastAPI(title="Known Around Town", version="0.1.0")
 @app.on_event("startup")
 async def on_startup() -> None:
     await ensure_indexes()
+    await run_startup_migrations()
     log.info("Indexes ensured. Tenant domains: %s", settings.parse_network_domains())
 
 
