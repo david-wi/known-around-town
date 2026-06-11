@@ -1039,12 +1039,38 @@ async def editorial_guide_page(request: Request, slug: str) -> HTMLResponse:
         featured = await cur.to_list(length=20)
 
     ctx = await _base_context(request, tenant)
+    # WHY: og_image controls the preview card when anyone shares a guide link on
+    # social media or iMessage. Prefer the guide's own hero image, then fall back
+    # to the first featured business photo, then the city hero — so the card is
+    # never blank regardless of how the guide was authored.
+    _og_image = (
+        guide.get("hero_image_url")
+        or next(
+            (
+                (b["photos"][0].get("url") if isinstance(b["photos"][0], dict) else b["photos"][0])
+                for b in featured
+                if b.get("photos")
+            ),
+            None,
+        )
+        or city.get("hero_photo_url")
+    )
     ctx.update(
         {
             "guide": guide,
             "featured_businesses_in_guide": featured,
             "seo_title": guide.get("seo_title") or guide.get("title"),
             "meta_description": guide.get("meta_description") or guide.get("subtitle"),
+            "og_image": _og_image,
+            # WHY: ItemList JSON-LD lets Google surface individual business names
+            # as rich results for guide-level queries like "best med spas Miami",
+            # increasing click-through before the user even reaches the page.
+            "item_list_jsonld": _build_item_list_jsonld(
+                featured,
+                list_name=guide.get("title", ""),
+                list_url=str(request.url).split("?")[0],
+                base_url=str(request.base_url).rstrip("/"),
+            ) if featured else None,
         }
     )
     return _templates.TemplateResponse("editorial_guide.html", ctx)

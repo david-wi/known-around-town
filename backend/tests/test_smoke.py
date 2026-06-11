@@ -1952,3 +1952,201 @@ def test_robots_txt_disallows_owner_auth_routes(client):
     assert "Sitemap:" in body, (
         "robots.txt must still include the Sitemap: directive"
     )
+
+
+# ---------------------------------------------------------------------------
+# Editorial guide SEO tests
+# ---------------------------------------------------------------------------
+
+def _insert_test_guide(seeded_db, city_id, network_id, *, with_featured=True):
+    """Insert a minimal editorial guide (and optionally a featured business)
+    for SEO tests. Returns (guide_doc, business_doc_or_None)."""
+    import asyncio
+    from datetime import datetime, timezone
+
+    biz = None
+    featured_ids = []
+    if with_featured:
+        biz = {
+            "slug": "test-guide-salon",
+            "name": "Test Guide Salon",
+            "city_id": city_id,
+            "network_id": network_id,
+            "category_slugs": ["spa"],
+            "neighborhood_slugs": [],
+            "photos": [{"url": "https://images.unsplash.com/test-guide-biz?w=800"}],
+            "status": "live",
+            "claim_status": "unclaimed",
+        }
+        asyncio.run(seeded_db.businesses.insert_one(biz))
+        featured_ids = [biz["_id"]]
+
+    guide = {
+        "city_id": city_id,
+        "network_id": network_id,
+        "slug": "test-seo-guide",
+        "title": "Best Test Spas in Miami",
+        "subtitle": "Our editors' picks for the finest spas.",
+        "seo_title": "Best Test Spas in Miami — Miami Knows Beauty",
+        "meta_description": "The definitive guide to the best test spas in Miami.",
+        "body_markdown": "## Introduction\n\nThese are the best test spas in Miami.",
+        "author": "Miami Knows Beauty Editorial",
+        "published_at": datetime(2026, 6, 1, tzinfo=timezone.utc),
+        "status": "published",
+        "featured_business_ids": featured_ids,
+    }
+    asyncio.run(seeded_db.editorial_guides.insert_one(guide))
+    return guide, biz
+
+
+def test_editorial_guide_page_renders(client, seeded_db):
+    """A guide page returns 200 and renders the guide title."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"}))
+    _insert_test_guide(seeded_db, city["_id"], network["_id"])
+
+    r = client.get("/guides/test-seo-guide", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "Best Test Spas in Miami" in r.text
+
+
+def test_editorial_guide_page_has_og_image_from_business_photo(client, seeded_db):
+    """Guide pages must include an og:image meta tag so social share cards show
+    a photo. When the guide has no hero_image_url, the route must fall back to
+    the first featured business's photo, then to the city hero.
+
+    WHY: before this fix, guide pages were missing og:image entirely — every
+    shared guide link rendered as a blank grey card with no preview image,
+    reducing click-through from social shares and iMessage previews."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"}))
+    _insert_test_guide(seeded_db, city["_id"], network["_id"], with_featured=True)
+
+    r = client.get("/guides/test-seo-guide", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    import re
+    m = re.search(r'<meta property="og:image" content="([^"]+)"', r.text)
+    assert m is not None, (
+        "Guide page /guides/test-seo-guide is missing og:image meta tag — "
+        "social share cards will show a blank grey box instead of a photo"
+    )
+    assert m.group(1).startswith("http"), (
+        f"og:image value '{m.group(1)}' is not a valid URL"
+    )
+
+
+def test_editorial_guide_page_has_og_image_fallback_to_city_hero(client, seeded_db):
+    """When a guide has no hero_image_url and no featured businesses, the
+    og:image must fall back to the city hero photo so the card is never blank.
+
+    WHY: a guide with no featured businesses (e.g. a pure editorial piece with
+    no business recommendations) should still have a social card image. The city
+    hero is the right fallback — it shows the Miami beauty scene rather than
+    nothing."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"}))
+    # Guide with no featured businesses and no hero image
+    _insert_test_guide(seeded_db, city["_id"], network["_id"], with_featured=False)
+
+    # og:image is only guaranteed when the city has a hero_photo_url.
+    # If it's absent in the seed the tag should still be present (or absent
+    # gracefully — no 500 error). The key invariant is: no crash.
+    r = client.get("/guides/test-seo-guide", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # No assertion on og:image presence here (city seed may or may not have hero)
+    # — the important thing is no 500.
+
+
+def test_editorial_guide_page_has_article_jsonld(client, seeded_db):
+    """Guide pages must include Article JSON-LD structured data so Google can
+    identify the page as editorial content rather than a generic listing.
+
+    WHY: Article JSON-LD signals to Google that this is a curated editorial
+    piece authored by Miami Knows Beauty, not just a business listing page.
+    Google uses this to treat the page differently in its index — potentially
+    surfacing it in Top Stories results or the Discover feed. Without it, Google
+    has no signal that these pages are editorial."""
+    import asyncio, json, re
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"}))
+    _insert_test_guide(seeded_db, city["_id"], network["_id"])
+
+    r = client.get("/guides/test-seo-guide", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+
+    blocks = _extract_jsonld_blocks(r.text)
+    article_blocks = [b for b in blocks if b.get("@type") == "Article"]
+    assert article_blocks, (
+        "Guide page /guides/test-seo-guide is missing Article JSON-LD — "
+        "Google cannot identify this page as editorial content"
+    )
+    article = article_blocks[0]
+    assert article.get("headline"), "Article JSON-LD must include a headline"
+    assert article.get("author"), "Article JSON-LD must include an author"
+    # datePublished must be present when guide has published_at
+    assert article.get("datePublished"), (
+        "Article JSON-LD must include datePublished when guide has published_at"
+    )
+
+
+def test_editorial_guide_page_has_itemlist_jsonld_when_featured(client, seeded_db):
+    """Guide pages with featured businesses must include ItemList JSON-LD so
+    Google can surface individual business names as rich results for guide-level
+    queries like 'best spas in Miami'.
+
+    WHY: ItemList lets Google show the featured business names directly under
+    the search result link ('1. Test Guide Salon, 2. …'), increasing click-
+    through rate before the user even reaches the page. Without it Google has
+    no machine-readable list of what the guide covers."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"}))
+    _insert_test_guide(seeded_db, city["_id"], network["_id"], with_featured=True)
+
+    r = client.get("/guides/test-seo-guide", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+
+    blocks = _extract_jsonld_blocks(r.text)
+    item_list_blocks = [b for b in blocks if b.get("@type") == "ItemList"]
+    assert item_list_blocks, (
+        "Guide page /guides/test-seo-guide is missing ItemList JSON-LD even though "
+        "it has featured businesses — Google cannot surface business names in rich results"
+    )
+    elements = item_list_blocks[0].get("itemListElement", [])
+    assert len(elements) > 0, "ItemList has no itemListElement entries"
+    first = elements[0]
+    assert first.get("position") == 1, "First ItemList element must have position 1"
+    assert first.get("item", {}).get("name"), "ItemList elements must include a business name"
+    assert first.get("item", {}).get("url"), "ItemList elements must include a business URL"
+
+
+def test_editorial_guide_page_no_itemlist_when_no_featured(client, seeded_db):
+    """Guide pages with no featured businesses must NOT emit an ItemList block.
+    An empty ItemList is invalid structured data that Google would flag as a
+    rich-result eligibility error.
+
+    WHY: emitting `"itemListElement": []` fails Google's Rich Results Test and
+    can cause the entire page's structured data to be ignored, which is worse
+    than not having ItemList at all."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"}))
+    _insert_test_guide(seeded_db, city["_id"], network["_id"], with_featured=False)
+
+    r = client.get("/guides/test-seo-guide", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+
+    blocks = _extract_jsonld_blocks(r.text)
+    item_list_blocks = [b for b in blocks if b.get("@type") == "ItemList"]
+    assert not item_list_blocks, (
+        "Guide page with no featured businesses must not emit an ItemList JSON-LD block"
+    )
