@@ -30,3 +30,22 @@ off in production, on in stage. Set in `/opt/known-around-town/.env` or as
 `gh pr checks --watch` works correctly — waits for "Smoke tests" to pass.
 Use it to confirm CI before treating a merge as complete.
 `gh pr merge --squash --auto` also waits for CI before auto-merging.
+
+## MongoDB env var name
+
+The production MongoDB connection string env var is **`MONGODB_URL`** (NOT `MONGODB_URI`).
+This is set in `/opt/known-around-town/.env` on the server. Any scripts that query
+production MongoDB must use `os.environ['MONGODB_URL']` — `MONGODB_URI` is not set.
+
+## Admin key for production
+
+The admin key (for `/admin/login`) is in `/opt/known-around-town/.env` on the
+production server under `ADMIN_COOKIE_KEY`. Fetch it with:
+  `ssh -p 2222 root@152.42.152.243 "grep ADMIN_COOKIE_KEY /opt/known-around-town/.env"`
+
+## Visual verification with Playwright
+
+Python Playwright is available; Node.js Playwright is NOT installed in this repo.
+Use `from playwright.sync_api import sync_playwright` — the package is at
+`/home/david/.local/lib/python3.12/site-packages/playwright/`.
+Do NOT `require('playwright')` — that will fail.

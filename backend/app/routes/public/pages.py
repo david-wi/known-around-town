@@ -871,6 +871,8 @@ async def _increment_business_view(business_id: str) -> None:
     WHY: background task so the atomic DB write happens after the response
     is sent — no added latency for the visitor. Using $inc on a single field
     is safe under concurrent requests without a read-modify-write race.
+    WHY str: business _id values are UUID strings (not ObjectIds), so the
+    str() call in the caller is a no-op and querying with the string is correct.
     """
     from app.database import get_db as _get_db  # local import to avoid circular
     db = _get_db()
