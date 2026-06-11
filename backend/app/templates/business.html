@@ -50,11 +50,34 @@
     "streetAddress": {{ (business.address.street or '')|tojson }}
     {#- WHY: omit region and postal when empty rather than emitting empty strings —
         Google's Rich Results validator treats "" as an invalid value for these
-        fields and can suppress the entire address block from Knowledge Panel. #}
+        fields and can suppress the entire address block from Knowledge Panel.
+        WHY: field names use both the Pydantic model names (state, postal_code)
+        AND the legacy dict-key names (region, postal) because imported records
+        may arrive as raw dicts rather than deserialized Address objects. Checking
+        both ensures the field is emitted regardless of which storage path wrote it. #}
     {% if business.address.city or city.name %},"addressLocality": {{ (business.address.city or city.name)|tojson }}{% endif %}
-    {% if business.address.region %},"addressRegion": {{ business.address.region|tojson }}{% endif %}
-    {% if business.address.postal %},"postalCode": {{ business.address.postal|tojson }}{% endif %}
+    {%- set _addr_region = business.address.state or business.address.region %}
+    {% if _addr_region %},"addressRegion": {{ _addr_region|tojson }}{% endif %}
+    {%- set _addr_postal = business.address.postal_code or business.address.postal %}
+    {% if _addr_postal %},"postalCode": {{ _addr_postal|tojson }}{% endif %}
+    {#- WHY: always emit addressCountry — it is required by Google's Rich Results
+        validator for the address block to render in Knowledge Panel. The model
+        defaults to "US"; for the Miami directory this will always be true, but
+        reading the stored value rather than hardcoding ensures correctness if the
+        platform ever expands to Canada or other markets. #}
+    ,"addressCountry": {{ (business.address.country or 'US')|tojson }}
   }{% endif %}
+  {#- WHY: geo coordinates let Google pin the business precisely on Google Maps
+      and are a strong signal for local pack ranking ("near me" searches). Without
+      them Google has to geocode the street address itself, which introduces
+      ambiguity for businesses with incomplete or non-standard addresses.
+      Coordinates live in address.lat / address.lng (from the Address model);
+      they are only emitted when both are present so the block is never partial. #}
+  {%- if business.address and business.address.lat and business.address.lng %},"geo": {
+    "@type": "GeoCoordinates",
+    "latitude": {{ business.address.lat }},
+    "longitude": {{ business.address.lng }}
+  }{%- endif %}
   {% if business.phone %},"telephone": {{ business.phone|tojson }}{% endif %}
   {% if business.website %},"url": {{ business.website|tojson }}{% endif %}
   {% if business.price_cues %},"priceRange": {{ business.price_cues|tojson }}{% endif %}
