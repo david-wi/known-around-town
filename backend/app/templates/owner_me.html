@@ -69,6 +69,20 @@
   </div>
 </section>
 {% else %}
+{#- WHY: Resolve the owner's primary neighborhood name so the upgrade card
+    can say "Be the first salon in Wynwood" rather than the generic "your
+    neighborhood". nav_neighborhoods is already in the base context as a
+    list of {slug, name} dicts — same pattern used in business.html. Falls
+    back to the generic phrase if the business has no neighborhood assigned. #}
+{%- set _uc_nb_slug = owner_business.neighborhood_slugs[0] if (owner_business and owner_business.neighborhood_slugs) else '' %}
+{%- set _uc_nb = (nav_neighborhoods|selectattr('slug','eq',_uc_nb_slug)|list|first) if _uc_nb_slug else None %}
+{%- set _uc_nb_name = _uc_nb.name if _uc_nb else 'your neighborhood' %}
+{#- WHY: Show the owner's actual service categories (e.g. "Hair Salons and
+    Nail Salons") so the Featured benefit is specific and concrete, not a
+    generic "every category" promise. Tags are stored as human-readable
+    strings. Use the first two if present; fall back to the generic line
+    if the business has no tags. #}
+{%- set _uc_tags = owner_business.tags[:2] if (owner_business and owner_business.tags) else [] %}
 {# ── Upgrade card ── #}
 <section class="bg-white border-b border-stone-100">
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-8">
@@ -80,9 +94,13 @@
               as the directory grows.  More compelling than generic "upgrade"
               copy for owners who just got verified and are deciding right now. #}
           <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-2">Founding Partner offer</p>
-          <h2 class="text-base font-semibold text-stone-900 mb-1.5">Be the first {{ listing_word_singular or 'salon' }} visitors see in your neighborhood</h2>
+          <h2 class="text-base font-semibold text-stone-900 mb-1.5">Be the first {{ listing_word_singular or 'salon' }} visitors see in {{ _uc_nb_name }}</h2>
           <ul class="text-sm text-stone-600 space-y-1 leading-relaxed max-w-xs list-none">
+            {% if _uc_tags %}
+            <li>✓ Featured first in {{ _uc_tags|join(' and ') }} searches in {{ _uc_nb_name }}</li>
+            {% else %}
             <li>✓ Featured first in every category and neighborhood search</li>
+            {% endif %}
             <li>✓ Featured badge on your public listing</li>
             <li>✓ Instagram caption generator — AI-written posts for your salon</li>
             <li>✓ Lock in Founding Partner pricing before rates increase</li>
