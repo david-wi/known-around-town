@@ -75,7 +75,11 @@
 <section class="sticky top-[72px] z-30 bg-white/95 backdrop-blur-lg border-b border-stone-200/60">
   <div class="max-w-7xl mx-auto px-6 lg:px-10 py-4 flex flex-wrap items-center gap-3">
     <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-stone-500 font-semibold mr-2">Filter</div>
-    <select class="text-sm bg-stone-100 hover:bg-stone-200 transition border-0 rounded-full px-4 py-2 font-medium text-stone-700 focus:outline-none focus:ring-2 {{ theme.focus_ring }}">
+    {# WHY: Wired to navigate to /n/{neighborhood}/c/{category} cross-pages on change.
+       Previously non-functional — visitors couldn't filter by service type, and
+       these cross-pages had no internal links pointing to them from neighborhood pages. #}
+    <select onchange="if(this.value !== 'all') window.location='/n/{{ neighborhood.slug }}/c/'+this.value"
+            class="text-sm bg-stone-100 hover:bg-stone-200 transition border-0 rounded-full px-4 py-2 font-medium text-stone-700 focus:outline-none focus:ring-2 {{ theme.focus_ring }}">
       <option value="all">All services</option>
       {% for c in nav_categories %}{% if not c.parent_slug %}<option value="{{ c.slug }}">{{ c.name }}</option>{% endif %}{% endfor %}
     </select>
@@ -105,6 +109,27 @@
   <p class="text-center text-stone-600 py-16">No listings here yet.</p>
   {% endif %}
 </section>
+
+{# WHY: Explicit <a> links to /n/{neighborhood}/c/{category} cross-pages give Google
+   crawlable paths from every neighborhood page. Visitors searching "hair wynwood" or
+   "nails south beach" land here and can navigate to the exact service-level page.
+   Without these, the cross-pages have no inbound internal links from neighborhood pages —
+   only the sitemap, which is weaker than anchor-tag link equity. #}
+{% if nav_categories and businesses %}
+<section class="border-t border-stone-200/40 bg-stone-50/40">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10 py-8">
+    <p class="text-xs uppercase tracking-widest text-stone-500 font-semibold mb-4">Browse by Service in {{ neighborhood.name }}</p>
+    <div class="flex flex-wrap gap-2">
+      {% for c in nav_categories %}{% if not c.parent_slug %}
+      <a href="/n/{{ neighborhood.slug }}/c/{{ c.slug }}"
+         class="text-sm px-4 py-2 rounded-full border border-stone-200 bg-white hover:border-stone-400 hover:shadow-sm transition text-stone-700 font-medium">
+        {% if c.emoji %}{{ c.emoji }} {% endif %}{{ c.name }}
+      </a>
+      {% endif %}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {# WHY: Salon owners often find the directory by searching "[neighborhood] salons"
    and land on this exact page. Without a prompt here, they see their listing and
