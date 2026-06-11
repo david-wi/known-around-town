@@ -73,6 +73,13 @@
 {% if item_list_jsonld %}
 <script type="application/ld+json">{{ item_list_jsonld | tojson }}</script>
 {% endif %}
+{# WHY: Cross-pages with no businesses are thin content that waste crawl budget and
+   can't rank — noindex prevents Google from indexing them while still following
+   links to the businesses themselves. Plain category pages (/c/hair) are always
+   indexable since they list all businesses city-wide. #}
+{% if neighborhood and not businesses %}
+<meta name="robots" content="noindex, follow">
+{% endif %}
 {% endblock %}
 
 {% block content %}
