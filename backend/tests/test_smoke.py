@@ -317,6 +317,23 @@ def test_pricing_page(client):
     assert "/owners#claim'" not in r.text  # ensure the broken anchor is gone
 
 
+def test_pricing_page_shows_founding_partner_callout(client):
+    """The /pricing page must include the founding partner callout while slots
+    are still available (the default state with zero subscribers)."""
+    r = client.get("/pricing", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # WHY: check for the stable key phrase rather than the exact number so
+    # the test does not break as soon as the first subscriber signs up.
+    assert "Founding Partner" in r.text, (
+        "Pricing page must show 'Founding Partner' callout while slots remain — "
+        "it is a key conversion incentive"
+    )
+    assert "permanent gold badge" in r.text, (
+        "Pricing page must mention the badge is permanent — "
+        "that permanence is the unique value of the founding partner offer"
+    )
+
+
 def test_pricing_link_in_header_nav(client):
     """The pricing page must be discoverable from the global nav so owners
     can find it without knowing the URL."""

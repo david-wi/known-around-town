@@ -691,3 +691,211 @@ class TestBillingPortal:
 
         assert captured.get("customer") == "cus_verify001"
         assert captured.get("return_url", "").endswith("/owners/me")
+
+
+# ─── Founding Partner auto-grant ─────────────────────────────────────────────
+
+class TestFoundingPartner:
+    """Verify that the first N subscribers receive is_founding_partner: True
+    automatically on checkout.session.completed, and that subscribers beyond
+    the cap do not.
+
+    WHY mock_db (not seeded_db): these tests count exactly how many businesses
+    have is_founding_partner: True. The seeded_db fixture inserts 147 seed
+    businesses; mongomock_motor's count_documents incorrectly counts documents
+    that LACK the field as matching {"is_founding_partner": True}, so the
+    seeded data inflates the count and makes the cap comparison wrong.
+    Using the bare mock_db (no seed data) keeps the count controlled and
+    tests the logic we actually care about.
+    """
+
+    @pytest.fixture
+    def client(self, mock_db):
+        # WHY: mock_db not seeded_db — see class docstring.
+        return _make_client(mock_db)
+
+    @pytest.mark.asyncio
+    async def test_first_subscriber_receives_founding_partner_badge(self, client, mock_db):
+        """When no other founding partners exist, the first subscriber is granted
+        is_founding_partner: True."""
+        import uuid
+        biz_id = str(uuid.uuid4())
+        await mock_db.businesses.insert_one({
+            "_id": biz_id,
+            "name": "First Salon",
+            "slug": "first-salon",
+            "claimed_email": "first@salon.com",
+            "featured": {"tier": "free", "enabled": False},
+        })
+
+        event = _make_checkout_event(biz_id, "sub_first_001", "cus_first_001")
+        # WHY: override cap to a small number so the test doesn't depend on
+        # the production default and is easy to understand at a glance.
+        with patch.dict(os.environ, {
+            "STRIPE_WEBHOOK_SECRET": "whsec_test",
+            "FOUNDING_PARTNER_CAP": "5",
+        }):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            with patch("stripe.Webhook.construct_event", return_value=event):
+                r = client.post(
+                    "/api/v1/billing/webhook",
+                    content=json.dumps(event).encode(),
+                    headers={"stripe-signature": "t=1,v1=abc"},
+                )
+            get_settings.cache_clear()
+
+        assert r.status_code == 200
+        biz = await mock_db.businesses.find_one({"_id": biz_id})
+        assert biz.get("is_founding_partner") is True, (
+            "First subscriber must receive the Founding Partner badge — "
+            "the owner dashboard promises this as an incentive"
+        )
+
+    @pytest.mark.asyncio
+    async def test_subscriber_at_cap_does_not_receive_badge(self, client, mock_db):
+        """When the founding partner cap is already reached, the next subscriber
+        does NOT receive is_founding_partner: True."""
+        import uuid
+
+        cap = 3
+        # Seed `cap` businesses that already have the badge.
+        for i in range(cap):
+            await mock_db.businesses.insert_one({
+                "_id": str(uuid.uuid4()),
+                "name": f"Existing FP Salon {i}",
+                "slug": f"fp-salon-{i}",
+                "claimed_email": f"fp{i}@salon.com",
+                "is_founding_partner": True,
+                "featured": {"tier": "premium", "enabled": True},
+                "stripe_subscription_id": f"sub_fp_{i}",
+            })
+
+        # The new subscriber — should NOT get the badge.
+        new_biz_id = str(uuid.uuid4())
+        await mock_db.businesses.insert_one({
+            "_id": new_biz_id,
+            "name": "Late Subscriber Salon",
+            "slug": "late-sub-salon",
+            "claimed_email": "late@salon.com",
+            "featured": {"tier": "free", "enabled": False},
+        })
+
+        event = _make_checkout_event(new_biz_id, "sub_late_001", "cus_late_001")
+        # Use event id different from existing tests to avoid idempotency short-circuit.
+        event["id"] = "evt_late_subscriber"
+
+        with patch.dict(os.environ, {
+            "STRIPE_WEBHOOK_SECRET": "whsec_test",
+            "FOUNDING_PARTNER_CAP": str(cap),
+        }):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            with patch("stripe.Webhook.construct_event", return_value=event):
+                r = client.post(
+                    "/api/v1/billing/webhook",
+                    content=json.dumps(event).encode(),
+                    headers={"stripe-signature": "t=1,v1=abc"},
+                )
+            get_settings.cache_clear()
+
+        assert r.status_code == 200
+        biz = await mock_db.businesses.find_one({"_id": new_biz_id})
+        assert biz.get("is_founding_partner") is not True, (
+            f"Subscriber #{cap + 1} must NOT receive Founding Partner status — "
+            f"the cap of {cap} is already reached"
+        )
+        # The subscription upgrade should still have happened even though no badge.
+        assert biz["featured"]["tier"] == "premium"
+        assert biz["stripe_subscription_id"] == "sub_late_001"
+
+    @pytest.mark.asyncio
+    async def test_last_available_slot_receives_badge(self, client, mock_db):
+        """The subscriber who fills the final slot (existing_count == cap - 1)
+        must receive the badge."""
+        import uuid
+
+        cap = 3
+        # Seed cap-1 businesses with the badge.
+        for i in range(cap - 1):
+            await mock_db.businesses.insert_one({
+                "_id": str(uuid.uuid4()),
+                "name": f"Early FP Salon {i}",
+                "slug": f"early-fp-{i}",
+                "claimed_email": f"earlyFP{i}@salon.com",
+                "is_founding_partner": True,
+                "featured": {"tier": "premium", "enabled": True},
+                "stripe_subscription_id": f"sub_early_{i}",
+            })
+
+        last_biz_id = str(uuid.uuid4())
+        await mock_db.businesses.insert_one({
+            "_id": last_biz_id,
+            "name": "Last FP Slot Salon",
+            "slug": "last-fp-salon",
+            "claimed_email": "lastfp@salon.com",
+            "featured": {"tier": "free", "enabled": False},
+        })
+
+        event = _make_checkout_event(last_biz_id, "sub_last_fp", "cus_last_fp")
+        event["id"] = "evt_last_fp_slot"
+
+        with patch.dict(os.environ, {
+            "STRIPE_WEBHOOK_SECRET": "whsec_test",
+            "FOUNDING_PARTNER_CAP": str(cap),
+        }):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            with patch("stripe.Webhook.construct_event", return_value=event):
+                r = client.post(
+                    "/api/v1/billing/webhook",
+                    content=json.dumps(event).encode(),
+                    headers={"stripe-signature": "t=1,v1=abc"},
+                )
+            get_settings.cache_clear()
+
+        assert r.status_code == 200
+        biz = await mock_db.businesses.find_one({"_id": last_biz_id})
+        assert biz.get("is_founding_partner") is True, (
+            f"Subscriber filling the last of {cap} slots must receive the badge"
+        )
+
+    @pytest.mark.asyncio
+    async def test_founding_partner_badge_persists_after_cancellation(self, client, mock_db):
+        """Cancelling the subscription must NOT revoke the founding partner badge —
+        the badge is permanent as promised in the owner dashboard copy."""
+        import uuid
+        biz_id = str(uuid.uuid4())
+        await mock_db.businesses.insert_one({
+            "_id": biz_id,
+            "name": "Founding Cancel Salon",
+            "slug": "founding-cancel-salon",
+            "claimed_email": "fpcancel@salon.com",
+            "is_founding_partner": True,
+            "stripe_subscription_id": "sub_fp_cancel",
+            "stripe_customer_id": "cus_fp_cancel",
+            "featured": {"tier": "premium", "enabled": True},
+        })
+
+        cancel_event = _make_cancel_event("sub_fp_cancel")
+        cancel_event["id"] = "evt_fp_cancel_unique"
+
+        with patch.dict(os.environ, {"STRIPE_WEBHOOK_SECRET": "whsec_test"}):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            with patch("stripe.Webhook.construct_event", return_value=cancel_event):
+                r = client.post(
+                    "/api/v1/billing/webhook",
+                    content=json.dumps(cancel_event).encode(),
+                    headers={"stripe-signature": "t=1,v1=abc"},
+                )
+            get_settings.cache_clear()
+
+        assert r.status_code == 200
+        biz = await mock_db.businesses.find_one({"_id": biz_id})
+        assert biz.get("is_founding_partner") is True, (
+            "Founding partner badge must survive cancellation — "
+            "the owner dashboard explicitly promises it is permanent"
+        )
+        assert biz["featured"]["tier"] == "free"  # subscription downgraded
+        assert "stripe_subscription_id" not in biz  # subscription cleared

@@ -1340,6 +1340,17 @@ async def pricing_page(request: Request) -> HTMLResponse:
     # customer or partner. The city hero is the right image for a pricing page — it
     # represents the Miami beauty market we're selling into.
     ctx["og_image"] = tenant.city.get("hero_photo_url") if tenant.city else None
+    # WHY: pass founding partner count so the pricing page can show how many
+    # spots are left. Render-time count is accurate to within a few seconds
+    # which is good enough — we don't need real-time precision for a "26 of
+    # 25 spots claimed" edge case.
+    cap = get_settings().founding_partner_cap
+    founding_count = await get_db().businesses.count_documents(
+        {"is_founding_partner": True}
+    )
+    ctx["founding_partner_cap"] = cap
+    ctx["founding_partner_count"] = founding_count
+    ctx["founding_partner_spots_left"] = max(0, cap - founding_count)
     return _templates.TemplateResponse("pricing.html", ctx)
 
 
