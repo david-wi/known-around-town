@@ -16,7 +16,7 @@
 {# Success toast — shown via JS when returning from Stripe checkout with ?subscribed=1 #}
 <div id="subscribed-toast"
      class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-emerald-700 text-white text-sm font-medium px-6 py-3 rounded-full shadow-xl pointer-events-none">
-  Welcome to Pro! Your listing is now featured at the top.
+  You're Featured! Your listing is now first in search results.
 </div>
 
 {# ── REAL DASHBOARD ─────────────────────────────────────────────── #}
@@ -57,7 +57,7 @@
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-5">
     <div class="inline-flex items-center gap-2.5 rounded-full border border-amber-200 bg-amber-50 px-5 py-2.5">
       <span class="text-amber-500 text-sm leading-none">★</span>
-      <span class="text-sm font-semibold text-stone-900">Pro listing active</span>
+      <span class="text-sm font-semibold text-stone-900">Featured listing active</span>
       <span class="text-stone-300 mx-0.5">|</span>
       <span class="text-xs text-stone-500">Your salon is featured at the top of search results.</span>
     </div>
@@ -78,7 +78,7 @@
           <h2 class="text-base font-semibold text-stone-900 mb-1.5">Be the first {{ listing_word_singular or 'salon' }} visitors see in your neighborhood</h2>
           <ul class="text-sm text-stone-600 space-y-1 leading-relaxed max-w-xs list-none">
             <li>✓ Featured first in every category and neighborhood search</li>
-            <li>✓ Pro badge on your public listing</li>
+            <li>✓ Featured badge on your public listing</li>
             <li>✓ Instagram caption generator — AI-written posts for your salon</li>
             <li>✓ Lock in Founding Partner pricing before rates increase</li>
           </ul>
@@ -86,7 +86,7 @@
         <div class="flex flex-col items-start gap-2 shrink-0 pt-1">
           <button id="upgrade-btn" type="button"
                   class="inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-2.5 rounded-full text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
-            <span id="upgrade-btn-label">Upgrade to Pro — $29/month</span>
+            <span id="upgrade-btn-label">Get Featured — $29/month</span>
           </button>
           <p class="text-xs text-stone-400">or $290/year &mdash; that&rsquo;s $24/month &middot; first month free</p>
           <p id="upgrade-error" class="hidden text-xs text-rose-700 max-w-[14rem]" role="alert" aria-live="polite"></p>
@@ -847,7 +847,7 @@
       window.location.href = body.url;
     } catch (err) {
       btn.disabled = false;
-      labelEl.textContent = 'Upgrade to Pro — $29/month';
+      labelEl.textContent = 'Get Featured — $29/month';
       if (errEl) {
         errEl.textContent = err.message || 'Could not start checkout. Please try again.';
         errEl.classList.remove('hidden');
