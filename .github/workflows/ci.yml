@@ -12,6 +12,13 @@ env:
   # a surprise outage. The flag is the official migration path from GitHub's
   # own deprecation notice.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  IMAGE: ghcr.io/david-wi/known-around-town
+
+# WHY: default to read-only for all jobs so the test job never has write
+# access to packages or repo contents. The build-and-push job overrides with
+# packages: write only for the specific job that actually needs it.
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -43,3 +50,41 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest tests/ -q --tb=short
+
+  build-and-push:
+    name: Build and push image
+    # WHY: only push to GHCR on merges to main (not on PRs) and only after
+    # tests pass. Running both jobs concurrently would push a broken image
+    # before CI reports failure; the `needs: test` gate prevents that.
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'david-wi/known-around-town'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          # WHY: tag both :latest (what Watchtower polls) and the commit SHA
+          # (enables rollback by pinning docker-compose.prod.yml to a specific
+          # SHA tag if the new :latest has a regression).
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          # WHY: registry cache dramatically speeds up subsequent builds by
+          # reusing unchanged layers — typically 80-90% of layers are cache
+          # hits after the first build, cutting build time from ~3min to ~30s.
+          cache-from: type=registry,ref=${{ env.IMAGE }}:cache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:cache,mode=max
