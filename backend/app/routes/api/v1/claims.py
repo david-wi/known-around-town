@@ -1,5 +1,6 @@
 import asyncio
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote as _url_quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -103,13 +104,19 @@ async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
     # they submitted, got a confirmation, and then heard nothing.  Fire-and-
     # forget so a slow email never blocks the admin verification response.
     business = await db.businesses.find_one({"_id": claim["business_id"]})
-    login_url = str(request.base_url).rstrip("/") + "/owners/login"
+    base = str(request.base_url).rstrip("/")
+    owner_email = (claim.get("submitter_email") or "").strip()
+    # WHY: pre-filling the email in the login URL means the owner lands on the
+    # code-entry screen immediately rather than having to re-type their address.
+    # One fewer step between "verified" and "inside the dashboard".
+    login_url = base + "/owners/login?email=" + _url_quote(owner_email, safe="")
     asyncio.create_task(
         send_claim_verified_email(
-            email=claim.get("submitter_email", ""),
+            email=owner_email,
             submitter_name=claim.get("submitter_name", ""),
             business_name=(business or {}).get("name", "your business"),
             login_url=login_url,
+            site_base_url=base,
         )
     )
     return {"status": "verified"}

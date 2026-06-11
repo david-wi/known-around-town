@@ -1154,15 +1154,17 @@ def test_claim_verified_email_function_exists_with_correct_content():
     address without hitting a real email provider."""
     from app.services.owner_email import _claim_verified_text, _claim_verified_html
 
-    login_url = "https://miami.knowsbeauty.ai.devintensive.com/owners/login"
+    base = "https://miami.knowsbeauty.ai.devintensive.com"
+    login_url = base + "/owners/login?email=maria%40example.com"
+    pricing_url = base + "/pricing"
 
-    text = _claim_verified_text("Maria Lopez", "Salon Bliss Miami", login_url)
+    text = _claim_verified_text("Maria Lopez", "Salon Bliss Miami", login_url, pricing_url)
     assert "Salon Bliss Miami" in text, "Business name missing from verified email text"
     assert login_url in text, "Login URL missing from verified email text"
     assert "hello@knowsbeauty.com" in text, "Support email missing from verified email text"
     assert "verified" in text.lower(), "Email must state the claim has been verified"
 
-    html = _claim_verified_html("Maria Lopez", "Salon Bliss Miami", login_url)
+    html = _claim_verified_html("Maria Lopez", "Salon Bliss Miami", login_url, pricing_url)
     assert "Salon Bliss Miami" in html, "Business name missing from verified email HTML"
     assert login_url in html, "Login URL missing from verified email HTML"
     assert "Log in to your dashboard" in html, "Login CTA missing from verified email HTML"
@@ -2371,3 +2373,47 @@ def test_business_page_view_counter_increments(seeded_db):
         f"{updated.get('page_view_count', 'field missing')}. "
         "Check that _increment_business_view is wired to the background task."
     )
+
+
+def test_claim_verified_email_login_url_contains_email():
+    """The claim-verified email must include ?email= in the login link so owners
+    land on the code-entry step immediately without retyping their address.
+
+    WHY: without the pre-filled email, the 'Log in to your dashboard →' button
+    sends owners to a blank login form where they have to re-enter the same
+    email address they just received the email at. That's an unnecessary friction
+    step right after the owner's first approval — not a good first impression.
+    """
+    from app.services.owner_email import _claim_verified_text, _claim_verified_html
+
+    login_url = "https://miami.knowsbeauty.ai.devintensive.com/owners/login?email=ana%40example.com"
+    pricing_url = "https://miami.knowsbeauty.ai.devintensive.com/pricing"
+
+    text = _claim_verified_text("Ana Garcia", "Salon Bella", login_url, pricing_url)
+    html = _claim_verified_html("Ana Garcia", "Salon Bella", login_url, pricing_url)
+
+    # Login URL must appear in both bodies with the email param
+    assert "?email=" in text, "login_url in text body must include ?email="
+    assert "?email=" in html, "login_url in HTML body must include ?email="
+
+    # Pricing URL must use the dynamic base, not the hardcoded dead domain
+    assert "miamiknowsbeauty.com" not in text, "hardcoded miamiknowsbeauty.com still in text body"
+    assert "miamiknowsbeauty.com" not in html, "hardcoded miamiknowsbeauty.com still in HTML body"
+    assert pricing_url in text, "dynamic pricing URL missing from text body"
+    assert pricing_url in html, "dynamic pricing URL missing from HTML body"
+
+
+def test_owner_login_page_loads_with_email_param(client):
+    """The owner login page must render without errors when ?email= is in the URL.
+
+    WHY: the email pre-fill reads window.location.href client-side, so the
+    server just needs to serve the page — but this test confirms the page
+    still renders a 200 with the email param present (no server-side breakage).
+    """
+    r = client.get(
+        "/owners/login?email=ana%40example.com",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, f"Login page with ?email= returned {r.status_code}"
+    # The JS block that reads the param must be present
+    assert "autoFillFromUrl" in r.text, "autoFillFromUrl JS function missing from login page"
