@@ -12,6 +12,7 @@ this feature is announced.
 
 from __future__ import annotations
 
+import html
 import logging
 import os
 from typing import Optional
@@ -537,5 +538,263 @@ def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:
       Questions while you wait?
       Email <a href="mailto:hello@knowsbeauty.com" style="color: #be185d;">hello@knowsbeauty.com</a>.
     </p>
+  </div>
+</body></html>"""
+
+
+# ---------------------------------------------------------------------------
+# Inquiry notifications — sent when a visitor contacts a business listing
+# ---------------------------------------------------------------------------
+
+async def send_owner_inquiry_email(
+    *,
+    owner_email: str,
+    business_name: str,
+    visitor_name: str,
+    visitor_email: Optional[str],
+    visitor_phone: Optional[str],
+    message: str,
+    dashboard_url: str,
+) -> bool:
+    """Notify a claimed-business owner that a visitor has sent them a message.
+
+    WHY: the owner dashboard shows all inquiries, but only if the owner
+    actively logs in. Without this email the owner may never see a hot lead.
+    Setting Reply-To lets the owner reply directly from their email client —
+    removing all friction from following up with the visitor.
+    """
+    subject = f"New message for {business_name} on Miami Knows Beauty"
+    text_body = _inquiry_owner_text(
+        business_name, visitor_name, visitor_email, visitor_phone, message, dashboard_url
+    )
+    html_body = _inquiry_owner_html(
+        business_name, visitor_name, visitor_email, visitor_phone, message, dashboard_url
+    )
+
+    api_key = _provider_api_key()
+    if not api_key:
+        logger.warning(
+            "RESEND_API_KEY not configured — inquiry notification logged instead of emailed "
+            "for %s (owner %s).",
+            business_name,
+            owner_email,
+        )
+        return True
+
+    payload: dict = {
+        "from": _from_address(),
+        "to": [owner_email],
+        "subject": subject,
+        "text": text_body,
+        "html": html_body,
+    }
+    # WHY: Reply-To lets the owner reply from their email client directly
+    # to the visitor without opening the dashboard — reduces friction for
+    # a time-sensitive response window.
+    if visitor_email:
+        payload["reply_to"] = visitor_email
+
+    try:
+        async with httpx.AsyncClient(timeout=_PROVIDER_TIMEOUT_SECONDS) as client:
+            resp = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+            resp.raise_for_status()
+            logger.info(
+                "Inquiry notification sent to owner %s for %s", owner_email, business_name
+            )
+            return True
+    except Exception:
+        logger.exception(
+            "Failed to send inquiry notification to owner %s for %s",
+            owner_email,
+            business_name,
+        )
+        return False
+
+
+async def send_admin_inquiry_email(
+    *,
+    business_name: str,
+    business_id: str,
+    visitor_name: str,
+    visitor_email: Optional[str],
+    visitor_phone: Optional[str],
+    message: str,
+) -> bool:
+    """Alert admin when a visitor messages an unclaimed business.
+
+    WHY: an unclaimed business getting inquiries is strong evidence the owner
+    would benefit from claiming it. Alerting admin immediately lets us follow
+    up with the owner while the lead is fresh, and ensures the visitor message
+    isn't silently dropped.
+    """
+    recipient = _admin_notify_address()
+    subject = f"Inquiry for unclaimed listing: {business_name}"
+    safe_name = html.escape(visitor_name)
+    safe_email = html.escape(visitor_email or "")
+    safe_phone = html.escape(visitor_phone or "")
+    safe_msg = html.escape(message)
+
+    text_body = (
+        f"A visitor sent a message to {business_name} — this listing is unclaimed.\n\n"
+        f"Visitor: {visitor_name}\n"
+        + (f"Email: {visitor_email}\n" if visitor_email else "")
+        + (f"Phone: {visitor_phone}\n" if visitor_phone else "")
+        + f"\nMessage:\n{message}\n\n"
+        f"Business ID: {business_id}\n\n"
+        "Consider reaching out to this salon to encourage them to claim their listing.\n\n"
+        "— Miami Knows Beauty notifications\n"
+    )
+    html_body = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+              background: #f8f5f2; padding: 32px; color: #1c1917;">
+  <div style="max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 16px;
+              padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+    <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
+              text-transform: uppercase; margin: 0 0 16px;">
+      Miami Knows Beauty · Admin
+    </p>
+    <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
+               font-size: 26px; line-height: 1.2; margin: 0 0 8px; color: #1c1917;">
+      Inquiry for unclaimed listing
+    </h1>
+    <p style="font-size: 15px; color: #78716c; margin: 0 0 24px;">
+      <strong style="color: #1c1917;">{html.escape(business_name)}</strong> has not been claimed yet.
+    </p>
+    <table style="width: 100%; border-collapse: collapse; margin: 0 0 20px; font-size: 14px;">
+      <tr><td style="padding: 6px 0; color: #78716c; width: 80px;">From</td>
+          <td style="padding: 6px 0; color: #1c1917;">{safe_name}</td></tr>
+      {"<tr><td style='padding: 6px 0; color: #78716c;'>Email</td>" +
+       f"<td style='padding: 6px 0;'><a href='mailto:{safe_email}' style='color: #be185d;'>{safe_email}</a></td></tr>"
+       if visitor_email else ""}
+      {"<tr><td style='padding: 6px 0; color: #78716c;'>Phone</td>" +
+       f"<td style='padding: 6px 0; color: #1c1917;'>{safe_phone}</td></tr>"
+       if visitor_phone else ""}
+    </table>
+    <div style="background: #f8f5f2; border-radius: 8px; padding: 16px; margin: 0 0 24px;
+                font-size: 14px; color: #1c1917; line-height: 1.7; white-space: pre-wrap;">{safe_msg}</div>
+    <p style="font-size: 13px; color: #78716c; margin: 0;">
+      Business ID: <code>{business_id}</code>
+    </p>
+  </div>
+</body></html>"""
+
+    api_key = _provider_api_key()
+    if not api_key:
+        logger.warning(
+            "RESEND_API_KEY not configured — admin inquiry alert logged instead of emailed "
+            "for unclaimed business %s.",
+            business_name,
+        )
+        return True
+
+    try:
+        async with httpx.AsyncClient(timeout=_PROVIDER_TIMEOUT_SECONDS) as client:
+            resp = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "from": _from_address(),
+                    "to": [recipient],
+                    "subject": subject,
+                    "text": text_body,
+                    "html": html_body,
+                },
+            )
+            resp.raise_for_status()
+            return True
+    except Exception:
+        logger.exception(
+            "Failed to send admin inquiry alert for unclaimed business %s", business_name
+        )
+        return False
+
+
+def _inquiry_owner_text(
+    business_name: str,
+    visitor_name: str,
+    visitor_email: Optional[str],
+    visitor_phone: Optional[str],
+    message: str,
+    dashboard_url: str,
+) -> str:
+    contact_lines = ""
+    if visitor_email:
+        contact_lines += f"Email: {visitor_email}\n"
+    if visitor_phone:
+        contact_lines += f"Phone: {visitor_phone}\n"
+    return (
+        f"Hi,\n\n"
+        f"A visitor sent a message to {business_name} on Miami Knows Beauty.\n\n"
+        f"From: {visitor_name}\n"
+        + contact_lines
+        + f"\nMessage:\n{message}\n\n"
+        "You can reply directly to this email, or view the full message in your dashboard:\n"
+        f"{dashboard_url}\n\n"
+        "— Miami Knows Beauty\n"
+    )
+
+
+def _inquiry_owner_html(
+    business_name: str,
+    visitor_name: str,
+    visitor_email: Optional[str],
+    visitor_phone: Optional[str],
+    message: str,
+    dashboard_url: str,
+) -> str:
+    safe_business = html.escape(business_name)
+    safe_name = html.escape(visitor_name)
+    safe_email = html.escape(visitor_email or "")
+    safe_phone = html.escape(visitor_phone or "")
+    safe_msg = html.escape(message)
+
+    contact_rows = ""
+    if visitor_email:
+        contact_rows += (
+            f"<tr><td style='padding: 6px 0; color: #78716c; width: 80px;'>Email</td>"
+            f"<td style='padding: 6px 0;'>"
+            f"<a href='mailto:{safe_email}' style='color: #be185d;'>{safe_email}</a>"
+            f"</td></tr>"
+        )
+    if visitor_phone:
+        contact_rows += (
+            f"<tr><td style='padding: 6px 0; color: #78716c;'>Phone</td>"
+            f"<td style='padding: 6px 0; color: #1c1917;'>{safe_phone}</td></tr>"
+        )
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+              background: #f8f5f2; padding: 32px; color: #1c1917;">
+  <div style="max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 16px;
+              padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+    <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
+              text-transform: uppercase; margin: 0 0 16px;">
+      Miami Knows Beauty
+    </p>
+    <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
+               font-size: 26px; line-height: 1.2; margin: 0 0 8px; color: #1c1917;">
+      New message for {safe_business}
+    </h1>
+    <p style="font-size: 14px; color: #78716c; margin: 0 0 24px;">
+      A visitor sent you a message through the directory.
+    </p>
+    <table style="width: 100%; border-collapse: collapse; margin: 0 0 20px; font-size: 14px;">
+      <tr><td style="padding: 6px 0; color: #78716c; width: 80px;">From</td>
+          <td style="padding: 6px 0; color: #1c1917;"><strong>{safe_name}</strong></td></tr>
+      {contact_rows}
+    </table>
+    <div style="background: #f8f5f2; border-radius: 8px; padding: 16px; margin: 0 0 24px;
+                font-size: 15px; color: #1c1917; line-height: 1.7; white-space: pre-wrap;">{safe_msg}</div>
+    <a href="{dashboard_url}"
+       style="display: inline-block; background: #be185d; color: #ffffff; font-size: 14px;
+              font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">
+      View in dashboard →
+    </a>
   </div>
 </body></html>"""

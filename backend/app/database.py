@@ -89,6 +89,11 @@ async def ensure_indexes() -> None:
     await db.owner_sessions.create_index(
         "session_expires_at", expireAfterSeconds=0
     )
+    # WHY: inquiry notifications look up the owner session by business_id;
+    # without this index that lookup is a full collection scan per inquiry.
+    # sparse=True because sessions without a bound business_id (pre-claim)
+    # should not be indexed.
+    await db.owner_sessions.create_index("business_id", sparse=True)
 
     # --- claim-and-pay: StripeEvent indexes (from stashed WIP) ---
     # WHY: webhook idempotency — we store the Stripe event id as _id.
