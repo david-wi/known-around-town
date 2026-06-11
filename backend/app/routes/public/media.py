@@ -29,11 +29,9 @@ router = APIRouter()
 # be cached for the full year.
 _CACHE_CONTROL = "public, max-age=31536000, immutable"
 
-_CONTENT_TYPE_MAP = {
-    "image/jpeg": "image/jpeg",
-    "image/png":  "image/png",
-    "image/webp": "image/webp",
-}
+# WHY: whitelist of MIME types the /media/ route will forward; anything else
+# falls through to the "image/jpeg" safe default.
+_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 @router.get("/media/{photo_id}")
@@ -52,14 +50,18 @@ async def serve_photo(photo_id: str) -> StreamingResponse:
     bucket = get_gridfs_bucket()
     try:
         grid_out = await bucket.open_download_stream(oid)
-    except Exception:
+    except Exception as exc:
+        # WHY: log the real exception before returning 404 so a GridFS timeout
+        # or Atlas connectivity error shows up in server logs instead of being
+        # silently swallowed as a missing-file 404.
+        log.warning("GridFS open_download_stream failed for %s: %s", photo_id, exc)
         raise HTTPException(404, "Photo not found")
 
     # WHY: fall back to image/jpeg if the metadata field is missing or has
-    # an unrecognised value. JPEG is the most common case and browsers
-    # handle it gracefully even when the header is slightly wrong.
+    # an unrecognised value. JPEG is the most common case and browsers handle
+    # it gracefully even when the Content-Type header is slightly wrong.
     raw_ct = (grid_out.metadata or {}).get("content_type", "image/jpeg")
-    content_type = _CONTENT_TYPE_MAP.get(raw_ct, "image/jpeg")
+    content_type = raw_ct if raw_ct in _ALLOWED_CONTENT_TYPES else "image/jpeg"
 
     async def _stream():
         while True:
