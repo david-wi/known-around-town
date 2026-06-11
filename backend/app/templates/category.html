@@ -99,15 +99,17 @@
   </div>
 </section>
 
-{# Sticky filter bar — visually mirrors the reference. Form is non-functional for now
-   (filtering would need server-side wiring); this section exists so the page looks
-   complete and matches the reference. #}
+{# WHY: The neighborhood dropdown now navigates to /n/{nb}/c/{category} instead of
+   doing nothing. This serves two purposes: (1) visitors who want to narrow to their
+   neighborhood get a real page with the right listings; (2) those destination pages
+   get internal link equity from every category page, helping Google find and rank them. #}
 <section class="sticky top-[72px] z-30 bg-white/95 backdrop-blur-lg border-b border-stone-200/60">
   <div class="max-w-7xl mx-auto px-6 lg:px-10 py-4 flex flex-wrap items-center gap-3">
     <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-stone-500 font-semibold mr-2">Filter</div>
-    <select class="text-sm bg-stone-100 hover:bg-stone-200 transition border-0 rounded-full px-4 py-2 font-medium text-stone-700 focus:outline-none focus:ring-2 {{ theme.focus_ring }}">
-      <option value="all">All neighborhoods</option>
-      {% for n in nav_neighborhoods %}<option value="{{ n.slug }}">{{ n.name }}</option>{% endfor %}
+    <select onchange="if(this.value !== 'all') window.location='/n/'+this.value+'/c/{{ category.slug }}'"
+            class="text-sm bg-stone-100 hover:bg-stone-200 transition border-0 rounded-full px-4 py-2 font-medium text-stone-700 focus:outline-none focus:ring-2 {{ theme.focus_ring }}">
+      <option value="all">{% if neighborhood %}{{ neighborhood.name }}{% else %}All neighborhoods{% endif %}</option>
+      {% for n in nav_neighborhoods %}{% if not neighborhood or n.slug != neighborhood.slug %}<option value="{{ n.slug }}">{{ n.name }}</option>{% endif %}{% endfor %}
     </select>
     <select class="text-sm bg-stone-100 hover:bg-stone-200 transition border-0 rounded-full px-4 py-2 font-medium text-stone-700 focus:outline-none focus:ring-2 {{ theme.focus_ring }}">
       <option value="all">All listings</option>
@@ -140,6 +142,28 @@
   </div>
   {% endif %}
 </section>
+
+{# WHY: Explicit <a> links to neighborhood+category cross-pages (/n/wynwood/c/hair)
+   give Google crawlable paths to those pages from every category page. Without real
+   anchor tags, Google can only discover them through the sitemap — internal links
+   add independent link-equity signals and help them rank for local searches like
+   "hair salons wynwood". Only shown when we're on the plain /c/<slug> page (not
+   already on a cross-page) and when there are enough neighborhoods to be worth showing. #}
+{% if not neighborhood and nav_neighborhoods|length > 1 %}
+<section class="border-t border-stone-200/40 bg-stone-50/40">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10 py-8">
+    <p class="text-xs uppercase tracking-widest text-stone-500 font-semibold mb-4">{{ category.name }} by Neighborhood</p>
+    <div class="flex flex-wrap gap-2">
+      {% for n in nav_neighborhoods %}
+      <a href="/n/{{ n.slug }}/c/{{ category.slug }}"
+         class="text-sm px-4 py-2 rounded-full border border-stone-200 bg-white hover:border-stone-400 hover:shadow-sm transition text-stone-700 font-medium">
+        {{ n.name }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {# WHY: Business owners often search for their category + city and land here before
    they ever think to look for a "claim" flow. A direct prompt at the end of the
