@@ -15,6 +15,13 @@ services:
     env_file: .env
     environment:
       MONGODB_URL: mongodb://mongo:27017
+      # WHY: this dev stack intentionally runs against the local Mongo
+      # container above. The app refuses local databases by default (so a
+      # misconfigured production deploy can never silently use one); this
+      # opt-in is the supported escape hatch for local development. It is set
+      # ONLY here — docker-compose.prod.yml never sets it, so production can
+      # only ever use the managed Atlas database.
+      ALLOW_LOCAL_MONGODB: "true"
       # Stripe billing — set real values in .env (never commit secrets here).
       # STRIPE_SECRET_KEY: sk_live_...        (or sk_test_... for dev)
       # STRIPE_WEBHOOK_SECRET: whsec_...      (from Stripe Dashboard > Webhooks)
