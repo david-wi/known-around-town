@@ -97,3 +97,55 @@ async def handle_webhook(event: stripe.Event) -> str:
 ```
 
 The `stripe_events` collection requires no explicit unique index because `_id` is always unique in MongoDB. No TTL or cleanup is strictly necessary for correctness, but a TTL index of 90 days keeps the collection from growing unbounded.
+
+## 6. Jinja2 Block Balance: Verify Parse After Any Structural Template Refactor
+
+Moving a template section outside a conditional is a silent crash risk. Jinja2 does NOT catch mismatched blocks until a request actually renders the template — and some routes return early (e.g., auth redirects) before rendering, masking the error from smoke tests.
+
+**The failure mode (found in owner_me.html, PR #131):** A missing `{% endif %}` caused `TemplateSyntaxError: Encountered unknown tag 'else'` for every signed-in owner visiting `/owners/me`. Unauthenticated requests redirect before rendering, so the error was invisible in smoke tests.
+
+**After any structural template change, always verify parse:**
+```bash
+cd backend
+python3 -c "
+from jinja2 import Environment, FileSystemLoader
+env = Environment(loader=FileSystemLoader('app/templates'))
+env.get_template('owner_me.html')
+print('Template parses OK')
+"
+```
+
+**Label block boundaries** with comments to make structure unambiguous:
+```jinja
+{% if owner_business.stripe_subscription_id %}
+  ...subscription content...
+</section>
+{% endif %}{# /if stripe_subscription_id #}
+
+{% if owner_business.get('is_founding_partner') %}
+```
+
+The `{# /if <condition> #}` suffix is searchable and makes block boundaries unambiguous.
+
+## 7. Founding Partner Badge: Place OUTSIDE the Subscription Conditional
+
+The `is_founding_partner` flag is permanent — it is never cleared, not even on subscription cancellation. The dashboard badge must live **outside** `{% if stripe_subscription_id %}` so founding partners see it regardless of current subscription state.
+
+The same principle applies to the post-subscribe success toast: show "You're a Founding Partner!" when the flag is already set at render time (webhook typically fires before the browser redirect lands), and fall back to "You're Featured!" if the webhook hasn't written the flag yet.
+
+## 8. mongomock_motor: Use Empty `mock_db` for `count_documents` Tests
+
+`mongomock_motor`'s `count_documents({"is_founding_partner": True})` returns inflated counts against `seeded_db` because the 147 seed businesses include documents where the field is absent — and mongomock treats absent fields as matching. Tests that assert on founding partner counts must use `mock_db` (empty DB), not `seeded_db`.
+
+```python
+# WRONG — seeded_db has 147 documents; mongomock inflates the count
+async def test_count(seeded_db):
+    count = await seeded_db.businesses.count_documents({"is_founding_partner": True})
+    assert count == 0  # fails; mongomock returns inflated number
+
+# RIGHT — mock_db starts empty; counts are deterministic
+async def test_count(mock_db):
+    await mock_db.businesses.insert_one({"is_founding_partner": True, ...})
+    count = await mock_db.businesses.count_documents({"is_founding_partner": True})
+    assert count == 1
+```
