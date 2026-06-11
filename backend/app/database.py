@@ -9,6 +9,13 @@ def get_client() -> AsyncIOMotorClient:
     global _client
     if _client is None:
         settings = get_settings()
+        # WHY: refuse to start against a local MongoDB unless explicitly opted
+        # in for development. Production must use the managed Atlas database;
+        # a silent fall-back to a local Mongo is how the wrong (and once,
+        # internet-exposed) database could be used without anyone noticing.
+        # Validated here, at the single point where the client is created, so
+        # it runs once on the first DB access at startup and fails loudly.
+        settings.validate_mongodb_url()
         _client = AsyncIOMotorClient(settings.mongodb_url, tz_aware=True)
     return _client
 

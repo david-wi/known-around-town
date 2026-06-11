@@ -1,14 +1,59 @@
 from functools import lru_cache
 from typing import Dict, List, Tuple
+from urllib.parse import urlsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# WHY: Host names that mean "a MongoDB running on this same box / inside this
+# same Compose stack" rather than the managed cloud database. The app must
+# never silently use one of these in production — a throwaway local Mongo was
+# left exposed to the internet and wiped by a ransomware bot on 2026-06-11.
+# Production data lives in MongoDB Atlas, reached via a `mongodb+srv://...`
+# URL, so any of these targets in production is a misconfiguration we want to
+# fail loudly on, not fall back to.
+_LOCAL_MONGO_HOSTS = frozenset(
+    {
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "0.0.0.0",
+        "mongo",  # the docker-compose service name for the local dev Mongo
+        "mongodb",
+    }
+)
+
+
+class LocalMongoForbiddenError(RuntimeError):
+    """Raised at startup when the configured MongoDB target is a local one.
+
+    WHY this is a hard error and not a warning: a silent fall-back to a local
+    database is exactly how production could end up reading and writing the
+    wrong (and unprotected) database without anyone noticing. Crashing on boot
+    surfaces the misconfiguration immediately in the deploy log instead of
+    quietly serving the wrong data.
+    """
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    mongodb_url: str = "mongodb://localhost:27017"
+    # WHY: no default value. Previously this defaulted to
+    # "mongodb://localhost:27017", which meant a missing/blank MONGODB_URL in
+    # production silently connected to a local Mongo instead of failing. An
+    # empty string is caught by validate_mongodb_url() below and turned into a
+    # loud startup error, so a misconfigured deploy can never quietly run
+    # against the wrong database.
+    mongodb_url: str = ""
     mongodb_database: str = "who_knows_local"
+
+    # WHY: the ONE escape hatch for local development. A developer running the
+    # app against a Mongo on their own machine (localhost / the Compose `mongo`
+    # service) sets ALLOW_LOCAL_MONGODB=true in their local .env. Production
+    # never sets it, so production can never connect to a local Mongo. This
+    # keeps the dev experience unchanged while closing the production
+    # fall-back path.
+    allow_local_mongodb: bool = False
 
     network_domains: str = ""
 
@@ -37,6 +82,51 @@ class Settings(BaseSettings):
             slug, suffix = chunk.split(":", 1)
             pairs.append((slug.strip().lower(), suffix.strip().lower()))
         return pairs
+
+    def _mongo_host(self) -> str:
+        """Best-effort extraction of the host from the MongoDB URL.
+
+        WHY urlsplit instead of a regex: connection strings vary
+        (`mongodb://`, `mongodb+srv://`, optional `user:pass@`, optional port,
+        comma-separated replica-set members). urlsplit handles the userinfo/
+        port stripping for the common single-host case, and we additionally
+        take only the first member of a comma-separated host list so a
+        replica-set URL is checked by its first host.
+        """
+        raw = (self.mongodb_url or "").strip()
+        if not raw:
+            return ""
+        # A bare `mongodb+srv://host/db` parses fine; urlsplit's .hostname
+        # lowercases and strips any `user:pass@` and `:port`.
+        host = urlsplit(raw).hostname or ""
+        # Replica-set URLs can list several hosts: take the first.
+        host = host.split(",", 1)[0]
+        return host.lower()
+
+    def validate_mongodb_url(self) -> None:
+        """Fail loudly unless MONGODB_URL is set to a non-local database.
+
+        Called once at startup (from app.database.get_client). Raises
+        LocalMongoForbiddenError when the URL is empty or points at a local
+        Mongo and the ALLOW_LOCAL_MONGODB dev opt-in is not set.
+        """
+        if not (self.mongodb_url or "").strip():
+            raise LocalMongoForbiddenError(
+                "MONGODB_URL is not set. The app refuses to start without an "
+                "explicit database URL. In production set MONGODB_URL to the "
+                "MongoDB Atlas connection string; for local development set a "
+                "local URL together with ALLOW_LOCAL_MONGODB=true."
+            )
+        if self.allow_local_mongodb:
+            return
+        host = self._mongo_host()
+        if host in _LOCAL_MONGO_HOSTS:
+            raise LocalMongoForbiddenError(
+                f"MONGODB_URL points at a local MongoDB host ({host!r}), which "
+                "is not allowed in production. Production must use the managed "
+                "MongoDB Atlas database. If this is a local development run, "
+                "set ALLOW_LOCAL_MONGODB=true to opt in."
+            )
 
 
 @lru_cache
