@@ -77,7 +77,7 @@
                placeholder="{% if claim_prefill %}{{ claim_prefill.name }}{% else %}e.g. {{ city.name if city else 'Your' }} {{ listing_word_singular or 'Business' }}{% endif %}">
         {% if not claim_prefill %}
           <p id="claim-form__biz-hint" class="text-xs text-stone-500 mt-1.5">
-            We'll match against listings in {{ city.name if city else 'this city' }}. Spelling counts.
+            Start typing and we'll match your listing automatically.
           </p>
           {#- WHY: Live match feedback removes the biggest friction point — owners don't
               know whether their spelling matched a real listing until they submit and
