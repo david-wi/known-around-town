@@ -99,7 +99,7 @@ def _mock_gridfs_bucket(fake_id: ObjectId | None = None):
 class TestPhotoUpload:
     @pytest.fixture
     def client(self, seeded_db):
-        return _make_client(seeded_db)
+        return _make_client()
 
     def test_upload_requires_auth(self, client, seeded_db):
         """No session cookie → 401 before any file validation."""
@@ -265,7 +265,7 @@ class TestPhotoUpload:
 class TestPhotoDelete:
     @pytest.fixture
     def client(self, seeded_db):
-        return _make_client(seeded_db)
+        return _make_client()
 
     def test_delete_requires_auth(self, client, seeded_db):
         """No session cookie → 401."""
@@ -353,6 +353,36 @@ class TestPhotoDelete:
         assert r.status_code == 404
 
     @pytest.mark.asyncio
+    async def test_delete_non_hero_leaves_hero_unchanged(self, client, seeded_db):
+        """Deleting a NON-hero photo must not change who the hero is.
+
+        WHY: a prior bug always set remaining[0].is_hero = True regardless of
+        which photo was deleted — this test would have caught it.
+        """
+        email = "nonhero@test.com"
+        hero_id   = ObjectId()
+        second_id = ObjectId()
+        await _insert_business(seeded_db, email=email, photos=[
+            {"url": f"/media/{hero_id}",   "alt": "", "caption": "", "order": 0, "is_hero": True},
+            {"url": f"/media/{second_id}", "alt": "", "caption": "", "order": 1, "is_hero": False},
+        ])
+        cookie = _signed_cookie(email)
+
+        # Delete the NON-hero (second photo)
+        with patch(_PATCH_OWNER, return_value=_mock_gridfs_bucket()):
+            r = client.delete(
+                f"/api/v1/owner/photos/{second_id}",
+                cookies={"kb_owner_session": cookie},
+            )
+
+        assert r.status_code == 200
+        remaining = r.json()["photos"]
+        assert len(remaining) == 1
+        # Hero must still be the original first photo — not re-assigned
+        assert remaining[0]["url"] == f"/media/{hero_id}"
+        assert remaining[0]["is_hero"] is True
+
+    @pytest.mark.asyncio
     async def test_delete_succeeds_even_if_gridfs_delete_fails(self, client, seeded_db):
         """GridFS.delete raising an exception must not fail the HTTP response.
 
@@ -385,7 +415,7 @@ class TestPhotoDelete:
 class TestMediaServing:
     @pytest.fixture
     def client(self, seeded_db):
-        return _make_client(seeded_db)
+        return _make_client()
 
     @pytest.mark.asyncio
     async def test_serve_photo_happy_path(self, client, seeded_db):
