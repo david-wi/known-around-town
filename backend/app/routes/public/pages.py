@@ -782,10 +782,14 @@ async def neighborhood_category_page(
                 category_name=category.get("name"),
             ),
             "seo_title": f"{category.get('name', '')} in {nb.get('name', '')} — {city.get('name', '')} {tenant.network.get('name', '')}",
-            # WHY: without meta_description Google picks a random excerpt from the page.
-            # A constructed sentence ("The best hair salons in Wynwood, Miami") gives
-            # Google compelling snippet copy and helps the page stand out in search results.
+            # WHY: including the business count ("Browse 3 hair salons") makes the
+            # search snippet more informative and increases click-through rate —
+            # a searcher for "hair salons wynwood" is more likely to click a result
+            # that shows 3 real listings exist than one that just says "the best".
             "meta_description": (
+                f"Browse {len(businesses)} {category.get('name', '').lower()} in {nb.get('name', '')}, {city.get('name', '')} — "
+                f"find the best on {city.get('name', '')} {tenant.network.get('name', '')}."
+                if businesses else
                 f"The best {category.get('name', '').lower()} in {nb.get('name', '')}, {city.get('name', '')} — "
                 f"browse {city.get('name', '')} {tenant.network.get('name', '')}."
             ),
@@ -908,6 +912,22 @@ async def business_page(request: Request, business_slug: str) -> HTMLResponse:
     _hero_url = (_hero["url"] if isinstance(_hero, dict) else _hero) if _hero else None
 
     ctx = await _base_context(request, tenant)
+    # WHY: include category and neighborhood in the page title so it targets
+    # the actual search terms ("hair salon design district miami") rather than
+    # just the brand name. Both nav lists are already loaded in _base_context
+    # so this costs zero extra DB queries.
+    _biz_primary_cat_slug = (business.get("category_slugs") or [None])[0]
+    _biz_primary_nb_slug = (business.get("neighborhood_slugs") or [None])[0]
+    _biz_cat_name = next((c["name"] for c in ctx["nav_categories"] if c["slug"] == _biz_primary_cat_slug), "")
+    _biz_nb_name = next((n["name"] for n in ctx["nav_neighborhoods"] if n["slug"] == _biz_primary_nb_slug), "")
+    if business.get("meta_title_override"):
+        _biz_seo_title = business["meta_title_override"]
+    elif _biz_cat_name and _biz_nb_name:
+        _biz_seo_title = f"{business.get('name')} | {_biz_cat_name} in {_biz_nb_name}, {city.get('name')}"
+    elif _biz_cat_name:
+        _biz_seo_title = f"{business.get('name')} | {_biz_cat_name} in {city.get('name')}"
+    else:
+        _biz_seo_title = f"{business.get('name')} — {city.get('name')} {tenant.network.get('name')}"
     ctx.update(
         {
             "business": business,
@@ -934,8 +954,7 @@ async def business_page(request: Request, business_slug: str) -> HTMLResponse:
             "badge_verified": await copy.get("badge.verified"),
             "badge_claimed": await copy.get("badge.claimed"),
             "badge_featured": await copy.get("badge.featured"),
-            "seo_title": business.get("meta_title_override")
-            or f"{business.get('name')} — {city.get('name')} {tenant.network.get('name')}",
+            "seo_title": _biz_seo_title,
             "meta_description": business.get("meta_description_override")
             or business.get("short_description"),
         }
