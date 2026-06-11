@@ -110,6 +110,10 @@ services:
       traefik.http.routers.kat-health.tls: "true"
       traefik.http.routers.kat-health.tls.certresolver: "letsencrypt"
       traefik.http.routers.kat-health.service: "known-around-town"
+      # WHY: opt this container into Watchtower auto-update.  When deploy.yml
+      # pushes a new :latest image to GHCR, Watchtower detects the new digest
+      # within 5 minutes and restarts this container with the updated image.
+      com.centurylinklabs.watchtower.enable: "true"
 
   # Stage / preview environment.
   #
@@ -215,6 +219,48 @@ services:
       traefik.http.routers.kat-stage-health.tls: "true"
       traefik.http.routers.kat-stage-health.tls.certresolver: "letsencrypt"
       traefik.http.routers.kat-stage-health.service: "known-around-town-stage"
+
+  watchtower:
+    # WHY: polls GHCR every 5 minutes and restarts any container whose image
+    # has been updated.  This is how new code gets to the server automatically
+    # after a deploy.yml push — no SSH key needed in GitHub Secrets, no manual
+    # `docker compose pull && up -d` after each merge.  Only watches containers
+    # in this stack (label filter below) so it doesn't accidentally restart
+    # unrelated services on the shared droplet.
+    image: containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      # WHY: Docker socket gives Watchtower permission to pull images and
+      # restart containers on the host.  This is a trusted-admin container
+      # (not exposed to the internet, not in the traefik network), so the
+      # broad socket access is acceptable.
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # WHY: 300s = 5 minutes.  Short enough that a hotfix reaches the server
+      # within one cycle.  Longer intervals reduce GHCR API calls but delay
+      # deployments; 5 min is a good balance for a low-traffic service.
+      WATCHTOWER_POLL_INTERVAL: "300"
+      # WHY: only restart containers whose image was actually updated.
+      # Without this Watchtower pulls all images on every cycle even when
+      # nothing changed, wasting bandwidth and causing unnecessary restarts.
+      WATCHTOWER_NO_PULL: "false"
+      # WHY: removes old image layers after an update to keep disk usage down.
+      # The shared droplet has limited storage; accumulating image versions
+      # would fill it over time.
+      WATCHTOWER_CLEANUP: "true"
+      # WHY: only watch containers that have been explicitly opted in with the
+      # com.centurylinklabs.watchtower.enable=true label.  This prevents
+      # Watchtower from touching other services on the shared droplet that
+      # are managed separately.
+      WATCHTOWER_LABEL_ENABLE: "true"
+      # WHY: credentials for pulling from GHCR.  The image is public so no
+      # token is strictly required, but providing one avoids anonymous pull
+      # rate limits (100 pulls/6h per IP vs 5000 pulls/day authenticated).
+      WATCHTOWER_HTTP_API_TOKEN: ""
+    labels:
+      # WHY: Watchtower watches itself but shouldn't restart itself — that
+      # would break the polling cycle.  Explicitly opt out.
+      com.centurylinklabs.watchtower.enable: "false"
 
 networks:
   traefik:
