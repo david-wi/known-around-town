@@ -29,7 +29,7 @@ from app.routes.api.v1 import (
     owner_stats as api_owner_stats,
     stripe_billing as api_stripe_billing,
 )
-from app.routes.admin import claims_admin
+from app.routes.admin import claims_admin, analytics_admin
 from app.routes.public import pages as public_pages, media as public_media
 
 settings = get_settings()
@@ -101,11 +101,13 @@ app.include_router(api_owner_photos.router)
 
 public_pages.attach_templates(templates)
 claims_admin.attach_templates(templates)
+analytics_admin.attach_templates(templates)
 
 # Admin HTML pages — registered BEFORE the public SSR catch-all so /admin/*
 # resolves to the admin router rather than being swallowed by the public
 # tenant-aware not-found handler.
 app.include_router(claims_admin.router)
+app.include_router(analytics_admin.router)
 
 # WHY: media route is registered before the public SSR catch-all so /media/{id}
 # is served by the GridFS streaming route and not handed to the 404 template.

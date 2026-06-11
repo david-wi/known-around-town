@@ -1,0 +1,167 @@
+{% extends "admin/_layout.html" %}
+
+{% block title %}Analytics · Admin · Known Around Town{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-6 lg:px-10 py-10">
+
+  <h1 class="font-serif text-2xl text-stone-900 mb-1" style="font-family: Georgia, serif;">Site analytics</h1>
+  <p class="text-sm text-stone-500 mb-8">Live data from production — refreshes every page load.</p>
+
+  {# ── Top-level stat cards ─────────────────────────────────────────────── #}
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+
+    <div class="bg-white rounded-xl border border-stone-200 px-6 py-5">
+      <p class="text-xs uppercase tracking-widest text-stone-400 mb-1">Total page views</p>
+      <p class="text-3xl font-semibold text-stone-900">{{ "{:,}".format(total_views) }}</p>
+      <p class="text-xs text-stone-400 mt-1">across {{ total_biz }} listings</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-stone-200 px-6 py-5">
+      <p class="text-xs uppercase tracking-widest text-stone-400 mb-1">Listings visited</p>
+      <p class="text-3xl font-semibold text-stone-900">{{ visited }}</p>
+      <p class="text-xs text-stone-400 mt-1">{{ unvisited }} not yet visited</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-stone-200 px-6 py-5">
+      <p class="text-xs uppercase tracking-widest text-stone-400 mb-1">Claims submitted</p>
+      <p class="text-3xl font-semibold text-stone-900">{{ total_claims }}</p>
+      <p class="text-xs text-stone-400 mt-1">{{ pending_claims }} pending · {{ approved_claims }} approved</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-stone-200 px-6 py-5">
+      <p class="text-xs uppercase tracking-widest text-stone-400 mb-1">Owner accounts</p>
+      <p class="text-3xl font-semibold text-stone-900">{{ total_owners }}</p>
+      <p class="text-xs text-stone-400 mt-1">{{ pro_count }} featured / Pro</p>
+    </div>
+
+  </div>
+
+  {# ── Top listings by page views ───────────────────────────────────────── #}
+  <div class="bg-white rounded-xl border border-stone-200 mb-8">
+    <div class="px-6 py-4 border-b border-stone-100">
+      <h2 class="font-semibold text-stone-900">Top listings by page views</h2>
+      <p class="text-xs text-stone-400 mt-0.5">Most-visited salon pages — useful for deciding who to reach out to first</p>
+    </div>
+
+    {% if top_listings %}
+    <div class="divide-y divide-stone-100">
+      {% for biz in top_listings %}
+      <div class="flex items-center gap-4 px-6 py-3">
+        <span class="text-sm font-semibold text-stone-900 w-10 text-right tabular-nums">
+          {{ "{:,}".format(biz.get("page_view_count", 0)) }}
+        </span>
+        <div class="flex-1 min-w-0">
+          <a href="/b/{{ biz.slug }}" target="_blank"
+             class="text-sm font-medium text-stone-900 hover:text-rose-700 truncate block">
+            {{ biz.name }}
+          </a>
+          <span class="text-xs text-stone-400">{{ biz.neighborhood or "—" }}</span>
+        </div>
+        {% if biz.get("featured") and biz.featured.get("enabled") %}
+        <span class="text-[10px] uppercase tracking-wider bg-amber-100 text-amber-800 rounded-full px-2 py-0.5 font-semibold">
+          Featured
+        </span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="px-6 py-10 text-center">
+      <p class="text-stone-400 text-sm">No page views recorded yet.</p>
+      <p class="text-stone-400 text-xs mt-1">Views are counted the first time someone visits a listing page.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── Claim funnel ────────────────────────────────────────────────────── #}
+  <div class="grid md:grid-cols-2 gap-6 mb-8">
+
+    <div class="bg-white rounded-xl border border-stone-200">
+      <div class="px-6 py-4 border-b border-stone-100">
+        <h2 class="font-semibold text-stone-900">Claim funnel</h2>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        {# WHY: inline style for bar width + hardcoded color classes because
+           Tailwind's JIT purges dynamic class names like bg-{{ color }}-400. #}
+        {% set funnel = [
+          ("Submitted", total_claims, "#a8a29e"),
+          ("Pending review", pending_claims, "#fbbf24"),
+          ("Approved", approved_claims, "#34d399"),
+          ("Rejected", rejected_claims, "#f87171"),
+        ] %}
+        {% for label, count, bar_color in funnel %}
+        <div class="flex items-center gap-3">
+          <span class="text-2xl font-semibold text-stone-900 w-10 text-right tabular-nums">{{ count }}</span>
+          <div class="flex-1">
+            <div class="text-sm text-stone-700">{{ label }}</div>
+            {% if total_claims > 0 and label != "Submitted" %}
+            <div class="mt-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+              <div class="h-full rounded-full"
+                   style="width: {{ (count / total_claims * 100)|int }}%; background-color: {{ bar_color }}"></div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        {% if total_claims == 0 %}
+        <p class="text-stone-400 text-sm pt-2">No claim submissions yet. Send the owner outreach email to get the first claim in.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-stone-200">
+      <div class="px-6 py-4 border-b border-stone-100">
+        <h2 class="font-semibold text-stone-900">Recent claims</h2>
+      </div>
+      {% if recent_claims %}
+      <div class="divide-y divide-stone-100">
+        {% for c in recent_claims %}
+        {% set biz = recent_businesses.get(c.get("business_id", ""), {}) %}
+        <div class="px-6 py-3 flex items-start gap-3">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-stone-900 truncate">
+              {{ biz.get("name", "Unknown listing") }}
+            </p>
+            <p class="text-xs text-stone-400 truncate">{{ c.get("submitter_email", "—") }}</p>
+          </div>
+          <div class="text-right flex-shrink-0">
+            {% set s = c.get("status", "") %}
+            <span class="inline-block text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 font-semibold
+              {% if s == 'pending' %}bg-amber-100 text-amber-800
+              {% elif s == 'approved' %}bg-emerald-100 text-emerald-800
+              {% else %}bg-red-100 text-red-800{% endif %}">
+              {{ s }}
+            </span>
+            {% if c.get("submitted_at") %}
+            <p class="text-[10px] text-stone-400 mt-0.5">
+              {{ c.submitted_at.strftime("%b %-d") if c.submitted_at else "" }}
+            </p>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="px-6 py-10 text-center">
+        <p class="text-stone-400 text-sm">No claims yet.</p>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  {# ── Tips while the funnel is empty ──────────────────────────────────── #}
+  {% if total_claims == 0 and total_views == 0 %}
+  <div class="bg-rose-50 border border-rose-200 rounded-xl px-6 py-5">
+    <h3 class="font-semibold text-rose-900 mb-1">Next steps to get the funnel moving</h3>
+    <ol class="text-sm text-rose-800 space-y-1 list-decimal list-inside">
+      <li>Send the owner outreach email (drafts at <code class="text-xs bg-rose-100 px-1 rounded">work/owner-outreach-email-draft.md</code>)</li>
+      <li>Add Stripe keys to the server so the upgrade button is live</li>
+      <li>Enable the Stripe Customer Portal so subscribers can manage billing</li>
+    </ol>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
