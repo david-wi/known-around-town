@@ -1,7 +1,7 @@
 """Owner profile update endpoint.
 
 Lets a signed-in salon owner update the public-facing fields of their
-own business listing. Only the five editable fields are accepted; name,
+own business listing. Only the editable fields are accepted; name,
 slug, network membership, and admin-only fields are never touched by
 this endpoint.
 
@@ -29,10 +29,45 @@ router = APIRouter(prefix="/api/v1/owner/profile")
 # layer when the email is displayed or used for communication.
 _SIMPLE_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# WHY: 24-hour HH:MM format mirrors what HTML <input type="time"> always
+# emits ("09:00", "17:30") and what schema.org OpeningHoursSpecification
+# expects — no conversion layer needed between form, DB, and JSON-LD.
+_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+_VALID_DAYS = frozenset({"mon", "tue", "wed", "thu", "fri", "sat", "sun"})
+
 
 class HoursEntry(BaseModel):
-    day: str = Field(max_length=20)
-    hours: str = Field(max_length=50)
+    # WHY: three-letter lowercase code (mon–sun) matches the schema.org
+    # day abbreviations in the JSON-LD template so no mapping layer is
+    # needed between the stored value and the structured-data renderer.
+    day: str = Field(max_length=10)
+    opens_at: Optional[str] = Field(None, max_length=5)   # "09:00"
+    closes_at: Optional[str] = Field(None, max_length=5)  # "18:00"
+    closed: bool = False
+
+    @field_validator("day")
+    @classmethod
+    def validate_day(cls, v: str) -> str:
+        if v not in _VALID_DAYS:
+            raise ValueError("Day must be one of: mon, tue, wed, thu, fri, sat, sun")
+        return v
+
+    @field_validator("opens_at", "closes_at", mode="before")
+    @classmethod
+    def validate_time_format(cls, v: Optional[str]) -> Optional[str]:
+        if v and not _TIME_RE.match(v):
+            raise ValueError("Time must be in HH:MM 24-hour format, e.g. 09:00")
+        return v or None
+
+
+class ServiceEntry(BaseModel):
+    name: str = Field(max_length=100)
+    # WHY: free-text price display (e.g. "$45+" or "From $80") rather than
+    # a numeric float so owners can express ranges and minimums the natural
+    # way they communicate pricing. Stored in `price` — the field the public
+    # business template already renders as `s.price`.
+    price: Optional[str] = Field(None, max_length=50)
 
 
 class OwnerProfileUpdate(BaseModel):
@@ -40,9 +75,12 @@ class OwnerProfileUpdate(BaseModel):
     website: Optional[str] = Field(None, max_length=500)
     email: Optional[str] = Field(None, max_length=254)
     description: Optional[str] = Field(None, max_length=1000)
-    # WHY: 14 entries = at most two rows per day of the week (open + close).
-    # Capping prevents a malformed client from writing a huge array.
-    hours: Optional[list[HoursEntry]] = Field(None, max_length=14)
+    # WHY: capped at 7 — one entry per day of the week. The form renders a
+    # fixed 7-row grid so there can never be more than one entry per day.
+    hours: Optional[list[HoursEntry]] = Field(None, max_length=7)
+    # WHY: capped at 30 — a reasonable upper bound for a salon's service
+    # menu that prevents a malformed client from bloating the document.
+    services: Optional[list[ServiceEntry]] = Field(None, max_length=30)
 
     @field_validator("email")
     @classmethod
@@ -63,7 +101,7 @@ class OwnerProfileUpdate(BaseModel):
 
 # Fields that owners may update. All other fields (name, slug, admin flags,
 # Stripe ids, etc.) are never touched by this endpoint.
-_OWNER_SAFE_FIELDS = {"phone", "website", "email", "description", "hours"}
+_OWNER_SAFE_FIELDS = {"phone", "website", "email", "description", "hours", "services"}
 
 
 def _safe_response(doc: dict) -> dict:
@@ -82,6 +120,7 @@ def _safe_response(doc: dict) -> dict:
         "email": doc.get("email"),
         "description": doc.get("description"),
         "hours": doc.get("hours"),
+        "services": doc.get("services"),
         "updated_at": doc.get("updated_at"),
     }
 

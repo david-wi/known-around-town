@@ -166,31 +166,70 @@
       </div>
 
       {# ── Hours ──────────────────────────────────────────────────── #}
-      {# WHY: Structured hours are stored as [{day, hours}] so we can
-         display "Monday 9 am–6 pm" rather than an unstructured blob.
-         The JS below builds the array from dynamic rows so the PATCH
-         payload matches the OwnerProfileUpdate.hours schema exactly. #}
+      {# WHY: structured per-day grid with HTML time pickers so the stored
+         format (opens_at/closes_at in HH:MM) matches what schema.org and
+         the AI receptionist consume — no free-text parsing needed. #}
+      {%- set _days = [('mon','Mon'),('tue','Tue'),('wed','Wed'),('thu','Thu'),('fri','Fri'),('sat','Sat'),('sun','Sun')] %}
       <div>
-        <label class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Hours</label>
-        <div id="op-hours-rows" class="space-y-2">
-          {% for h in (owner_business.hours or []) %}
-          <div class="op-hours-row flex items-center gap-2">
-            <input type="text" data-role="day"
-                   value="{{ h.get('day','') if h is mapping else (h.day or '') }}"
-                   placeholder="e.g. Monday" maxlength="30"
-                   class="w-32 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition" />
-            <input type="text" data-role="hours"
-                   value="{{ h.get('hours','') if h is mapping else (h.hours or '') }}"
-                   placeholder="e.g. 9 am – 6 pm" maxlength="60"
-                   class="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition" />
-            <button type="button" data-role="remove-row" aria-label="Remove this hours row"
-                    class="shrink-0 text-stone-400 hover:text-rose-600 transition text-lg leading-none px-1">×</button>
+        <label class="block text-xs font-medium text-stone-700 mb-3 uppercase tracking-wide">Hours</label>
+        <div class="rounded-xl border border-stone-200 overflow-hidden divide-y divide-stone-100">
+          {% for day_code, day_label in _days %}
+          {#- Find stored entry for this day; data from MongoDB is always a dict #}
+          {%- set h_match = [] %}
+          {%- for he in (owner_business.hours or []) %}
+            {%- if (he.get('day','') if he is mapping else '') == day_code and not h_match %}
+              {%- set _ = h_match.append(he) %}
+            {%- endif %}
+          {%- endfor %}
+          {%- set h = h_match[0] if h_match else none %}
+          {%- set h_closed = h.get('closed', false) if h else false %}
+          {%- set h_opens  = (h.get('opens_at') or '') if h else '' %}
+          {%- set h_closes = (h.get('closes_at') or '') if h else '' %}
+          <div class="hours-row flex items-center gap-3 px-4 py-2.5 bg-white" data-day="{{ day_code }}">
+            <span class="w-8 text-sm font-medium text-stone-700 shrink-0">{{ day_label }}</span>
+            <label class="flex items-center gap-1.5 text-xs text-stone-500 shrink-0 cursor-pointer select-none min-w-[4.5rem]">
+              <input type="checkbox" class="rounded border-stone-300 accent-rose-600" data-role="closed"
+                     {% if h_closed %}checked{% endif %}> Closed
+            </label>
+            <div class="hours-times flex items-center gap-2 flex-1 min-w-0 {% if h_closed %}opacity-40 pointer-events-none{% endif %}">
+              <input type="time" data-role="opens_at" value="{{ h_opens }}"
+                     {% if h_closed %}disabled{% endif %}
+                     class="flex-1 min-w-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm text-stone-900 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition">
+              <span class="text-stone-300 text-xs shrink-0">&ndash;</span>
+              <input type="time" data-role="closes_at" value="{{ h_closes }}"
+                     {% if h_closed %}disabled{% endif %}
+                     class="flex-1 min-w-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm text-stone-900 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition">
+            </div>
           </div>
           {% endfor %}
         </div>
-        <button type="button" id="op-add-hours"
+      </div>
+
+      {# ── Services ─────────────────────────────────────────────────── #}
+      {# WHY: owners enter their service menu here so it appears on their
+         public listing and powers the AI receptionist's knowledge of what
+         the salon offers and what it costs. #}
+      <div>
+        <label class="block text-xs font-medium text-stone-700 mb-3 uppercase tracking-wide">Services</label>
+        <div id="op-services-rows" class="space-y-2">
+          {% for s in (owner_business.services or []) %}
+          <div class="service-row flex items-center gap-2">
+            <input type="text" data-role="name" maxlength="100"
+                   value="{{ s.get('name','') if s is mapping else (s.name or '') }}"
+                   placeholder="e.g. Balayage"
+                   class="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition" />
+            <input type="text" data-role="price" maxlength="50"
+                   value="{{ s.get('price','') if s is mapping else (s.price or '') }}"
+                   placeholder="e.g. $125+"
+                   class="w-28 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition" />
+            <button type="button" data-role="remove-service" aria-label="Remove service"
+                    class="shrink-0 text-stone-400 hover:text-rose-600 transition text-lg leading-none px-1">&times;</button>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="button" id="op-add-service"
                 class="mt-2 text-xs text-stone-500 hover:text-stone-900 underline decoration-stone-300 hover:decoration-stone-600 transition">
-          + Add row
+          + Add service
         </button>
       </div>
 
@@ -435,8 +474,6 @@
   var errorEl     = document.getElementById('op-error');
   var descEl      = document.getElementById('op-description');
   var countEl     = document.getElementById('op-desc-count');
-  var hoursRows   = document.getElementById('op-hours-rows');
-  var addHoursBtn = document.getElementById('op-add-hours');
 
   /* Live character count */
   if (descEl && countEl) {
@@ -445,53 +482,93 @@
     });
   }
 
-  /* ── Hours row management ──────────────────────────────────── */
-  function makeHoursRow(dayVal, hoursVal) {
+  /* ── Structured hours grid ──────────────────────────────────── */
+  /* WHY: toggle the time inputs when "Closed" changes so the owner
+     gets immediate feedback that those hours won't be saved. */
+  function applyClosedState(row) {
+    var closed   = row.querySelector('[data-role="closed"]').checked;
+    var timesDiv = row.querySelector('.hours-times');
+    if (!timesDiv) return;
+    timesDiv.classList.toggle('opacity-40', closed);
+    timesDiv.classList.toggle('pointer-events-none', closed);
+    timesDiv.querySelectorAll('input').forEach(function (inp) { inp.disabled = closed; });
+  }
+
+  document.querySelectorAll('.hours-row').forEach(function (row) {
+    var cb = row.querySelector('[data-role="closed"]');
+    if (!cb) return;
+    applyClosedState(row);
+    cb.addEventListener('change', function () { applyClosedState(row); });
+  });
+
+  function collectHours() {
+    var entries = [];
+    document.querySelectorAll('.hours-row').forEach(function (row) {
+      var day    = row.dataset.day;
+      var closed = row.querySelector('[data-role="closed"]').checked;
+      var opens  = (row.querySelector('[data-role="opens_at"]').value || '').trim();
+      var closes = (row.querySelector('[data-role="closes_at"]').value || '').trim();
+      if (closed) {
+        entries.push({ day: day, closed: true });
+      } else if (opens || closes) {
+        entries.push({ day: day, opens_at: opens || null, closes_at: closes || null, closed: false });
+      }
+      /* WHY: days with neither Closed checked nor any time entered are
+         omitted — they represent "not set yet" rather than "intentionally
+         closed", so we leave them out of the JSON-LD block rather than
+         emitting an entry with null times. */
+    });
+    /* WHY: undefined means "no change to hours" — backend exclude_none=True
+       leaves existing hours untouched when the owner only updated their bio.
+       An empty array would silently clear all hours. */
+    return entries.length ? entries : undefined;
+  }
+
+  /* ── Services list management ───────────────────────────────── */
+  var servicesRows  = document.getElementById('op-services-rows');
+  var addServiceBtn = document.getElementById('op-add-service');
+
+  function makeServiceRow(nameVal, priceVal) {
     var inputCls = 'rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:border-transparent transition';
     var row = document.createElement('div');
-    row.className = 'op-hours-row flex items-center gap-2';
+    row.className = 'service-row flex items-center gap-2';
     row.innerHTML =
-      '<input type="text" data-role="day" maxlength="30" ' +
-        'placeholder="e.g. Monday" value="' + (dayVal || '').replace(/"/g, '&quot;') + '" ' +
-        'class="w-32 shrink-0 ' + inputCls + '" />' +
-      '<input type="text" data-role="hours" maxlength="60" ' +
-        'placeholder="e.g. 9 am – 6 pm" value="' + (hoursVal || '').replace(/"/g, '&quot;') + '" ' +
+      '<input type="text" data-role="name" maxlength="100" placeholder="e.g. Balayage" ' +
+        'value="' + (nameVal || '').replace(/"/g, '&quot;') + '" ' +
         'class="flex-1 ' + inputCls + '" />' +
-      '<button type="button" data-role="remove-row" aria-label="Remove row" ' +
+      '<input type="text" data-role="price" maxlength="50" placeholder="e.g. $125+" ' +
+        'value="' + (priceVal || '').replace(/"/g, '&quot;') + '" ' +
+        'class="w-28 shrink-0 ' + inputCls + '" />' +
+      '<button type="button" data-role="remove-service" aria-label="Remove service" ' +
         'class="shrink-0 text-stone-400 hover:text-rose-600 transition text-lg leading-none px-1">\xd7</button>';
-    row.querySelector('[data-role="remove-row"]').addEventListener('click', function () {
-      row.remove();
-    });
+    row.querySelector('[data-role="remove-service"]').addEventListener('click', function () { row.remove(); });
     return row;
   }
 
-  /* Wire remove buttons on server-rendered rows */
-  if (hoursRows) {
-    hoursRows.querySelectorAll('[data-role="remove-row"]').forEach(function (btn) {
-      btn.addEventListener('click', function () { btn.closest('.op-hours-row').remove(); });
+  if (servicesRows) {
+    servicesRows.querySelectorAll('[data-role="remove-service"]').forEach(function (btn) {
+      btn.addEventListener('click', function () { btn.closest('.service-row').remove(); });
     });
   }
 
-  if (addHoursBtn && hoursRows) {
-    addHoursBtn.addEventListener('click', function () {
-      var row = makeHoursRow('', '');
-      hoursRows.appendChild(row);
-      row.querySelector('[data-role="day"]').focus();
+  if (addServiceBtn && servicesRows) {
+    addServiceBtn.addEventListener('click', function () {
+      var row = makeServiceRow('', '');
+      servicesRows.appendChild(row);
+      row.querySelector('[data-role="name"]').focus();
     });
   }
 
-  function collectHours() {
-    if (!hoursRows) return undefined;
+  function collectServices() {
+    if (!servicesRows) return undefined;
     var entries = [];
-    hoursRows.querySelectorAll('.op-hours-row').forEach(function (row) {
-      var day   = (row.querySelector('[data-role="day"]').value || '').trim();
-      var hours = (row.querySelector('[data-role="hours"]').value || '').trim();
-      if (day || hours) entries.push({ day: day, hours: hours });
+    servicesRows.querySelectorAll('.service-row').forEach(function (row) {
+      var name  = (row.querySelector('[data-role="name"]').value || '').trim();
+      var price = (row.querySelector('[data-role="price"]').value || '').trim();
+      if (name) entries.push({ name: name, price: price || null });
     });
-    /* WHY: undefined means "no change" — backend uses exclude_none=True so
-       omitting hours leaves existing hours untouched. An empty array would
-       clear all hours, which shouldn't happen silently on a Save click that
-       didn't touch the hours section (e.g. the owner just updated their bio). */
+    /* WHY: undefined means "no change to services" — same logic as hours.
+       A save that only updates phone leaves the service list untouched. */
     return entries.length ? entries : undefined;
   }
 
@@ -517,6 +594,8 @@
     };
     var hours = collectHours();
     if (hours !== undefined) payload.hours = hours;
+    var services = collectServices();
+    if (services !== undefined) payload.services = services;
 
     try {
       var r = await fetch('/api/v1/owner/profile', {
