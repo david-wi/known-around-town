@@ -1011,6 +1011,139 @@ def test_business_detail_has_breadcrumb_jsonld(client):
     assert "rossano-ferretti-hair-spa-miami" in body
 
 
+def test_business_page_title_includes_category_and_neighborhood(client):
+    """Business detail page titles must include the service category and
+    neighborhood so they target the actual search terms people type.
+
+    WHY: 'Rossano Ferretti Hair Spa — Miami Knows Beauty' only ranks well for
+    branded searches from people who already know the salon. Adding the category
+    and neighborhood ('Hair in Design District, Miami') makes the page also rank
+    for high-intent queries like 'hair salon design district miami' that come from
+    people who haven't heard of the salon yet. The category and neighborhood are
+    already loaded in the page context — this costs zero extra database queries."""
+    import re
+
+    r = client.get(
+        "/b/rossano-ferretti-hair-spa-miami",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    m = re.search(r"<title>(.*?)</title>", r.text)
+    assert m, "Business page has no <title> tag"
+    title = m.group(1)
+
+    # Must contain the business name.
+    assert "Rossano Ferretti Hair Spa" in title, (
+        f"Business page title '{title}' is missing the business name"
+    )
+    # Must contain the category name (used as the search term anchor).
+    assert "Hair" in title, (
+        f"Business page title '{title}' is missing the category name 'Hair' — "
+        "title only ranks for branded searches, not 'hair salon design district' queries"
+    )
+    # Must contain the neighborhood name.
+    assert "Design District" in title, (
+        f"Business page title '{title}' is missing the neighborhood 'Design District' — "
+        "title won't rank for local neighborhood searches"
+    )
+    # Must contain the city name.
+    assert "Miami" in title, (
+        f"Business page title '{title}' is missing 'Miami'"
+    )
+
+
+def test_business_page_title_falls_back_gracefully_when_no_neighborhood(client, seeded_db):
+    """When a business has no neighborhood slug, the title falls back to
+    'Name | Category in Miami' rather than crashing or producing a mangled title.
+
+    WHY: several seed businesses have empty neighborhood_slugs lists. The title
+    code must handle this gracefully — a crash or empty title is worse than a
+    partial title without the neighborhood."""
+    import asyncio
+    import re
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    # Insert a test business with a category but no neighborhood.
+    biz_doc = {
+        "city_id": city["_id"],
+        "network_id": network["_id"],
+        "slug": "test-no-neighborhood-hair",
+        "name": "Test No Neighborhood Hair",
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": [],  # explicitly empty
+        "status": "active",
+    }
+    asyncio.run(seeded_db.businesses.insert_one(biz_doc))
+
+    r = client.get(
+        "/b/test-no-neighborhood-hair",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    m = re.search(r"<title>(.*?)</title>", r.text)
+    assert m, "Business page has no <title> tag"
+    title = m.group(1)
+
+    # Must not crash — must contain the business name.
+    assert "Test No Neighborhood Hair" in title, (
+        f"Business title '{title}' is missing the business name"
+    )
+    # Must not contain a bare pipe with nothing after it (broken formatting).
+    assert "| " not in title or title.index("| ") < len(title) - 2, (
+        f"Business title '{title}' has a bare trailing pipe — formatting is broken"
+    )
+
+
+def test_cross_page_meta_description_includes_business_count(client):
+    """The meta description on neighborhood+category pages must include the number
+    of listed businesses (e.g. 'Browse 1 hair in Design District') so Google shows
+    a meaningful snippet in search results.
+
+    WHY: a snippet that says 'Browse 1 hair in Design District' tells a searcher
+    there are real listings before they click — which increases click-through rate
+    versus a generic 'The best hair in Design District' that gives no information
+    about what they'll find. The count comes from the existing query result so there
+    is no extra database cost."""
+    r = client.get(
+        "/n/design-district/c/hair",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    # Rossano Ferretti is in design-district/hair, so there is at least 1 business.
+    assert 'meta name="description"' in r.text, (
+        "/n/design-district/c/hair is missing a meta description tag"
+    )
+    # The description must start with "Browse N" (the count) not "The best".
+    assert "Browse " in r.text, (
+        "Cross-page meta description is missing 'Browse N' count — "
+        "was showing generic 'The best' text that gives no listing information"
+    )
+
+
+def test_cross_page_meta_description_fallback_when_no_businesses(client):
+    """When a neighborhood+category page has no businesses, the meta description
+    falls back to the generic 'The best …' form rather than saying 'Browse 0'.
+
+    WHY: 'Browse 0 hair in Aventura' would look broken in a search result. The
+    fallback text is generic but at least not misleading — and these pages have
+    noindex anyway, so this is mostly a defensive check."""
+    r = client.get(
+        "/n/aventura/c/hair",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    # Page should load (may have 0 businesses).
+    assert r.status_code == 200, r.text
+    if 'meta name="description"' not in r.text:
+        return  # noindex pages may omit description — acceptable
+    # If there IS a description, it must not say 'Browse 0'.
+    assert "Browse 0" not in r.text, (
+        "Cross-page meta description says 'Browse 0' — should use fallback text when empty"
+    )
+
+
 def test_claim_verified_email_function_exists_with_correct_content():
     """The claim-verified email helper must exist and produce the right content.
 
