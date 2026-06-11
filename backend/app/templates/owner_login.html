@@ -86,6 +86,16 @@
         Use a different email
       </button>
     </form>
+
+    {#- WHY: owners who land on the login page via David's outreach email may not
+        have claimed yet — they click the link, see a sign-in form, and have nowhere
+        to go. This one-liner below the form gives them the obvious escape hatch:
+        "New here? Claim your listing →" routes them to /owners which has the claim
+        form. The accent colour matches every other action link on the site. #}
+    <p class="mt-8 text-sm text-stone-500 text-center">
+      New here?
+      <a href="/owners" class="{{ theme.accent_text_full }} hover:opacity-80 font-medium">Claim your listing →</a>
+    </p>
   </div>
 </section>
 
