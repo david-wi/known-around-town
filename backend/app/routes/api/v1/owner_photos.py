@@ -127,7 +127,7 @@ async def upload_photo(request: Request, file: UploadFile = File(...)) -> dict:
             "content_type": detected,
             "business_id": str(business["_id"]),
             "uploaded_by": email,
-            "uploaded_at": datetime.now(timezone.utc).isoformat(),
+            "uploaded_at": datetime.now(timezone.utc),
         },
     )
 
@@ -193,15 +193,21 @@ async def delete_photo(photo_id: str, request: Request) -> dict:
         raise HTTPException(404, "Photo not found on your listing")
 
     # Remove from the business document.
+    deleted_was_hero = any(
+        p.get("url") == photo_url and p.get("is_hero") for p in existing_photos if isinstance(p, dict)
+    )
     remaining = [p for p in existing_photos if isinstance(p, dict) and p.get("url") != photo_url]
 
-    # If the deleted photo was the hero, promote the next photo.
-    if remaining:
-        remaining[0]["is_hero"] = True
-        remaining[0]["order"] = 0
-        for i, p in enumerate(remaining[1:], start=1):
-            p["order"] = i
+    # Re-index the remaining photos.  Only update hero if the deleted photo
+    # was the hero — otherwise the existing hero must not change.
+    for i, p in enumerate(remaining):
+        p["order"] = i
+    if deleted_was_hero and remaining:
+        # WHY: promote the next photo to hero so the listing header always has
+        # an image. Without this, deleting the hero leaves the page headerless.
+        for p in remaining:
             p["is_hero"] = False
+        remaining[0]["is_hero"] = True
 
     await db.businesses.update_one(
         {"_id": business["_id"]},
