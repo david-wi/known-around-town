@@ -170,3 +170,42 @@ async def run_startup_migrations() -> None:
         log.info(
             "Migration %s: reset %d businesses to unclaimed", migration_id, reset_count
         )
+
+    # ------------------------------------------------------------------
+    # Migration: publish all businesses still stuck on the default
+    # "draft" status so they appear in public search and the sitemap.
+    #
+    # WHY: The Business model's default publish status is "draft", not
+    # "live". Any business inserted via the admin API, an import script,
+    # or a partial seed run (before the status field was explicitly set)
+    # silently lands as draft and is invisible to the public: it won't
+    # show up in search results, the sitemap, or the claim form directory.
+    #
+    # In production this affected 97 of 147 businesses — more than 2/3
+    # of the directory was hidden. Owners of those salons would get
+    # "couldn't find your business" if they tried to claim.
+    #
+    # All 147 businesses in the Miami seed data are intended to be
+    # publicly visible. "Archived" is the intentional "hidden" status;
+    # "draft" is just the model default that got stuck. This migration
+    # promotes every non-live, non-archived business to "live" once.
+    # ------------------------------------------------------------------
+    migration_id = "publish-all-draft-businesses-20260611"
+    if not await db.app_migrations.find_one({"_id": migration_id}):
+        result = await db.businesses.update_many(
+            {"status": {"$nin": ["live", "archived"]}},
+            {"$set": {"status": "live"}},
+        )
+        published_count = result.modified_count
+        await db.app_migrations.insert_one(
+            {
+                "_id": migration_id,
+                "ran_at": datetime.now(timezone.utc),
+                "published_count": published_count,
+            }
+        )
+        log.info(
+            "Migration %s: published %d draft businesses to live",
+            migration_id,
+            published_count,
+        )

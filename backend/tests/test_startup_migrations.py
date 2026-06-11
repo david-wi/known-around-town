@@ -83,3 +83,95 @@ async def test_migration_records_reset_count(mock_db):
     )
     assert record is not None
     assert record["reset_count"] == 2
+
+
+# ---------------------------------------------------------------------------
+# publish-all-draft-businesses-20260611
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_migration_publishes_draft_businesses(mock_db):
+    """Businesses stuck on the default 'draft' status become 'live' so they
+    appear in search results, the sitemap, and the claim form directory."""
+    await mock_db.businesses.insert_many(
+        [
+            {"_id": "biz-draft-1", "name": "Draft Salon 1", "status": "draft"},
+            {"_id": "biz-draft-2", "name": "Draft Salon 2", "status": "draft"},
+        ]
+    )
+
+    await database.run_startup_migrations()
+
+    b1 = await mock_db.businesses.find_one({"_id": "biz-draft-1"})
+    b2 = await mock_db.businesses.find_one({"_id": "biz-draft-2"})
+    assert b1["status"] == "live"
+    assert b2["status"] == "live"
+
+
+@pytest.mark.asyncio
+async def test_migration_does_not_touch_live_businesses(mock_db):
+    """Businesses already 'live' are left unchanged."""
+    await mock_db.businesses.insert_one(
+        {"_id": "biz-already-live", "name": "Live Salon", "status": "live"}
+    )
+
+    await database.run_startup_migrations()
+
+    biz = await mock_db.businesses.find_one({"_id": "biz-already-live"})
+    assert biz["status"] == "live"
+
+
+@pytest.mark.asyncio
+async def test_migration_does_not_publish_archived_businesses(mock_db):
+    """Businesses intentionally 'archived' must not be promoted to 'live'."""
+    await mock_db.businesses.insert_one(
+        {"_id": "biz-archived", "name": "Closed Spa", "status": "archived"}
+    )
+
+    await database.run_startup_migrations()
+
+    biz = await mock_db.businesses.find_one({"_id": "biz-archived"})
+    assert biz["status"] == "archived"
+
+
+@pytest.mark.asyncio
+async def test_migration_publish_draft_guard_runs_only_once(mock_db):
+    """The guard record prevents the migration from running a second time."""
+    await mock_db.businesses.insert_one(
+        {"_id": "biz-guard", "name": "Guard Salon", "status": "draft"}
+    )
+
+    await database.run_startup_migrations()
+
+    # Flip back to draft to simulate a re-run scenario.
+    await mock_db.businesses.update_one(
+        {"_id": "biz-guard"}, {"$set": {"status": "draft"}}
+    )
+
+    # Second run — guard should block, business stays draft.
+    await database.run_startup_migrations()
+
+    biz = await mock_db.businesses.find_one({"_id": "biz-guard"})
+    assert biz["status"] == "draft"
+
+
+@pytest.mark.asyncio
+async def test_migration_publish_records_count(mock_db):
+    """The migration log entry records how many businesses were promoted."""
+    await mock_db.businesses.insert_many(
+        [
+            {"_id": "biz-p1", "name": "P1", "status": "draft"},
+            {"_id": "biz-p2", "name": "P2", "status": "draft"},
+            {"_id": "biz-p3", "name": "P3", "status": "live"},
+        ]
+    )
+
+    await database.run_startup_migrations()
+
+    record = await mock_db.app_migrations.find_one(
+        {"_id": "publish-all-draft-businesses-20260611"}
+    )
+    assert record is not None
+    # Only the 2 draft businesses should have been promoted.
+    assert record["published_count"] == 2
