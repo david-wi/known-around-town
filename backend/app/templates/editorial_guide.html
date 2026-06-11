@@ -6,6 +6,32 @@
   + 4-col side card pattern used elsewhere on the site.
 -#}
 {% set header_variant = 'sticky' %}
+{#- WHY: head_extra injects two structured-data blocks that help Google understand
+    guide pages. The Article block tells Google this is editorial content with a
+    named author and publication date. The ItemList block (when featured businesses
+    exist) lets Google surface individual salon names as rich results for queries
+    like "best med spas Miami", increasing click-through from search. Without these,
+    Google can only infer structure from the page HTML, which is less reliable. -#}
+{% block head_extra %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": {{ (guide.seo_title or guide.title)|tojson }},
+  "description": {{ (guide.meta_description or guide.subtitle or "")|tojson }},
+  "author": {
+    "@type": "Organization",
+    "name": {{ (guide.author or network.name)|tojson }}
+  }{% if guide.published_at %},
+  "datePublished": {{ guide.published_at.isoformat()|tojson }}{% endif %}{% if canonical_url %},
+  "url": {{ canonical_url|tojson }}{% endif %}{% if og_image %},
+  "image": {{ og_image|tojson }}{% endif %}
+}
+</script>
+{% if item_list_jsonld %}
+<script type="application/ld+json">{{ item_list_jsonld|tojson }}</script>
+{% endif %}
+{% endblock %}
 {% block content %}
 <article>
   <section class="relative bg-stone-950 overflow-hidden">
