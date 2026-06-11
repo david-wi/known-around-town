@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.database import ensure_indexes
-from seed._helpers import category_groups, run, upsert
+from seed._helpers import assert_seed_target_allowed, category_groups, run, upsert
 
 
 # Categories: slug + display name + one-line description (matches the
@@ -140,6 +140,10 @@ NETWORK_DEFS = [
 
 
 async def main() -> None:
+    # WHY: refuse to seed/reset a production database unless explicitly
+    # confirmed. Runs before any DB access so a wrong-database run aborts with
+    # nothing touched. See seed._helpers.assert_seed_target_allowed.
+    assert_seed_target_allowed()
     await ensure_indexes()
     now = datetime.now(timezone.utc)
     for n in NETWORK_DEFS:

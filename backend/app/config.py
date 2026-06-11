@@ -103,6 +103,29 @@ class Settings(BaseSettings):
         host = host.split(",", 1)[0]
         return host.lower()
 
+    def mongo_host(self) -> str:
+        """Public accessor for the parsed MongoDB host.
+
+        WHY this exists: the destructive seed/reset guard
+        (`seed._helpers.assert_seed_target_allowed`) needs to classify the same
+        host the app validates, and must use the exact parsing rules above so
+        the two guards can never disagree about what counts as "local".
+        """
+        return self._mongo_host()
+
+    def is_local_mongo_target(self) -> bool:
+        """True only when BOTH the dev opt-in is set AND the host is local.
+
+        WHY both conditions: the opt-in flag alone is not proof the target is a
+        throwaway local database — a developer can leave ALLOW_LOCAL_MONGODB
+        set in their shell while MONGODB_URL points at the managed Atlas
+        database. Requiring the host to ALSO be a known-local one means a
+        mistakenly-aimed-at-Atlas run is never treated as "local", so the
+        destructive seed guard keeps protecting production even when the dev
+        opt-in happens to be on.
+        """
+        return bool(self.allow_local_mongodb) and self.mongo_host() in _LOCAL_MONGO_HOSTS
+
     def validate_mongodb_url(self) -> None:
         """Fail loudly unless MONGODB_URL is set to a non-local database.
 
