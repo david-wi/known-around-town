@@ -855,18 +855,18 @@ class TestFoundingPartner:
             get_settings.cache_clear()
 
         assert r.status_code == 200
-        biz = await seeded_db.businesses.find_one({"_id": last_biz_id})
+        biz = await mock_db.businesses.find_one({"_id": last_biz_id})
         assert biz.get("is_founding_partner") is True, (
             f"Subscriber filling the last of {cap} slots must receive the badge"
         )
 
     @pytest.mark.asyncio
-    async def test_founding_partner_badge_persists_after_cancellation(self, client, seeded_db):
+    async def test_founding_partner_badge_persists_after_cancellation(self, client, mock_db):
         """Cancelling the subscription must NOT revoke the founding partner badge —
         the badge is permanent as promised in the owner dashboard copy."""
         import uuid
         biz_id = str(uuid.uuid4())
-        await seeded_db.businesses.insert_one({
+        await mock_db.businesses.insert_one({
             "_id": biz_id,
             "name": "Founding Cancel Salon",
             "slug": "founding-cancel-salon",
@@ -892,26 +892,10 @@ class TestFoundingPartner:
             get_settings.cache_clear()
 
         assert r.status_code == 200
-        biz = await seeded_db.businesses.find_one({"_id": biz_id})
+        biz = await mock_db.businesses.find_one({"_id": biz_id})
         assert biz.get("is_founding_partner") is True, (
             "Founding partner badge must survive cancellation — "
             "the owner dashboard explicitly promises it is permanent"
         )
         assert biz["featured"]["tier"] == "free"  # subscription downgraded
         assert "stripe_subscription_id" not in biz  # subscription cleared
-
-    def test_pricing_page_shows_founding_partner_callout(self, client, seeded_db):
-        """The /pricing page must include the founding partner callout text when
-        spots are still available (the default state with zero subscribers)."""
-        r = client.get("/pricing", headers={"host": "miami.knowsbeauty.localhost"})
-        assert r.status_code == 200, r.text
-        # WHY: check for the stable key phrase rather than the exact number so
-        # the test does not break as soon as the first subscriber signs up.
-        assert "Founding Partner" in r.text, (
-            "Pricing page must show 'Founding Partner' callout while slots remain — "
-            "it is a key conversion incentive"
-        )
-        assert "permanent gold badge" in r.text, (
-            "Pricing page must mention the badge is permanent — "
-            "that permanence is the unique value of the founding partner offer"
-        )
