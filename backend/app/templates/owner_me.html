@@ -287,6 +287,25 @@
   </div>
 </section>
 
+{# ── Visitor inquiries ────────────────────────────────────────────── #}
+{# WHY: Owners need to see who tried to contact them through their listing.
+   Without this, a lead sitting in business_inquiries is invisible — the
+   owner never knows someone reached out, and the inquiry dies unused. #}
+<section class="bg-stone-50/40 border-t border-stone-100">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
+    <h2 class="text-base font-semibold text-stone-900 mb-1">Visitor inquiries</h2>
+    <p class="text-sm text-stone-500 mb-6">
+      Contact messages sent through your listing page.
+    </p>
+    <div id="inquiries-loading" class="text-sm text-stone-400">Loading&hellip;</div>
+    <p id="inquiries-empty" class="hidden text-sm text-stone-500">
+      No inquiries yet — when a visitor contacts you through your listing, it will appear here.
+    </p>
+    <p id="inquiries-error" class="hidden text-sm text-rose-700" role="alert" aria-live="polite"></p>
+    <div id="inquiries-list" class="hidden divide-y divide-stone-100 rounded-2xl border border-stone-200 bg-white overflow-hidden"></div>
+  </div>
+</section>
+
 {% else %}
 
 {# ── CLAIM PENDING / NO BUSINESS FOUND ──────────────────────────── #}
@@ -732,6 +751,89 @@
       }
     }
   });
+})();
+
+/* ── Visitor inquiries panel ───────────────────────────────── */
+(function () {
+  var loadingEl  = document.getElementById('inquiries-loading');
+  var emptyEl    = document.getElementById('inquiries-empty');
+  var errorEl    = document.getElementById('inquiries-error');
+  var listEl     = document.getElementById('inquiries-list');
+
+  /* Only present in the dashboard (owner_business is set) state */
+  if (!loadingEl) return;
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso);
+      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch (e) { return iso; }
+  }
+
+  function renderInquiry(inq) {
+    var div = document.createElement('div');
+    div.className = 'px-5 py-4';
+    var header = document.createElement('div');
+    header.className = 'flex flex-wrap items-baseline justify-between gap-2 mb-1';
+
+    var nameSpan = document.createElement('span');
+    nameSpan.className = 'text-sm font-semibold text-stone-900';
+    nameSpan.textContent = inq.name || 'Anonymous';
+    header.appendChild(nameSpan);
+
+    if (inq.submitted_at) {
+      var dateSpan = document.createElement('span');
+      dateSpan.className = 'text-xs text-stone-400';
+      dateSpan.textContent = fmtDate(inq.submitted_at);
+      header.appendChild(dateSpan);
+    }
+
+    div.appendChild(header);
+
+    /* Contact details */
+    var contacts = [];
+    if (inq.email) contacts.push(inq.email);
+    if (inq.phone) contacts.push(inq.phone);
+    if (contacts.length) {
+      var contactP = document.createElement('p');
+      contactP.className = 'text-xs text-stone-500 mb-2';
+      contactP.textContent = contacts.join(' · ');
+      div.appendChild(contactP);
+    }
+
+    /* Message */
+    if (inq.message) {
+      var msgP = document.createElement('p');
+      msgP.className = 'text-sm text-stone-700 leading-relaxed';
+      msgP.textContent = inq.message;
+      div.appendChild(msgP);
+    }
+
+    return div;
+  }
+
+  fetch('/api/v1/owner/inquiries')
+    .then(function (r) {
+      if (!r.ok) throw new Error('Error ' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      loadingEl.classList.add('hidden');
+      if (!data || data.length === 0) {
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+      data.forEach(function (inq) {
+        listEl.appendChild(renderInquiry(inq));
+      });
+      listEl.classList.remove('hidden');
+    })
+    .catch(function () {
+      loadingEl.classList.add('hidden');
+      errorEl.textContent = 'Could not load inquiries. Please refresh the page.';
+      errorEl.classList.remove('hidden');
+    });
 })();
 </script>
 
