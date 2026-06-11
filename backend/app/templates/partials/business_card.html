@@ -14,7 +14,10 @@
 {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
 <a class="group block bg-white rounded-2xl overflow-hidden border border-stone-200/70 hover:border-stone-300 hover:shadow-xl hover:shadow-stone-900/5 transition-all duration-300" href="/b/{{ b.slug }}">
   <div class="relative aspect-[4/3] bg-stone-100 overflow-hidden">
-    {% if photo_url %}<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" style='background-image: url("{{ photo_url }}");'></div>{% endif %}
+    {# WHY: <img loading="lazy"> defers off-screen images so the browser only fetches
+       cards as they scroll into view. bg-cover/bg-center becomes object-cover/object-center
+       on <img>; inset-0 + w-full h-full fills the aspect-ratio container the same way. #}
+    {% if photo_url %}<img src="{{ photo_url }}" alt="{{ b.name }}" loading="lazy" class="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105">{% endif %}
     {% if b.editors_pick %}<div class="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/95 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-semibold text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
     {% if b.featured and b.featured.enabled %}<div class="absolute top-3 right-3 bg-gradient-to-br from-amber-400 to-yellow-500 text-stone-900 text-[9px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full">{{ b.featured.tier or 'Premium' }}</div>{% endif %}
     {% if b.is_founding_partner %}{% with variant='overlay', tenant_label=tenant_label %}{% include 'partials/founding_partner_badge.html' %}{% endwith %}{% endif %}
