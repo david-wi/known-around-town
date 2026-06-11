@@ -39,6 +39,28 @@ The LocalBusiness and BreadcrumbList JSON-LD blocks live in
 The template also already has: type inference (HairSalon/NailSalon/DaySpa/BeautySalon),
 openingHoursSpecification, sameAs, image, @id.
 
+## GridFS patch path in tests: patch at the point of use, not the definition
+
+`app.routes.api.v1.owner_photos` and `app.routes.public.media` both do
+`from app.database import get_gridfs_bucket`, which binds the function into
+each module's own namespace. Patching `app.database.get_gridfs_bucket` has
+no effect on those already-bound names. Always patch at the module that uses it:
+
+```python
+_PATCH_OWNER = "app.routes.api.v1.owner_photos.get_gridfs_bucket"
+_PATCH_MEDIA  = "app.routes.public.media.get_gridfs_bucket"
+```
+
+This is the same principle that applies to any `from X import Y` import
+across the codebase — patch `module_that_calls_it.Y`, not `X.Y`.
+
+## Hero-photo promotion on delete: always check which photo was deleted first
+
+The delete endpoint tracks whether the deleted photo was the hero *before*
+computing the remaining list. Only then does it promote `remaining[0]` to hero.
+Checking after the fact (or skipping the check) will incorrectly reassign the
+hero on every delete, even when a non-hero photo is removed.
+
 ## Only CI workflow (no separate deploy workflow)
 
 The repo has one GitHub Actions workflow: `.github/workflows/ci.yml`. As of PR #115
