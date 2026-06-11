@@ -23,6 +23,7 @@ from app.routes.api.v1 import (
     marketing_ai as api_marketing_ai,
     owner_login as api_owner_login,
     owner_leads as api_owner_leads,
+    owner_inquiries as api_owner_inquiries,
     owner_profile as api_owner_profile,
     stripe_billing as api_stripe_billing,
 )
@@ -82,6 +83,9 @@ app.include_router(api_owner_login.router, prefix="/api/v1")
 # /api/v1/owner/profile prefix, unlike the other routers above which
 # only carry the resource path and rely on the include_router prefix.
 app.include_router(api_owner_profile.router)
+# WHY: same full-prefix pattern as owner_profile — the router carries
+# /api/v1/owner/inquiries internally so no prefix is passed here.
+app.include_router(api_owner_inquiries.router)
 # Stripe billing: checkout session creation + webhook receiver.
 app.include_router(api_stripe_billing.router, prefix="/api/v1")
 
