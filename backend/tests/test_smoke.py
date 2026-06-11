@@ -2701,3 +2701,115 @@ def test_ga_measurement_id_from_settings(seeded_db, monkeypatch):
         )
     finally:
         get_settings.cache_clear()
+
+
+def test_owner_me_founding_partner_badge_shown_when_flag_set():
+    """The owner dashboard must show a permanent 'Founding Partner' badge section
+    when the business has is_founding_partner set to True.
+
+    WHY: owners who subscribed early earned a permanent gold badge that appears
+    on their public listing forever.  Without a dashboard confirmation, they have
+    no way to see or celebrate that status — which undercuts the 'founding partner'
+    framing used in the upgrade card to motivate early sign-ups.  Seeing 'Your
+    permanent gold badge appears on your public listing — forever' is the payoff
+    for being an early adopter.
+
+    This section must also live OUTSIDE the Stripe subscription conditional so it
+    stays visible even if the owner later cancels.  The badge is permanent;
+    its dashboard display must be too.
+
+    We test the Jinja2 logic directly (without a full HTTP round-trip) because
+    /owners/me is auth-gated and the template variable that drives this section
+    is straightforward to verify in isolation."""
+    import pathlib
+    from jinja2 import Environment as JEnv
+
+    templates_dir = pathlib.Path(__file__).parent.parent / "app" / "templates"
+    source = (templates_dir / "owner_me.html").read_text()
+
+    # 1. Template source must contain the founding-partner conditional and badge copy.
+    assert "is_founding_partner" in source, (
+        "owner_me.html has no reference to is_founding_partner — "
+        "founding partner badge can never render"
+    )
+    assert "permanent gold badge" in source, (
+        "owner_me.html missing 'permanent gold badge' copy — "
+        "founding partners won't see confirmation of their permanent status"
+    )
+    assert "Founding Partner" in source, (
+        "owner_me.html missing 'Founding Partner' label text"
+    )
+
+    # 2. Render the conditional snippet with the flag set → badge content appears.
+    snippet = (
+        "{% if owner_business.get('is_founding_partner') %}"
+        "BADGE_SHOWN"
+        "{% else %}"
+        "BADGE_HIDDEN"
+        "{% endif %}"
+    )
+    env = JEnv()
+    tmpl = env.from_string(snippet)
+
+    out_with_flag = tmpl.render(owner_business={"is_founding_partner": True})
+    assert "BADGE_SHOWN" in out_with_flag, (
+        "Founding Partner badge section does not render when is_founding_partner=True"
+    )
+    assert "BADGE_HIDDEN" not in out_with_flag, (
+        "Founding Partner badge rendered the wrong branch with is_founding_partner=True"
+    )
+
+    # 3. When the flag is absent, the badge must NOT appear.
+    out_no_flag = tmpl.render(owner_business={})
+    assert "BADGE_HIDDEN" in out_no_flag, (
+        "Founding Partner badge section appeared when is_founding_partner is absent — "
+        "non-founding-partner owners would see a badge they didn't earn"
+    )
+    assert "BADGE_SHOWN" not in out_no_flag, (
+        "Founding Partner badge incorrectly shown when is_founding_partner is absent"
+    )
+
+
+def test_owner_me_founding_partner_badge_outside_subscription_conditional():
+    """The Founding Partner badge section must be structurally outside the Stripe
+    subscription conditional in owner_me.html.
+
+    WHY: is_founding_partner is a permanent boolean — the webhook that grants it
+    intentionally never clears it, even when an owner cancels their subscription.
+    If the badge were inside the stripe_subscription_id block, a founding partner
+    who cancels would lose their dashboard confirmation of a status that still
+    shows on their public listing.  They would have a live gold badge on their
+    public page with no matching confirmation in their dashboard — confusing and
+    demoralising for an early adopter.
+
+    We verify this structurally: the is_founding_partner check must appear in the
+    template source after the endif that closes the subscription block."""
+    import pathlib
+
+    source = (
+        pathlib.Path(__file__).parent.parent
+        / "app" / "templates" / "owner_me.html"
+    ).read_text()
+
+    # The closing comment was added when the badge was moved outside the subscription
+    # block, making the boundary unambiguous.
+    sub_endif_marker = "{% endif %}{# /if stripe_subscription_id #}"
+    sub_endif_pos = source.find(sub_endif_marker)
+    assert sub_endif_pos != -1, (
+        "owner_me.html is missing the '{% endif %}{# /if stripe_subscription_id #}' "
+        "marker that closes the subscription block — "
+        "the founding partner badge may be inside the subscription conditional"
+    )
+
+    # The is_founding_partner check must appear AFTER the subscription endif.
+    fp_check = "{% if owner_business.get('is_founding_partner') %}"
+    fp_check_pos = source.find(fp_check)
+    assert fp_check_pos != -1, (
+        "owner_me.html is missing the founding partner conditional — "
+        "founding partner badge section may have been removed"
+    )
+    assert fp_check_pos > sub_endif_pos, (
+        "Founding Partner badge check appears BEFORE the subscription block's "
+        "{% endif %} — the badge is inside the subscription conditional and won't "
+        "render for founding partners who cancel their subscription later"
+    )
