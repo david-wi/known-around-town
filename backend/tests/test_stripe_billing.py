@@ -500,3 +500,194 @@ class TestWebhook:
                 )
             get_settings.cache_clear()
         assert r.status_code == 200
+
+
+# ─── Billing portal endpoint ─────────────────────────────────────────────────
+
+class TestBillingPortal:
+    @pytest.fixture
+    def client(self, seeded_db):
+        return _make_client(seeded_db)
+
+    def test_portal_requires_auth(self, client, seeded_db):
+        """No session cookie → 401."""
+        with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test_key"}):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            r = client.post("/api/v1/billing/portal")
+            get_settings.cache_clear()
+        assert r.status_code == 401
+
+    def test_portal_503_when_billing_not_configured(self, client, seeded_db):
+        """Missing Stripe key → 503 before auth check."""
+        email = "owner@test.com"
+        cookie = _signed_cookie(email)
+        with patch.dict(os.environ, {"STRIPE_SECRET_KEY": ""}):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            r = client.post(
+                "/api/v1/billing/portal",
+                cookies={"kb_owner_session": cookie},
+            )
+            get_settings.cache_clear()
+        assert r.status_code == 503
+
+    @pytest.mark.asyncio
+    async def test_portal_404_when_no_business(self, client, seeded_db):
+        """Signed in but no claimed business → 404."""
+        email = "nobody@portal.com"
+        cookie = _signed_cookie(email)
+        with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            r = client.post(
+                "/api/v1/billing/portal",
+                cookies={"kb_owner_session": cookie},
+            )
+            get_settings.cache_clear()
+        assert r.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_portal_409_when_no_customer_id(self, client, seeded_db):
+        """Business has no stripe_customer_id (never subscribed) → 409."""
+        email = "nosub@portal.com"
+        await _insert_business(seeded_db, email=email)
+        cookie = _signed_cookie(email)
+        with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            r = client.post(
+                "/api/v1/billing/portal",
+                cookies={"kb_owner_session": cookie},
+            )
+            get_settings.cache_clear()
+        assert r.status_code == 409
+
+    @pytest.mark.asyncio
+    async def test_portal_409_when_subscription_cancelled(self, client, seeded_db):
+        """Customer ID exists but subscription was cancelled → 409 (defence-in-depth)."""
+        email = "cancelled@portal.com"
+        import uuid
+        biz_id = str(uuid.uuid4())
+        # stripe_customer_id present, stripe_subscription_id absent (post-cancellation state)
+        await seeded_db.businesses.insert_one({
+            "_id": biz_id,
+            "name": "Cancelled Salon",
+            "slug": "cancelled-salon",
+            "claimed_email": email,
+            "stripe_customer_id": "cus_cancelled123",
+            "featured": {"tier": "free", "enabled": False},
+        })
+        cookie = _signed_cookie(email)
+        with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            r = client.post(
+                "/api/v1/billing/portal",
+                cookies={"kb_owner_session": cookie},
+            )
+            get_settings.cache_clear()
+        assert r.status_code == 409
+
+    @pytest.mark.asyncio
+    async def test_portal_502_on_stripe_error(self, client, seeded_db):
+        """Stripe API failure → 502."""
+        import stripe.error
+        email = "stripe-err@portal.com"
+        import uuid
+        biz_id = str(uuid.uuid4())
+        await seeded_db.businesses.insert_one({
+            "_id": biz_id,
+            "name": "Error Salon",
+            "slug": "error-salon",
+            "claimed_email": email,
+            "stripe_customer_id": "cus_err456",
+            "stripe_subscription_id": "sub_err456",
+            "featured": {"tier": "premium", "enabled": True},
+        })
+        cookie = _signed_cookie(email)
+        with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            with patch(
+                "stripe.billing_portal.Session.create",
+                side_effect=stripe.error.StripeError("Stripe is down"),
+            ):
+                r = client.post(
+                    "/api/v1/billing/portal",
+                    cookies={"kb_owner_session": cookie},
+                )
+            get_settings.cache_clear()
+        assert r.status_code == 502
+
+    @pytest.mark.asyncio
+    async def test_portal_success_returns_url(self, client, seeded_db):
+        """Happy path: portal session URL returned."""
+        email = "pro@portal.com"
+        import uuid
+        biz_id = str(uuid.uuid4())
+        await seeded_db.businesses.insert_one({
+            "_id": biz_id,
+            "name": "Pro Salon",
+            "slug": "pro-salon",
+            "claimed_email": email,
+            "stripe_customer_id": "cus_pro789",
+            "stripe_subscription_id": "sub_pro789",
+            "featured": {"tier": "premium", "enabled": True},
+        })
+        cookie = _signed_cookie(email)
+
+        mock_portal = MagicMock()
+        mock_portal.url = "https://billing.stripe.com/session/test_portal_abc"
+
+        with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            with patch("stripe.billing_portal.Session.create", return_value=mock_portal):
+                r = client.post(
+                    "/api/v1/billing/portal",
+                    cookies={"kb_owner_session": cookie},
+                )
+            get_settings.cache_clear()
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["url"] == "https://billing.stripe.com/session/test_portal_abc"
+
+    @pytest.mark.asyncio
+    async def test_portal_passes_correct_customer_and_return_url(self, client, seeded_db):
+        """Stripe Session.create is called with the right customer id and return_url."""
+        email = "verify@portal.com"
+        import uuid
+        biz_id = str(uuid.uuid4())
+        await seeded_db.businesses.insert_one({
+            "_id": biz_id,
+            "name": "Verify Salon",
+            "slug": "verify-salon",
+            "claimed_email": email,
+            "stripe_customer_id": "cus_verify001",
+            "stripe_subscription_id": "sub_verify001",
+            "featured": {"tier": "premium", "enabled": True},
+        })
+        cookie = _signed_cookie(email)
+
+        mock_portal = MagicMock()
+        mock_portal.url = "https://billing.stripe.com/session/verify"
+        captured: dict = {}
+
+        def fake_create(**kwargs):
+            captured.update(kwargs)
+            return mock_portal
+
+        with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            with patch("stripe.billing_portal.Session.create", side_effect=fake_create):
+                client.post(
+                    "/api/v1/billing/portal",
+                    cookies={"kb_owner_session": cookie},
+                )
+            get_settings.cache_clear()
+
+        assert captured.get("customer") == "cus_verify001"
+        assert captured.get("return_url", "").endswith("/owners/me")

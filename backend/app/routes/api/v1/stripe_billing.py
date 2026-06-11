@@ -97,6 +97,60 @@ async def create_checkout_session(request: Request) -> JSONResponse:
     return JSONResponse({"url": checkout.url})
 
 
+@router.post("/billing/portal")
+async def create_portal_session(request: Request) -> JSONResponse:
+    """Open a Stripe Billing Portal session for a Pro subscriber.
+
+    Returns {"url": portal_url}.  The browser should redirect there so the
+    owner can update their payment method, view invoices, or cancel — all
+    handled by Stripe's hosted portal UI.
+    """
+    settings = get_settings()
+    if not settings.stripe_secret_key:
+        raise HTTPException(503, "Billing is not yet configured")
+
+    cookie = request.cookies.get(SESSION_COOKIE_NAME)
+    session = verify_session(cookie) if cookie else None
+    if not session:
+        raise HTTPException(401, "Not signed in")
+
+    db = get_db()
+    business = await db.businesses.find_one({"claimed_email": session["email"]})
+    if not business:
+        raise HTTPException(404, "No verified listing found for this account")
+
+    customer_id = business.get("stripe_customer_id")
+    # WHY: check both customer_id and subscription_id.  customer_id is set at
+    # checkout and never cleared; subscription_id is cleared by the webhook
+    # when a subscription is cancelled.  Checking only customer_id would let
+    # a cancelled subscriber call this endpoint directly (the UI already hides
+    # the button, but defence-in-depth requires server-side enforcement too).
+    if not customer_id or not business.get("stripe_subscription_id"):
+        raise HTTPException(409, "No active subscription found")
+
+    stripe.api_key = settings.stripe_secret_key
+    # WHY: base_url is derived from the Host header, which is set by our
+    # Nginx/Traefik proxy — not the raw client.  Stripe also validates the
+    # return_url against domains configured in the portal settings, which is
+    # the canonical server-side guard against header injection.  This follows
+    # the same pattern used by create_checkout_session.
+    base_url = str(request.base_url).rstrip("/")
+
+    try:
+        portal = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            # WHY: send the owner back to their dashboard after they finish
+            # managing the subscription — keeps them in the product flow
+            # rather than ending up on Stripe's generic exit page.
+            return_url=f"{base_url}/owners/me",
+        )
+    except stripe.error.StripeError as exc:
+        log.error("Stripe billing portal creation failed: %s", exc)
+        raise HTTPException(502, "Could not open billing portal — please try again")
+
+    return JSONResponse({"url": portal.url})
+
+
 @router.post("/billing/webhook")
 async def stripe_webhook(request: Request) -> JSONResponse:
     """Receive and process signed Stripe webhook events.
