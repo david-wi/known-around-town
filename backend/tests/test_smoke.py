@@ -1410,6 +1410,166 @@ def test_business_jsonld_omits_empty_address_fields(client):
             )
 
 
+def test_business_jsonld_emits_address_region_when_state_present(seeded_db, client):
+    """The JSON-LD on a business page must include addressRegion when the
+    database record has a state field, so Google shows the full address
+    (including state) in Knowledge Panel results.
+
+    WHY: the template previously checked business.address.region but the
+    database stores this as business.address.state. The field was silently
+    omitted from every listing even though the data existed, meaning Google
+    never saw the state abbreviation in structured data."""
+    import asyncio, json, re
+
+    # Patch the seed business to have an explicit state in its address
+    city = asyncio.run(seeded_db.cities.find_one({"slug": "miami"}))
+    assert city, "test seed missing miami city"
+    biz = asyncio.run(
+        seeded_db.businesses.find_one({"city_id": city["_id"], "slug": "blow-dry-bar-brickell"})
+    )
+    assert biz, "test seed missing blow-dry-bar-brickell"
+
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {"address.state": "FL", "address.postal_code": "33131"}},
+        )
+    )
+
+    r = client.get(
+        "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    blocks = re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>', r.text, re.DOTALL
+    )
+    lb_block = None
+    for block in blocks:
+        try:
+            data = json.loads(block.strip())
+        except json.JSONDecodeError:
+            continue
+        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "LocalBusiness"):
+            lb_block = data
+            break
+
+    assert lb_block is not None, "No LocalBusiness JSON-LD block found"
+    addr = lb_block.get("address", {})
+    assert addr.get("addressRegion") == "FL", (
+        f"addressRegion should be 'FL' when address.state='FL'; got {addr.get('addressRegion')!r}"
+    )
+    assert addr.get("postalCode") == "33131", (
+        f"postalCode should be '33131' when address.postal_code='33131'; got {addr.get('postalCode')!r}"
+    )
+    assert addr.get("addressCountry") == "US", (
+        f"addressCountry must always be present; got {addr.get('addressCountry')!r}"
+    )
+
+
+def test_business_jsonld_emits_geo_when_coordinates_present(seeded_db, client):
+    """The JSON-LD on a business page must include a geo block (latitude +
+    longitude) when coordinates are stored, so Google can pin the salon
+    precisely on Maps and rank it for 'near me' searches.
+
+    WHY: the Address model has lat/lng fields but the template never emitted
+    them. Adding the geo block lets Google skip its own geocoding step (which
+    introduces ambiguity for addresses stored as a single combined string)."""
+    import asyncio, json, re
+
+    city = asyncio.run(seeded_db.cities.find_one({"slug": "miami"}))
+    assert city, "test seed missing miami city"
+    biz = asyncio.run(
+        seeded_db.businesses.find_one({"city_id": city["_id"], "slug": "blow-dry-bar-brickell"})
+    )
+    assert biz, "test seed missing blow-dry-bar-brickell"
+
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {"address.lat": 25.7617, "address.lng": -80.1918}},
+        )
+    )
+
+    r = client.get(
+        "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    blocks = re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>', r.text, re.DOTALL
+    )
+    lb_block = None
+    for block in blocks:
+        try:
+            data = json.loads(block.strip())
+        except json.JSONDecodeError:
+            continue
+        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "LocalBusiness"):
+            lb_block = data
+            break
+
+    assert lb_block is not None, "No LocalBusiness JSON-LD block found"
+    geo = lb_block.get("geo")
+    assert geo is not None, "geo block missing from JSON-LD when lat/lng are present"
+    assert geo.get("@type") == "GeoCoordinates", f"geo @type wrong: {geo.get('@type')!r}"
+    assert abs(geo.get("latitude", 0) - 25.7617) < 0.0001, (
+        f"geo latitude mismatch: {geo.get('latitude')!r}"
+    )
+    assert abs(geo.get("longitude", 0) - (-80.1918)) < 0.0001, (
+        f"geo longitude mismatch: {geo.get('longitude')!r}"
+    )
+
+
+def test_business_jsonld_omits_geo_when_no_coordinates(client):
+    """The JSON-LD on a business page must NOT include a geo block when the
+    business has no lat/lng stored, to avoid emitting an incomplete or
+    null-valued GeoCoordinates node that would fail Rich Results validation."""
+    import json, re
+
+    r = client.get(
+        "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    blocks = re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>', r.text, re.DOTALL
+    )
+    for block in blocks:
+        try:
+            data = json.loads(block.strip())
+        except json.JSONDecodeError:
+            continue
+        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "LocalBusiness"):
+            assert "geo" not in data, (
+                "geo block must be omitted when no coordinates are stored; "
+                f"got: {data.get('geo')}"
+            )
+
+
+def test_business_jsonld_address_always_has_country(client):
+    """The JSON-LD address block must always include addressCountry when an
+    address is present. Google's Rich Results validator requires this field
+    for the address to render in the Knowledge Panel."""
+    import json, re
+
+    r = client.get(
+        "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    blocks = re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>', r.text, re.DOTALL
+    )
+    for block in blocks:
+        try:
+            data = json.loads(block.strip())
+        except json.JSONDecodeError:
+            continue
+        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "LocalBusiness"):
+            addr = data.get("address")
+            if addr:
+                assert addr.get("addressCountry"), (
+                    "addressCountry must be present and non-empty in the address block"
+                )
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
