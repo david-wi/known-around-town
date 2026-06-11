@@ -13,10 +13,19 @@
 
 {% if owner_business %}
 
-{# Success toast — shown via JS when returning from Stripe checkout with ?subscribed=1 #}
+{# Success toast — shown via JS when returning from Stripe checkout with ?subscribed=1.
+   WHY: Show the richer "Founding Partner" message when the flag is already set at
+   page-render time (the webhook typically fires before the browser redirect lands).
+   Falls back to the generic message if the webhook hasn't written the flag yet —
+   the Founding Partner badge in the subscription section below will appear on the
+   next refresh once Stripe's webhook completes. #}
 <div id="subscribed-toast"
      class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-emerald-700 text-white text-sm font-medium px-6 py-3 rounded-full shadow-xl pointer-events-none">
+  {% if owner_business and owner_business.get('is_founding_partner') %}
+  You're a Founding Partner! Your permanent gold badge is now live.
+  {% else %}
   You're Featured! Your listing is now first in search results.
+  {% endif %}
 </div>
 
 {# ── REAL DASHBOARD ─────────────────────────────────────────────── #}
@@ -116,6 +125,25 @@
         </div>
       </div>
     </div>
+  </div>
+</section>
+{% endif %}{# /if stripe_subscription_id #}
+{# WHY: Founding Partner status is permanent — the webhook never clears it, not
+   even when the owner cancels their subscription. So this badge must live OUTSIDE
+   the stripe_subscription_id conditional above.  A founding partner who cancels
+   should still see (and feel good about) their permanent status, which keeps the
+   gold badge visible on their public listing forever. #}
+{% if owner_business.get('is_founding_partner') %}
+<section class="bg-amber-50 border-b border-amber-100">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-4 flex flex-wrap items-center gap-3">
+    <div class="inline-flex items-center gap-2.5 rounded-full border border-amber-300 bg-white px-5 py-2.5 shadow-sm">
+      <span class="text-amber-500 text-sm leading-none">★</span>
+      <span class="text-sm font-semibold text-amber-900">Founding Partner</span>
+    </div>
+    <p class="text-sm text-amber-800">
+      You&rsquo;re one of the first salons on Miami Knows Beauty.
+      Your permanent gold badge appears on your public listing — forever.
+    </p>
   </div>
 </section>
 {% endif %}
