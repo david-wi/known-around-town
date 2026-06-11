@@ -100,3 +100,55 @@ async def ensure_indexes() -> None:
     # Second delivery of the same event id causes a duplicate-key insert
     # error and we treat that as "already handled". No explicit index
     # needed — MongoDB's built-in _id index is already unique.
+
+    # app_migrations: track which one-time data migrations have run.
+    # WHY: a unique index on _id is built-in, but a secondary index on
+    # `ran_at` lets ops quickly query migration history in order.
+    await db.app_migrations.create_index("ran_at")
+
+
+async def run_startup_migrations() -> None:
+    """One-time data migrations, each guarded by a record in app_migrations."""
+    import logging
+    from datetime import datetime, timezone
+
+    db = get_db()
+    log = logging.getLogger(__name__)
+
+    # ------------------------------------------------------------------
+    # Migration: reset editorially-seeded businesses from claim_status
+    # "verified" back to "unclaimed" so the Claim CTA shows on their page.
+    #
+    # WHY: The seed script tagged every business with claim_status="verified"
+    # to mean "editorial data quality approved". But the public listing
+    # template reads "verified" as "owner has claimed this", and hides the
+    # Claim CTA entirely. The result: every owner who clicks through from
+    # outreach email sees a page with no way to claim their listing.
+    #
+    # The correct meaning of "verified": a real entry exists in
+    # business_claims with status="verified". Businesses without that
+    # entry should be "unclaimed" so the CTA is visible.
+    # ------------------------------------------------------------------
+    migration_id = "reset-editorial-verified-to-unclaimed-20260611"
+    if not await db.app_migrations.find_one({"_id": migration_id}):
+        reset_count = 0
+        async for biz in db.businesses.find({"claim_status": "verified"}):
+            has_real_claim = await db.business_claims.find_one(
+                {"business_id": biz["_id"], "status": "verified"}
+            )
+            if not has_real_claim:
+                await db.businesses.update_one(
+                    {"_id": biz["_id"]},
+                    {"$set": {"claim_status": "unclaimed"}},
+                )
+                reset_count += 1
+        await db.app_migrations.insert_one(
+            {
+                "_id": migration_id,
+                "ran_at": datetime.now(timezone.utc),
+                "reset_count": reset_count,
+            }
+        )
+        log.info(
+            "Migration %s: reset %d businesses to unclaimed", migration_id, reset_count
+        )

@@ -50,11 +50,13 @@ def test_session_cookie_rejects_tampered_payload():
 
     cookie = sign_session("owner@example.com")
     payload, sig = cookie.rsplit(".", 1)
-    # Change one character of the payload. The signature still covers
-    # the original payload, so verification must refuse.
-    tampered = (
-        payload[:-1] + ("A" if payload[-1] != "A" else "B")
-    ) + "." + sig
+    # WHY: change the first base64 character, not the last. The final
+    # base64 character of a non-multiple-of-3 byte sequence has unused
+    # padding bits that Python's decoder silently ignores, so flipping
+    # it from 'A' to 'B' can produce the same decoded bytes ~25% of
+    # the time. The first character has no padding bits — a one-char
+    # change there always alters the decoded bytes and breaks the MAC.
+    tampered = ("B" if payload[0] != "B" else "C") + payload[1:] + "." + sig
     assert verify_session(tampered) is None
 
 
@@ -63,7 +65,13 @@ def test_session_cookie_rejects_tampered_signature():
 
     cookie = sign_session("owner@example.com")
     payload, sig = cookie.rsplit(".", 1)
-    tampered = payload + "." + sig[:-1] + ("A" if sig[-1] != "A" else "B")
+    # WHY: same padding-bit hazard as test_session_cookie_rejects_tampered_payload.
+    # HMAC-SHA256 is 32 bytes → 43 base64url chars where the final char
+    # encodes only 4 real bits + 2 zero padding bits.  Python decodes
+    # 'A' and 'B' identically for that position, making the last-char
+    # flip a no-op about 25% of runs.  Changing the first character is
+    # always significant — all 6 bits are real HMAC data.
+    tampered = payload + "." + ("B" if sig[0] != "B" else "C") + sig[1:]
     assert verify_session(tampered) is None
 
 
