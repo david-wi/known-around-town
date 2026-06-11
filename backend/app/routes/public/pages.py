@@ -1458,7 +1458,15 @@ async def sitemap(request: Request) -> HTMLResponse:
 
     # List of (url, lastmod_str) tuples. Business pages carry per-record
     # updated_at when available; everything else uses today's date.
-    entries: List[tuple[str, str]] = [(base + "/", today_str)]
+    # WHY: /pricing and /owners are the two highest-value owner-acquisition
+    # pages — if Google can't crawl them the "upgrade to Pro" funnel is
+    # invisible to organic search. /guides lists all editorial content.
+    entries: List[tuple[str, str]] = [
+        (base + "/", today_str),
+        (base + "/pricing", today_str),
+        (base + "/owners", today_str),
+        (base + "/guides", today_str),
+    ]
 
     if tenant.city:
         city_id = tenant.city["_id"]

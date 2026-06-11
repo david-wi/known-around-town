@@ -2083,6 +2083,22 @@ def test_sitemap_includes_neighborhood_category_pages(client):
         f"{re.findall(r'/n/[^<]+', r.text)[:5]}"
     )
 
+def test_sitemap_includes_owner_acquisition_pages(client):
+    """The sitemap must include /pricing, /owners, and /guides.
+
+    WHY: These are the highest-value owner-acquisition pages. If Google cannot
+    crawl them the entire 'upgrade to Pro' funnel is invisible to organic search.
+    /guides is the editorial content hub. Previously all three were missing from
+    the sitemap even though they were live, navigable pages.
+    """
+    r = client.get("/sitemap.xml", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200
+    for path in ("/pricing", "/owners", "/guides"):
+        assert path in r.text, (
+            f"{path} is missing from the sitemap — Google cannot discover this page"
+        )
+
+
 def test_search_results_page_is_noindexed(client):
     """Search result pages must have a noindex robots meta tag so Google does not
     index /search?q=hair, /search?q=salon, etc. as separate pages. Each of those
