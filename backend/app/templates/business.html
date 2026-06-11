@@ -85,23 +85,38 @@
   {% endif %}
   {% if business.website %}{% set _ = _same_as.append(business.website) %}{% endif %}
   {% if _same_as %},"sameAs": {{ _same_as|tojson }}{% endif %}
-  {#- WHY: omit openingHoursSpecification entirely rather than emit a broken
-      structure. The hours field stores combined strings like "Mon–Sat 10am–8pm"
-      which Google expects as separate opens/closes times (HH:MM format). Emitting
-      the combined string in "opens" and "" in "closes" causes the validator to
-      reject the entire hours block. A schema-less listing is better than one with
-      explicitly invalid data. The route handler should parse hours into ISO times
-      before passing them here if proper structured hours are desired in future. #}
-  {% if business.hours and false %},"openingHoursSpecification": [
-    {% for day in business.hours %}
+  {#- WHY: openingHoursSpecification is the second-highest-value structured-data
+      field after image. Google shows hours in the Knowledge Panel ("Open · Closes 6pm")
+      and uses them for voice search ("Is [salon] open right now?").
+      HoursEntry.day stores "mon".."sun"; schema.org dayOfWeek wants a full URL
+      like "https://schema.org/Monday". Closed days and days with missing times
+      are excluded rather than emitted with empty strings (empty strings fail the
+      Rich Results validator and suppress the whole block). #}
+  {%- set _day_map = {
+    'mon': 'https://schema.org/Monday',
+    'tue': 'https://schema.org/Tuesday',
+    'wed': 'https://schema.org/Wednesday',
+    'thu': 'https://schema.org/Thursday',
+    'fri': 'https://schema.org/Friday',
+    'sat': 'https://schema.org/Saturday',
+    'sun': 'https://schema.org/Sunday'
+  } %}
+  {%- set _open_days = [] %}
+  {%- for h in (business.hours or []) %}
+    {%- if not h.closed and h.opens_at and h.closes_at and h.day in _day_map %}
+      {%- set _ = _open_days.append(h) %}
+    {%- endif %}
+  {%- endfor %}
+  {%- if _open_days %},"openingHoursSpecification": [
+    {%- for h in _open_days %}
     {
       "@type": "OpeningHoursSpecification",
-      "dayOfWeek": {{ (day.label or day.day or '')|tojson }},
-      "opens": {{ (day.value or day.hours or '')|tojson }},
-      "closes": ""
+      "dayOfWeek": {{ _day_map[h.day]|tojson }},
+      "opens": {{ h.opens_at|tojson }},
+      "closes": {{ h.closes_at|tojson }}
     }{% if not loop.last %},{% endif %}
-    {% endfor %}
-  ]{% endif %}
+    {%- endfor %}
+  ]{%- endif %}
 }
 </script>
 {#- WHY: BreadcrumbList tells Google the navigation path from the directory home
