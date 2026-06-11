@@ -2,16 +2,26 @@
 
 ## How deploy works
 
-GitHub Actions CI runs smoke tests on every PR and push to `main`. The server
-also runs an auto-deploy webhook that fires on every push to `main`. It runs
-`/opt/known-around-town/scripts/deploy.sh`, which:
-1. `git pull origin main` into `/opt/known-around-town`
-2. Builds `ghcr.io/david-wi/known-around-town:latest` from `backend/Dockerfile`
-3. Restarts the container via `docker compose up -d`
+Code deploys (any change to Python, templates, or static files) are fully
+automatic via GitHub Actions + Watchtower:
+1. PR merges to `main`
+2. GitHub Actions CI builds `ghcr.io/david-wi/known-around-town:latest` and pushes it
+3. Watchtower polls GHCR every 5 minutes, detects the new image digest, and
+   restarts the container automatically — no SSH needed
 
-After merging a PR, the container typically restarts within ~8–10 seconds of
-the merge (the webhook fires almost immediately). Check with:
+Check status after a merge:
   `ssh -p 2222 root@152.42.152.243 "docker ps --format '{{.Names}}\t{{.Status}}' | grep known"`
+
+**Compose-file-only changes** (e.g. adding Traefik routing labels, changing env vars in
+`docker-compose.prod.yml`) do NOT push a new image, so Watchtower won't pick them up.
+After such a PR merges, SSH and apply manually:
+  `ssh -p 2222 root@152.42.152.243 "docker compose -f /opt/known-around-town/docker-compose.prod.yml up -d backend"`
+
+**CRITICAL:** The server has both `docker-compose.yml` (dev, has a `build:` section) and
+`docker-compose.prod.yml` (production). ALWAYS use `-f docker-compose.prod.yml` when
+SSHing to the server. Running bare `docker compose up -d` without the `-f` flag will use
+the dev file, start a local image build, and likely take the backend down. This mistake
+caused a ~3-minute outage on 2026-06-11.
 
 ## Stage
 
