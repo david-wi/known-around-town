@@ -1471,6 +1471,14 @@ async def robots_txt(request: Request) -> HTMLResponse:
     tenant = await resolve_tenant(request.headers.get("host", ""))
     if not tenant:
         return HTMLResponse("User-agent: *\nDisallow: /\n", media_type="text/plain")
+    # WHY: while the site is in preview mode, all public content pages redirect
+    # to a login wall. Telling Google "Allow: /" while the site is gated would
+    # waste crawl budget — every page Google tries to visit gets a 302 redirect.
+    # Instead, return "Disallow: /" so Google waits until the site is public.
+    # The preview gate bypass means this response is now reachable by crawlers
+    # (they no longer get redirected before reaching this handler).
+    if get_settings().preview_mode_enabled:
+        return HTMLResponse("User-agent: *\nDisallow: /\n", media_type="text/plain")
     host = request.headers.get("host", "")
     scheme = request.url.scheme
     # WHY: disallow the auth and owner-dashboard routes so Google doesn't spend crawl
@@ -1498,6 +1506,22 @@ async def robots_txt(request: Request) -> HTMLResponse:
 
 @router.get("/sitemap.xml")
 async def sitemap(request: Request) -> HTMLResponse:
+    # WHY: check preview mode BEFORE _require_tenant so that:
+    # (a) the empty sitemap is returned even for unknown test hosts, and
+    # (b) we avoid a DB lookup when the result is unconditionally empty anyway.
+    # While preview mode is active, return a valid but empty sitemap rather than
+    # listing all business slugs. The full slug list being enumerable before
+    # launch would let anyone discover business names before the site is public.
+    # robots.txt already returns "Disallow: /" during preview, so well-behaved
+    # crawlers won't request the sitemap — but this guard closes the gap for
+    # direct requests. Once preview mode is off, execution falls through to the
+    # full sitemap that lists every business, category, and neighborhood URL.
+    if get_settings().preview_mode_enabled:
+        return HTMLResponse(
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>',
+            media_type="application/xml",
+        )
     tenant = await _require_tenant(request)
     host = request.headers.get("host", "")
     scheme = request.url.scheme

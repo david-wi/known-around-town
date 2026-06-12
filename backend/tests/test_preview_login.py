@@ -292,6 +292,26 @@ class TestBypassPaths:
         from app.middleware.preview_gate import _is_bypassed
         assert _is_bypassed("/owners/me")
 
+    def test_robots_txt_bypassed(self):
+        # WHY: search engine crawlers request /robots.txt before crawling anything
+        # else. If the preview gate blocks it (302 redirect), Googlebot has no
+        # signal about what to crawl and wastes budget on gated listing pages.
+        # The handler itself returns "Disallow: /" during preview mode, so Google
+        # gets an accurate "site is private" signal — not a confusing redirect.
+        from app.middleware.preview_gate import _is_bypassed
+        assert _is_bypassed("/robots.txt")
+        # Only the exact path — nothing below it should be accidentally bypassed.
+        assert not _is_bypassed("/robots.txt.bak")
+
+    def test_sitemap_xml_bypassed(self):
+        # WHY: sitemap.xml is in the bypass list so crawlers can request it.
+        # The handler returns an empty sitemap during preview mode, which is
+        # the correct signal — there is nothing to crawl yet.
+        from app.middleware.preview_gate import _is_bypassed
+        assert _is_bypassed("/sitemap.xml")
+        # Only the exact path — nothing below it should be accidentally bypassed.
+        assert not _is_bypassed("/sitemap.xml.bak")
+
 
 class TestMiddlewareRedirection:
     """Integration tests that run the full app stack with the gate active."""
@@ -397,6 +417,37 @@ class TestMiddlewareRedirection:
             assert r.status_code == 302
         finally:
             get_settings.cache_clear()
+
+    def test_robots_txt_reachable_during_preview(self, client):
+        """robots.txt must be reachable by Googlebot during preview mode.
+
+        WHY: if the gate blocks /robots.txt, Googlebot gets a redirect to the
+        login page instead of crawl instructions. This wastes crawl budget and
+        signals to Google that the site is broken. With the bypass in place,
+        the handler returns "Disallow: /" — an accurate "private, don't crawl"
+        signal that automatically switches to "crawl everything" when preview
+        mode is turned off.
+        """
+        r = client.get("/robots.txt", follow_redirects=False)
+        # Must NOT redirect — that's the bug we're fixing.
+        assert r.status_code == 200
+        # Must tell crawlers to stay out while the site is in preview.
+        assert "Disallow: /" in r.text
+        assert "Allow: /" not in r.text
+
+    def test_sitemap_xml_reachable_during_preview(self, client):
+        """sitemap.xml must be reachable during preview, but must return empty.
+
+        WHY: the bypass list now includes /sitemap.xml so crawlers can request
+        it. The handler returns a valid but empty sitemap — no business slugs
+        are exposed before launch. Once preview mode is off, the handler returns
+        the full sitemap automatically.
+        """
+        r = client.get("/sitemap.xml", follow_redirects=False)
+        assert r.status_code == 200
+        # Must be a valid XML document, but with no <url> entries.
+        assert "urlset" in r.text
+        assert "<url>" not in r.text
 
 
 # ══════════════════════════════════════════════════════════════════════════════
