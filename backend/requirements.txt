@@ -16,3 +16,6 @@ stripe==11.4.1
 # extra, which in turn requires this package. Without it the app crashes
 # at startup before handling any request (including /pricing).
 email-validator==2.2.0
+# WHY: respx is the httpx-specific mock library used in test_google_places.py
+# to intercept Places API HTTP calls without making real network requests.
+respx==0.22.0

@@ -104,6 +104,12 @@ class Settings(BaseSettings):
     # toggle is faster and safer than a code deploy when launch day arrives.
     preview_mode_enabled: bool = True
 
+    # WHY: Places API key enables Google rating lookup and AggregateRating
+    # rich snippets. Ratings are cached in business documents (not fetched
+    # live on each page load), so a missing key just means ratings stay blank
+    # — the rest of the app continues to work normally.
+    google_places_api_key: str = ""
+
     port: int = 8000
     log_level: str = "INFO"
 

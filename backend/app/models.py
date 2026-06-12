@@ -280,6 +280,14 @@ class Business(BaseModel):
     import_source: Optional[str] = None
     import_data: Optional[Dict[str, Any]] = None
     quality_score: int = 0
+    # WHY: Google Places identifiers cached here so pages load instantly without
+    # a live API call on every request. Refreshed by the admin sync endpoint.
+    # google_rating is stored as a float (1.0–5.0) to preserve decimal precision
+    # (e.g. 4.7), and also emitted in AggregateRating JSON-LD for rich snippets.
+    google_place_id: Optional[str] = None
+    google_rating: Optional[float] = None
+    google_review_count: Optional[int] = None
+    google_rating_synced_at: Optional[datetime] = None
     # WHY: Stripe identifiers live on the business document so billing
     # webhooks and owner billing-portal links can find the listing without
     # a second lookup table. Both stay null until the owner subscribes.
