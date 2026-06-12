@@ -32,7 +32,10 @@ Add SPF, DKIM, and MX DNS records for `knowsbeauty.com` via Dynadot API so email
 can be sent from `david@knowsbeauty.com` using Resend.
 **Acceptance:** Given the DNS records added, when Resend verifies the domain, then
 emails sent from `david@knowsbeauty.com` pass SPF/DKIM and are not marked as spam.
-**Blocked on:** Dynadot DNS access (dependent on KAT-061 account funding).
+**Blocked on:** Resend account needs a domain-management API key (the current key in `.env`
+is send-only and cannot verify domains). David must create a new full API key in the Resend
+dashboard and share it so the SPF/DKIM/MX records can be retrieved and added to Dynadot.
+Note: Dynadot DNS access is already available (not blocked by KAT-061).
 
 ### KAT-064 — Voice profile builder · V2 · draft
 **Persona:** Salon Owner.
@@ -57,5 +60,8 @@ route resolves the business record and passes `claim_prefill = {id, name, slug}`
 template, which shows a "Claiming: [Name]" banner and locks the name input as read-only.
 The email draft (updated 2026-06-11) now uses `miami.knowsbeauty.com/owners?slug=[slug]`
 as the primary CTA — a direct one-click path to the pre-filled form.
-**Blocked on:** (1) DNS cutover for `miami.knowsbeauty.com`; (2) David sends the outreach
-emails (external communication rule applies).
+**Blocked on:** David sends the outreach emails (external communication rule applies).
+**DNS note (2026-06-12):** `miami.knowsbeauty.com` now resolves to the production server
+on all major DNS providers. The DNS cutover blocker is resolved. The HTTPS certificate is
+pending Let's Encrypt auto-provisioning (Traefik retries automatically every ~30 min).
+Once the cert is live, the email links will work end-to-end.
