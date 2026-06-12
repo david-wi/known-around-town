@@ -12,7 +12,33 @@
       "website": "https://www.rossanoferretti.com/our-salons/miami-salon/",
       "instagram": "@rossanoferrettimiami",
       "editors_pick": true,
-      "premium": true
+      "premium": true,
+      "services": [
+        {
+          "name": "Signature Haircut",
+          "price_from": 175
+        },
+        {
+          "name": "Blowout & Style",
+          "price_from": 95
+        },
+        {
+          "name": "Balayage",
+          "price_from": 275
+        },
+        {
+          "name": "Full Highlights",
+          "price_from": 225
+        },
+        {
+          "name": "Color Treatment",
+          "price_from": 150
+        },
+        {
+          "name": "Deep Conditioning Treatment",
+          "price_from": 85
+        }
+      ]
     },
     {
       "slug": "warren-tricomi-salon-miami-beach",
@@ -126,7 +152,33 @@
       "website": "https://www.vanityprojectsnyc.com/miami",
       "instagram": "@vanityprojectsmia",
       "editors_pick": true,
-      "premium": false
+      "premium": false,
+      "services": [
+        {
+          "name": "Manicure",
+          "price_from": 30
+        },
+        {
+          "name": "Pedicure",
+          "price_from": 50
+        },
+        {
+          "name": "Gel Manicure",
+          "price_from": 45
+        },
+        {
+          "name": "Gel Pedicure",
+          "price_from": 65
+        },
+        {
+          "name": "Full Set Acrylics",
+          "price_from": 75
+        },
+        {
+          "name": "Nail Art Add-on",
+          "price_from": 20
+        }
+      ]
     },
     {
       "slug": "bellacures-coral-gables",
@@ -282,7 +334,29 @@
       "website": "https://apbarberstudio.com",
       "instagram": "@ap.barberstudio",
       "editors_pick": false,
-      "premium": false
+      "premium": false,
+      "services": [
+        {
+          "name": "Classic Haircut",
+          "price_from": 35
+        },
+        {
+          "name": "Beard Trim",
+          "price_from": 20
+        },
+        {
+          "name": "Haircut & Beard Combo",
+          "price_from": 50
+        },
+        {
+          "name": "Hot Towel Shave",
+          "price_from": 45
+        },
+        {
+          "name": "Kids' Haircut",
+          "price_from": 25
+        }
+      ]
     },
     {
       "slug": "kingsmen-barbershop-wynwood",
@@ -353,7 +427,37 @@
       "website": "https://www.igkhair.com/pages/miami-salon",
       "instagram": "@igksalon",
       "editors_pick": true,
-      "premium": false
+      "premium": false,
+      "services": [
+        {
+          "name": "Haircut & Style",
+          "price_from": 95
+        },
+        {
+          "name": "Blowout",
+          "price_from": 65
+        },
+        {
+          "name": "Balayage",
+          "price_from": 185
+        },
+        {
+          "name": "Full Color",
+          "price_from": 145
+        },
+        {
+          "name": "Root Touch-Up",
+          "price_from": 90
+        },
+        {
+          "name": "Color Correction",
+          "price_from": 275
+        },
+        {
+          "name": "Extensions Consultation",
+          "price_from": 50
+        }
+      ]
     },
     {
       "slug": "drybar-miami-beach",
@@ -437,7 +541,29 @@
       "website": "https://www.blowdrybar.com/",
       "instagram": "@blowdrybar",
       "editors_pick": false,
-      "premium": false
+      "premium": false,
+      "services": [
+        {
+          "name": "Classic Blowout",
+          "price_from": 45
+        },
+        {
+          "name": "Updo & Special Occasion",
+          "price_from": 65
+        },
+        {
+          "name": "Signature Braid Style",
+          "price_from": 55
+        },
+        {
+          "name": "Blowout + Makeup",
+          "price_from": 120
+        },
+        {
+          "name": "Touch-Up Blowout",
+          "price_from": 35
+        }
+      ]
     },
     {
       "slug": "massage-envy-brickell",
@@ -521,7 +647,37 @@
       "website": "https://www.nuestudio.co/",
       "instagram": "@nuestudio",
       "editors_pick": true,
-      "premium": false
+      "premium": false,
+      "services": [
+        {
+          "name": "Haircut & Style",
+          "price_from": 75
+        },
+        {
+          "name": "Blowout",
+          "price_from": 55
+        },
+        {
+          "name": "Balayage",
+          "price_from": 150
+        },
+        {
+          "name": "Full Color",
+          "price_from": 120
+        },
+        {
+          "name": "Highlights",
+          "price_from": 130
+        },
+        {
+          "name": "Keratin Smoothing",
+          "price_from": 200
+        },
+        {
+          "name": "Root Touch-Up",
+          "price_from": 85
+        }
+      ]
     },
     {
       "slug": "the-nail-lab-wynwood",
@@ -900,6 +1056,158 @@
       "instagram": "@raulmunozhairstudio",
       "editors_pick": false,
       "premium": false
+    },
+    {
+      "slug": "sky-nails-spa-south-beach",
+      "name": "Sky Nails & Spa",
+      "neighborhood_slug": "south-beach",
+      "category_slug": "nails",
+      "price_cues": "$$",
+      "short_description": "Relaxed South Beach nail spa with a breezy, island-meets-city vibe. Known for long-lasting gel sets, indulgent spa pedicures, and walk-in-friendly manicures.",
+      "address": "1215 20th St, Miami Beach, FL 33139",
+      "phone": "(305) 534-7790",
+      "editors_pick": true,
+      "services": [
+        {
+          "name": "Classic Manicure",
+          "price_from": 20
+        },
+        {
+          "name": "Classic Pedicure",
+          "price_from": 35
+        },
+        {
+          "name": "Gel Manicure",
+          "price_from": 35
+        },
+        {
+          "name": "Gel Pedicure",
+          "price_from": 50
+        },
+        {
+          "name": "Deluxe Spa Pedicure",
+          "price_from": 65
+        },
+        {
+          "name": "Full Set Acrylics",
+          "price_from": 55
+        }
+      ]
+    },
+    {
+      "slug": "wynwood-hair-co",
+      "name": "Wynwood Hair Co.",
+      "neighborhood_slug": "wynwood",
+      "category_slug": "hair",
+      "price_cues": "$$",
+      "short_description": "Wynwood's artsy, independent hair collective. Specializes in lived-in color, textured cuts, and balayage that looks like you spent a summer on the water.",
+      "address": "2750 NW 3rd Ave, Miami, FL 33127",
+      "phone": "(305) 456-8820",
+      "editors_pick": true,
+      "services": [
+        {
+          "name": "Haircut & Style",
+          "price_from": 65
+        },
+        {
+          "name": "Blowout",
+          "price_from": 50
+        },
+        {
+          "name": "Balayage",
+          "price_from": 130
+        },
+        {
+          "name": "Full Color",
+          "price_from": 95
+        },
+        {
+          "name": "Highlights",
+          "price_from": 115
+        },
+        {
+          "name": "Keratin Treatment",
+          "price_from": 175
+        }
+      ]
+    },
+    {
+      "slug": "gloss-nail-bar-coral-gables",
+      "name": "GLOSS Nail Bar",
+      "neighborhood_slug": "coral-gables",
+      "category_slug": "nails",
+      "price_cues": "$$",
+      "short_description": "Sleek, minimalist nail bar in the Gables with clean aesthetics and an eye for detail. The go-to for dip powder, gel extensions, and custom nail art in a calm, modern setting.",
+      "address": "283 Miracle Mile, Coral Gables, FL 33134",
+      "phone": "(305) 448-5560",
+      "editors_pick": true,
+      "services": [
+        {
+          "name": "Classic Manicure",
+          "price_from": 25
+        },
+        {
+          "name": "Classic Pedicure",
+          "price_from": 40
+        },
+        {
+          "name": "Gel Manicure",
+          "price_from": 40
+        },
+        {
+          "name": "Gel Pedicure",
+          "price_from": 55
+        },
+        {
+          "name": "Dip Powder Manicure",
+          "price_from": 50
+        },
+        {
+          "name": "Nail Art Add-on",
+          "price_from": 15
+        }
+      ]
+    },
+    {
+      "slug": "kijana-salon-south-miami",
+      "name": "Kijana Salon & Blow Dry Bar",
+      "neighborhood_slug": "coral-gables",
+      "category_slug": "hair",
+      "price_cues": "$$",
+      "short_description": "South Miami blow dry bar and full-service salon with deep expertise in natural textures and protective styles. Equal parts neighborhood staple and destination for nourishing hair care.",
+      "address": "5716 S Dixie Hwy, South Miami, FL 33143",
+      "phone": "(305) 665-4421",
+      "editors_pick": true,
+      "services": [
+        {
+          "name": "Haircut & Style",
+          "price_from": 65
+        },
+        {
+          "name": "Blowout",
+          "price_from": 45
+        },
+        {
+          "name": "Natural Hair Services",
+          "price_from": 85
+        },
+        {
+          "name": "Braids & Protective Styles",
+          "price_from": 120
+        },
+        {
+          "name": "Color Services",
+          "price_from": 95
+        },
+        {
+          "name": "Keratin Treatment",
+          "price_from": 160
+        },
+        {
+          "name": "Deep Conditioning",
+          "price_from": 55
+        }
+      ]
     }
   ],
   "wellness": [
