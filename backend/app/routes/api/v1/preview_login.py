@@ -18,7 +18,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.database import get_db
@@ -87,6 +88,41 @@ def _set_preview_cookie(response: Response, request: Request, token: str) -> Non
         samesite="lax",
         path="/",
     )
+
+
+@router.get("/preview/set-session")
+async def set_session_via_link(
+    request: Request,
+    token: str = Query(..., max_length=200),
+    next: str = Query(default="/"),
+) -> RedirectResponse:
+    """Set a preview session cookie from a pre-generated token link.
+
+    WHY: the normal flow requires the user to receive an email and enter a
+    6-digit code.  This endpoint lets an admin hand a direct-access URL to a
+    specific person without requiring email delivery — useful when the email
+    flow is unreliable during setup or when onboarding a specific guest.
+
+    Only tokens that exist and are unexpired in preview_sessions work, so
+    forwarding a link to the wrong person grants no access unless the DB has
+    a matching token hash.
+    """
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    token_hash = hash_value(token)
+    session = await db.preview_sessions.find_one(
+        {"token_hash": token_hash, "expires_at": {"$gt": now}}
+    )
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid or expired preview link.")
+
+    # WHY: only allow relative paths so this endpoint cannot be used as an
+    # open redirect to send users to arbitrary external URLs.
+    safe_next = next if next.startswith("/") else "/"
+
+    resp = RedirectResponse(url=safe_next, status_code=303)
+    _set_preview_cookie(resp, request, token)
+    return resp
 
 
 @router.post("/preview/login/request", response_model=OkResponse)
