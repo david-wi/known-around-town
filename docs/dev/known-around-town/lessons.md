@@ -112,3 +112,18 @@ re-seed production by hand, you must set `KAT_ALLOW_PRODUCTION_RESET=true` delib
 that requirement is the safety net, do not remove it. `backfill_founding_partners.py`
 is intentionally NOT guarded (it only `update_many`s a flag, deletes nothing, and is
 run against production by design).
+
+## Preview gate — owner portal paths must ALL be bypassed (2026-06-12)
+
+When the claim form (`/owners`) was bypassed so owners without preview accounts
+could submit claims, the rest of the owner journey was overlooked. Three more
+paths need to bypass the gate:
+- `/owners/login` — the sign-in page owners land on after claim verification
+- `/owners/me` — the dashboard (safe to bypass: it has its own session check
+  that redirects to `/owners/login` when there's no owner cookie)
+- `/api/v1/owner/login/` — the API calls the login form makes in the background
+  to send and verify the one-time code
+
+Without all three, a verified salon owner clicks their email link, hits the
+staff-only preview page, and has no way to proceed. The bug silently kills every
+outreach conversion. Fixed in PR #155 (KAT-025).
