@@ -2869,7 +2869,11 @@ async def test_owner_me_shows_subscribed_banner_on_stripe_return(seeded_db):
         "Post-payment confirmation banner (#subscribed-banner) not found in the page — "
         "owner returning from Stripe checkout gets no visible confirmation"
     )
-    assert "featured listing is now live" in r.text or "Founding Partner" in r.text, (
+    # WHY: non-founding-partner subscribers see "You're now Featured!" copy;
+    # founding partners see "You're now a Founding Partner!" — either is valid
+    # confirmation.  The old "featured listing is now live" phrasing was wrong
+    # for non-founding-partner subscribers (it called them "Founding Partner").
+    assert "now Featured" in r.text or "Founding Partner" in r.text, (
         "Confirmation message text missing from subscribed-banner — "
         "banner element exists but contains no confirmation copy"
     )
