@@ -49,6 +49,18 @@ covers backend routes, billing, preview gate, owner portal, and admin paths.
 **Acceptance:** Given any push to `main`, when GitHub Actions completes, then all
 372+ tests pass or the PR is blocked from merging.
 
+### KAT-008 — Pydantic-to-MongoDB serialization excludes unset optional fields · V1 · implemented
+**Persona:** David (operator).
+`to_doc()` in `_crud.py` must call `model.model_dump(by_alias=True, exclude_none=True)`
+so that optional fields that haven't been set are absent from the stored document rather
+than written as explicit `null`. MongoDB sparse-unique indexes (e.g. `stripe_customer_id_1`)
+include documents with the field set to `null` — only documents where the field is
+entirely absent are excluded. Writing `null` therefore consumes the one "null slot" and
+causes every subsequent `INSERT` to raise `DuplicateKeyError`.
+**Acceptance:** Given a new `Business` with no Stripe identifiers, when `to_doc()` is
+called, then `stripe_customer_id` and `stripe_subscription_id` are absent from the
+returned dict (not present-and-null). Covered by `test_new_business_omits_unset_optional_fields`.
+
 ### KAT-007 — Environment-variable-driven configuration · V1 · implemented
 **Persona:** David (operator).
 All secrets, feature flags, and configurable parameters are read from environment
