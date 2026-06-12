@@ -9,7 +9,9 @@ Paths that bypass the gate:
   - /preview-login  — the login page itself (would cause an infinite redirect)
   - /api/v1/preview/*  — the login API endpoints
   - /health         — uptime checks from container orchestration
-  - /api/v1/billing/webhook  — Stripe calls this directly; it must never be gated
+  - /api/v1/billing/*  — Stripe webhook (must reach without a cookie) AND owner
+                      billing actions (checkout, portal) — those have their own
+                      owner-session auth at the route level.
   - /assets/*       — static CSS/JS/images needed to render the login page
   - /favicon.*      — browser favicon probes
   - /owners         — owner claim form (exact path only); linked from outreach emails
@@ -20,9 +22,16 @@ Paths that bypass the gate:
                       account and should be able to log in without one.
   - /owners/me      — owner dashboard; has its own auth check that redirects to
                       /owners/login if no session cookie is present.
-  - /api/v1/owner/login/*  — the OTP request and verify API endpoints called by
-                      the owner login page. Must be reachable by an unauthenticated
-                      browser (the login form itself is making these calls).
+  - /api/v1/owner/* — ALL owner API endpoints (OTP login, profile, stats, photos,
+                      logout, inquiries). Owners have an owner-session cookie but no
+                      preview cookie; every fetch() from the dashboard would otherwise
+                      receive a 302 redirect instead of JSON and the dashboard would
+                      be completely non-functional.
+  - /api/v1/claims  — claim form submission; salon owners post this from /owners
+                      without a preview account.
+  - /api/v1/owner-leads  — email lead capture on the /owners page.
+  - /api/v1/marketing-ai/*  — AI caption and ad-copy generators on the owner
+                      dashboard; have their own owner-session auth at the route level.
 
 Design choice — middleware vs. route dependency:
   WHY middleware: a route-level dependency only protects routes we explicitly
@@ -54,17 +63,33 @@ logger = logging.getLogger(__name__)
 # small — anything not here must present a valid preview_token cookie.
 _BYPASS_PREFIXES = (
     "/preview-login",       # the login page and its form POST
-    "/api/v1/preview/",     # login API endpoints (request code / verify code)
-    "/api/v1/billing/webhook",  # Stripe must reach this without a browser cookie
+    "/api/v1/preview/",     # preview login API endpoints (request code / verify code)
+    # WHY: /api/v1/billing/ expanded from /api/v1/billing/webhook so that owner
+    # billing actions (checkout + portal) are also reachable. All routes under
+    # /api/v1/billing/ except the webhook enforce owner-session auth at the route
+    # level, so bypassing the preview gate here does not expose any billing data.
+    "/api/v1/billing/",
     "/health",              # container health checks from the load balancer
     "/assets/",             # CSS/JS/images needed by the login page itself
     "/favicon",             # browser favicon probes
-    # WHY: owner login API endpoints must be reachable by an unauthenticated
-    # browser — the /owners/login page calls these to send and verify OTP codes.
-    # Without this bypass the login form's fetch() calls are redirected to
-    # /preview-login before they reach the API, so the owner gets a 302 back
-    # from a JSON fetch and the login silently fails.
-    "/api/v1/owner/login/",
+    # WHY: ALL owner API endpoints are bypassed, not just /api/v1/owner/login/.
+    # Authenticated owners have an owner-session cookie but no preview_token.
+    # Every fetch() from the owner dashboard (profile, stats, photos, logout,
+    # inquiries, billing checkout, marketing-ai) would receive a 302 redirect to
+    # /preview-login instead of JSON, silently breaking the entire dashboard.
+    # Each sub-route enforces owner-session auth at the route level, so bypassing
+    # the preview gate here is safe.
+    "/api/v1/owner/",
+    # WHY: claim submission and email lead-capture come from /owners, which is
+    # bypassed as a page, but the form's fetch() targets these API endpoints.
+    # Without bypassing them, a salon owner who fills in the claim form gets a
+    # 302 HTML redirect in the fetch() response and their claim silently fails.
+    "/api/v1/claims",
+    "/api/v1/owner-leads",
+    # WHY: AI caption and ad-copy generators on the owner dashboard. These
+    # require an active owner session at the route level; bypassing the preview
+    # gate here does not allow unauthenticated access.
+    "/api/v1/marketing-ai/",
 )
 
 # WHY: exact-path bypass for paths where sub-paths must stay gated. The claim

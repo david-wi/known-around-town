@@ -45,16 +45,28 @@ given an invalid or missing key, then the gate redirect applies as normal.
 **Persona:** Salon owner (verified claim).
 After their claim is verified, a salon owner receives a login link by email pointing to
 `/owners/login`. They have no preview account. The preview gate must not intercept their
-login or dashboard session.
-Bypassed paths: `/owners/login` (the sign-in page), `/owners/me` (the dashboard — has its
-own session check), `/api/v1/owner/login/` (OTP request and verify endpoints called by the
-login form).
+login or dashboard session — including any `fetch()` calls the dashboard pages make to
+backend API endpoints.
+Bypassed paths:
+- `/owners` (the claim form page — exact), `/owners/login` (sign-in page), `/owners/me`
+  (dashboard — has its own session check)
+- `/api/v1/owner/` (all owner API endpoints: OTP login/verify, profile, stats, photos,
+  logout, inquiries; each enforces owner-session auth at the route level)
+- `/api/v1/claims` and `/api/v1/owner-leads` (claim form and email capture submissions
+  from /owners — no preview account, no owner session)
+- `/api/v1/billing/` (Stripe webhook + owner checkout + portal; billing routes enforce
+  owner-session auth except the webhook which is machine-to-machine)
+- `/api/v1/marketing-ai/` (AI features on owner dashboard; enforce owner-session auth)
 **Acceptance:** Given `PREVIEW_MODE_ENABLED=true` and a salon owner who received a
 verified-claim email with a login link, when they click the link, then they reach
 `/owners/login` without being redirected to `/preview-login`; given a valid owner
 session cookie, when they navigate to `/owners/me`, then they see their dashboard
 without a preview-gate redirect; given no owner session cookie, when they navigate to
-`/owners/me`, then the route itself redirects them to `/owners/login` (not the preview gate).
+`/owners/me`, then the route itself redirects them to `/owners/login` (not the preview
+gate); given an authenticated owner on the dashboard, when the page fetches their
+profile, stats, photos, or billing status, then each API call succeeds (not a 302
+redirect); given an anonymous salon owner who fills in the claim form and submits it,
+then the claim is received by the server (not swallowed by a preview-gate redirect).
 
 ### KAT-023 — Public launch toggle · V1 · implemented
 **Persona:** David (operator).
