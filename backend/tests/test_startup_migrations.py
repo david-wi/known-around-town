@@ -175,3 +175,107 @@ async def test_migration_publish_records_count(mock_db):
     assert record is not None
     # Only the 2 draft businesses should have been promoted.
     assert record["published_count"] == 2
+
+
+# ---------------------------------------------------------------------------
+# clear-seeded-founding-partner-flags-20260611
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_migration_clears_fake_founding_partner_flags(mock_db):
+    """A business flagged by seed data (no payment, no verified claim) should
+    have is_founding_partner removed so the pricing page spot count is accurate."""
+    await mock_db.businesses.insert_one(
+        {"_id": "biz-fake-fp", "name": "Demo Salon", "is_founding_partner": True}
+    )
+
+    await database.run_startup_migrations()
+
+    biz = await mock_db.businesses.find_one({"_id": "biz-fake-fp"})
+    # The field should be unset (missing), not just False.
+    assert "is_founding_partner" not in biz or not biz.get("is_founding_partner")
+
+
+@pytest.mark.asyncio
+async def test_migration_preserves_founding_partner_for_paying_subscriber(mock_db):
+    """A business that paid via Stripe checkout (stripe_customer_id set) keeps
+    the badge — even if their subscription was later cancelled."""
+    await mock_db.businesses.insert_one(
+        {
+            "_id": "biz-paid",
+            "name": "Paying Salon",
+            "is_founding_partner": True,
+            "stripe_customer_id": "cus_abc123",
+            # stripe_subscription_id may be absent after cancellation — that is OK.
+        }
+    )
+
+    await database.run_startup_migrations()
+
+    biz = await mock_db.businesses.find_one({"_id": "biz-paid"})
+    assert biz.get("is_founding_partner") is True
+
+
+@pytest.mark.asyncio
+async def test_migration_preserves_founding_partner_for_verified_claimer(mock_db):
+    """A business whose owner went through the admin claim verification flow
+    legitimately earned the badge and should keep it."""
+    await mock_db.businesses.insert_one(
+        {"_id": "biz-claimed", "name": "Claimed Salon", "is_founding_partner": True}
+    )
+    await mock_db.business_claims.insert_one(
+        {"_id": "claim-fp", "business_id": "biz-claimed", "status": "verified"}
+    )
+
+    await database.run_startup_migrations()
+
+    biz = await mock_db.businesses.find_one({"_id": "biz-claimed"})
+    assert biz.get("is_founding_partner") is True
+
+
+@pytest.mark.asyncio
+async def test_migration_clear_fp_guard_runs_only_once(mock_db):
+    """The idempotency guard prevents re-clearing on a second startup."""
+    await mock_db.businesses.insert_one(
+        {"_id": "biz-fp-once", "name": "Once Salon", "is_founding_partner": True}
+    )
+
+    await database.run_startup_migrations()
+
+    # Manually re-set the flag to simulate a seed accident after migration ran.
+    await mock_db.businesses.update_one(
+        {"_id": "biz-fp-once"}, {"$set": {"is_founding_partner": True}}
+    )
+
+    # Second run — migration guard should block; flag stays True.
+    await database.run_startup_migrations()
+
+    biz = await mock_db.businesses.find_one({"_id": "biz-fp-once"})
+    assert biz.get("is_founding_partner") is True
+
+
+@pytest.mark.asyncio
+async def test_migration_clear_fp_records_count(mock_db):
+    """The migration log entry records how many fake badges were cleared."""
+    await mock_db.businesses.insert_many(
+        [
+            {"_id": "biz-fp-a", "name": "Fake FP 1", "is_founding_partner": True},
+            {"_id": "biz-fp-b", "name": "Fake FP 2", "is_founding_partner": True},
+            # This one has a customer ID — should be preserved, not counted.
+            {
+                "_id": "biz-fp-c",
+                "name": "Real FP",
+                "is_founding_partner": True,
+                "stripe_customer_id": "cus_xyz",
+            },
+        ]
+    )
+
+    await database.run_startup_migrations()
+
+    record = await mock_db.app_migrations.find_one(
+        {"_id": "clear-seeded-founding-partner-flags-20260611"}
+    )
+    assert record is not None
+    assert record["cleared_count"] == 2
