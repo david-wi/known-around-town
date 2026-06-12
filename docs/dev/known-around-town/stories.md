@@ -15,6 +15,7 @@
 | XML sitemap | ✅ Live | `/sitemap.xml` with canonical URLs |
 | Canonical URLs | ✅ Live | `CANONICAL_BASE_URL=https://miami.knowsbeauty.com` |
 | GA4 analytics | ✅ Live | `GA_MEASUREMENT_ID` env var |
+| Google star ratings display | ✅ Live | On salon pages + JSON-LD AggregateRating; populated after API sync |
 | Google Search Console | ⚠️ Pending | Verification tag ready; David needs to verify |
 
 ## Preview / Access Control
@@ -49,12 +50,21 @@
 | Customer portal (self-serve cancel) | ⚠️ Pending | Enable at stripe.com/settings/billing/portal |
 | Founding partner cap | ✅ Live | 25 slots, configurable via `FOUNDING_PARTNER_CAP` |
 
+## Marketing AI (Featured Tier)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Instagram caption generator | ✅ Live | `/api/v1/marketing-ai/instagram-caption`; gated on `MARKETING_AI_ENABLED` |
+| Marketing AI toggle | ✅ Live | `/admin/settings` → Feature Flags section |
+
 ## Admin Tools
 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Claims management | ✅ Live | `/admin/claims` |
 | Analytics dashboard | ✅ Live | `/admin/analytics` |
+| Settings / feature flags | ✅ Live | `/admin/settings` — toggle Marketing AI, preview mode, etc. |
+| Google ratings sync | ✅ Live | `/admin/sync` — one-click pull from Google Places API (requires `GOOGLE_PLACES_API_KEY`) |
 
 ## Platform / Infrastructure
 
@@ -62,7 +72,7 @@
 |---------|--------|-------|
 | Multi-tenant routing | ✅ Live | `NETWORK_DOMAINS` env var, host-based |
 | Auto-deploy via Watchtower | ✅ Live | Polls GHCR every 5 min |
-| CI tests | ✅ Live | GitHub Actions; 372 tests |
+| CI tests | ✅ Live | GitHub Actions; 413 tests |
 | Startup migrations | ✅ Live | Idempotent, tracked in `app_migrations` |
 | Preview gate | ✅ Live | Email + code, 30-day cookie |
 
@@ -70,11 +80,12 @@
 
 | Item | Priority | Blocked On |
 |------|---------|-----------|
-| Stripe customer portal | P1 | David: enable at stripe.com |
+| Google Places API key → run rating sync | P1 | David: get key from Google Cloud Console, set `GOOGLE_PLACES_API_KEY` on server (~$2 one-time for 165 salons) |
+| Stripe customer portal | P1 | David: enable at stripe.com/settings/billing/portal |
 | Google Search Console verification | P1 | David: verify using meta tag |
-| Public launch | P1 | David's go/no-go (turn off preview gate, send outreach) |
+| Public launch | P1 | David's go/no-go (set `PREVIEW_MODE_ENABLED=false` via `/admin/settings`) |
+| Owner outreach email send | P1 | David sends from drafts at `/home/david/Spaces/posey/work/owner-outreach-email-draft.md` |
 | "Knows" vertical domains (9 available) | P2 | David: fund Dynadot account ($~196) |
-| Owner outreach email send | P2 | David sends from drafts at `/home/david/Spaces/posey/work/owner-outreach-email-draft.md` |
 | Resend domain verification (knowsbeauty.com) | P2 | SPF/DKIM/MX DNS records needed |
 | GPS coordinates on listings | P3 | Geocoding at import time |
 | Multi-city expansion | P3 | Platform ready; needs data |
