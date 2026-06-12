@@ -564,6 +564,135 @@ def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Subscription confirmation — sent when an owner's Pro upgrade goes through
+# ---------------------------------------------------------------------------
+
+async def send_subscription_confirmed_email(
+    *,
+    email: str,
+    business_name: str,
+    dashboard_url: str,
+) -> bool:
+    """Congratulate the owner after a successful Pro subscription payment.
+
+    WHY: without this, an owner pays on Stripe, gets redirected back to the
+    dashboard, and hears nothing in their inbox.  That's a trust gap — a
+    'welcome aboard' email confirms the charge was legitimate and tells them
+    exactly what they just unlocked.  Fire-and-forget from the webhook so
+    a slow email provider never delays the Stripe 200 response.
+    """
+    subject = f"Welcome to Featured — {business_name} is now a Pro listing"
+    first = email.split("@")[0].replace(".", " ").replace("_", " ").title()
+    text_body = _subscription_confirmed_text(first, business_name, dashboard_url)
+    html_body = _subscription_confirmed_html(first, business_name, dashboard_url)
+
+    api_key = _provider_api_key()
+    if not api_key:
+        logger.warning(
+            "RESEND_API_KEY not configured — subscription confirmation logged instead "
+            "of emailed for %s (%s).",
+            email,
+            business_name,
+        )
+        return True
+
+    try:
+        async with httpx.AsyncClient(timeout=_PROVIDER_TIMEOUT_SECONDS) as client:
+            response = await client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": _from_address(),
+                    "to": email,
+                    "subject": subject,
+                    "html": html_body,
+                    "text": text_body,
+                },
+            )
+        if response.status_code == 200:
+            logger.info("Subscription confirmation sent to %s for %s", email, business_name)
+            return True
+        logger.error(
+            "Email provider returned status %s for subscription confirmation",
+            response.status_code,
+        )
+        return False
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to send subscription confirmed email: %s", type(exc).__name__)
+        return False
+
+
+def _subscription_confirmed_text(first: str, business_name: str, dashboard_url: str) -> str:
+    return (
+        f"Hi {first},\n\n"
+        f"You're in — {business_name} is now a Featured Pro listing on Miami Knows Beauty.\n\n"
+        "What just unlocked:\n"
+        "• Featured placement — your listing appears at the top of category and neighborhood pages\n"
+        "• Pro badge — signals quality and helps visitors choose you over unverified listings\n"
+        "• Instagram caption generator — describe your post, get a polished caption with hashtags\n"
+        "• Google & Meta ad copy — describe what you're promoting, get 20 ready-to-run ad variations\n\n"
+        f"Head to your dashboard to see your listing and start using these features:\n{dashboard_url}\n\n"
+        "Questions? Email hello@knowsbeauty.com and we'll get back to you same day.\n\n"
+        "— The Miami Knows Beauty team\n"
+    )
+
+
+def _subscription_confirmed_html(first: str, business_name: str, dashboard_url: str) -> str:
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+              background: #f8f5f2; padding: 32px; color: #1c1917;">
+  <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 16px;
+              padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+    <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
+              text-transform: uppercase; margin: 0 0 16px;">
+      Miami Knows Beauty
+    </p>
+    <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
+               font-size: 28px; line-height: 1.2; margin: 0 0 8px; color: #1c1917;">
+      You&rsquo;re now Featured
+    </h1>
+    <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 24px;">
+      Hi {first} — <strong>{business_name}</strong> has been upgraded to a Pro Featured listing.
+      Here&rsquo;s what just unlocked:
+    </p>
+    <ul style="padding: 0; margin: 0 0 24px; list-style: none;">
+      <li style="padding: 8px 0; border-bottom: 1px solid #f5f0eb; font-size: 14px; color: #1c1917;">
+        <span style="color: #be185d; font-weight: 700;">&#10003;</span>&nbsp;
+        <strong>Featured placement</strong> &mdash; top of category and neighborhood pages
+      </li>
+      <li style="padding: 8px 0; border-bottom: 1px solid #f5f0eb; font-size: 14px; color: #1c1917;">
+        <span style="color: #be185d; font-weight: 700;">&#10003;</span>&nbsp;
+        <strong>Pro badge</strong> &mdash; instantly recognisable mark of quality
+      </li>
+      <li style="padding: 8px 0; border-bottom: 1px solid #f5f0eb; font-size: 14px; color: #1c1917;">
+        <span style="color: #be185d; font-weight: 700;">&#10003;</span>&nbsp;
+        <strong>Instagram caption generator</strong> &mdash; polished captions in seconds
+      </li>
+      <li style="padding: 8px 0; font-size: 14px; color: #1c1917;">
+        <span style="color: #be185d; font-weight: 700;">&#10003;</span>&nbsp;
+        <strong>Google &amp; Meta ad copy</strong> &mdash; 20 ready-to-run variations per campaign
+      </li>
+    </ul>
+    <a href="{dashboard_url}"
+       style="display: inline-block; background: #be185d; color: #ffffff; font-size: 15px;
+              font-weight: 600; text-decoration: none; padding: 14px 28px; border-radius: 8px;
+              margin-bottom: 24px;">
+      Go to your dashboard &rarr;
+    </a>
+    <p style="font-size: 13px; color: #78716c; margin: 0;">
+      Questions? Email
+      <a href="mailto:hello@knowsbeauty.com" style="color: #be185d;">hello@knowsbeauty.com</a>
+      &mdash; we reply same day.
+    </p>
+  </div>
+</body></html>"""
+
+
+# ---------------------------------------------------------------------------
 # Inquiry notifications — sent when a visitor contacts a business listing
 # ---------------------------------------------------------------------------
 
