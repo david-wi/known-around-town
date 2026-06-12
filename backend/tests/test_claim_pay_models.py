@@ -34,6 +34,30 @@ def test_claim_pay_models_serialize_with_mongo_ids():
     assert event_doc["event_type"] == "customer.subscription.updated"
 
 
+def test_new_business_omits_unset_optional_fields():
+    """Regression: to_doc must not write None values to the document.
+
+    A sparse-unique index (e.g. stripe_customer_id_1) allows only ONE
+    document with the field explicitly set to null.  If to_doc serializes
+    Optional fields as null rather than omitting them, the second new
+    business inserted raises DuplicateKeyError even though neither has a
+    real Stripe customer ID yet.
+    """
+    business = Business(
+        network_id="network-1",
+        city_id="city-1",
+        slug="new-salon",
+        name="New Salon",
+    )
+
+    doc = to_doc(business)
+
+    # Fields that aren't set must be ABSENT, not present-and-null.
+    assert "stripe_customer_id" not in doc
+    assert "stripe_subscription_id" not in doc
+    assert "website" not in doc
+
+
 def test_claim_pay_indexes_include_stripe_identifiers(mock_db):
     from app import database
 
