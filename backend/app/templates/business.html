@@ -497,13 +497,23 @@
       {% endif %}
 
       {% if business.hours %}
+      {#- WHY: HoursEntry fields are day/opens_at/closes_at/closed — the old
+          day.label/day.value/day.hours attributes don't exist on this model.
+          Day names are 3-letter abbreviations ("mon") that need expansion. #}
+      {%- set _day_names = {"mon":"Monday","tue":"Tuesday","wed":"Wednesday","thu":"Thursday","fri":"Friday","sat":"Saturday","sun":"Sunday"} %}
       <div class="bg-white border border-stone-200 rounded-2xl p-5">
         <div class="text-xs uppercase tracking-wide text-stone-500 font-semibold mb-3">{{ section_hours or 'Hours' }}</div>
         <div class="space-y-2 text-sm">
-          {% for day in business.hours %}
+          {% for h in business.hours %}
           <div class="flex justify-between">
-            <span class="text-stone-600">{{ day.label or day.day }}</span>
-            <span class="text-stone-900 font-medium">{{ day.value or day.hours }}</span>
+            <span class="text-stone-600">{{ _day_names.get(h.day, h.day) }}</span>
+            {% if h.closed %}
+            <span class="text-stone-400">Closed</span>
+            {% elif h.opens_at and h.closes_at %}
+            <span class="text-stone-900 font-medium">{{ h.opens_at }} – {{ h.closes_at }}</span>
+            {% else %}
+            <span class="text-stone-400">—</span>
+            {% endif %}
           </div>
           {% endfor %}
         </div>
