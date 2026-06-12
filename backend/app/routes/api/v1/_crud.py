@@ -15,8 +15,15 @@ def now_utc() -> datetime:
 
 
 def to_doc(model: BaseModel) -> Dict[str, Any]:
-    """Pydantic -> Mongo doc using `_id` (not `id`)."""
-    doc = model.model_dump(by_alias=True)
+    """Pydantic -> Mongo doc using `_id` (not `id`).
+
+    WHY exclude_none=True: optional fields that aren't set should be absent
+    from the document rather than stored as null. MongoDB's sparse-unique
+    indexes (e.g. stripe_customer_id_1) only skip documents where the field
+    is absent — documents with the field explicitly set to null still consume
+    a slot and cause duplicate-key errors for every subsequent new business.
+    """
+    doc = model.model_dump(by_alias=True, exclude_none=True)
     # Normalize enums to their string values for Mongo storage.
     for k, v in list(doc.items()):
         if hasattr(v, "value"):
