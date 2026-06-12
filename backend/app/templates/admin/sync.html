@@ -7,7 +7,7 @@
 
   <div class="mb-8">
     <h1 class="text-2xl font-bold text-stone-900">Google Ratings Sync</h1>
-    <p class="text-stone-500 mt-1 text-sm">Pull live star ratings and review counts from Google for every salon in the directory. Ratings appear on salon pages and in search results as rich snippets.</p>
+    <p class="text-stone-500 mt-1 text-sm">Pull live star ratings, review counts, and opening hours from Google for every salon in the directory. Ratings appear on salon pages and in search results as rich snippets; hours feed the "Open · Closes 6pm" display in Google's Knowledge Panel.</p>
   </div>
 
   {# ── Result banner ── #}
@@ -18,7 +18,7 @@
     </svg>
     <div class="text-emerald-800">
       <span class="font-semibold">Sync complete.</span>
-      {{ sync_updated }} salon{{ 's' if sync_updated != 1 else '' }} updated with fresh ratings.
+      {{ sync_updated }} salon{{ 's' if sync_updated != 1 else '' }} updated with fresh ratings and hours.
       {% if sync_no_match %}{{ sync_no_match }} had no Google match.{% endif %}
       {% if sync_failed %}{{ sync_failed }} had temporary fetch errors (try again).{% endif %}
     </div>
@@ -72,7 +72,7 @@
   <form method="post" action="/admin/sync/ratings">
     <div class="bg-white border border-stone-200 rounded-xl px-6 py-5 mb-6">
       <h2 class="font-semibold text-stone-900 mb-2">Sync all salons</h2>
-      <p class="text-sm text-stone-500 mb-4">Looks up every published salon on Google, matches by name and city, and stores the star rating and review count. Existing ratings are refreshed. Takes 30–90 seconds for the full directory.</p>
+      <p class="text-sm text-stone-500 mb-4">Looks up every published salon on Google, matches by name and city, and stores the star rating, review count, and opening hours. Existing data is refreshed. Takes 30–90 seconds for the full directory.</p>
       <p class="text-xs text-stone-400 mb-4">
         <strong>Cost:</strong> Each salon without a Google Place ID costs 1 Places Text Search call (≈ $0.017). Salons with an existing Place ID cost 1 Place Details call (cheaper). Total cost for {{ total }} salons is under $2.
       </p>
@@ -81,7 +81,7 @@
         {% if not api_configured %}disabled{% endif %}
         class="px-5 py-2 rounded-lg {{ 'bg-rose-600 hover:bg-rose-700 text-white' if api_configured else 'bg-stone-200 text-stone-400 cursor-not-allowed' }} text-sm font-medium transition-colors"
       >
-        {% if api_configured %}Sync Google ratings{% else %}API key required{% endif %}
+        {% if api_configured %}Sync ratings & hours{% else %}API key required{% endif %}
       </button>
     </div>
   </form>
@@ -91,7 +91,7 @@
     <h2 class="font-medium text-stone-900 mb-3">What syncing does</h2>
     <ul class="space-y-2 text-sm text-stone-600">
       <li class="flex items-start gap-2"><span class="text-rose-400 flex-shrink-0 mt-0.5">→</span> Searches Google for each salon by name and city</li>
-      <li class="flex items-start gap-2"><span class="text-rose-400 flex-shrink-0 mt-0.5">→</span> Stores the star rating (e.g. 4.7 ★) and review count in the salon's database record</li>
+      <li class="flex items-start gap-2"><span class="text-rose-400 flex-shrink-0 mt-0.5">→</span> Stores the star rating (e.g. 4.7 ★), review count, and weekly opening hours in the salon's database record</li>
       <li class="flex items-start gap-2"><span class="text-rose-400 flex-shrink-0 mt-0.5">→</span> Ratings appear immediately on salon pages — no restart needed</li>
       <li class="flex items-start gap-2"><span class="text-rose-400 flex-shrink-0 mt-0.5">→</span> Google search results will start showing star snippets for salon pages (usually within a week of Google's next crawl)</li>
     </ul>
