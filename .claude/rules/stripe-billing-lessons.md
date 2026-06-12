@@ -133,6 +133,35 @@ The `is_founding_partner` flag is permanent — it is never cleared, not even on
 
 The same principle applies to the post-subscribe success toast: show "You're a Founding Partner!" when the flag is already set at render time (webhook typically fires before the browser redirect lands), and fall back to "You're Featured!" if the webhook hasn't written the flag yet.
 
+## 9. Founding Partner Guard: Use `stripe_customer_id`, NOT `stripe_subscription_id`
+
+The founding-partner badge is **permanent** — it is never taken away, even if the owner later cancels their subscription. This is by design (`stripe_billing.py` line 221). When writing code that decides "did this business legitimately earn the badge?", use `stripe_customer_id` — not `stripe_subscription_id`.
+
+**Why the distinction matters:**
+- `stripe_customer_id` — set at checkout, **never cleared**, even on cancellation. A non-empty value means the business went through the Stripe payment flow at some point.
+- `stripe_subscription_id` — set at checkout, **cleared by the webhook** when the subscription is cancelled. Checking this for badge eligibility would strip the permanent badge from any founding partner who ever cancelled.
+
+**The correct guard:**
+```python
+# Legitimately earned? Two paths:
+has_paid = bool(biz.get("stripe_customer_id"))          # went through checkout
+has_verified_claim = bool(                               # admin-verified owner claim
+    await db.business_claims.find_one(
+        {"business_id": biz["_id"], "status": "verified"}
+    )
+)
+if has_paid or has_verified_claim:
+    # badge is legitimately earned — do not remove
+```
+
+**The wrong guard (strips badges from former subscribers):**
+```python
+# WRONG — stripe_subscription_id is cleared on cancellation
+has_active_sub = bool(biz.get("stripe_subscription_id"))
+```
+
+This was the critical bug caught in code review of the `clear-seeded-founding-partner-flags-20260611` migration (PR #140). Using the wrong field would have worked fine until the first subscriber ever cancelled, at which point their permanent badge would have been incorrectly removed on the next deploy.
+
 ## 8. mongomock_motor: Use Empty `mock_db` for `count_documents` Tests
 
 `mongomock_motor`'s `count_documents({"is_founding_partner": True})` returns inflated counts against `seeded_db` because the 147 seed businesses include documents where the field is absent — and mongomock treats absent fields as matching. Tests that assert on founding partner counts must use `mock_db` (empty DB), not `seeded_db`.
