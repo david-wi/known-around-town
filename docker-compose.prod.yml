@@ -91,7 +91,9 @@ services:
       traefik.http.routers.kat-beauty.rule: >-
         Host(`miami.knowsbeauty.ai.devintensive.com`) ||
         Host(`knowsbeauty.ai.devintensive.com`) ||
-        Host(`miami.knowsbeauty.com`)
+        Host(`miami.knowsbeauty.com`) ||
+        Host(`www.miami.knowsbeauty.com`) ||
+        Host(`stage-miami.knowsbeauty.com`)
       traefik.http.routers.kat-beauty.tls: "true"
       traefik.http.routers.kat-beauty.tls.certresolver: "letsencrypt"
       traefik.http.routers.kat-beauty.service: "known-around-town"
@@ -100,7 +102,9 @@ services:
       traefik.http.routers.kat-wellness.entrypoints: "https"
       traefik.http.routers.kat-wellness.rule: >-
         Host(`miami.knowswellness.ai.devintensive.com`) ||
-        Host(`knowswellness.ai.devintensive.com`)
+        Host(`knowswellness.ai.devintensive.com`) ||
+        Host(`miami.knowswellness.com`) ||
+        Host(`www.miami.knowswellness.com`)
       traefik.http.routers.kat-wellness.tls: "true"
       traefik.http.routers.kat-wellness.tls.certresolver: "letsencrypt"
       traefik.http.routers.kat-wellness.service: "known-around-town"
