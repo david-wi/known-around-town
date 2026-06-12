@@ -445,6 +445,11 @@ def _load_real_businesses() -> Dict[str, List[Dict[str, Any]]]:
                 "address_full":       it.get("address"),
                 # No specific photo from the LLM — fall back to a category photo
                 "photo_url":          _CATEGORY_FALLBACK_PHOTOS.get(it["category_slug"]),
+                # WHY: seed-time services let us pre-populate curated menus for
+                # outreach-target businesses before any owner claims the listing.
+                # On re-seed the existing DB services are preserved (see upsert
+                # logic below), so this only sets services for brand-new inserts.
+                "services":           it.get("services", []),
             })
         out[net] = rows
     return out
@@ -660,7 +665,49 @@ async def seed_network(network_slug: str) -> None:
             "created_at": now,
             "updated_at": now,
         }
-        await upsert("businesses", {"city_id": city["_id"], "slug": biz["slug"]}, biz_doc)
+        # WHY: the generic upsert() does a full replace_one, which wipes services,
+        # claim data, and Stripe billing fields on every deploy. Owners who've set
+        # up a service menu or completed the claim flow would lose their work.
+        # Instead, carry those fields forward from the existing document while
+        # still refreshing editorial metadata (name, description, photos, etc.).
+        existing_biz = await db.businesses.find_one(
+            {"city_id": city["_id"], "slug": biz["slug"]}
+        )
+        if existing_biz:
+            for _preserve in (
+                "claim_status",
+                "claimed_email",
+                "claimed_by_user_id",
+                "claimed_at",
+                "verified_at",
+                "stripe_customer_id",
+                "stripe_subscription_id",
+                # WHY: is_founding_partner from the DB always wins over the seed JSON
+                # value — an admin may have toggled the flag after first insert, and
+                # a re-seed should never override that decision.
+                "is_founding_partner",
+                "hours",
+            ):
+                if _preserve in existing_biz:
+                    biz_doc[_preserve] = existing_biz[_preserve]
+            # WHY: services are a special case — only preserve the DB copy when it is
+            # non-empty (meaning an owner or admin actually set them). An empty list
+            # means "not yet populated" OR "was wiped by the deploy bug". In either
+            # case, fall back to the curated seed services so outreach targets keep
+            # their menus through every re-deploy.
+            existing_services = existing_biz.get("services") or []
+            if existing_services:
+                biz_doc["services"] = existing_services
+            elif biz.get("services"):
+                biz_doc["services"] = biz["services"]
+            biz_doc["_id"] = existing_biz["_id"]
+            biz_doc["created_at"] = existing_biz.get("created_at", biz_doc["created_at"])
+            await db.businesses.replace_one({"_id": existing_biz["_id"]}, biz_doc)
+        else:
+            # New business: seed the curated service menu from the JSON if provided.
+            if biz.get("services"):
+                biz_doc["services"] = biz["services"]
+            await db.businesses.insert_one(biz_doc)
 
     # City-level copy blocks for the structural strings that appear on the
     # home page (the same ones an editor would later tweak through the API).
