@@ -55,18 +55,17 @@ If you skip step 2, the env var is silently invisible to the container even if i
 
 ## Stripe Setup
 
-**Current state**: Live billing enabled. Webhook NOT yet wired.
+**Current state**: Fully live as of 2026-06-11. Checkout, webhook, and Founding Partner badge all operational.
 
-**To complete Stripe setup**:
-1. Add `webhook_write` permission to the restricted key at stripe.com/apikeys, OR
-2. Manually create a webhook in Stripe dashboard pointing to: `https://miami.knowsbeauty.com/api/v1/billing/webhook` with events: `checkout.session.completed`, `customer.subscription.deleted`
-3. Copy the `whsec_...` secret to `/opt/known-around-town/.env` as `STRIPE_WEBHOOK_SECRET=whsec_...`
-4. Restart the container
+- Checkout creates a session via `POST /api/v1/billing/checkout`
+- Webhook at `POST /api/v1/billing/webhook` receives `checkout.session.completed` and `customer.subscription.deleted`
+- `STRIPE_WEBHOOK_SECRET` is set in production `.env`
+- Founding Partner badge (first 25 subscribers, permanent) is working
 
 **Stripe product**: `prod_UgggS2CyiLgD52`
 **Stripe price**: `price_1ThJJFAIj5oq6xI8oejLDzvu` ($29/month)
 **Statement descriptor**: `EXPERTLY*KNOWSBEAUTY`
-**Customer portal**: Enable at stripe.com/settings/billing/portal
+**Customer portal**: Needs to be enabled at stripe.com/settings/billing/portal (David action — 2-min task)
 
 ## DNS
 
