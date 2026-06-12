@@ -1,0 +1,152 @@
+{#-
+  /walkthrough — Shareable owner journey page.
+
+  A concise, design-forward walkthrough of the 6-step path from "finding your
+  listing" to "managing your Featured profile." Intended for outreach: David
+  sends this URL to salon owners as a quick visual explainer before or after
+  a cold email.
+
+  The page is added to the preview gate bypass list so it's always publicly
+  accessible regardless of whether preview mode is active.
+
+  All Tailwind classes used here are present in the compiled reference.css.
+-#}
+{% extends 'base.html' %}
+{% set header_variant = 'sticky' %}
+
+{% block content %}
+
+{# ----- Hero ----- #}
+<section class="bg-stone-50/60 border-b border-stone-200/60">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-20 lg:py-24 text-center">
+    <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-5">For Owners</p>
+    <h1 class="font-light text-stone-900 leading-[1.05] tracking-tight mb-6"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2rem, 4vw, 3.25rem); font-weight: 300;'>
+      From listed to thriving —<br>
+      <em class="italic text-stone-500">in about five minutes.</em>
+    </h1>
+    <p class="text-lg text-stone-600 leading-relaxed max-w-xl mx-auto">
+      Your {{ listing_word_singular or 'business' }} is already in Miami Knows {{ vertical_word }}. Here's how to claim it, customize it, and make it work for you.
+    </p>
+  </div>
+</section>
+
+{# ----- Steps ----- #}
+<section class="bg-white">
+  <div class="max-w-2xl mx-auto px-6 lg:px-10 py-20 space-y-16">
+
+    {# Step 1 #}
+    <div class="flex gap-8 items-start">
+      <div class="flex-shrink-0 w-12 h-12 rounded-full {{ theme.button_bg }} text-white flex items-center justify-center font-semibold text-lg">1</div>
+      <div>
+        <p class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-2">Already here</p>
+        <h2 class="text-2xl font-light text-stone-900 mb-3" style='font-family: Georgia, "Times New Roman", serif;'>Find your listing</h2>
+        <p class="text-stone-600 leading-relaxed">
+          We've already built a page for your {{ listing_word_singular or 'business' }} on Miami Knows {{ vertical_word }}. It shows your name, neighborhood, category, price range, hours, and a short description pulled from public sources. You can find it by browsing the directory or searching your name.
+        </p>
+        <a href="/" class="inline-flex items-center gap-1.5 mt-4 text-sm {{ theme.accent_text_full }} {{ theme.accent_hover_text }} font-medium">
+          Browse the directory <span aria-hidden="true">→</span>
+        </a>
+      </div>
+    </div>
+
+    {# Step 2 #}
+    <div class="flex gap-8 items-start">
+      <div class="flex-shrink-0 w-12 h-12 rounded-full {{ theme.button_bg }} text-white flex items-center justify-center font-semibold text-lg">2</div>
+      <div>
+        <p class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-2">Two minutes, no cost</p>
+        <h2 class="text-2xl font-light text-stone-900 mb-3" style='font-family: Georgia, "Times New Roman", serif;'>Claim it — free</h2>
+        <p class="text-stone-600 leading-relaxed">
+          Click "Claim this listing" on your listing page or go directly to the owners page. Enter your name, email address, and your role at the {{ listing_word_singular or 'business' }}. That's the whole form. Free, no credit card, no commitment.
+        </p>
+        <a href="/owners" class="inline-flex items-center gap-1.5 mt-4 text-sm {{ theme.accent_text_full }} {{ theme.accent_hover_text }} font-medium">
+          Go to the claim form <span aria-hidden="true">→</span>
+        </a>
+      </div>
+    </div>
+
+    {# Step 3 #}
+    <div class="flex gap-8 items-start">
+      <div class="flex-shrink-0 w-12 h-12 rounded-full {{ theme.button_bg }} text-white flex items-center justify-center font-semibold text-lg">3</div>
+      <div>
+        <p class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-2">Usually within 24 hours</p>
+        <h2 class="text-2xl font-light text-stone-900 mb-3" style='font-family: Georgia, "Times New Roman", serif;'>We verify you're the owner</h2>
+        <p class="text-stone-600 leading-relaxed">
+          We do a quick manual check to confirm the claim is legitimate — a Google Maps cross-reference, a quick look at your Instagram, sometimes a short phone call. Once verified, you'll get an email with a link to sign in. We do this to keep the directory trustworthy for everyone who reads it.
+        </p>
+      </div>
+    </div>
+
+    {# Step 4 #}
+    <div class="flex gap-8 items-start">
+      <div class="flex-shrink-0 w-12 h-12 rounded-full {{ theme.button_bg }} text-white flex items-center justify-center font-semibold text-lg">4</div>
+      <div>
+        <p class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-2">No password needed</p>
+        <h2 class="text-2xl font-light text-stone-900 mb-3" style='font-family: Georgia, "Times New Roman", serif;'>Sign in to your dashboard</h2>
+        <p class="text-stone-600 leading-relaxed">
+          We email you a six-digit code each time you sign in — no password to forget. From your dashboard you can see how many people viewed your listing this week, review any customer inquiries you've received, and choose whether to stay on the free tier or upgrade.
+        </p>
+      </div>
+    </div>
+
+    {# Step 5 #}
+    <div class="flex gap-8 items-start">
+      <div class="flex-shrink-0 w-12 h-12 rounded-full {{ theme.button_bg }} text-white flex items-center justify-center font-semibold text-lg">5</div>
+      <div>
+        <p class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-2">Optional — $29/month</p>
+        <h2 class="text-2xl font-light text-stone-900 mb-3" style='font-family: Georgia, "Times New Roman", serif;'>Upgrade to Featured</h2>
+        <p class="text-stone-600 leading-relaxed mb-4">
+          Featured {{ listing_word_plural or 'listings' }} stand out in every search result and category page. You also get:
+        </p>
+        <ul class="space-y-2 text-stone-600 leading-relaxed text-sm">
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>A full photo gallery (up to 12 photos)</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Priority placement in your category and neighborhood</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>A "Featured" badge visible to readers</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Detailed visitor stats (views, inquiries, click-throughs)</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>A full description you write and control</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Direct booking and website links prominently displayed</span></li>
+        </ul>
+        <p class="text-stone-500 text-sm mt-4">First month free. Cancel anytime — no contracts.</p>
+        <a href="/pricing" class="inline-flex items-center gap-1.5 mt-4 text-sm {{ theme.accent_text_full }} {{ theme.accent_hover_text }} font-medium">
+          See full pricing <span aria-hidden="true">→</span>
+        </a>
+      </div>
+    </div>
+
+    {# Step 6 #}
+    <div class="flex gap-8 items-start">
+      <div class="flex-shrink-0 w-12 h-12 rounded-full bg-amber-500 text-white flex items-center justify-center font-semibold text-lg">★</div>
+      <div>
+        <p class="text-[10px] uppercase tracking-[0.3em] text-amber-600 font-semibold mb-2">Limited — while spots last</p>
+        <h2 class="text-2xl font-light text-stone-900 mb-3" style='font-family: Georgia, "Times New Roman", serif;'>Become a Founding Partner</h2>
+        <p class="text-stone-600 leading-relaxed">
+          The first {{ founding_partner_cap or 25 }} {{ listing_word_plural or 'businesses' }} to subscribe as Featured earn Founding Partner status permanently — a gold badge on their listing that tells readers they were here from the beginning. Once those spots are gone, they're gone. Right now there are <strong class="text-stone-800">{{ founding_partner_spots_left or 'a limited number of' }}</strong> spots remaining.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+{# ----- CTA ----- #}
+<section class="bg-gradient-to-br {{ theme.owners_gradient or 'from-stone-100 via-stone-50 to-white' }} border-t border-stone-200/60">
+  <div class="max-w-2xl mx-auto px-6 lg:px-10 py-20 text-center">
+    <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-5">Ready?</p>
+    <h2 class="font-light text-stone-900 leading-tight mb-6"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.75rem, 3.5vw, 2.75rem); font-weight: 300;'>
+      Claim your listing — it takes two minutes.
+    </h2>
+    <p class="text-stone-600 leading-relaxed mb-10 max-w-md mx-auto">
+      Free to claim, no credit card required. Upgrade to Featured anytime from your dashboard.
+    </p>
+    <a href="/owners"
+       class="inline-flex items-center justify-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-8 py-4 rounded-full transition tracking-wide text-base shadow-lg">
+      Claim your listing — free <span aria-hidden="true">→</span>
+    </a>
+    <p class="mt-6 text-sm text-stone-400">
+      Questions? Email <a href="mailto:hello@miami.knowsbeauty.com" class="underline underline-offset-2 hover:text-stone-600 transition">hello@miami.knowsbeauty.com</a>
+    </p>
+  </div>
+</section>
+
+{% endblock %}

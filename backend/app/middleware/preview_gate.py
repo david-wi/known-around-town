@@ -127,6 +127,13 @@ _BYPASS_EXACT = frozenset({
     # so they belong in _BYPASS_EXACT rather than _BYPASS_PREFIXES.
     "/robots.txt",
     "/sitemap.xml",
+    # WHY: /walkthrough is a shareable owner-journey explainer sent to
+    # prospective salon owners during outreach. It must be publicly accessible
+    # even while preview mode is active — an owner receiving David's email has
+    # no preview account and should never need one just to read a product
+    # overview. The page contains no private data; it only renders marketing copy
+    # and links to /owners and /pricing (both also bypassed).
+    "/walkthrough",
 })
 
 
