@@ -30,6 +30,17 @@ via MongoDB TTL indexes.
 to use it, then it is rejected; given a session cookie from 31 days ago, then the
 visitor is redirected to `/preview-login`.
 
+### KAT-024 — Admin API key bypasses preview gate · V1 · implemented
+**Persona:** David (operator), Posey (PM agent).
+When the preview gate is active, HTTP requests that include a valid `X-API-Key`
+header matching `ADMIN_API_KEY` pass through the gate without a `preview_token`
+cookie. This allows admin tooling and scripts to call any API endpoint from
+outside a browser session.
+**Acceptance:** Given `PREVIEW_MODE_ENABLED=true` and a request with a valid
+`X-API-Key` header to any protected endpoint, when the request is received, then
+it is not redirected to `/preview-login` and proceeds to route-level auth;
+given an invalid or missing key, then the gate redirect applies as normal.
+
 ### KAT-023 — Public launch toggle · V1 · implemented
 **Persona:** David (operator).
 Setting `PREVIEW_MODE_ENABLED=false` in `/opt/known-around-town/.env` and
