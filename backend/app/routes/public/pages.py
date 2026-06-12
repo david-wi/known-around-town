@@ -21,7 +21,9 @@ from app.database import get_db
 from app.services import content as content_svc
 from app.services.copy import CopyResolver
 from app.services.owner_auth import SESSION_COOKIE_NAME, verify_session
+from app.services.site_settings import get_google_site_verification, get_preview_mode_enabled
 from app.services.tenant import TenantContext, resolve_tenant
+
 
 router = APIRouter()
 
@@ -236,9 +238,9 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         # {% if ga_measurement_id %} guard in base.html emits no script at
         # all — no dead snippet, no console noise on dev.
         "ga_measurement_id": get_settings().ga_measurement_id,
-        # WHY: passed here (base context) so every page gets the tag without
-        # duplicating the settings read in each handler. Empty = tag absent.
-        "google_site_verification": get_settings().google_site_verification,
+        # WHY: DB value read first so the admin settings page can set the GSC
+        # code without an SSH restart. Falls back to the env var automatically.
+        "google_site_verification": await get_google_site_verification(),
     }
 
 
@@ -1526,7 +1528,10 @@ async def robots_txt(request: Request) -> HTMLResponse:
     # Instead, return "Disallow: /" so Google waits until the site is public.
     # The preview gate bypass means this response is now reachable by crawlers
     # (they no longer get redirected before reaching this handler).
-    if get_settings().preview_mode_enabled:
+    # WHY: use the DB-backed helper so the admin settings toggle is reflected
+    # immediately — without this, the env var value would persist even after
+    # David flips preview mode off via the admin UI.
+    if await get_preview_mode_enabled():
         return HTMLResponse("User-agent: *\nDisallow: /\n", media_type="text/plain")
     host = request.headers.get("host", "")
     scheme = request.url.scheme
@@ -1565,7 +1570,8 @@ async def sitemap(request: Request) -> HTMLResponse:
     # crawlers won't request the sitemap — but this guard closes the gap for
     # direct requests. Once preview mode is off, execution falls through to the
     # full sitemap that lists every business, category, and neighborhood URL.
-    if get_settings().preview_mode_enabled:
+    # WHY: use DB-backed helper so the admin settings toggle is reflected immediately.
+    if await get_preview_mode_enabled():
         return HTMLResponse(
             '<?xml version="1.0" encoding="UTF-8"?>'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>',
