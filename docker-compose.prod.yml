@@ -68,6 +68,10 @@ services:
       # the "HTML tag" verification method in Search Console so David can
       # verify site ownership without adding a file to the repo.
       GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
+      # WHY: gates the entire site behind an email+code login during the
+      # pre-launch period. Defaults to true (gate active). Set to false in
+      # .env on the server to open the site publicly without a code deploy.
+      PREVIEW_MODE_ENABLED: ${PREVIEW_MODE_ENABLED:-true}
       LOG_LEVEL: INFO
     networks:
       - traefik
@@ -177,6 +181,9 @@ services:
       GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
       CANONICAL_BASE_URL: ${CANONICAL_BASE_URL:-}
       GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
+      # WHY: stage keeps the preview gate active by default (same as prod)
+      # so reviewers also go through the login flow and can verify it works.
+      PREVIEW_MODE_ENABLED: ${PREVIEW_MODE_ENABLED:-true}
       LOG_LEVEL: INFO
     networks:
       - traefik

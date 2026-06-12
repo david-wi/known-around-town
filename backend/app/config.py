@@ -98,6 +98,12 @@ class Settings(BaseSettings):
     # can verify ownership in one config change without a code deploy.
     google_site_verification: str = ""
 
+    # WHY: when True (the default), every page is hidden behind an email + code
+    # login so the site stays private during the pre-launch period. Set to False
+    # (or remove the env var) to open the site to the public. A single env-var
+    # toggle is faster and safer than a code deploy when launch day arrives.
+    preview_mode_enabled: bool = True
+
     port: int = 8000
     log_level: str = "INFO"
 

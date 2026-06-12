@@ -22,6 +22,11 @@ os.environ["NETWORK_DOMAINS"] = (
 )
 os.environ["MONGODB_URL"] = "mongodb://test"
 os.environ["MONGODB_DATABASE"] = "wkl_test"
+# WHY: disable the preview gate for all tests. Pre-gate tests don't supply a
+# preview_token cookie, so they'd all get 302 → /preview-login → 200 instead
+# of the responses they assert. Tests that specifically exercise the gate
+# (test_preview_login.py) override this within their own client fixture.
+os.environ["PREVIEW_MODE_ENABLED"] = "false"
 # WHY: owner-login tests intentionally use the dev log fallback to read
 # one-time codes. Developer shells may have real Resend credentials set,
 # but tests must never call the live email provider.

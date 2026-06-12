@@ -1,0 +1,237 @@
+{#-
+  Preview login page — two-step form on a single page.
+
+  Step 1: visitor enters their email. We post to /api/v1/preview/login/request.
+  Step 2: visitor enters the 6-digit code from their email. We post to
+          /api/v1/preview/login/verify. On success the API sets the
+          preview_token cookie and we send the browser to `next` (or /).
+
+  Deliberately standalone — does NOT extend base.html because base.html
+  requires a tenant context (network/city) to render the header/footer,
+  and the gate intercepts requests before that context is resolved.
+  Style mirrors the site's aesthetic using the same reference.css.
+-#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Preview Access — Miami Knows Beauty</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="stylesheet" href="/assets/css/reference.css">
+</head>
+<body>
+<div class="min-h-screen bg-stone-50 text-stone-900 antialiased flex flex-col items-center justify-center px-6 py-16">
+
+  {# Site wordmark #}
+  <a href="/" class="block mb-10 text-center">
+    <p class="text-[11px] uppercase tracking-[0.3em] text-rose-700 font-semibold mb-1">Miami</p>
+    <p style='font-family: Georgia, "Times New Roman", serif; font-size: 1.6rem; font-weight: 300; color: #1c1917; letter-spacing: -0.01em;'>
+      Knows Beauty
+    </p>
+  </a>
+
+  <div class="w-full max-w-md bg-white rounded-2xl shadow-sm border border-stone-200/60 px-8 py-10">
+
+    {# ---- Step 1: email ---- #}
+    <div id="step-email">
+      <h1 class="text-2xl font-light text-stone-900 mb-2"
+          style='font-family: Georgia, "Times New Roman", serif;'>
+        Preview access
+      </h1>
+      <p class="text-sm text-stone-500 mb-8 leading-relaxed">
+        This site is in private preview. Enter your email address and we'll
+        send you a code.
+      </p>
+
+      <form id="email-form" novalidate class="space-y-4">
+        <label class="block">
+          <span class="block text-sm font-medium text-stone-700 mb-1.5">Email address</span>
+          <input id="email-input"
+                 type="email"
+                 autocomplete="email"
+                 required
+                 class="w-full px-4 py-3 rounded-xl border border-stone-300 bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition text-sm"
+                 placeholder="you@example.com" />
+        </label>
+        <button type="submit"
+                id="email-submit"
+                class="w-full inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed">
+          <span data-label-default>Send me a code</span>
+          <span data-label-loading class="hidden">Sending…</span>
+        </button>
+        <p id="email-error" class="text-sm text-rose-700 hidden" role="alert" aria-live="polite"></p>
+      </form>
+    </div>
+
+    {# ---- Step 2: code ---- #}
+    <div id="step-code" class="hidden">
+      <h1 class="text-2xl font-light text-stone-900 mb-2"
+          style='font-family: Georgia, "Times New Roman", serif;'>
+        Check your email
+      </h1>
+      <p class="text-sm text-stone-500 mb-2 leading-relaxed">
+        We sent a 6-digit code to
+        <strong id="code-email-echo" class="text-stone-700"></strong>.
+      </p>
+      <p class="text-xs text-stone-400 mb-8">
+        Check your spam folder if you don't see it within a minute.
+      </p>
+
+      <form id="code-form" novalidate class="space-y-4">
+        <label class="block">
+          <span class="block text-sm font-medium text-stone-700 mb-1.5">Access code</span>
+          <input id="code-input"
+                 type="text"
+                 inputmode="numeric"
+                 autocomplete="one-time-code"
+                 maxlength="6"
+                 required
+                 class="w-full px-4 py-3 rounded-xl border border-stone-300 bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition tracking-[0.5em] font-mono text-center text-xl"
+                 placeholder="······" />
+        </label>
+        <button type="submit"
+                id="code-submit"
+                class="w-full inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-6 py-3 rounded-full transition text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed">
+          <span data-label-default>Enter the site</span>
+          <span data-label-loading class="hidden">Verifying…</span>
+        </button>
+        <p id="code-error" class="text-sm text-rose-700 hidden" role="alert" aria-live="polite"></p>
+        <button type="button"
+                id="code-back"
+                class="text-sm text-stone-400 hover:text-stone-700 underline underline-offset-4">
+          Use a different email
+        </button>
+      </form>
+    </div>
+
+  </div>{# /.card #}
+
+  <p class="mt-8 text-xs text-stone-400">
+    Miami Knows Beauty — private preview
+  </p>
+</div>
+
+<script>
+(function () {
+  var stepEmail = document.getElementById('step-email');
+  var stepCode  = document.getElementById('step-code');
+
+  var emailForm   = document.getElementById('email-form');
+  var emailInput  = document.getElementById('email-input');
+  var emailSubmit = document.getElementById('email-submit');
+  var emailError  = document.getElementById('email-error');
+
+  var codeForm      = document.getElementById('code-form');
+  var codeInput     = document.getElementById('code-input');
+  var codeSubmit    = document.getElementById('code-submit');
+  var codeError     = document.getElementById('code-error');
+  var codeBack      = document.getElementById('code-back');
+  var codeEmailEcho = document.getElementById('code-email-echo');
+
+  // Read the `next` param so we can redirect back after a successful login.
+  var nextUrl = (function () {
+    try {
+      return new URL(window.location.href).searchParams.get('next') || '/';
+    } catch (e) { return '/'; }
+  })();
+
+  function setLoading(btn, loading) {
+    btn.disabled = loading;
+    btn.querySelector('[data-label-default]').classList.toggle('hidden', loading);
+    btn.querySelector('[data-label-loading]').classList.toggle('hidden', !loading);
+  }
+
+  function showError(el, msg) {
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+
+  function clearError(el) {
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
+
+  function showCodeStep(email) {
+    codeEmailEcho.textContent = email;
+    codeForm.dataset.email = email;
+    stepEmail.classList.add('hidden');
+    stepCode.classList.remove('hidden');
+    setTimeout(function () { codeInput.focus(); }, 50);
+  }
+
+  emailForm.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    clearError(emailError);
+    var email = (emailInput.value || '').trim();
+    if (!email || email.indexOf('@') < 0) {
+      showError(emailError, 'Please enter a valid email address.');
+      return;
+    }
+    setLoading(emailSubmit, true);
+    try {
+      var r = await fetch('/api/v1/preview/login/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email }),
+      });
+      var data = null;
+      try { data = await r.json(); } catch (e) {}
+      if (!r.ok) {
+        showError(emailError, (data && data.detail) || 'Something went wrong. Please try again.');
+        setLoading(emailSubmit, false);
+        return;
+      }
+      // Always advance to the code step regardless of allow-list membership.
+      // This prevents exposing which addresses are allowed.
+      showCodeStep(email);
+    } catch (e) {
+      showError(emailError, 'Network error. Please try again.');
+    } finally {
+      setLoading(emailSubmit, false);
+    }
+  });
+
+  codeForm.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    clearError(codeError);
+    var email = codeForm.dataset.email || '';
+    var code  = (codeInput.value || '').replace(/\D/g, '');
+    if (code.length !== 6) {
+      showError(codeError, 'Please enter the 6-digit code.');
+      return;
+    }
+    setLoading(codeSubmit, true);
+    try {
+      var r = await fetch('/api/v1/preview/login/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, code: code }),
+      });
+      var data = null;
+      try { data = await r.json(); } catch (e) {}
+      if (!r.ok) {
+        showError(codeError, (data && data.detail) || ‘That code did not match. Please try again.’);
+        setLoading(codeSubmit, false);
+        return;
+      }
+      // Cookie is set by the API response. Navigate to the original destination.
+      window.location.href = nextUrl;
+    } catch (e) {
+      showError(codeError, 'Network error. Please try again.');
+      setLoading(codeSubmit, false);
+    }
+  });
+
+  codeBack.addEventListener('click', function () {
+    clearError(codeError);
+    stepCode.classList.add('hidden');
+    stepEmail.classList.remove('hidden');
+    setTimeout(function () { emailInput.focus(); }, 50);
+  });
+})();
+</script>
+
+</body>
+</html>

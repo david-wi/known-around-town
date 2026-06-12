@@ -4,12 +4,13 @@ import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings
 from app.database import ensure_indexes, run_startup_migrations
+from app.middleware.preview_gate import PreviewGateMiddleware
 from app.routes.api.v1 import (
     networks as api_networks,
     cities as api_cities,
@@ -22,6 +23,7 @@ from app.routes.api.v1 import (
     inquiries as api_inquiries,
     marketing_ai as api_marketing_ai,
     owner_login as api_owner_login,
+    preview_login as api_preview_login,
     owner_leads as api_owner_leads,
     owner_inquiries as api_owner_inquiries,
     owner_profile as api_owner_profile,
@@ -40,6 +42,15 @@ BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 app = FastAPI(title="Known Around Town", version="0.1.0")
+
+# WHY: the preview gate must be added as middleware BEFORE any routes are
+# registered. FastAPI/Starlette applies middleware in reverse-registration
+# order; adding it here, at the top, means it wraps the entire application
+# and intercepts every request before it reaches any route handler.
+app.add_middleware(
+    PreviewGateMiddleware,
+    enabled=settings.preview_mode_enabled,
+)
 
 
 @app.on_event("startup")
@@ -81,6 +92,9 @@ app.include_router(api_owner_leads.router, prefix="/api/v1")
 app.include_router(api_marketing_ai.router, prefix="/api/v1")
 # Owner login (passwordless code-by-email). Public — no admin key required.
 app.include_router(api_owner_login.router, prefix="/api/v1")
+# Preview gate login API (email + 6-digit code). Public — no auth required
+# because this IS the auth step for the preview gate.
+app.include_router(api_preview_login.router, prefix="/api/v1")
 # Owner profile editing — session-cookie-authenticated, no admin key.
 # WHY: prefix omitted here because the router itself carries the full
 # /api/v1/owner/profile prefix, unlike the other routers above which
@@ -102,6 +116,21 @@ app.include_router(api_owner_photos.router)
 public_pages.attach_templates(templates)
 claims_admin.attach_templates(templates)
 analytics_admin.attach_templates(templates)
+
+
+@app.get("/preview-login", include_in_schema=False, response_class=HTMLResponse)
+async def preview_login_page() -> HTMLResponse:
+    """Serve the standalone preview login page.
+
+    WHY: this page is intentionally standalone (does not extend base.html)
+    because base.html requires a resolved tenant context (network/city), and
+    the preview gate intercepts requests before tenant resolution happens.
+    The template is a self-contained HTML document that includes reference.css
+    directly so it matches the site's look without requiring tenant data.
+    """
+    tpl = templates.get_template("preview_login.html")
+    content = tpl.render()
+    return HTMLResponse(content=content)
 
 # Admin HTML pages — registered BEFORE the public SSR catch-all so /admin/*
 # resolves to the admin router rather than being swallowed by the public
