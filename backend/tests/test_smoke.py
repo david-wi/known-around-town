@@ -2830,3 +2830,75 @@ def test_owner_me_founding_partner_badge_outside_subscription_conditional():
         "{% endif %} — the badge is inside the subscription conditional and won't "
         "render for founding partners who cancel their subscription later"
     )
+
+
+def test_business_page_shows_related_guide_links(client, seeded_db):
+    """A business listing page must show links to editorial guides that feature it.
+
+    WHY: editorial guides already link out to the businesses in them, but listing
+    pages had no way back — a visitor reading about a salon had no way to discover
+    the curated guides it appeared in. This section closes the loop for both users
+    (more content to explore) and search engines (bidirectional link equity between
+    listing pages and guides)."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    # Find an existing business to link from a guide.
+    biz = asyncio.run(
+        seeded_db.businesses.find_one({"city_id": city["_id"], "status": "live"})
+    )
+    assert biz, "Need at least one live business in seed data"
+
+    # Insert a live editorial guide that features this business.
+    guide_doc = {
+        "_id": "test-guide-for-backlink-test",
+        "city_id": city["_id"],
+        "network_id": network["_id"],
+        "slug": "test-guide-backlink",
+        "title": "Best Salons for a Glow-Up",
+        "status": "live",
+        "featured_business_ids": [biz["_id"]],
+    }
+    asyncio.run(seeded_db.editorial_guides.insert_one(guide_doc))
+
+    r = client.get(
+        f"/b/{biz['slug']}",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "Featured in our guides" in r.text, (
+        f"/b/{biz['slug']} is missing the 'Featured in our guides' section — "
+        "the guide backlink feature is not rendering"
+    )
+    assert "Best Salons for a Glow-Up" in r.text, (
+        f"/b/{biz['slug']} does not contain the guide title — "
+        "the guide link did not render in the 'Featured in our guides' section"
+    )
+    assert "/guides/test-guide-backlink" in r.text, (
+        f"/b/{biz['slug']} does not contain a link to the guide — "
+        "the href was not rendered correctly"
+    )
+
+    # Cleanup.
+    asyncio.run(seeded_db.editorial_guides.delete_one({"_id": "test-guide-for-backlink-test"}))
+
+
+def test_business_page_hides_guide_section_when_no_guides(client):
+    """When no editorial guides feature the business, the 'Featured in our guides'
+    section must not appear on the listing page at all.
+
+    WHY: showing an empty section or a heading with nothing under it would look broken.
+    The section is conditional ({% if related_guides %}) — verify this guard works."""
+    # blow-dry-bar-brickell is a seed business not featured in any editorial guide.
+    r = client.get(
+        "/b/blow-dry-bar-brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "Featured in our guides" not in r.text, (
+        "/b/blow-dry-bar-brickell shows 'Featured in our guides' even though "
+        "this business is not in any editorial guide — the conditional guard is broken"
+    )
