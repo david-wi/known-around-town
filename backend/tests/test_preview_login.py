@@ -116,6 +116,11 @@ class TestAllowList:
         from app.services.preview_auth import is_allowed_email
         assert not is_allowed_email("attacker@sub.expertly.com")
 
+    def test_david_personal_emails_allowed(self):
+        from app.services.preview_auth import is_allowed_email
+        assert is_allowed_email("david@bodnick.com")
+        assert is_allowed_email("david@wisdev.com")
+
 
 class TestCodeGeneration:
     def test_generate_code_is_six_digits(self):

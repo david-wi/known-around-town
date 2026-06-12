@@ -29,6 +29,8 @@ ALLOWED_EMAILS = frozenset(
     {
         "aggiewaggie06@gmail.com",
         "karissa.ostoski@gmail.com",
+        "david@bodnick.com",
+        "david@wisdev.com",
     }
 )
 
