@@ -32,6 +32,11 @@ Paths that bypass the gate:
   - /api/v1/owner-leads  — email lead capture on the /owners page.
   - /api/v1/marketing-ai/*  — AI caption and ad-copy generators on the owner
                       dashboard; have their own owner-session auth at the route level.
+  - /admin/*         — admin panel login and management pages; each page enforces
+                      admin API key auth via an HttpOnly cookie. Without this bypass
+                      the browser cannot reach /admin/login to obtain the cookie.
+                      Adding /admin/ to the bypass does not weaken security because
+                      every admin route still requires the key-derived cookie.
 
 Design choice — middleware vs. route dependency:
   WHY middleware: a route-level dependency only protects routes we explicitly
@@ -72,6 +77,13 @@ _BYPASS_PREFIXES = (
     "/health",              # container health checks from the load balancer
     "/assets/",             # CSS/JS/images needed by the login page itself
     "/favicon",             # browser favicon probes
+    # WHY: the admin panel (/admin/login, /admin/claims, /admin/analytics) requires
+    # the admin API key to authenticate — the login page sets an HttpOnly admin
+    # cookie that all subsequent /admin/* routes verify. Without this bypass, the
+    # browser cannot reach /admin/login to obtain the cookie, making the entire
+    # admin panel inaccessible when preview mode is on. Bypassing /admin/ here is
+    # safe because every admin page still enforces its own key-based auth.
+    "/admin/",
     # WHY: ALL owner API endpoints are bypassed, not just /api/v1/owner/login/.
     # Authenticated owners have an owner-session cookie but no preview_token.
     # Every fetch() from the owner dashboard (profile, stats, photos, logout,
