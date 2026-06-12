@@ -8,7 +8,7 @@ container. No code deploy needed — the toggle is already implemented.
 **Acceptance:** Given the env var change and container restart, then any visitor
 can access the public directory without email authentication.
 **Blocked on:**
-1. `MARKETING_AI_ENABLED=true` set in production `.env` and container restarted (otherwise subscribers who pay $29/month hit a 404 when using AI tools) — Posey can do this with David's go-ahead
+1. `MARKETING_AI_ENABLED_PROD=true` set in production `.env` and container restarted — Posey can do this with David's go-ahead (note: production reads `MARKETING_AI_ENABLED_PROD`, not `MARKETING_AI_ENABLED`; staging uses the latter and defaults to true)
 2. Stripe Customer Portal enabled at stripe.com/settings/billing/portal (2-min task, David action)
 3. David's launch go/no-go decision
 HTTPS is live (2026-06-12). Stripe billing is live (2026-06-11).

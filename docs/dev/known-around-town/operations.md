@@ -91,19 +91,21 @@ All feature flags are set in `/opt/known-around-town/.env` and take effect after
 | Flag | What it controls | Safe to enable when |
 |---|---|---|
 | `PREVIEW_MODE_ENABLED` | Gates the entire site behind email+code login | Ready to open to the public |
-| `MARKETING_AI_ENABLED` | Enables the AI caption and ad copy endpoints for Featured subscribers | An Anthropic API key is confirmed configured and the AI tools are ready to serve |
+| `MARKETING_AI_ENABLED_PROD` | Enables the AI caption and ad copy endpoints for Featured subscribers | An Anthropic API key is confirmed configured and the AI tools are ready to serve |
+
+> **Note on variable naming:** The staging container reads `MARKETING_AI_ENABLED` (defaults to `true`). The production container reads `MARKETING_AI_ENABLED_PROD` (defaults to empty/off). This split is intentional — staging always has AI on; production stays off until explicitly enabled. Don't use `MARKETING_AI_ENABLED=true` in production's `.env`; it has no effect.
 
 ### Enabling marketing AI tools
 
 ```bash
 # Add/update in /opt/known-around-town/.env
-MARKETING_AI_ENABLED=true
+MARKETING_AI_ENABLED_PROD=true
 
 # Apply (no image pull needed)
 docker compose -f docker-compose.prod.yml restart backend
 ```
 
-If `MARKETING_AI_ENABLED` is blank or `false`, the Instagram caption and ad copy endpoints return HTTP 404, so subscribers who try to use these tools get a silent failure. **This flag must be `true` before launch.**
+If `MARKETING_AI_ENABLED_PROD` is blank or `false`, the Instagram caption and ad copy endpoints return HTTP 404, so subscribers who try to use these tools get a silent failure. **This flag must be `true` before launch.**
 
 ## Preview Gate
 
