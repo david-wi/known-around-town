@@ -5,6 +5,11 @@
   1. owner_business is set  → real dashboard: show listing details + edit form
   2. owner_business is None → "claim pending" holding page (claim submitted but
      admin hasn't verified it yet, or owner signed in with a different email)
+
+  Context variables from the route:
+    is_subscribed         — True when the business has an active Stripe subscription
+    show_subscribed_banner — True when the owner just returned from Stripe checkout
+                             (?subscribed=1) AND is_subscribed is True
 -#}
 {% extends 'base.html' %}
 {% set header_variant = 'sticky' %}
@@ -13,15 +18,51 @@
 
 {% if owner_business %}
 
+{# ── Post-payment confirmation banner (server-rendered) ──────────
+   WHY: Stripe redirects to /owners/me?subscribed=1 after a successful
+   checkout. Without this banner the page looks identical before and after
+   payment — the owner has no confirmation their card was charged and their
+   listing is now featured. This is a full-width section rendered in the
+   server response, so it appears even when JavaScript is disabled.
+   The banner is dismissible via a close button so the owner can clear it
+   once they've seen the message. show_subscribed_banner is set server-side
+   only when both ?subscribed=1 is present AND stripe_subscription_id is
+   set on the business, preventing false positives if someone bookmarks the
+   URL with the query param. #}
+{% if show_subscribed_banner %}
+<div id="subscribed-banner" role="status"
+     class="bg-emerald-700 text-white">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-4 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="text-emerald-200 text-lg leading-none shrink-0">✓</span>
+      <div class="min-w-0">
+        {% if owner_business.get('is_founding_partner') %}
+        <p class="font-semibold text-sm">You're now a Founding Partner!</p>
+        <p class="text-emerald-200 text-xs mt-0.5">Your featured listing and permanent gold badge are now live. Thank you for being an early supporter.</p>
+        {% else %}
+        <p class="font-semibold text-sm">You're now a Founding Partner! Your featured listing is now live.</p>
+        <p class="text-emerald-200 text-xs mt-0.5">Your salon now appears first in search results in your neighborhood.</p>
+        {% endif %}
+      </div>
+    </div>
+    <button id="subscribed-banner-close" type="button"
+            aria-label="Dismiss"
+            class="shrink-0 text-emerald-200 hover:text-white transition text-xl leading-none px-1">
+      &times;
+    </button>
+  </div>
+</div>
+{% endif %}{# /if show_subscribed_banner #}
+
 {# Success toast — shown via JS when returning from Stripe checkout with ?subscribed=1.
-   WHY: Show the richer "Founding Partner" message when the flag is already set at
-   page-render time (the webhook typically fires before the browser redirect lands).
-   Falls back to the generic message if the webhook hasn't written the flag yet —
-   the Founding Partner badge in the subscription section below will appear on the
-   next refresh once Stripe's webhook completes. #}
+   WHY: Progressive enhancement layer on top of the server-side banner above. The JS
+   toast animates in as a floating pill and auto-fades after 3.5 s, giving a more
+   polished feel when JavaScript is available while the server-side banner is the
+   reliable non-JS baseline. The JS also strips ?subscribed=1 from the URL so a
+   page refresh after success doesn't re-show either banner. #}
 <div id="subscribed-toast"
      class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-emerald-700 text-white text-sm font-medium px-6 py-3 rounded-full shadow-xl pointer-events-none">
-  {% if owner_business and owner_business.get('is_founding_partner') %}
+  {% if owner_business.get('is_founding_partner') %}
   You're a Founding Partner! Your permanent gold badge is now live.
   {% else %}
   You're Featured! Your listing is now first in search results.
@@ -55,12 +96,15 @@
 
 {# ── Pro subscription status ──────────────────────────────────────
    WHY: show upgrade card for free-tier owners and a status badge for
-   Pro owners.  We check stripe_subscription_id (set by the webhook)
-   as the authoritative signal rather than featured.tier alone, so a
-   site admin who manually edits featured.tier still doesn't trigger
-   the checkout button if there's no Stripe subscription backing it.
+   Pro owners. is_subscribed is set server-side from stripe_subscription_id
+   (the authoritative signal set by the Stripe webhook) rather than
+   featured.tier alone, so a site admin who manually edits featured.tier
+   still doesn't trigger the checkout button if there's no Stripe
+   subscription backing it. Using is_subscribed (a boolean) rather than
+   accessing the raw field here keeps business logic in the route handler
+   where it is testable, and templates readable.
 #}
-{% if owner_business.stripe_subscription_id %}
+{% if is_subscribed %}
 {# ── Pro active badge ── #}
 <section class="bg-white border-b border-stone-100">
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-5 flex flex-wrap items-center gap-4">
@@ -127,7 +171,7 @@
     </div>
   </div>
 </section>
-{% endif %}{# /if stripe_subscription_id #}
+{% endif %}{# /if is_subscribed #}
 {# WHY: Founding Partner status is permanent — the webhook never clears it, not
    even when the owner cancels their subscription. So this badge must live OUTSIDE
    the stripe_subscription_id conditional above.  A founding partner who cancels
@@ -985,13 +1029,43 @@
   });
 })();
 
+/* ── Post-payment banner dismiss button ──────────────────── */
+/* WHY: The server-rendered banner has no JS by default.  This wires
+   the × button so owners can clear the banner once they've read it.
+   Also removes ?subscribed=1 from the URL so a bookmark/refresh
+   doesn't re-show the banner on the next server render. */
+(function () {
+  var closeBtn = document.getElementById('subscribed-banner-close');
+  if (!closeBtn) return;
+  /* Strip the query param immediately so a refresh doesn't re-render it */
+  if (window.history && window.history.replaceState) {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+  closeBtn.addEventListener('click', function () {
+    var banner = document.getElementById('subscribed-banner');
+    if (banner) {
+      banner.style.transition = 'opacity 0.3s';
+      banner.style.opacity = '0';
+      setTimeout(function () { banner.style.display = 'none'; }, 350);
+    }
+  });
+})();
+
 /* ── Success toast after Stripe checkout redirect ──────────── */
+/* WHY: Progressive enhancement — the floating pill toast is shown when
+   JS is available, layered on top of the server-rendered banner above.
+   The banner is the reliable baseline; this adds a polished animated
+   confirmation for users with JavaScript enabled. Only fires when the
+   server-side banner was NOT rendered (i.e. when ?subscribed=1 is in
+   the URL but the webhook hasn't written stripe_subscription_id yet),
+   so the two never compete. */
 (function () {
   var params = new URLSearchParams(window.location.search);
   if (params.get('subscribed') !== '1') return;
-  /* WHY: replaceState removes ?subscribed=1 before showing the toast
-     so a page refresh after success doesn't re-show the message. */
+  /* Strip param whether or not the banner already fired */
   window.history.replaceState({}, '', window.location.pathname);
+  /* Skip the floating toast when the server-side banner is already showing */
+  if (document.getElementById('subscribed-banner')) return;
   var toast = document.getElementById('subscribed-toast');
   if (!toast) return;
   toast.classList.remove('hidden');

@@ -2788,16 +2788,16 @@ def test_owner_me_founding_partner_badge_shown_when_flag_set():
 
 
 def test_owner_me_founding_partner_badge_outside_subscription_conditional():
-    """The Founding Partner badge section must be structurally outside the Stripe
+    """The Founding Partner badge section must be structurally outside the
     subscription conditional in owner_me.html.
 
     WHY: is_founding_partner is a permanent boolean — the webhook that grants it
     intentionally never clears it, even when an owner cancels their subscription.
-    If the badge were inside the stripe_subscription_id block, a founding partner
-    who cancels would lose their dashboard confirmation of a status that still
-    shows on their public listing.  They would have a live gold badge on their
-    public page with no matching confirmation in their dashboard — confusing and
-    demoralising for an early adopter.
+    If the badge were inside the is_subscribed block, a founding partner who cancels
+    would lose their dashboard confirmation of a status that still shows on their
+    public listing.  They would have a live gold badge on their public page with no
+    matching confirmation in their dashboard — confusing and demoralising for an
+    early adopter.
 
     We verify this structurally: the is_founding_partner check must appear in the
     template source after the endif that closes the subscription block."""
@@ -2808,19 +2808,22 @@ def test_owner_me_founding_partner_badge_outside_subscription_conditional():
         / "app" / "templates" / "owner_me.html"
     ).read_text()
 
-    # The closing comment was added when the badge was moved outside the subscription
-    # block, making the boundary unambiguous.
-    sub_endif_marker = "{% endif %}{# /if stripe_subscription_id #}"
+    # The closing comment marks the boundary between the subscription block and
+    # the permanent Founding Partner section.
+    sub_endif_marker = "{% endif %}{# /if is_subscribed #}"
     sub_endif_pos = source.find(sub_endif_marker)
     assert sub_endif_pos != -1, (
-        "owner_me.html is missing the '{% endif %}{# /if stripe_subscription_id #}' "
+        "owner_me.html is missing the '{% endif %}{# /if is_subscribed #}' "
         "marker that closes the subscription block — "
         "the founding partner badge may be inside the subscription conditional"
     )
 
-    # The is_founding_partner check must appear AFTER the subscription endif.
+    # The permanent Founding Partner BADGE SECTION (the amber section that says
+    # "You're one of the first salons") must appear AFTER the subscription endif.
+    # We use rfind() so we match the badge's own conditional, not any earlier
+    # occurrence of the same check inside the post-payment confirmation banner.
     fp_check = "{% if owner_business.get('is_founding_partner') %}"
-    fp_check_pos = source.find(fp_check)
+    fp_check_pos = source.rfind(fp_check)
     assert fp_check_pos != -1, (
         "owner_me.html is missing the founding partner conditional — "
         "founding partner badge section may have been removed"
@@ -2829,6 +2832,196 @@ def test_owner_me_founding_partner_badge_outside_subscription_conditional():
         "Founding Partner badge check appears BEFORE the subscription block's "
         "{% endif %} — the badge is inside the subscription conditional and won't "
         "render for founding partners who cancel their subscription later"
+    )
+
+
+async def test_owner_me_shows_subscribed_banner_on_stripe_return(seeded_db):
+    """Visiting /owners/me?subscribed=1 while subscribed shows the post-payment banner.
+
+    WHY: Stripe redirects the owner to /owners/me?subscribed=1 after a successful
+    checkout. Without this banner the page looks identical before and after payment —
+    the owner sees no confirmation their card was charged and their listing is live.
+    The banner must be a full-width, prominently visible section rendered in the HTML,
+    not just a JS-only floating pill that relies on a ?subscribed=1 query param being
+    read after page load."""
+    from app.main import app
+    from app.services.owner_auth import SESSION_COOKIE_NAME, sign_session
+    from fastapi.testclient import TestClient
+
+    email = "subscribed@example.com"
+    # WHY: insert a business with stripe_subscription_id set so is_subscribed=True
+    await seeded_db.businesses.insert_one({
+        "_id": "biz-sub-001",
+        "name": "Glow Studio",
+        "slug": "glow-studio",
+        "claimed_email": email,
+        "stripe_subscription_id": "sub_test_123",
+        "featured": {"tier": "pro", "enabled": True},
+    })
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.get(
+        "/owners/me?subscribed=1",
+        headers={"host": "miami.knowsbeauty.localhost"},
+        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+    )
+    assert r.status_code == 200, r.text
+    assert 'id="subscribed-banner"' in r.text, (
+        "Post-payment confirmation banner (#subscribed-banner) not found in the page — "
+        "owner returning from Stripe checkout gets no visible confirmation"
+    )
+    assert "featured listing is now live" in r.text or "Founding Partner" in r.text, (
+        "Confirmation message text missing from subscribed-banner — "
+        "banner element exists but contains no confirmation copy"
+    )
+    assert 'id="subscribed-banner-close"' in r.text, (
+        "Banner close/dismiss button missing — "
+        "owner has no way to clear the banner once they've seen it"
+    )
+
+
+async def test_owner_me_no_banner_without_subscribed_param(seeded_db):
+    """The post-payment banner must NOT appear when ?subscribed=1 is absent.
+
+    WHY: A subscribed owner visiting their dashboard normally (e.g., to edit
+    their listing) should not see the 'you just subscribed' banner — it's only
+    meaningful on the redirect from Stripe checkout."""
+    from app.main import app
+    from app.services.owner_auth import SESSION_COOKIE_NAME, sign_session
+    from fastapi.testclient import TestClient
+
+    email = "subscribed2@example.com"
+    await seeded_db.businesses.insert_one({
+        "_id": "biz-sub-002",
+        "name": "Bliss Salon",
+        "slug": "bliss-salon",
+        "claimed_email": email,
+        "stripe_subscription_id": "sub_test_456",
+        "featured": {"tier": "pro", "enabled": True},
+    })
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.get(
+        "/owners/me",
+        headers={"host": "miami.knowsbeauty.localhost"},
+        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+    )
+    assert r.status_code == 200, r.text
+    assert 'id="subscribed-banner"' not in r.text, (
+        "Post-payment banner appeared on a normal dashboard visit (no ?subscribed=1) — "
+        "subscribed owners would see a stale 'you just subscribed' message on every visit"
+    )
+
+
+async def test_owner_me_no_banner_when_not_yet_subscribed(seeded_db):
+    """?subscribed=1 alone must NOT show the banner if the webhook hasn't fired yet.
+
+    WHY: The banner requires both ?subscribed=1 AND an active subscription
+    (stripe_subscription_id set on the business). If someone visits ?subscribed=1
+    but the Stripe webhook hasn't written the subscription ID yet, we suppress the
+    server-rendered banner (the JS toast fallback handles this race condition
+    gracefully). This also prevents a stale bookmark from showing a false
+    'you just subscribed' message."""
+    from app.main import app
+    from app.services.owner_auth import SESSION_COOKIE_NAME, sign_session
+    from fastapi.testclient import TestClient
+
+    email = "pending@example.com"
+    await seeded_db.businesses.insert_one({
+        "_id": "biz-sub-003",
+        "name": "Pending Studio",
+        "slug": "pending-studio",
+        "claimed_email": email,
+        # WHY: no stripe_subscription_id — simulates webhook not yet fired
+        "featured": {"tier": "free", "enabled": False},
+    })
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.get(
+        "/owners/me?subscribed=1",
+        headers={"host": "miami.knowsbeauty.localhost"},
+        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+    )
+    assert r.status_code == 200, r.text
+    assert 'id="subscribed-banner"' not in r.text, (
+        "Server-side banner appeared even though stripe_subscription_id is not set — "
+        "the banner guard on is_subscribed=True is not working"
+    )
+
+
+async def test_owner_me_upgrade_cta_hidden_when_subscribed(seeded_db):
+    """Subscribed owners must NOT see the 'Founding Partner offer' upgrade card.
+
+    WHY: Showing the 'Get Featured' checkout button to an owner who has already
+    paid is confusing and undermines trust — they'd wonder whether their payment
+    actually went through. Once subscribed, the upgrade card must be replaced by
+    the 'Featured listing active' status badge."""
+    from app.main import app
+    from app.services.owner_auth import SESSION_COOKIE_NAME, sign_session
+    from fastapi.testclient import TestClient
+
+    email = "subscribed3@example.com"
+    await seeded_db.businesses.insert_one({
+        "_id": "biz-sub-004",
+        "name": "Lux Beauty",
+        "slug": "lux-beauty",
+        "claimed_email": email,
+        "stripe_subscription_id": "sub_test_789",
+        "featured": {"tier": "pro", "enabled": True},
+    })
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.get(
+        "/owners/me",
+        headers={"host": "miami.knowsbeauty.localhost"},
+        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+    )
+    assert r.status_code == 200, r.text
+    assert "Founding Partner offer" not in r.text, (
+        "Upgrade card ('Founding Partner offer') is visible to a subscribed owner — "
+        "they already paid, seeing a checkout CTA undermines trust"
+    )
+    assert "Featured listing active" in r.text, (
+        "'Featured listing active' status badge missing for subscribed owner — "
+        "owner has no confirmation their paid subscription is active"
+    )
+    assert 'id="upgrade-btn"' not in r.text, (
+        "'Get Featured' checkout button still visible to subscribed owner"
+    )
+
+
+async def test_owner_me_upgrade_cta_shown_when_not_subscribed(seeded_db):
+    """Free-tier owners must see the 'Founding Partner offer' upgrade card.
+
+    WHY: The upgrade card is the primary revenue driver — it's how free-tier
+    owners convert to paid subscribers. If it disappears, owners have no way
+    to upgrade from their dashboard."""
+    from app.main import app
+    from app.services.owner_auth import SESSION_COOKIE_NAME, sign_session
+    from fastapi.testclient import TestClient
+
+    email = "free@example.com"
+    await seeded_db.businesses.insert_one({
+        "_id": "biz-free-001",
+        "name": "Free Salon",
+        "slug": "free-salon",
+        "claimed_email": email,
+        # WHY: no stripe_subscription_id — free tier owner
+        "featured": {"tier": "free", "enabled": False},
+    })
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.get(
+        "/owners/me",
+        headers={"host": "miami.knowsbeauty.localhost"},
+        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+    )
+    assert r.status_code == 200, r.text
+    assert "Founding Partner offer" in r.text, (
+        "Upgrade card ('Founding Partner offer') missing for free-tier owner — "
+        "owners on the free tier cannot upgrade from their dashboard"
+    )
+    assert 'id="upgrade-btn"' in r.text, (
+        "'Get Featured' checkout button missing for free-tier owner"
+    )
+    assert "Featured listing active" not in r.text, (
+        "'Featured listing active' badge shown to a free-tier owner — "
+        "they are not featured, showing this badge would be incorrect"
     )
 
 
