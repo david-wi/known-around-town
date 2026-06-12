@@ -91,8 +91,7 @@ services:
       traefik.http.routers.kat-beauty.rule: >-
         Host(`miami.knowsbeauty.ai.devintensive.com`) ||
         Host(`knowsbeauty.ai.devintensive.com`) ||
-        Host(`miami.knowsbeauty.com`) ||
-        Host(`www.miami.knowsbeauty.com`)
+        Host(`miami.knowsbeauty.com`)
       traefik.http.routers.kat-beauty.tls: "true"
       traefik.http.routers.kat-beauty.tls.certresolver: "letsencrypt"
       traefik.http.routers.kat-beauty.service: "known-around-town"
