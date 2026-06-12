@@ -17,7 +17,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.routes.api.v1._auth import require_admin
-from app.services.site_settings import get_all_site_settings, get_marketing_ai_enabled, update_site_settings
+from app.services.site_settings import (
+    get_google_site_verification,
+    get_marketing_ai_enabled,
+    get_preview_mode_enabled,
+    update_site_settings,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -41,12 +46,16 @@ async def settings_page(
         raise HTTPException(500, "Templates not attached")
 
     marketing_ai_enabled = await get_marketing_ai_enabled()
+    preview_mode_enabled = await get_preview_mode_enabled()
+    google_site_verification = await get_google_site_verification()
 
     return _templates.TemplateResponse(
         "admin/settings.html",
         {
             "request": request,
             "marketing_ai_enabled": marketing_ai_enabled,
+            "preview_mode_enabled": preview_mode_enabled,
+            "google_site_verification": google_site_verification,
             "saved": saved == "1",
         },
     )
@@ -66,7 +75,17 @@ async def update_settings(
     """
     form = await request.form()
     marketing_ai_enabled = form.get("marketing_ai_enabled") == "on"
+    # WHY: preview_mode toggle uses the same checkbox convention — present means
+    # "private (preview on)", absent means "public (preview off)".
+    preview_mode_enabled = form.get("preview_mode_enabled") == "on"
+    # WHY: strip whitespace so a stray space in the pasted GSC code doesn't
+    # silently break verification (Google requires an exact match).
+    google_site_verification = str(form.get("google_site_verification") or "").strip()
 
-    await update_site_settings({"marketing_ai_enabled": marketing_ai_enabled})
+    await update_site_settings({
+        "marketing_ai_enabled": marketing_ai_enabled,
+        "preview_mode_enabled": preview_mode_enabled,
+        "google_site_verification": google_site_verification,
+    })
 
     return RedirectResponse(url="/admin/settings?saved=1", status_code=303)

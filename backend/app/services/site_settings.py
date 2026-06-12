@@ -61,3 +61,33 @@ async def get_marketing_ai_enabled() -> bool:
     # WHY: fall back to env-var check so behaviour is unchanged on first deploy
     # before anyone has touched the admin settings page.
     return env_feature_enabled()
+
+
+async def get_preview_mode_enabled() -> bool:
+    """Return whether the preview gate is active (site is private).
+
+    DB value takes precedence. Falls back to the PREVIEW_MODE_ENABLED env var
+    (default True) so the site stays private on a fresh deploy before David
+    has touched the admin settings page.
+    """
+    from app.config import get_settings
+
+    db_val = await get_site_setting("preview_mode_enabled", default=None)
+    if db_val is not None:
+        return bool(db_val)
+    # WHY: env var fallback preserves existing production behaviour unchanged
+    return get_settings().preview_mode_enabled
+
+
+async def get_google_site_verification() -> str:
+    """Return the Google Search Console verification code.
+
+    DB value takes precedence. Falls back to the GOOGLE_SITE_VERIFICATION env
+    var so the old setup-by-SSH path keeps working alongside the admin UI.
+    """
+    from app.config import get_settings
+
+    db_val = await get_site_setting("google_site_verification", default=None)
+    if db_val is not None:
+        return str(db_val).strip()
+    return get_settings().google_site_verification

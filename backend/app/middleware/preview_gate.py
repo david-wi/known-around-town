@@ -162,12 +162,12 @@ class PreviewGateMiddleware(BaseHTTPMiddleware):
         self._initial_enabled = enabled
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        # Re-read the current setting on every request. This is cache-backed
-        # (lru_cache on get_settings) so it costs nothing in production, but
-        # allows tests to toggle the flag via monkeypatch + cache_clear.
-        from app.config import get_settings as _get_settings
-        settings = _get_settings()
-        if not settings.preview_mode_enabled:
+        # WHY: DB value is checked first so the admin settings page can open
+        # the site without an SSH restart. Falls back to the env var so the
+        # existing production config works unchanged on first deploy.
+        from app.services.site_settings import get_preview_mode_enabled
+        preview_on = await get_preview_mode_enabled()
+        if not preview_on:
             return await call_next(request)
 
         path = request.url.path
@@ -179,8 +179,9 @@ class PreviewGateMiddleware(BaseHTTPMiddleware):
         # Admin tools (scripts, internal APIs) run outside a browser and
         # cannot present a preview_token cookie; the admin key is sufficient
         # proof of identity for these callers.
+        from app.config import get_settings as _get_settings
         api_key = request.headers.get("X-API-Key", "")
-        if api_key and api_key == settings.admin_api_key:
+        if api_key and api_key == _get_settings().admin_api_key:
             return await call_next(request)
 
         token = request.cookies.get(PREVIEW_COOKIE_NAME, "")
