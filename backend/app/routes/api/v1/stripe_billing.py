@@ -24,10 +24,13 @@ import stripe.error
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+import asyncio
+
 from app.config import get_settings
 from app.database import get_db
 from app.models import FeaturedTier
 from app.services.owner_auth import SESSION_COOKIE_NAME, verify_session
+from app.services.owner_email import send_subscription_confirmed_email
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -241,6 +244,30 @@ async def stripe_webhook(request: Request) -> JSONResponse:
                 "Business %s upgraded to Pro (customer %s, sub %s)",
                 business_id, customer_id, subscription_id,
             )
+
+            # WHY: send confirmation email fire-and-forget so a slow email
+            # provider never delays the Stripe 200 response (Stripe retries
+            # on non-2xx, so we must respond quickly).  Look up owner email
+            # and business name from the just-upgraded document.
+            upgraded_biz = await db.businesses.find_one(
+                {"_id": business_id},
+                {"claimed_email": 1, "name": 1},
+            )
+            if upgraded_biz and upgraded_biz.get("claimed_email"):
+                owner_email_addr = upgraded_biz["claimed_email"]
+                biz_name = upgraded_biz.get("name", "your listing")
+                # WHY: use canonical_base_url from config (not request.base_url) because
+                # Stripe webhook calls come from Stripe's servers, not the owner's browser,
+                # so request.base_url reflects the internal container address, not the
+                # public site URL.
+                base = (get_settings().canonical_base_url or "https://miami.knowsbeauty.com").rstrip("/")
+                asyncio.create_task(
+                    send_subscription_confirmed_email(
+                        email=owner_email_addr,
+                        business_name=biz_name,
+                        dashboard_url=f"{base}/owners/me",
+                    )
+                )
         else:
             log.warning(
                 "checkout.session.completed missing business_id or subscription (event %s): "
