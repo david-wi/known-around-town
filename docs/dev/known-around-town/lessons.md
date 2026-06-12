@@ -1,5 +1,27 @@
 # known-around-town — Lessons Learned
 
+## `to_doc()` must use `exclude_none=True` — sparse-unique indexes and null slots
+
+`_crud.py`'s `to_doc()` helper converts a Pydantic model to a MongoDB document.
+Before PR #159 it called `model.model_dump(by_alias=True)` without `exclude_none=True`,
+so every Optional field that wasn't set was written to the document as explicit `null`.
+
+This silently consumed the one "null slot" that MongoDB's sparse-unique indexes allow.
+For example, `stripe_customer_id_1` is sparse+unique — documents **without** the field
+are excluded from the index, but documents **with the field set to null** are included
+and count as one duplicate of each other. The second new business added after the
+security-incident restore always failed with `DuplicateKeyError: stripe_customer_id_1
+dup key: null`, because the first new business had already consumed the one null slot.
+
+**Fix:** `model.model_dump(by_alias=True, exclude_none=True)`. Optional fields that
+aren't set are now absent from the document rather than present-and-null.
+
+**Regression test:** `test_new_business_omits_unset_optional_fields` in
+`tests/test_claim_pay_models.py`.
+
+**Symptom to watch for:** Any `DuplicateKeyError` on `_1 dup key: null` is this bug
+recurring — check `to_doc()` callers.
+
 ## Address field names: two conventions in the same codebase
 
 The `Address` Pydantic model (`models.py`) uses `state` and `postal_code`.
