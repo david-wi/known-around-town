@@ -187,6 +187,31 @@ within 5 minutes. If the site ever seems intermittently unreachable, check both
 nameservers: `dig +short miami.knowsbeauty.com @ns1.dyna-ns.net` and
 `@ns2.dyna-ns.net`.
 
+## Preview login: allow-list is silent, sessionStorage preserves state (2026-06-12)
+
+**Symptom:** "I got a code but there's no place to enter it." — David, bug report.
+
+**Two bugs in one report:**
+
+1. **Silent allow-list miss.** `preview_auth.is_allowed_email()` returns `True` only for
+   `@expertly.com`, `@webintensive.com`, and a short explicit list. The API endpoint
+   (`/api/v1/preview/login/request`) intentionally returns `{"ok": true}` regardless of
+   whether an email is on the list — this prevents probing which addresses are allowed.
+   The JS shows the code-entry step on success, so the user sees "check your email" but
+   receives nothing. Fix: add the missing email to `ALLOWED_EMAILS` in `preview_auth.py`.
+
+2. **JS state lost on navigation.** The code-entry step is shown by JavaScript after
+   the email form succeeds. All state is in-memory — if the user navigates away (to
+   their email app) and comes back, the page resets to step 1 and the code field
+   disappears. The user has a valid code they can't enter.
+   Fix: save the email in `sessionStorage` when the code step is shown; restore it on
+   page load. Clear on successful verify or "use a different email". Uses a try/catch
+   around all sessionStorage calls for private-browsing resilience.
+
+**Rule:** Any time you add a new preview login UI step that requires round-trips to
+other apps (email, SMS), save the UI state in sessionStorage so it survives app-switch.
+Consider this the "browser-back from email app" test.
+
 ## Preview gate bypass: _BYPASS_EXACT vs _BYPASS_PREFIXES
 
 `preview_gate.py` has two bypass mechanisms:
