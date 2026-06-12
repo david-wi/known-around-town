@@ -68,6 +68,22 @@ profile, stats, photos, or billing status, then each API call succeeds (not a 30
 redirect); given an anonymous salon owner who fills in the claim form and submits it,
 then the claim is received by the server (not swallowed by a preview-gate redirect).
 
+### KAT-026 — Search engine crawlers bypass preview gate · V1 · implemented
+**Persona:** David (operator), Google/search crawlers.
+`/robots.txt` and `/sitemap.xml` bypass the preview gate so search engine crawlers
+receive correct crawl signals even while the site is in private preview. During
+preview mode the `robots.txt` handler returns `Disallow: /` (signal: site is
+private, do not crawl) and the `sitemap.xml` handler returns an empty urlset (no
+business names enumerable before launch). When `PREVIEW_MODE_ENABLED=false` both
+handlers automatically return their full live-site responses — no code change needed
+at launch.
+**Acceptance:** Given `PREVIEW_MODE_ENABLED=true`, when a request is made to
+`/robots.txt`, then the response is HTTP 200 with `User-agent: *` and `Disallow: /`;
+given a request to `/sitemap.xml`, then the response is HTTP 200 with a valid but
+empty XML urlset; given `PREVIEW_MODE_ENABLED=false`, when a request is made to
+`/robots.txt`, then the response includes `Allow: /` with the sitemap URL; given a
+request to `/sitemap.xml`, then the response includes all published business URLs.
+
 ### KAT-023 — Public launch toggle · V1 · implemented
 **Persona:** David (operator).
 Setting `PREVIEW_MODE_ENABLED=false` in `/opt/known-around-town/.env` and
