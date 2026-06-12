@@ -146,16 +146,22 @@ async def sync_ratings(
                 no_match += 1
             return
 
+        update_fields: dict = {
+            "google_place_id": rating_result.place_id,
+            "google_rating": rating_result.rating,
+            "google_review_count": rating_result.review_count,
+            "google_rating_synced_at": datetime.now(timezone.utc),
+        }
+        # WHY: only overwrite hours when Places returned data. An empty list means
+        # Google had no hour data for this business — preserving any manually-entered
+        # hours is better than blanking them. A non-empty list from the API is
+        # authoritative and replaces whatever was there before.
+        if rating_result.hours:
+            update_fields["hours"] = [h.model_dump() for h in rating_result.hours]
+
         await db.businesses.update_one(
             {"_id": biz["_id"]},
-            {
-                "$set": {
-                    "google_place_id": rating_result.place_id,
-                    "google_rating": rating_result.rating,
-                    "google_review_count": rating_result.review_count,
-                    "google_rating_synced_at": datetime.now(timezone.utc),
-                }
-            },
+            {"$set": update_fields},
         )
         updated += 1
 

@@ -1,4 +1,4 @@
-"""Google Places API client for fetching business ratings.
+"""Google Places API client for fetching business ratings and hours.
 
 WHY this module exists: Showing a salon's Google star rating and review count is
 the single highest-value trust signal we can add to the directory. Consumers
@@ -8,20 +8,25 @@ also enables Google to show star snippets in search results, which increases
 click-through rate by 15–30% for queries where the snippets appear (approximate
 industry estimate; varies by query type and market).
 
-Ratings are cached in the business document so page loads never block on a live
-API call. The admin sync endpoint refreshes them on demand.
+Opening hours are also fetched alongside ratings: they enable the
+openingHoursSpecification JSON-LD block (which powers "Open · Closes 6pm"
+in Google's Knowledge Panel) and the hours display in the business listing itself.
+
+Ratings and hours are cached in the business document so page loads never block
+on a live API call. The admin sync endpoint refreshes them on demand.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from typing import Optional
+from typing import List, Optional
 
 import httpx
 
 from app.config import get_settings
+from app.models import HoursEntry
 
 log = logging.getLogger(__name__)
 
@@ -45,12 +50,18 @@ _TIMEOUT_SECONDS = 8
 # omit city or business-type words that the Google listing includes.
 _NAME_SIMILARITY_THRESHOLD = 0.40
 
+# WHY: Google Places day-of-week integer (0=Sunday … 6=Saturday) maps to
+# HoursEntry.day strings. This lets us translate the API's numeric format
+# into the model's named-day format without a conditional chain.
+_DAY_INT_TO_STR = {0: "sun", 1: "mon", 2: "tue", 3: "wed", 4: "thu", 5: "fri", 6: "sat"}
+
 
 @dataclass
 class PlaceRating:
     place_id: str
-    rating: float        # 1.0 – 5.0
+    rating: float                    # 1.0 – 5.0
     review_count: int
+    hours: List[HoursEntry] = field(default_factory=list)  # empty = not available
 
 
 def is_configured() -> bool:
@@ -64,7 +75,7 @@ async def lookup_rating(
     state: str = "FL",
     existing_place_id: Optional[str] = None,
 ) -> Optional[PlaceRating]:
-    """Return the Google rating for a business, or None on any failure.
+    """Return the Google rating (and hours) for a business, or None on any failure.
 
     When ``existing_place_id`` is provided, uses the faster Place Details
     endpoint instead of a name-based text search.
@@ -92,6 +103,54 @@ def _name_similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
 
+def _parse_hours(opening_hours: dict) -> List[HoursEntry]:
+    """Convert a Places API opening_hours object to a HoursEntry list.
+
+    Returns an empty list when hours are unknown so callers can distinguish
+    "unknown" (empty list → skip update) from "closed this day" (entry with
+    closed=True → store explicitly).
+
+    WHY periods not weekday_text: periods gives machine-readable open/close
+    times we can store and re-render in any format; weekday_text is display-only
+    and may be localised.
+
+    WHY return [] when day_map is empty after parsing: an empty periods list
+    means Google has no hour data. Returning [] preserves any manually-entered
+    hours rather than incorrectly overwriting them with "always closed".
+    """
+    if not opening_hours:
+        return []
+
+    periods = opening_hours.get("periods") or []
+    day_map: dict[int, tuple[str, str]] = {}
+    for period in periods:
+        open_info = period.get("open") or {}
+        close_info = period.get("close") or {}
+        day_int = open_info.get("day")
+        opens = open_info.get("time", "")    # "0900"
+        closes = close_info.get("time", "")  # "1700"
+        if day_int is None or not opens or not closes:
+            continue
+        # WHY: format "0900" → "09:00" to match HoursEntry convention
+        opens_fmt = f"{opens[:2]}:{opens[2:]}" if len(opens) == 4 else opens
+        closes_fmt = f"{closes[:2]}:{closes[2:]}" if len(closes) == 4 else closes
+        day_map[day_int] = (opens_fmt, closes_fmt)
+
+    # WHY: no valid open periods → hours unknown, not "all closed"
+    if not day_map:
+        return []
+
+    result: List[HoursEntry] = []
+    for day_int in range(7):
+        day_str = _DAY_INT_TO_STR[day_int]
+        if day_int in day_map:
+            opens_fmt, closes_fmt = day_map[day_int]
+            result.append(HoursEntry(day=day_str, opens_at=opens_fmt, closes_at=closes_fmt))
+        else:
+            result.append(HoursEntry(day=day_str, closed=True))
+    return result
+
+
 async def _search_and_fetch(
     client: httpx.AsyncClient,
     business_name: str,
@@ -99,13 +158,18 @@ async def _search_and_fetch(
     state: str,
     api_key: str,
 ) -> Optional[PlaceRating]:
-    """Look up a business by name + city and return its rating.
+    """Look up a business by name + city, then fetch its rating and hours.
 
     WHY no `type` filter: a `type=beauty_salon` filter would silently exclude
     nail salons, barbershops, spas, waxing studios, and other business types
     that legitimately appear in a beauty directory. Leaving the type open and
     relying on name + city matching gives accurate results for the full range
     of beauty businesses.
+
+    WHY delegate to _fetch_by_place_id after text search: opening_hours is
+    not available in text search results — only Place Details returns it.
+    The extra Details call only occurs on first-time discovery; subsequent
+    syncs skip the text search entirely because place_id is already cached.
     """
     query = f"{business_name} {city} {state}"
     try:
@@ -126,8 +190,6 @@ async def _search_and_fetch(
 
     # WHY: take the first result (highest-relevance match), but guard against
     # a completely wrong business ranking first for a short or common name.
-    # If the top result's name has below-threshold similarity to ours, we
-    # skip it rather than storing a mismatched rating.
     top = results[0]
     top_name = top.get("name", "")
     similarity = _name_similarity(business_name, top_name)
@@ -145,14 +207,8 @@ async def _search_and_fetch(
         log.warning("Places result for %r missing place_id — skipping", query)
         return None
 
-    rating_val = top.get("rating")
-    if rating_val is None:
-        return None
-    return PlaceRating(
-        place_id=place_id,
-        rating=float(rating_val),
-        review_count=int(top.get("user_ratings_total", 0)),
-    )
+    # Fetch details to get opening_hours (not available in text search results).
+    return await _fetch_by_place_id(client, place_id, api_key)
 
 
 async def _fetch_by_place_id(
@@ -160,14 +216,16 @@ async def _fetch_by_place_id(
     place_id: str,
     api_key: str,
 ) -> Optional[PlaceRating]:
-    """Refresh rating for a known place_id (faster, no name-match uncertainty)."""
+    """Refresh rating and hours for a known place_id (faster, no name-match uncertainty)."""
     try:
         r = await client.get(
             _PLACES_DETAILS_URL,
             params={
                 "place_id": place_id,
-                # WHY: only request the two fields we need to minimise billed SKU cost
-                "fields": "rating,user_ratings_total",
+                # WHY: opening_hours added alongside rating fields to get both in
+                # one Details call. The field adds minimal response size but enables
+                # structured-data hours and the hours display on listing pages.
+                "fields": "rating,user_ratings_total,opening_hours",
                 "key": api_key,
             },
         )
@@ -185,4 +243,5 @@ async def _fetch_by_place_id(
         place_id=place_id,
         rating=float(rating_val),
         review_count=int(result.get("user_ratings_total", 0)),
+        hours=_parse_hours(result.get("opening_hours")),
     )

@@ -16,7 +16,6 @@ class TestIsConfigured:
             google_places_api_key=""
         )):
             from app.services import google_places
-            # Force reload of the function using the patched settings
             assert google_places.is_configured() is False
 
     def test_true_when_key_set(self):
@@ -37,17 +36,20 @@ class TestLookupRating:
 
     @pytest.mark.asyncio
     async def test_returns_rating_from_text_search(self, respx_mock):
-        """lookup_rating without existing_place_id uses Text Search."""
+        """lookup_rating without existing_place_id uses Text Search then Place Details.
+
+        WHY both endpoints are mocked: _search_and_fetch finds the place_id via
+        text search, then calls _fetch_by_place_id to get opening_hours (which
+        text search results do not include). The test verifies the full two-call flow.
+        """
         from app.services import google_places
 
         with patch("app.services.google_places.get_settings") as mock_settings:
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
-            # Mock the text search response
-            search_pattern = respx_mock.get(
+            respx_mock.get(
                 "https://maps.googleapis.com/maps/api/place/textsearch/json"
-            )
-            search_pattern.return_value = httpx.Response(
+            ).return_value = httpx.Response(
                 200,
                 json={
                     "results": [
@@ -61,6 +63,23 @@ class TestLookupRating:
                     "status": "OK",
                 },
             )
+            respx_mock.get(
+                "https://maps.googleapis.com/maps/api/place/details/json"
+            ).return_value = httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "rating": 4.7,
+                        "user_ratings_total": 312,
+                        "opening_hours": {
+                            "periods": [
+                                {"open": {"day": 1, "time": "0900"}, "close": {"day": 1, "time": "1800"}},
+                            ]
+                        },
+                    },
+                    "status": "OK",
+                },
+            )
 
             result = await google_places.lookup_rating("Test Salon", "Miami")
 
@@ -68,6 +87,11 @@ class TestLookupRating:
         assert result.place_id == "ChIJ_place_123"
         assert result.rating == 4.7
         assert result.review_count == 312
+        assert len(result.hours) == 7
+        monday = next(h for h in result.hours if h.day == "mon")
+        assert monday.opens_at == "09:00"
+        assert monday.closes_at == "18:00"
+        assert monday.closed is False
 
     @pytest.mark.asyncio
     async def test_returns_none_on_no_results(self, respx_mock):
@@ -109,17 +133,15 @@ class TestLookupRating:
         with patch("app.services.google_places.get_settings") as mock_settings:
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
-            # Details endpoint should be called
             respx_mock.get(
                 "https://maps.googleapis.com/maps/api/place/details/json"
             ).return_value = httpx.Response(
                 200,
                 json={
-                    "result": {"rating": 4.9, "user_ratings_total": 800},
+                    "result": {"rating": 4.9, "user_ratings_total": 800, "opening_hours": None},
                     "status": "OK",
                 },
             )
-            # Text Search should NOT be called
             respx_mock.get(
                 "https://maps.googleapis.com/maps/api/place/textsearch/json"
             ).return_value = httpx.Response(400, json={"error": "should not call this"})
@@ -134,8 +156,8 @@ class TestLookupRating:
         assert result.review_count == 800
 
     @pytest.mark.asyncio
-    async def test_returns_none_when_result_has_no_rating(self, respx_mock):
-        """lookup_rating returns None when the matched place has no rating."""
+    async def test_returns_none_when_place_details_has_no_rating(self, respx_mock):
+        """lookup_rating returns None when Place Details has no rating (brand-new business)."""
         from app.services import google_places
 
         with patch("app.services.google_places.get_settings") as mock_settings:
@@ -150,10 +172,115 @@ class TestLookupRating:
                     "status": "OK",
                 },
             )
+            respx_mock.get(
+                "https://maps.googleapis.com/maps/api/place/details/json"
+            ).return_value = httpx.Response(
+                200,
+                json={"result": {}, "status": "OK"},
+            )
 
             result = await google_places.lookup_rating("New Salon", "Miami")
 
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_hours_populated_when_place_has_opening_hours(self, respx_mock):
+        """Hours are returned as a full 7-day list when Place Details includes opening_hours."""
+        from app.services import google_places
+
+        with patch("app.services.google_places.get_settings") as mock_settings:
+            mock_settings.return_value.google_places_api_key = "AIza-test-key"
+
+            respx_mock.get(
+                "https://maps.googleapis.com/maps/api/place/details/json"
+            ).return_value = httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "rating": 4.5,
+                        "user_ratings_total": 200,
+                        "opening_hours": {
+                            "periods": [
+                                {"open": {"day": 1, "time": "0900"}, "close": {"day": 1, "time": "1800"}},
+                                {"open": {"day": 2, "time": "0900"}, "close": {"day": 2, "time": "1800"}},
+                                {"open": {"day": 5, "time": "1000"}, "close": {"day": 5, "time": "2000"}},
+                                {"open": {"day": 6, "time": "1000"}, "close": {"day": 6, "time": "1800"}},
+                            ]
+                        },
+                    },
+                    "status": "OK",
+                },
+            )
+
+            result = await google_places.lookup_rating(
+                "Any Salon", "Miami", existing_place_id="ChIJ_known"
+            )
+
+        assert result is not None
+        assert len(result.hours) == 7
+        open_days = sorted(h.day for h in result.hours if not h.closed)
+        assert open_days == ["fri", "mon", "sat", "tue"]
+        closed_days = sorted(h.day for h in result.hours if h.closed)
+        assert closed_days == ["sun", "thu", "wed"]
+        fri = next(h for h in result.hours if h.day == "fri")
+        assert fri.opens_at == "10:00"
+        assert fri.closes_at == "20:00"
+
+    @pytest.mark.asyncio
+    async def test_hours_empty_when_opening_hours_has_empty_periods(self, respx_mock):
+        """Hours list is [] when opening_hours.periods is empty (Google has no data).
+
+        WHY: empty periods means Google doesn't know the hours, not that the
+        business is always closed. Returning [] tells the sync to leave any
+        manually-entered hours alone rather than overwriting them with 7 closed days.
+        """
+        from app.services import google_places
+
+        with patch("app.services.google_places.get_settings") as mock_settings:
+            mock_settings.return_value.google_places_api_key = "AIza-test-key"
+
+            respx_mock.get(
+                "https://maps.googleapis.com/maps/api/place/details/json"
+            ).return_value = httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "rating": 4.0,
+                        "user_ratings_total": 50,
+                        "opening_hours": {"periods": []},
+                    },
+                    "status": "OK",
+                },
+            )
+
+            result = await google_places.lookup_rating(
+                "Any Salon", "Miami", existing_place_id="ChIJ_empty_periods"
+            )
+
+        assert result is not None
+        assert result.hours == []
+
+    @pytest.mark.asyncio
+    async def test_hours_empty_when_place_has_no_opening_hours(self, respx_mock):
+        """Hours list is [] when Place Details has no opening_hours field at all."""
+        from app.services import google_places
+
+        with patch("app.services.google_places.get_settings") as mock_settings:
+            mock_settings.return_value.google_places_api_key = "AIza-test-key"
+
+            respx_mock.get(
+                "https://maps.googleapis.com/maps/api/place/details/json"
+            ).return_value = httpx.Response(
+                200,
+                json={"result": {"rating": 4.0, "user_ratings_total": 50}, "status": "OK"},
+            )
+
+            result = await google_places.lookup_rating(
+                "Any Salon", "Miami", existing_place_id="ChIJ_no_hours"
+            )
+
+        assert result is not None
+        assert result.hours == []
 
 
 # ── admin sync endpoint tests ────────────────────────────────────────────────
@@ -165,7 +292,6 @@ def admin_client(seeded_db):
     import os
 
     client = TestClient(app)
-    # Set the admin cookie so require_admin passes
     client.cookies.set(
         "mkb_admin",
         "test-admin-token",
@@ -181,10 +307,6 @@ class TestSyncPage:
         from fastapi.testclient import TestClient
         from app.config import get_settings
 
-        # WHY: require_admin only gates requests when ADMIN_API_KEY is set;
-        # with no key the gate is intentionally open for local dev. Setting
-        # the env var here and clearing the lru_cache exercises the real
-        # production code path.
         monkeypatch.setenv("ADMIN_API_KEY", "test-secret")
         get_settings.cache_clear()
 
@@ -193,7 +315,6 @@ class TestSyncPage:
             r = client.get("/admin/sync")
             assert r.status_code == 401
         finally:
-            # Always restore — subsequent tests depend on the open gate
             monkeypatch.delenv("ADMIN_API_KEY", raising=False)
             get_settings.cache_clear()
 
@@ -202,7 +323,6 @@ class TestSyncPage:
         from fastapi.testclient import TestClient
         import app.routes.api.v1._auth as _auth_module
 
-        # Bypass the require_admin dependency
         monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
 
         client = TestClient(app)
@@ -228,12 +348,6 @@ class TestSyncPage:
         client = TestClient(app)
         r = client.get("/admin/sync")
         assert r.status_code == 200
-        # The seeded_db includes live businesses (status="live"). The coverage
-        # section should show a non-zero total — if it shows 0, the status filter
-        # is querying the wrong value.
-        #
-        # Extract the number immediately before "TOTAL SALONS" in the HTML.
-        # The template renders: <div ...>NN</div><div ...>TOTAL SALONS</div>
         match = re.search(r">(\d+)<[^>]+>[^<]*TOTAL SALONS", r.text, re.IGNORECASE)
         if match:
             assert int(match.group(1)) > 0, (
@@ -266,8 +380,6 @@ class TestSyncRatingsPost:
         monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: False)
 
-        # WHY follow_redirects=False: we want to inspect the redirect itself,
-        # not the page it leads to.
         client = TestClient(app, follow_redirects=False)
         r = client.post("/admin/sync/ratings")
         assert r.status_code == 303
@@ -295,7 +407,6 @@ class TestSyncRatingsPost:
 
         client = TestClient(app, follow_redirects=False)
         r = client.post("/admin/sync/ratings")
-        # Should redirect to sync page with result summary
         assert r.status_code == 303
         assert "/admin/sync" in r.headers["location"]
         assert "updated=" in r.headers["location"]
