@@ -30,12 +30,16 @@ flag set, then 147 businesses are seeded.
 ### KAT-054 — Admin settings page · V1 · implemented
 **Persona:** David (operator), Posey.
 A web interface at `/admin/settings` where David or Posey can toggle feature flags
-(initially: Marketing AI enabled/disabled) without SSH or command-line access.
+and manage site-wide settings without SSH or command-line access.
 Settings are stored in a `site_settings` MongoDB collection and take precedence
-over environment variables so the toggle works instantly without a container restart.
-**Acceptance:** Given David at `/admin/settings`, when he toggles Marketing AI and
-saves, then the change takes effect immediately for all new API requests (no restart
-needed); the setting persists across container restarts.
+over environment variables so changes take effect instantly without a container restart.
+
+Controls (as of PR #191, PR #197):
+- **Marketing AI tools** — enables/disables the AI caption and ad copy generators
+- **Site is private (preview mode)** — when on, only preview invitees can access the site; the status badge shows amber (private) or green (live). Turning it off is the launch action. robots.txt and sitemap.xml also update automatically so Google gets the correct crawl signal.
+- **Google Search Console verification** — paste the Google-provided code; the HTML meta tag appears on every page immediately.
+
+**Acceptance:** Given David at `/admin/settings`, when he changes any setting and saves, then the change takes effect immediately for all new requests (no restart needed); settings persist across container restarts.
 
 ### KAT-053 — Admin API key authentication · V1 · implemented
 **Persona:** David (operator), Posey.
