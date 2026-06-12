@@ -217,19 +217,34 @@ class TestBypassPaths:
         assert _is_bypassed("/owners")
         assert _is_bypassed("/owners")   # same path regardless of ?slug= param
 
-    def test_owner_login_not_bypassed(self):
-        # WHY: /owners/login is the owner dashboard sign-in page for existing
-        # owners managing their listings — they are internal users who must also
-        # pass the preview gate. The claim-form bypass uses an exact path match
-        # ("/owners") specifically so this sub-path stays gated.
+    def test_owner_login_bypassed(self):
+        # WHY: verified salon owners receive a login link by email after their
+        # claim is approved. They have no preview account and must be able to
+        # reach /owners/login without being redirected to the preview gate.
+        # The route has its own session check and redirects unauthenticated
+        # visitors to /owners/login — bypassing the preview gate here does not
+        # expose any owner data to the general public.
         from app.middleware.preview_gate import _is_bypassed
-        assert not _is_bypassed("/owners/login")
+        assert _is_bypassed("/owners/login")
 
-    def test_owner_dashboard_not_bypassed(self):
-        # WHY: /owners/me (the owner dashboard) is gated — only authenticated
-        # owners may view it. Only the top-level claim form (/owners) is open.
+    def test_owner_login_api_bypassed(self):
+        # WHY: the /owners/login page makes fetch() calls to these API endpoints
+        # to send and verify the OTP code. Without bypassing them, the browser's
+        # fetch() receives a 302 redirect instead of JSON and the login silently
+        # fails — the form appears to do nothing.
         from app.middleware.preview_gate import _is_bypassed
-        assert not _is_bypassed("/owners/me")
+        assert _is_bypassed("/api/v1/owner/login/request")
+        assert _is_bypassed("/api/v1/owner/login/verify")
+
+    def test_owner_me_bypassed(self):
+        # WHY: /owners/me is the owner dashboard. It has its own auth check:
+        # if the owner has no session cookie it redirects to /owners/login.
+        # Bypassing the preview gate is safe — unauthenticated visitors just
+        # get sent to /owners/login rather than seeing any owner data.
+        # Without this bypass, an owner who just logged in is intercepted by
+        # the preview gate before they can reach their dashboard.
+        from app.middleware.preview_gate import _is_bypassed
+        assert _is_bypassed("/owners/me")
 
 
 class TestMiddlewareRedirection:

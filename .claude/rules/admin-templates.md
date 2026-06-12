@@ -34,3 +34,24 @@ built. See `claims_admin.py` for the canonical pattern.
 
 Admin routers must be registered BEFORE the public SSR catch-all in `main.py`.
 The public router catches broad URL patterns and will swallow `/admin/*` if registered first.
+
+## Admin API key bypass (preview gate)
+
+The preview gate middleware now allows requests with a valid `X-API-Key` header
+to pass through without a `preview_token` cookie. This means admin scripts can
+call any API endpoint directly from outside a browser:
+
+```bash
+curl -H "X-API-Key: <ADMIN_API_KEY>" https://miami.knowsbeauty.com/api/v1/businesses/by-slug/<city_id>/<slug>
+```
+
+The admin key is in `/opt/known-around-town/.env` as `ADMIN_API_KEY`. The
+city UUID for Miami is `c9a53e0a-638c-43f9-96c0-d72a6e830c5c`.
+
+## Seed data JSON safety
+
+`backend/seed/_real_businesses.json` contains Unicode curly-quote characters
+inside string values (e.g., `"invisible cut"`). The Edit tool corrupts this
+file by converting ASCII `"` delimiters to curly quotes when it matches a
+block containing them. Always use Python's `json` module (load → modify → dump)
+to patch this file — never the Edit tool.

@@ -41,6 +41,21 @@ outside a browser session.
 it is not redirected to `/preview-login` and proceeds to route-level auth;
 given an invalid or missing key, then the gate redirect applies as normal.
 
+### KAT-025 — Owner portal bypasses preview gate · V1 · implemented
+**Persona:** Salon owner (verified claim).
+After their claim is verified, a salon owner receives a login link by email pointing to
+`/owners/login`. They have no preview account. The preview gate must not intercept their
+login or dashboard session.
+Bypassed paths: `/owners/login` (the sign-in page), `/owners/me` (the dashboard — has its
+own session check), `/api/v1/owner/login/` (OTP request and verify endpoints called by the
+login form).
+**Acceptance:** Given `PREVIEW_MODE_ENABLED=true` and a salon owner who received a
+verified-claim email with a login link, when they click the link, then they reach
+`/owners/login` without being redirected to `/preview-login`; given a valid owner
+session cookie, when they navigate to `/owners/me`, then they see their dashboard
+without a preview-gate redirect; given no owner session cookie, when they navigate to
+`/owners/me`, then the route itself redirects them to `/owners/login` (not the preview gate).
+
 ### KAT-023 — Public launch toggle · V1 · implemented
 **Persona:** David (operator).
 Setting `PREVIEW_MODE_ENABLED=false` in `/opt/known-around-town/.env` and

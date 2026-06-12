@@ -14,7 +14,15 @@ Paths that bypass the gate:
   - /favicon.*      — browser favicon probes
   - /owners         — owner claim form (exact path only); linked from outreach emails
                       sent to external salon owners who have no preview account and
-                      should never need one. /owners/login stays gated.
+                      should never need one.
+  - /owners/login   — owner dashboard sign-in; verified salon owners receive a login
+                      link by email after their claim is approved. They have no preview
+                      account and should be able to log in without one.
+  - /owners/me      — owner dashboard; has its own auth check that redirects to
+                      /owners/login if no session cookie is present.
+  - /api/v1/owner/login/*  — the OTP request and verify API endpoints called by
+                      the owner login page. Must be reachable by an unauthenticated
+                      browser (the login form itself is making these calls).
 
 Design choice — middleware vs. route dependency:
   WHY middleware: a route-level dependency only protects routes we explicitly
@@ -51,14 +59,26 @@ _BYPASS_PREFIXES = (
     "/health",              # container health checks from the load balancer
     "/assets/",             # CSS/JS/images needed by the login page itself
     "/favicon",             # browser favicon probes
+    # WHY: owner login API endpoints must be reachable by an unauthenticated
+    # browser — the /owners/login page calls these to send and verify OTP codes.
+    # Without this bypass the login form's fetch() calls are redirected to
+    # /preview-login before they reach the API, so the owner gets a 302 back
+    # from a JSON fetch and the login silently fails.
+    "/api/v1/owner/login/",
 )
 
 # WHY: exact-path bypass for paths where sub-paths must stay gated. The claim
 # form lives at /owners (with optional query params like ?slug=salon-name).
-# /owners/login is the authenticated owner dashboard sign-in and must remain
-# gated — so a prefix match on "/owners" would be too broad.
+# /owners/login and /owners/me are the owner dashboard sign-in and portal;
+# verified salon owners receive a login link by email (no preview account) and
+# must be able to sign in and access their dashboard without a preview cookie.
+# The owner dashboard has its own auth check that redirects to /owners/login
+# when no owner session cookie is present, so bypassing the preview gate here
+# is safe — an unauthenticated visitor still cannot see any owner data.
 _BYPASS_EXACT = frozenset({
     "/owners",
+    "/owners/login",
+    "/owners/me",
 })
 
 
