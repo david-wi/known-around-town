@@ -137,7 +137,7 @@
     } catch (e) { return '/'; }
   })();
 
-  // WHY: persist code-request state in sessionStorage so if the user
+  // WHY: persist code-request state in localStorage so if the user
   // navigates to their email app and comes back, the code entry step
   // is still shown rather than resetting to the email form.
   var STORAGE_KEY = 'mkb_preview_email';
@@ -163,18 +163,18 @@
     codeForm.dataset.email = email;
     stepEmail.classList.add('hidden');
     stepCode.classList.remove('hidden');
-    try { sessionStorage.setItem(STORAGE_KEY, email); } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, email); } catch (e) {}
     setTimeout(function () { codeInput.focus(); }, 50);
   }
 
   function clearCodeStep() {
-    try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
   }
 
   // On load: if we already requested a code this session, restore step 2.
   (function restoreState() {
     try {
-      var saved = sessionStorage.getItem(STORAGE_KEY);
+      var saved = localStorage.getItem(STORAGE_KEY);
       if (saved) { showCodeStep(saved); }
     } catch (e) {}
   })();
@@ -230,7 +230,7 @@
       var data = null;
       try { data = await r.json(); } catch (e) {}
       if (!r.ok) {
-        showError(codeError, (data && data.detail) || ‘That code did not match. Please try again.’);
+        showError(codeError, (data && data.detail) || 'That code did not match. Please try again.');
         setLoading(codeSubmit, false);
         return;
       }
