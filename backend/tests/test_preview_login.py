@@ -184,6 +184,15 @@ class TestBypassPaths:
         from app.middleware.preview_gate import _is_bypassed
         assert _is_bypassed("/api/v1/billing/webhook")
 
+    def test_billing_checkout_bypassed(self):
+        # WHY: authenticated owners have an owner-session cookie but no preview
+        # cookie. The checkout and portal buttons on the owner dashboard POST to
+        # these endpoints; without the bypass they receive a 302 HTML redirect
+        # instead of JSON and the Stripe flow never starts.
+        from app.middleware.preview_gate import _is_bypassed
+        assert _is_bypassed("/api/v1/billing/checkout")
+        assert _is_bypassed("/api/v1/billing/portal")
+
     def test_health_bypassed(self):
         from app.middleware.preview_gate import _is_bypassed
         assert _is_bypassed("/health")
@@ -235,6 +244,43 @@ class TestBypassPaths:
         from app.middleware.preview_gate import _is_bypassed
         assert _is_bypassed("/api/v1/owner/login/request")
         assert _is_bypassed("/api/v1/owner/login/verify")
+
+    def test_owner_dashboard_api_bypassed(self):
+        # WHY: authenticated owners have an owner-session cookie but no preview
+        # cookie. Every fetch() from the dashboard (profile, stats, photos,
+        # logout, inquiries) hits /api/v1/owner/*. Without the bypass they all
+        # receive a 302 HTML redirect and the entire dashboard is non-functional.
+        # Each endpoint enforces owner-session auth at the route level, so
+        # bypassing the preview gate does not expose owner data to the public.
+        from app.middleware.preview_gate import _is_bypassed
+        assert _is_bypassed("/api/v1/owner/profile")
+        assert _is_bypassed("/api/v1/owner/stats")
+        assert _is_bypassed("/api/v1/owner/photos")
+        assert _is_bypassed("/api/v1/owner/photos/some-id")
+        assert _is_bypassed("/api/v1/owner/inquiries")
+        assert _is_bypassed("/api/v1/owner/logout")
+
+    def test_claim_submission_api_bypassed(self):
+        # WHY: the /owners claim form posts to /api/v1/claims. Salon owners who
+        # fill in the form have no preview account; without the bypass their claim
+        # submission receives a 302 HTML redirect instead of a JSON response and
+        # the claim silently fails.
+        from app.middleware.preview_gate import _is_bypassed
+        assert _is_bypassed("/api/v1/claims")
+
+    def test_owner_lead_capture_api_bypassed(self):
+        # WHY: the email lead-capture form on /owners posts to /api/v1/owner-leads.
+        # Same situation as the claim form — no preview cookie for outreach recipients.
+        from app.middleware.preview_gate import _is_bypassed
+        assert _is_bypassed("/api/v1/owner-leads")
+
+    def test_marketing_ai_api_bypassed(self):
+        # WHY: the AI caption and ad-copy generators on the owner dashboard post to
+        # /api/v1/marketing-ai/*. These require an active owner session at the route
+        # level; bypassing the preview gate only removes the preview-cookie check.
+        from app.middleware.preview_gate import _is_bypassed
+        assert _is_bypassed("/api/v1/marketing-ai/instagram-caption")
+        assert _is_bypassed("/api/v1/marketing-ai/ad-copy")
 
     def test_owner_me_bypassed(self):
         # WHY: /owners/me is the owner dashboard. It has its own auth check:
