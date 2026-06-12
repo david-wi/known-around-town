@@ -20,9 +20,11 @@ Auth requirements (owner sessions are live):
   presence of ``stripe_subscription_id`` on the business document (402 if
   not subscribed — the dashboard shows an upgrade prompt on 402).
 
-Feature flag: when ``MARKETING_AI_ENABLED`` is falsy the routes return 404,
-hiding the feature entirely. This lets stage and production share the same
-image while gating the feature.
+Feature flag: when the feature is disabled the routes return 404, hiding
+the feature entirely. The flag is read from the ``site_settings`` MongoDB
+collection (set via the admin settings web page), falling back to the
+``MARKETING_AI_ENABLED`` env var so behaviour is unchanged before the
+admin page is first used.
 """
 
 from __future__ import annotations
@@ -36,6 +38,7 @@ from pydantic import BaseModel, Field
 from app.database import get_db
 from app.services import ai_caption
 from app.services.owner_auth import SESSION_COOKIE_NAME, verify_session
+from app.services.site_settings import get_marketing_ai_enabled
 
 log = logging.getLogger(__name__)
 
@@ -78,11 +81,15 @@ class InstagramCaptionResponse(BaseModel):
     business_id: str
 
 
-def _feature_required() -> None:
+async def _feature_required() -> None:
     """Common feature-flag gate, raised as 404 (not 403) to fully hide
     the feature in environments where it is not enabled.
+
+    WHY: async so it can query the site_settings collection, which lets
+    the admin web page toggle the flag without a server restart. Falls back
+    to the MARKETING_AI_ENABLED env var when no DB value has been set.
     """
-    if not ai_caption.feature_enabled():
+    if not await get_marketing_ai_enabled():
         raise HTTPException(status_code=404, detail="Not found")
 
 
@@ -180,7 +187,7 @@ async def generate_instagram_caption(
     Returns 404 when the feature flag is off or the business doesn't exist.
     Returns 502 when the AI gateway is unreachable.
     """
-    _feature_required()
+    await _feature_required()
 
     business = await _require_pro_owner(request, body.business_id)
     city_id = business.get("city_id")
@@ -289,7 +296,7 @@ async def generate_ad_copy(
     Returns 404 when the feature flag is off or the business doesn't exist.
     Returns 502 when the AI gateway is unreachable.
     """
-    _feature_required()
+    await _feature_required()
 
     business = await _require_pro_owner(request, body.business_id)
     city_id = business.get("city_id")

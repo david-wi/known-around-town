@@ -1,0 +1,72 @@
+{% extends "admin/_layout.html" %}
+
+{% block title %}Settings · Admin · Known Around Town{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
+
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold text-stone-900">Site Settings</h1>
+    <p class="text-stone-500 mt-1 text-sm">Toggle features and options for Miami Knows Beauty without editing the server.</p>
+  </div>
+
+  {% if saved %}
+  <div class="mb-6 flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-emerald-800 text-sm">
+    <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+    </svg>
+    Settings saved successfully.
+  </div>
+  {% endif %}
+
+  <form method="post" action="/admin/settings">
+
+    <div class="bg-white border border-stone-200 rounded-xl divide-y divide-stone-100">
+
+      {# ── Marketing AI ── #}
+      <div class="px-6 py-5 flex items-start justify-between gap-6">
+        <div class="flex-1 min-w-0">
+          <label for="toggle-marketing-ai" class="block font-medium text-stone-900 cursor-pointer">
+            Marketing AI tools
+          </label>
+          <p class="mt-1 text-sm text-stone-500">
+            Enables the Instagram caption and ad copy generators for Featured subscribers.
+            Subscribers who have paid $29/month can use these tools from their dashboard.
+            When off, these tools return "not found" — subscribers see a silent failure.
+          </p>
+          <p class="mt-1 text-xs text-stone-400">
+            Controlled by <code class="font-mono bg-stone-100 px-1 rounded">MARKETING_AI_ENABLED_PROD</code>
+            env var as a fallback; this toggle overrides it without a server restart.
+          </p>
+        </div>
+        <div class="flex-shrink-0 pt-1">
+          {# Toggle switch — uses a checkbox under the hood #}
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              id="toggle-marketing-ai"
+              name="marketing_ai_enabled"
+              value="on"
+              {% if marketing_ai_enabled %}checked{% endif %}
+              class="sr-only peer"
+            >
+            <div class="w-11 h-6 bg-stone-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-rose-400 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="mt-6 flex justify-end">
+      <button
+        type="submit"
+        class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium transition-colors"
+      >
+        Save settings
+      </button>
+    </div>
+
+  </form>
+
+</div>
+{% endblock %}

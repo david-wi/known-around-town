@@ -27,6 +27,16 @@ Normal deploys do NOT run seeds.
 runs, then it exits with an error and does not modify production data; given the
 flag set, then 147 businesses are seeded.
 
+### KAT-054 — Admin settings page · V1 · implemented
+**Persona:** David (operator), Posey.
+A web interface at `/admin/settings` where David or Posey can toggle feature flags
+(initially: Marketing AI enabled/disabled) without SSH or command-line access.
+Settings are stored in a `site_settings` MongoDB collection and take precedence
+over environment variables so the toggle works instantly without a container restart.
+**Acceptance:** Given David at `/admin/settings`, when he toggles Marketing AI and
+saves, then the change takes effect immediately for all new API requests (no restart
+needed); the setting persists across container restarts.
+
 ### KAT-053 — Admin API key authentication · V1 · implemented
 **Persona:** David (operator), Posey.
 Write endpoints (`POST`, `PATCH`, `DELETE` on business resources) require an
