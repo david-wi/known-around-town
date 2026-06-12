@@ -83,7 +83,7 @@ FastAPI middleware (`app.middleware.preview_gate.PreviewGateMiddleware`) wraps e
 1. Checks for a valid `preview_token` cookie (32-byte hex, stored as SHA-256 hash in `preview_sessions`)
 2. If missing/invalid → redirects to `/preview-login`
 3. Bypassed routes: `/health`, `/api/v1/billing/webhook`, `/preview-login`, `/preview-login/…`, `/assets/…`, `/media/…`
-4. Allowed emails: `@expertly.com`, `@webintensive.com`, `aggiewaggie06@gmail.com`, `karissa.ostoski@gmail.com`
+4. Allowed emails: `@expertly.com`, `@webintensive.com`, `aggiewaggie06@gmail.com`, `karissa.ostoski@gmail.com`, `david@bodnick.com`, `david@wisdev.com`
 
 To disable the gate (public launch): set `PREVIEW_MODE_ENABLED=false` in `/opt/known-around-town/.env` and restart the container. No code deploy needed.
 
