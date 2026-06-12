@@ -1375,47 +1375,6 @@ async def pricing_page(request: Request) -> HTMLResponse:
     return _templates.TemplateResponse("pricing.html", ctx)
 
 
-@router.get("/walkthrough", response_class=HTMLResponse)
-async def walkthrough_page(request: Request) -> HTMLResponse:
-    """Shareable owner-journey explainer page.
-
-    WHY: this page is sent to salon owners in cold-outreach emails as a quick
-    visual overview of the 6-step path from "your listing is already here" to
-    "Featured profile with AI tools". It must be publicly accessible without a
-    preview account, so it is added to the preview gate bypass list in
-    middleware/preview_gate.py alongside /owners and /pricing.
-    """
-    tenant = await _require_tenant(request)
-    ctx = await _base_context(request, tenant)
-    city_name = tenant.city.get("name", "") if tenant.city else ""
-    vertical = _vertical_word(tenant.network)
-    ctx["seo_title"] = f"How it works for owners — {city_name} Knows {vertical}".strip(" —")
-    ctx["meta_description"] = (
-        f"From listed to thriving in about five minutes. "
-        f"Here's how to claim your listing on {city_name} Knows {vertical}, "
-        f"upgrade to Featured, and start using the AI marketing tools."
-    ).strip()
-    ctx["og_image"] = tenant.city.get("hero_photo_url") if tenant.city else None
-    # WHY: show founding partner spots remaining so owners see real-time
-    # urgency. Same city-filtered count as /pricing.
-    cap = get_settings().founding_partner_cap
-    city_id = str(tenant.city["_id"]) if tenant.city else None
-    founding_filter: dict = {"is_founding_partner": True}
-    if city_id:
-        founding_filter["city_id"] = city_id
-    founding_count = await get_db().businesses.count_documents(founding_filter)
-    ctx["founding_partner_cap"] = cap
-    ctx["founding_partner_spots_left"] = max(0, cap - founding_count)
-    # WHY: listing_word_singular / listing_word_plural come from _base_context
-    # (city.listing_word_plural / city.listing_word_singular). vertical_word is
-    # the network-specific name ("Beauty", "Wellness", "Health"). The walkthrough
-    # template uses all three to say "salon" vs "spa" vs "barbershop" depending
-    # on which directory the owner is viewing from.
-    ctx["vertical_word"] = vertical
-    ctx["walkthrough_pdf_url"] = "/assets/walkthrough/mkb-owner-journey.pdf"
-    return _templates.TemplateResponse("walkthrough.html", ctx)
-
-
 @router.get("/owners/login", response_class=HTMLResponse)
 async def owners_login_page(request: Request) -> HTMLResponse:
     """The two-step sign-in form for salon owners.
