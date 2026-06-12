@@ -7,7 +7,7 @@ setting `PREVIEW_MODE_ENABLED=false` in production `.env` and restarting the
 container. No code deploy needed — the toggle is already implemented.
 **Acceptance:** Given the env var change and container restart, then any visitor
 can access the public directory without email authentication.
-**Blocked on:** Stripe webhook operational + David's launch go/no-go decision.
+**Blocked on:** Stripe Customer Portal enabled (2-min task at stripe.com/settings/billing/portal) + David's launch go/no-go decision. HTTPS is now live (2026-06-12).
 
 ### KAT-061 — "Knows" vertical domain portfolio · V2 · ready_to_build
 **Persona:** David (operator).
@@ -61,7 +61,7 @@ template, which shows a "Claiming: [Name]" banner and locks the name input as re
 The email draft (updated 2026-06-11) now uses `miami.knowsbeauty.com/owners?slug=[slug]`
 as the primary CTA — a direct one-click path to the pre-filled form.
 **Blocked on:** David sends the outreach emails (external communication rule applies).
-**DNS note (2026-06-12):** `miami.knowsbeauty.com` now resolves to the production server
-on all major DNS providers. The DNS cutover blocker is resolved. The HTTPS certificate is
-pending Let's Encrypt auto-provisioning (Traefik retries automatically every ~30 min).
-Once the cert is live, the email links will work end-to-end.
+**HTTPS confirmed live (2026-06-12 03:06 UTC):** `https://miami.knowsbeauty.com/` and
+`https://www.miami.knowsbeauty.com/` are serving over HTTPS with a valid SSL certificate.
+Email links work end-to-end. The only remaining blocker for this requirement is David
+sending the outreach emails (Posey cannot contact external parties).
