@@ -31,7 +31,7 @@ from app.routes.api.v1 import (
     owner_stats as api_owner_stats,
     stripe_billing as api_stripe_billing,
 )
-from app.routes.admin import claims_admin, analytics_admin
+from app.routes.admin import claims_admin, analytics_admin, settings_admin
 from app.routes.public import pages as public_pages, media as public_media
 
 settings = get_settings()
@@ -119,6 +119,7 @@ app.include_router(api_owner_photos.router)
 public_pages.attach_templates(templates)
 claims_admin.attach_templates(templates)
 analytics_admin.attach_templates(templates)
+settings_admin.attach_templates(templates)
 
 
 @app.get("/preview-login", include_in_schema=False, response_class=HTMLResponse)
@@ -140,6 +141,7 @@ async def preview_login_page() -> HTMLResponse:
 # tenant-aware not-found handler.
 app.include_router(claims_admin.router)
 app.include_router(analytics_admin.router)
+app.include_router(settings_admin.router)
 
 # WHY: media route is registered before the public SSR catch-all so /media/{id}
 # is served by the GridFS streaming route and not handed to the 404 template.
