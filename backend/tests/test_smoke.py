@@ -302,12 +302,13 @@ def test_pricing_page(client):
         assert tier in r.text
     # Prices are present and unambiguous
     assert "$29" in r.text
-    assert "$290" in r.text  # annual
     assert "$299" in r.text
     # Featured is positioned as the recommended tier
     assert "Most popular" in r.text
-    # Trial / cancel terms appear (must align with owners.html copy)
-    assert "first month free" in r.text.lower()
+    # Accurate cancel terms appear — no false annual plan or free-trial copy
+    assert "Cancel anytime" in r.text
+    assert "$290" not in r.text, "Annual plan copy was removed — must not reappear"
+    assert "first month free" not in r.text.lower(), "Free-trial copy was removed — must not reappear"
     # At least one FAQ question is rendered
     assert "How do I claim" in r.text
     # WHY: anchor must point to #claim-form (the actual div id), not #claim —
@@ -678,27 +679,32 @@ def test_photos_render_as_dict_url_format(client, seeded_db):
     )
 
 
-def test_pricing_shows_monthly_equivalent_for_annual_plan(client):
-    """The Featured annual price must show the per-month cost breakdown so
-    owners comparing monthly subscription tools don't miscalculate the
-    annual price as expensive. '$24/month' alongside '$290/year' makes the
-    annual deal feel cheap rather than large."""
+def test_pricing_shows_accurate_monthly_price(client):
+    """The pricing page must show the accurate $29/month price for Featured
+    and must NOT show the annual plan option ($290/year) that was removed
+    because no annual Stripe price exists — advertising a price that can't
+    be purchased would mislead paying customers."""
     r = client.get("/pricing", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
-    # The monthly equivalent must appear near the annual price
-    assert "$24/month" in r.text or "that&#39;s $24/month" in r.text or "that's $24/month" in r.text
+    # Accurate monthly price is shown
+    assert "$29" in r.text
+    # Annual plan and its per-month equivalent are not shown
+    assert "$290" not in r.text, "Annual plan removed — must not reappear"
+    assert "$24/month" not in r.text, "Annual plan per-month equivalent removed — must not reappear"
 
 
-def test_owners_page_shows_monthly_equivalent_and_support_email(client):
-    """The owners page pricing strip must (a) show the monthly cost breakdown
-    for the annual Featured plan, and (b) include a support email address in
-    the 'what happens next' section so owners who submit and hear nothing have
-    somewhere to follow up."""
+def test_owners_page_shows_accurate_price_and_support_email(client):
+    """The owners page pricing strip must (a) show the accurate $29/month price
+    for Featured, and (b) include a support email address so owners who submit
+    and hear nothing have somewhere to follow up."""
     r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
     body = r.text
-    # Monthly equivalent makes the annual plan feel affordable
-    assert "$24/month" in body or "that's $24/month" in body or "$24" in body
+    # Accurate monthly price is shown
+    assert "$29" in body
+    # Annual plan and its misleading per-month equivalent must not appear
+    assert "$290" not in body, "Annual plan removed — must not reappear"
+    assert "$24" not in body, "Annual plan per-month equivalent removed — must not reappear"
     # Support email removes the silent-wait drop-off point
     assert "hello@knowsbeauty.com" in body
 
@@ -1778,10 +1784,11 @@ def test_owner_me_upgrade_button_shows_correct_price():
     )
     assert "$99" not in content, (
         "owner_me.html still contains the old '$99' price — "
-        "must be updated to match pricing page ($29/month or $290/year)"
+        "must be updated to match pricing page ($29/month)"
     )
-    assert "$290" in content, (
-        "owner_me.html must show the annual option ($290/year) to match the pricing page"
+    assert "$290" not in content, (
+        "owner_me.html must not show the annual option ($290/year) — "
+        "no annual Stripe price exists; advertising it misleads paying customers"
     )
 
 
