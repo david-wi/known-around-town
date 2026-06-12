@@ -86,37 +86,58 @@ services:
       traefik.docker.network: "traefik"
       traefik.http.services.known-around-town.loadbalancer.server.port: "8000"
 
-      # Beauty
-      traefik.http.routers.kat-beauty.entrypoints: "https"
-      traefik.http.routers.kat-beauty.rule: >-
-        Host(`miami.knowsbeauty.ai.devintensive.com`) ||
-        Host(`knowsbeauty.ai.devintensive.com`) ||
+      # Beauty — public .com domains get their own router so Traefik issues a
+      # cert whose main domain is the public hostname (not the dev subdomain).
+      # WHY split: Traefik's certResolver builds the cert around the FIRST
+      # Host() in the rule as the cert's main domain. If .ai.devintensive.com
+      # comes first, that cert is served for all requests to this router —
+      # including .com requests — causing a cert-mismatch error in browsers.
+      # Separate routers = separate certs = correct cert served per domain.
+      traefik.http.routers.kat-beauty-com.entrypoints: "https"
+      traefik.http.routers.kat-beauty-com.rule: >-
         Host(`miami.knowsbeauty.com`) ||
         Host(`www.miami.knowsbeauty.com`) ||
         Host(`stage-miami.knowsbeauty.com`)
-      traefik.http.routers.kat-beauty.tls: "true"
-      traefik.http.routers.kat-beauty.tls.certresolver: "letsencrypt"
-      traefik.http.routers.kat-beauty.service: "known-around-town"
+      traefik.http.routers.kat-beauty-com.tls: "true"
+      traefik.http.routers.kat-beauty-com.tls.certresolver: "letsencrypt"
+      traefik.http.routers.kat-beauty-com.service: "known-around-town"
 
-      # Wellness
-      traefik.http.routers.kat-wellness.entrypoints: "https"
-      traefik.http.routers.kat-wellness.rule: >-
-        Host(`miami.knowswellness.ai.devintensive.com`) ||
-        Host(`knowswellness.ai.devintensive.com`) ||
+      # Beauty — dev subdomains (internal QA / Expertly platform access)
+      traefik.http.routers.kat-beauty-dev.entrypoints: "https"
+      traefik.http.routers.kat-beauty-dev.rule: >-
+        Host(`miami.knowsbeauty.ai.devintensive.com`) ||
+        Host(`knowsbeauty.ai.devintensive.com`)
+      traefik.http.routers.kat-beauty-dev.tls: "true"
+      traefik.http.routers.kat-beauty-dev.tls.certresolver: "letsencrypt"
+      traefik.http.routers.kat-beauty-dev.service: "known-around-town"
+
+      # Wellness — public .com domains (same split rationale as beauty above)
+      traefik.http.routers.kat-wellness-com.entrypoints: "https"
+      traefik.http.routers.kat-wellness-com.rule: >-
         Host(`miami.knowswellness.com`) ||
         Host(`www.miami.knowswellness.com`)
-      traefik.http.routers.kat-wellness.tls: "true"
-      traefik.http.routers.kat-wellness.tls.certresolver: "letsencrypt"
-      traefik.http.routers.kat-wellness.service: "known-around-town"
+      traefik.http.routers.kat-wellness-com.tls: "true"
+      traefik.http.routers.kat-wellness-com.tls.certresolver: "letsencrypt"
+      traefik.http.routers.kat-wellness-com.service: "known-around-town"
 
-      # Health
-      traefik.http.routers.kat-health.entrypoints: "https"
-      traefik.http.routers.kat-health.rule: >-
+      # Wellness — dev subdomains
+      traefik.http.routers.kat-wellness-dev.entrypoints: "https"
+      traefik.http.routers.kat-wellness-dev.rule: >-
+        Host(`miami.knowswellness.ai.devintensive.com`) ||
+        Host(`knowswellness.ai.devintensive.com`)
+      traefik.http.routers.kat-wellness-dev.tls: "true"
+      traefik.http.routers.kat-wellness-dev.tls.certresolver: "letsencrypt"
+      traefik.http.routers.kat-wellness-dev.service: "known-around-town"
+
+      # Health — dev subdomains only for now; add kat-health-com when
+      # knowshealth.com .com domains are configured with DNS.
+      traefik.http.routers.kat-health-dev.entrypoints: "https"
+      traefik.http.routers.kat-health-dev.rule: >-
         Host(`miami.knowshealth.ai.devintensive.com`) ||
         Host(`knowshealth.ai.devintensive.com`)
-      traefik.http.routers.kat-health.tls: "true"
-      traefik.http.routers.kat-health.tls.certresolver: "letsencrypt"
-      traefik.http.routers.kat-health.service: "known-around-town"
+      traefik.http.routers.kat-health-dev.tls: "true"
+      traefik.http.routers.kat-health-dev.tls.certresolver: "letsencrypt"
+      traefik.http.routers.kat-health-dev.service: "known-around-town"
       # WHY: opt this container into Watchtower auto-update.  When deploy.yml
       # pushes a new :latest image to GHCR, Watchtower detects the new digest
       # within 5 minutes and restarts this container with the updated image.
