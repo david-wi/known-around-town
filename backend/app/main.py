@@ -75,7 +75,10 @@ async def favicon() -> RedirectResponse:
 
 # Static assets are served at /assets so it doesn't conflict with /api or
 # tenant-specific URL patterns.
-app.mount("/assets", StaticFiles(directory=str(BASE_DIR / "static")), name="assets")
+# WHY: html=True enables directory-index serving — a request to /assets/walkthrough/
+# returns /assets/walkthrough/index.html automatically, so the walkthrough landing
+# page works at a clean URL without a separate route handler.
+app.mount("/assets", StaticFiles(directory=str(BASE_DIR / "static"), html=True), name="assets")
 
 # JSON management API (tenant-agnostic — admins manage every network/city from
 # any host). All write endpoints require ADMIN_API_KEY when configured.
