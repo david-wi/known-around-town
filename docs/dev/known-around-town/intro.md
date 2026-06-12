@@ -29,10 +29,10 @@ David (the operator) sends outreach emails to Miami salon owners. Owners click a
 - **Dev/staging domain**: `miami.knowsbeauty.ai.devintensive.com`
 - **Preview mode**: ON — only allowed emails (@expertly.com, @webintensive.com, aggiewaggie06@gmail.com, karissa.ostoski@gmail.com) can access the site; turn off to launch publicly
 - **Stripe billing**: fully live — checkout and webhook processing both active as of 2026-06-11
-- **Directory size**: 19 verified beauty businesses (post-cleanup; 31 ghost/closed listings archived 2026-06-12); wellness network at miami.knowswellness.com has 48 businesses (audited 2026-06-12; all have web presence)
+- **Directory size**: 64 beauty businesses (miami.knowsbeauty.com), 48 wellness (miami.knowswellness.com), 49 health — 161 total across all verticals (as of 2026-06-12)
 - **Founding Partner cap**: 25 subscribers (configurable via `FOUNDING_PARTNER_CAP` env var)
 - **Second vertical**: miami.knowswellness.com is live in the database behind the preview gate; ready to open alongside beauty
-- **Ghost removal audit**: 30 confirmed ghost listings archived 2026-06-12; full evidence at `~/Spaces/posey/notes/ghost-removals-evidence.md`
+- **Marketing AI**: Instagram caption and ad copy endpoints are built and auth-gated, but the `MARKETING_AI_ENABLED` feature flag is currently OFF on production — must be enabled before launch so subscribers can use these tools
 
 ## GitHub
 

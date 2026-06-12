@@ -7,7 +7,11 @@ setting `PREVIEW_MODE_ENABLED=false` in production `.env` and restarting the
 container. No code deploy needed — the toggle is already implemented.
 **Acceptance:** Given the env var change and container restart, then any visitor
 can access the public directory without email authentication.
-**Blocked on:** Stripe Customer Portal enabled (2-min task at stripe.com/settings/billing/portal) + David's launch go/no-go decision. HTTPS is now live (2026-06-12).
+**Blocked on:**
+1. `MARKETING_AI_ENABLED=true` set in production `.env` and container restarted (otherwise subscribers who pay $29/month hit a 404 when using AI tools) — Posey can do this with David's go-ahead
+2. Stripe Customer Portal enabled at stripe.com/settings/billing/portal (2-min task, David action)
+3. David's launch go/no-go decision
+HTTPS is live (2026-06-12). Stripe billing is live (2026-06-11).
 
 ### KAT-061 — "Knows" vertical domain portfolio · V2 · ready_to_build
 **Persona:** David (operator).

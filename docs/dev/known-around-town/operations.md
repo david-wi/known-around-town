@@ -84,6 +84,27 @@ If you skip step 2, the env var is silently invisible to the container even if i
 
 **Access**: Only from Atlas-allowlisted IPs. To run direct queries, use the production container or an allowlisted machine.
 
+## Feature Flags
+
+All feature flags are set in `/opt/known-around-town/.env` and take effect after a container restart.
+
+| Flag | What it controls | Safe to enable when |
+|---|---|---|
+| `PREVIEW_MODE_ENABLED` | Gates the entire site behind email+code login | Ready to open to the public |
+| `MARKETING_AI_ENABLED` | Enables the AI caption and ad copy endpoints for Featured subscribers | An Anthropic API key is confirmed configured and the AI tools are ready to serve |
+
+### Enabling marketing AI tools
+
+```bash
+# Add/update in /opt/known-around-town/.env
+MARKETING_AI_ENABLED=true
+
+# Apply (no image pull needed)
+docker compose -f docker-compose.prod.yml restart backend
+```
+
+If `MARKETING_AI_ENABLED` is blank or `false`, the Instagram caption and ad copy endpoints return HTTP 404, so subscribers who try to use these tools get a silent failure. **This flag must be `true` before launch.**
+
 ## Preview Gate
 
 Toggle via env var — no code deploy needed:
