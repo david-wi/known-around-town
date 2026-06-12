@@ -152,3 +152,15 @@ API; both nameservers synced within ~60 seconds. TTL is 300s so resolvers clear
 within 5 minutes. If the site ever seems intermittently unreachable, check both
 nameservers: `dig +short miami.knowsbeauty.com @ns1.dyna-ns.net` and
 `@ns2.dyna-ns.net`.
+
+## Preview gate bypass: _BYPASS_EXACT vs _BYPASS_PREFIXES
+
+`preview_gate.py` has two bypass mechanisms:
+- `_BYPASS_PREFIXES` — tuple checked with `str.startswith()`; for path families like `/assets/`, `/api/v1/owner/` where all sub-paths should also bypass
+- `_BYPASS_EXACT` — frozenset of exact paths; for single paths like `/robots.txt` where no sub-paths should bypass
+
+Single-path entries belong in `_BYPASS_EXACT`. Using `_BYPASS_PREFIXES` for `/robots.txt` would also bypass `/robots.txt.bak`, `/robots.txt/anything`, etc. — correct semantics require the frozenset.
+
+**Handlers that are bypassed must check preview mode themselves.** The gate short-circuits before the handler runs, so if the handler should behave differently during preview it must call `get_settings().preview_mode_enabled` directly. For `robots.txt` and `sitemap.xml`: return a "site is private" signal during preview (Disallow: /, empty urlset), and the full live-site response once preview is off.
+
+**Handler order matters.** Any preview-mode short-circuit in a handler must come BEFORE the `_require_tenant()` call. `_require_tenant()` does a DB lookup and raises HTTP 404 for unknown hosts (like test client hosts), so putting the preview check after it causes test failures for handlers that have been bypassed. Put preview checks first so they work unconditionally.
