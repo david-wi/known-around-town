@@ -306,6 +306,10 @@ def _patch_generate(monkeypatch, *, raises: Exception | None = None, returns: st
     monkeypatch.setattr(ai_caption, "generate_caption", fake_generate)
 
 
+_TEST_OWNER_EMAIL = "testowner@example.com"
+_TEST_STRIPE_ID = "sub_test123"
+
+
 def _pick_seeded_business(seeded_db):
     """Return any seeded Miami Beauty business for endpoint tests."""
     biz = asyncio.get_event_loop().run_until_complete(
@@ -319,14 +323,35 @@ def _pick_seeded_business(seeded_db):
     return biz
 
 
+def _make_pro_business(seeded_db, biz):
+    """Stamp a test business with claimed_email + stripe_subscription_id so
+    the auth helper recognises it as an active Featured subscriber.
+
+    Returns the cookie value that corresponds to this owner session.
+    """
+    asyncio.get_event_loop().run_until_complete(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {
+                "claimed_email": _TEST_OWNER_EMAIL,
+                "stripe_subscription_id": _TEST_STRIPE_ID,
+            }},
+        )
+    )
+    from app.services.owner_auth import sign_session
+    return sign_session(_TEST_OWNER_EMAIL)
+
+
 def test_endpoint_returns_caption_on_success(client, seeded_db, monkeypatch):
     biz = _pick_seeded_business(seeded_db)
     assert biz is not None
+    cookie = _make_pro_business(seeded_db, biz)
     _patch_generate(monkeypatch, returns="Hello from the mock 💅\n#mock #test")
 
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "grand opening"},
+        cookies={"kb_owner_session": cookie},
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()
@@ -334,39 +359,98 @@ def test_endpoint_returns_caption_on_success(client, seeded_db, monkeypatch):
     assert data["business_id"] == biz["_id"]
 
 
-def test_endpoint_404_when_feature_disabled(client, seeded_db, monkeypatch):
+def test_endpoint_401_when_no_session_cookie(client, seeded_db, monkeypatch):
+    """No cookie at all should return 401."""
     biz = _pick_seeded_business(seeded_db)
-    monkeypatch.delenv("MARKETING_AI_ENABLED", raising=False)
+    _make_pro_business(seeded_db, biz)
+    _patch_generate(monkeypatch)
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "x"},
     )
+    assert resp.status_code == 401
+
+
+def test_endpoint_403_when_wrong_owner(client, seeded_db, monkeypatch):
+    """A session for a different email should be rejected."""
+    biz = _pick_seeded_business(seeded_db)
+    _make_pro_business(seeded_db, biz)
+    from app.services.owner_auth import sign_session
+    other_cookie = sign_session("someone-else@example.com")
+    _patch_generate(monkeypatch)
+    resp = client.post(
+        "/api/v1/marketing-ai/instagram-caption",
+        json={"business_id": biz["_id"], "prompt": "x"},
+        cookies={"kb_owner_session": other_cookie},
+    )
+    assert resp.status_code == 403
+
+
+def test_endpoint_402_when_not_subscribed(client, seeded_db, monkeypatch):
+    """A valid owner session but no Stripe subscription returns 402."""
+    biz = _pick_seeded_business(seeded_db)
+    # Set claimed_email but NOT stripe_subscription_id
+    asyncio.get_event_loop().run_until_complete(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {"claimed_email": _TEST_OWNER_EMAIL},
+             "$unset": {"stripe_subscription_id": ""}},
+        )
+    )
+    from app.services.owner_auth import sign_session
+    cookie = sign_session(_TEST_OWNER_EMAIL)
+    _patch_generate(monkeypatch)
+    resp = client.post(
+        "/api/v1/marketing-ai/instagram-caption",
+        json={"business_id": biz["_id"], "prompt": "x"},
+        cookies={"kb_owner_session": cookie},
+    )
+    assert resp.status_code == 402
+
+
+def test_endpoint_404_when_feature_disabled(client, seeded_db, monkeypatch):
+    biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
+    monkeypatch.delenv("MARKETING_AI_ENABLED", raising=False)
+    resp = client.post(
+        "/api/v1/marketing-ai/instagram-caption",
+        json={"business_id": biz["_id"], "prompt": "x"},
+        cookies={"kb_owner_session": cookie},
+    )
     assert resp.status_code == 404
 
 
-def test_endpoint_404_when_business_not_found(client, monkeypatch):
+def test_endpoint_404_when_business_not_found(client, seeded_db, monkeypatch):
+    """A nonexistent business id should 404 even with a valid session."""
+    biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
     _patch_generate(monkeypatch)
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": "does-not-exist", "prompt": "x"},
+        cookies={"kb_owner_session": cookie},
     )
     assert resp.status_code == 404
 
 
 def test_endpoint_422_on_empty_prompt(client, seeded_db):
     biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": ""},
+        cookies={"kb_owner_session": cookie},
     )
     assert resp.status_code == 422
 
 
 def test_endpoint_422_on_overlong_prompt(client, seeded_db):
     biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "x" * 601},
+        cookies={"kb_owner_session": cookie},
     )
     assert resp.status_code == 422
 
@@ -375,10 +459,12 @@ def test_endpoint_502_on_gateway_error(client, seeded_db, monkeypatch):
     from app.services.ai_caption import CaptionGenerationError
 
     biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
     _patch_generate(monkeypatch, raises=CaptionGenerationError("unreachable"))
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "x"},
+        cookies={"kb_owner_session": cookie},
     )
     assert resp.status_code == 502
     assert "try again" in resp.json()["detail"].lower()
@@ -601,11 +687,13 @@ def _patch_generate_ad_copy(
 def test_ad_copy_endpoint_returns_copy_on_success(client, seeded_db, monkeypatch):
     biz = _pick_seeded_business(seeded_db)
     assert biz is not None
+    cookie = _make_pro_business(seeded_db, biz)
     _patch_generate_ad_copy(monkeypatch, returns="Headline One\nDesc one.\n\nHeadline Two\nDesc two.\n\nHeadline Three\nDesc three.")
 
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": "summer specials"},
+        cookies={"kb_owner_session": cookie},
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()
@@ -613,39 +701,82 @@ def test_ad_copy_endpoint_returns_copy_on_success(client, seeded_db, monkeypatch
     assert data["business_id"] == biz["_id"]
 
 
-def test_ad_copy_endpoint_404_when_feature_disabled(client, seeded_db, monkeypatch):
+def test_ad_copy_endpoint_401_when_no_session(client, seeded_db, monkeypatch):
+    """No cookie should return 401 for ad copy too."""
     biz = _pick_seeded_business(seeded_db)
-    monkeypatch.delenv("MARKETING_AI_ENABLED", raising=False)
+    _make_pro_business(seeded_db, biz)
+    _patch_generate_ad_copy(monkeypatch)
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": "x"},
     )
+    assert resp.status_code == 401
+
+
+def test_ad_copy_endpoint_402_when_not_subscribed(client, seeded_db, monkeypatch):
+    """Authenticated owner without a subscription gets 402."""
+    biz = _pick_seeded_business(seeded_db)
+    asyncio.get_event_loop().run_until_complete(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {"claimed_email": _TEST_OWNER_EMAIL},
+             "$unset": {"stripe_subscription_id": ""}},
+        )
+    )
+    from app.services.owner_auth import sign_session
+    cookie = sign_session(_TEST_OWNER_EMAIL)
+    _patch_generate_ad_copy(monkeypatch)
+    resp = client.post(
+        "/api/v1/marketing-ai/ad-copy",
+        json={"business_id": biz["_id"], "prompt": "x"},
+        cookies={"kb_owner_session": cookie},
+    )
+    assert resp.status_code == 402
+
+
+def test_ad_copy_endpoint_404_when_feature_disabled(client, seeded_db, monkeypatch):
+    biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
+    monkeypatch.delenv("MARKETING_AI_ENABLED", raising=False)
+    resp = client.post(
+        "/api/v1/marketing-ai/ad-copy",
+        json={"business_id": biz["_id"], "prompt": "x"},
+        cookies={"kb_owner_session": cookie},
+    )
     assert resp.status_code == 404
 
 
-def test_ad_copy_endpoint_404_when_business_not_found(client, monkeypatch):
+def test_ad_copy_endpoint_404_when_business_not_found(client, seeded_db, monkeypatch):
+    """Nonexistent business id 404s even with a valid session."""
+    biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
     _patch_generate_ad_copy(monkeypatch)
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": "does-not-exist", "prompt": "x"},
+        cookies={"kb_owner_session": cookie},
     )
     assert resp.status_code == 404
 
 
 def test_ad_copy_endpoint_422_on_empty_prompt(client, seeded_db):
     biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": ""},
+        cookies={"kb_owner_session": cookie},
     )
     assert resp.status_code == 422
 
 
 def test_ad_copy_endpoint_422_on_overlong_prompt(client, seeded_db):
     biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": "x" * 601},
+        cookies={"kb_owner_session": cookie},
     )
     assert resp.status_code == 422
 
@@ -654,10 +785,12 @@ def test_ad_copy_endpoint_502_on_gateway_error(client, seeded_db, monkeypatch):
     from app.services.ai_caption import CaptionGenerationError
 
     biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
     _patch_generate_ad_copy(monkeypatch, raises=CaptionGenerationError("unreachable"))
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": "x"},
+        cookies={"kb_owner_session": cookie},
     )
     assert resp.status_code == 502
     assert "try again" in resp.json()["detail"].lower()
