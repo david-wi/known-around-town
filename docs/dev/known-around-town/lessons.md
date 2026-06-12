@@ -242,6 +242,20 @@ The pricing page advertised "Google Business Profile sync — hours, photos, ser
 
 **Related:** The `MARKETING_AI_ENABLED` feature flag was blank on production even though the AI caption and ad copy endpoints were built and advertised. Subscribers who paid $29/month would hit a 404. Always verify every feature flag that controls advertised functionality is actually enabled before launch. See the Feature Flags section in `operations.md`. `_require_tenant()` does a DB lookup and raises HTTP 404 for unknown hosts (like test client hosts), so putting the preview check after it causes test failures for handlers that have been bypassed. Put preview checks first so they work unconditionally.
 
+## Business status values: "live" not "published" (2026-06-12)
+
+`PublishStatus` enum (models.py) has three values: `"draft"`, `"live"`, `"archived"`. There is no `"published"`.
+
+Any MongoDB query filtering for live businesses must use `{"status": "live"}`. Querying for `"published"` silently returns zero results — no error, just an empty count. The admin sync page (PR #194) originally used `"published"` and showed 0/165 salons until fixed.
+
+**Regression test:** `test_sync_page_counts_live_businesses` in `tests/test_google_places.py` seeds live businesses and verifies the count is > 0. If it fails, a query is using the wrong status value.
+
+## Live domain is miami.knowsbeauty.com (not miamiknowsbeauty.com) (2026-06-12)
+
+The live public URL is `https://miami.knowsbeauty.com` — the Traefik router label and TLS cert both use this hostname. Sending curl or Playwright to `miamiknowsbeauty.com` or using `Host: miamiknowsbeauty.com` returns a 404 from Traefik because no router matches.
+
+Admin routes (`/admin/*`) bypass the preview gate entirely — useful for verifying deployed admin UI without a preview session cookie. Public pages require either a `preview_token` cookie (from the preview login flow) or preview mode disabled.
+
 ## Tailwind pre-compiled CSS: peer-checked variants not available (2026-06-12)
 
 `reference.css` is a pre-compiled Tailwind CSS file. It only contains utilities that
