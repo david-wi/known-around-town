@@ -977,10 +977,24 @@ async def business_page(
         _biz_seo_title = f"{business.get('name')} | {_biz_cat_name} in {city.get('name')}"
     else:
         _biz_seo_title = f"{business.get('name')} — {city.get('name')} {tenant.network.get('name')}"
+
+    # WHY: surface guides that feature this business so visitors can discover related
+    # editorial content and so Google sees bidirectional link equity between listing pages
+    # and the guides they appear in. Capped at 5 to keep the section scannable.
+    related_guides = await get_db().editorial_guides.find(
+        {
+            "city_id": city["_id"],
+            "status": "live",
+            "featured_business_ids": business["_id"],
+        },
+        {"slug": 1, "title": 1, "_id": 0},
+    ).to_list(length=5)
+
     ctx.update(
         {
             "business": business,
             "nearby_businesses": nearby,
+            "related_guides": related_guides,
             "directions_url": directions_url,
             # WHY: prefer the salon's own photo over the city hero — it's more accurate
             # for sharing. Fall back to city hero so cards are never blank.

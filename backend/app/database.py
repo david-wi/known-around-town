@@ -75,6 +75,11 @@ async def ensure_indexes() -> None:
 
     await db.editorial_guides.create_index([("city_id", 1), ("slug", 1)], unique=True)
     await db.editorial_guides.create_index([("city_id", 1), ("status", 1)])
+    # WHY: "which guides feature this business?" query on listing pages needs this;
+    # without it every page load does a full collection scan.
+    await db.editorial_guides.create_index(
+        [("featured_business_ids", 1), ("city_id", 1), ("status", 1)]
+    )
 
     await db.business_claims.create_index([("business_id", 1), ("status", 1)])
     await db.business_inquiries.create_index([("business_id", 1), ("submitted_at", -1)])

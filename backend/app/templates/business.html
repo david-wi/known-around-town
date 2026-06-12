@@ -480,6 +480,23 @@
   </div>
 </section>
 
+{% if related_guides %}
+<section class="bg-white border-t border-stone-100 py-12">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10">
+    <h2 class="font-serif text-2xl text-stone-900 mb-5" style="font-family: Georgia, serif;">Featured in our guides</h2>
+    <div class="flex flex-wrap gap-3">
+      {% for guide in related_guides %}
+      <a href="/guides/{{ guide.slug }}"
+         class="inline-flex items-center gap-2 text-sm font-medium text-stone-700 bg-stone-50 border border-stone-200 px-4 py-2.5 rounded-full hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 transition-colors">
+        <svg class="w-3.5 h-3.5 opacity-60" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        {{ guide.title }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
 {% if nearby_businesses %}
 <section class="bg-stone-50 py-20">
   <div class="max-w-7xl mx-auto px-6 lg:px-10">
