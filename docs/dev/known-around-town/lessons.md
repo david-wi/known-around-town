@@ -113,17 +113,42 @@ that requirement is the safety net, do not remove it. `backfill_founding_partner
 is intentionally NOT guarded (it only `update_many`s a flag, deletes nothing, and is
 run against production by design).
 
-## Preview gate — owner portal paths must ALL be bypassed (2026-06-12)
+## Preview gate — bypass the PAGES and ALL API CALLS for any owner journey (2026-06-12)
 
-When the claim form (`/owners`) was bypassed so owners without preview accounts
-could submit claims, the rest of the owner journey was overlooked. Three more
-paths need to bypass the gate:
-- `/owners/login` — the sign-in page owners land on after claim verification
-- `/owners/me` — the dashboard (safe to bypass: it has its own session check
-  that redirects to `/owners/login` when there's no owner cookie)
-- `/api/v1/owner/login/` — the API calls the login form makes in the background
-  to send and verify the one-time code
+This pattern burned us twice in the same session. The principle: when you add a
+page to the preview gate bypass list, **immediately grep that page's template for
+every `fetch(` call and add those API endpoints to the bypass list too**. A page
+that loads fine but whose form submissions hit blocked API endpoints fails
+completely and silently — the browser gets an HTML redirect instead of JSON,
+shows no error, and the form just does nothing.
 
-Without all three, a verified salon owner clicks their email link, hits the
-staff-only preview page, and has no way to proceed. The bug silently kills every
-outreach conversion. Fixed in PR #155 (KAT-025).
+**Round 1 (PR #155):** Added the claim form page (`/owners`), the login page
+(`/owners/login`), and the dashboard (`/owners/me`). Also added the OTP API
+(`/api/v1/owner/login/`) — but that was the only API endpoint added.
+
+**Round 2 (PR #156):** Discovered the claim form submission, email lead capture,
+and the entire authenticated owner dashboard (profile, stats, photos, billing,
+AI tools) were all still blocked. An owner who logged in successfully could not
+do anything in their dashboard; a new owner submitting the claim form got a silent
+failure.
+
+**Complete bypass list after PR #156:**
+- Pages: `/owners`, `/owners/login`, `/owners/me`
+- APIs: `/api/v1/owner/` (all owner endpoints), `/api/v1/billing/` (webhook +
+  checkout + portal), `/api/v1/claims`, `/api/v1/owner-leads`,
+  `/api/v1/marketing-ai/`
+
+**Rule for the future:** For every page added to `_BYPASS_EXACT` or
+`_BYPASS_PREFIXES`, run `grep -n "fetch(" backend/app/templates/<page>.html`
+and verify each target URL is also on the bypass list before merging. If the
+API endpoint enforces its own owner-session auth at the route level, bypassing
+the preview gate for it is safe — "bypassed" means skip the preview-cookie check,
+not skip all auth.
+
+**Also discovered (2026-06-12):** `miami.knowsbeauty.com` DNS had split-brain —
+one Dynadot nameserver (ns1) had the correct A record, the other (ns2) still
+served the old parking address. Fixed by re-calling `set_dns2` via the Dynadot
+API; both nameservers synced within ~60 seconds. TTL is 300s so resolvers clear
+within 5 minutes. If the site ever seems intermittently unreachable, check both
+nameservers: `dig +short miami.knowsbeauty.com @ns1.dyna-ns.net` and
+`@ns2.dyna-ns.net`.
