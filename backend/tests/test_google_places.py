@@ -211,6 +211,36 @@ class TestSyncPage:
         assert "Google Ratings Sync" in r.text
         assert "Coverage" in r.text
 
+    def test_sync_page_counts_live_businesses(self, seeded_db, monkeypatch):
+        """Coverage stats must count 'live' businesses, not 'published' (wrong status value).
+
+        WHY this test exists: sync_admin.py originally queried {"status": "published"}
+        but the PublishStatus enum uses "live". The coverage dashboard showed 0 even
+        when 55+ salons were in the directory.
+        """
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.api.v1._auth as _auth_module
+        import re
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+
+        client = TestClient(app)
+        r = client.get("/admin/sync")
+        assert r.status_code == 200
+        # The seeded_db includes live businesses (status="live"). The coverage
+        # section should show a non-zero total — if it shows 0, the status filter
+        # is querying the wrong value.
+        #
+        # Extract the number immediately before "TOTAL SALONS" in the HTML.
+        # The template renders: <div ...>NN</div><div ...>TOTAL SALONS</div>
+        match = re.search(r">(\d+)<[^>]+>[^<]*TOTAL SALONS", r.text, re.IGNORECASE)
+        if match:
+            assert int(match.group(1)) > 0, (
+                "sync page shows 0 total salons even though seeded_db has live businesses. "
+                "This means the status filter is using the wrong value."
+            )
+
     def test_sync_page_shows_no_key_warning_when_not_configured(self, seeded_db, monkeypatch):
         from app.main import app
         from fastapi.testclient import TestClient

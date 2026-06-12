@@ -55,9 +55,11 @@ async def sync_page(
         raise RuntimeError("Templates not attached — call attach_templates() at startup")
 
     db = get_db()
-    total = await db.businesses.count_documents({"status": "published"})
+    # WHY: the PublishStatus enum uses "live" not "published" — querying for
+    # "published" returns 0 results even when businesses exist.
+    total = await db.businesses.count_documents({"status": "live"})
     with_rating = await db.businesses.count_documents(
-        {"status": "published", "google_rating": {"$ne": None}}
+        {"status": "live", "google_rating": {"$ne": None}}
     )
     without_rating = total - with_rating
 
@@ -102,7 +104,7 @@ async def sync_ratings(
     # WHY: cap at 5000 to avoid runaway memory usage. Log a warning if we hit
     # it so the operator knows they need to re-run or implement pagination.
     businesses = await db.businesses.find(
-        {"status": "published"},
+        {"status": "live"},
         {"_id": 1, "name": 1, "city_id": 1, "google_place_id": 1},
     ).to_list(5000)
 
