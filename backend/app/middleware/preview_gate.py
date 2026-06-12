@@ -134,6 +134,13 @@ _BYPASS_EXACT = frozenset({
     # overview. The page contains no private data; it only renders marketing copy
     # and links to /owners and /pricing (both also bypassed).
     "/walkthrough",
+    # WHY: /pricing is linked from the /walkthrough page (Step 5: Upgrade to
+    # Featured). An owner reading the walkthrough must be able to click through
+    # to see the subscription tiers without hitting a preview login wall — they
+    # have no preview account. /pricing renders only public marketing copy; no
+    # private data is exposed. It belongs in _BYPASS_EXACT (not _BYPASS_PREFIXES)
+    # so that sub-paths (none exist currently) remain gated by default.
+    "/pricing",
 })
 
 
