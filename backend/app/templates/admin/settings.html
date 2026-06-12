@@ -40,17 +40,27 @@
           </p>
         </div>
         <div class="flex-shrink-0 pt-1">
-          {# Toggle switch — uses a checkbox under the hood #}
-          <label class="relative inline-flex items-center cursor-pointer">
+          {# Toggle switch — inline styles because peer-checked Tailwind variants
+             are not in the pre-compiled reference.css. The initial visual state
+             is set server-side; JS updates it live when the user clicks. #}
+          <label class="relative inline-flex items-center cursor-pointer" style="cursor:pointer;">
             <input
               type="checkbox"
               id="toggle-marketing-ai"
               name="marketing_ai_enabled"
               value="on"
               {% if marketing_ai_enabled %}checked{% endif %}
-              class="sr-only peer"
+              style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"
+              onchange="
+                var track=this.nextElementSibling;
+                var thumb=track.firstElementChild;
+                track.style.backgroundColor=this.checked?'#f43f5e':'#d6d3d1';
+                thumb.style.transform=this.checked?'translateX(20px)':'translateX(0)';
+              "
             >
-            <div class="w-11 h-6 bg-stone-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-rose-400 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
+            <div style="width:44px;height:24px;border-radius:9999px;position:relative;transition:background-color 0.2s;background-color:{{ '#f43f5e' if marketing_ai_enabled else '#d6d3d1' }};">
+              <div style="position:absolute;top:2px;left:2px;width:20px;height:20px;background-color:white;border-radius:9999px;box-shadow:0 1px 3px rgba(0,0,0,0.2);transition:transform 0.2s;transform:{{ 'translateX(20px)' if marketing_ai_enabled else 'translateX(0)' }};"></div>
+            </div>
           </label>
         </div>
       </div>
