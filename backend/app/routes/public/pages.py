@@ -1348,7 +1348,7 @@ async def pricing_page(request: Request) -> HTMLResponse:
     ctx["meta_description"] = (
         f"Three ways to show up on {city_name} Knows {vertical}. "
         f"Free listing, $29/month Featured, or $299/month Concierge with an AI phone "
-        f"receptionist. First month free on Featured, cancel anytime."
+        f"receptionist. Cancel anytime. No long-term contract."
     ).strip()
     # WHY: og:image controls the preview card when this page is shared with a potential
     # customer or partner. The city hero is the right image for a pricing page — it
