@@ -4,6 +4,7 @@ from urllib.parse import quote as _url_quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from app.config import get_settings
 from app.database import get_db
 from app.models import BusinessClaim
 from app.routes.api.v1._auth import require_admin
@@ -31,7 +32,10 @@ async def submit_claim(body: BusinessClaim, request: Request) -> Dict[str, Any]:
         {"_id": doc["business_id"]},
         {"$set": {"claim_status": "pending", "updated_at": now_utc()}},
     )
-    admin_url = str(request.base_url).rstrip("/") + "/admin/claims"
+    # WHY: use canonical_base_url so the admin link in the notification email
+    # points at the public hostname, not the Docker-internal address that
+    # request.base_url returns when the app runs behind nginx.
+    admin_url = (get_settings().canonical_base_url or str(request.base_url)).rstrip("/") + "/admin/claims"
     # WHY: fire-and-forget so slow or failed email sends never block the
     # API response — the claim is already saved.  Both emails swallow errors.
     asyncio.create_task(
@@ -104,7 +108,10 @@ async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
     # they submitted, got a confirmation, and then heard nothing.  Fire-and-
     # forget so a slow email never blocks the admin verification response.
     business = await db.businesses.find_one({"_id": claim["business_id"]})
-    base = str(request.base_url).rstrip("/")
+    # WHY: use canonical_base_url so the login link in the verification email
+    # points at the public hostname.  request.base_url is the Docker-internal
+    # address when running behind nginx, producing a broken link for the owner.
+    base = (get_settings().canonical_base_url or str(request.base_url)).rstrip("/")
     owner_email = (claim.get("submitter_email") or "").strip()
     # WHY: pre-filling the email in the login URL means the owner lands on the
     # code-entry screen immediately rather than having to re-type their address.
