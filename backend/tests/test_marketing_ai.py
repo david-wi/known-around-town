@@ -734,6 +734,21 @@ def test_ad_copy_endpoint_402_when_not_subscribed(client, seeded_db, monkeypatch
     assert resp.status_code == 402
 
 
+def test_ad_copy_endpoint_403_when_wrong_owner(client, seeded_db, monkeypatch):
+    """Session for a different email is rejected with 403 for ad copy too."""
+    biz = _pick_seeded_business(seeded_db)
+    _make_pro_business(seeded_db, biz)
+    from app.services.owner_auth import sign_session
+    other_cookie = sign_session("someone-else@example.com")
+    _patch_generate_ad_copy(monkeypatch)
+    resp = client.post(
+        "/api/v1/marketing-ai/ad-copy",
+        json={"business_id": biz["_id"], "prompt": "x"},
+        cookies={"kb_owner_session": other_cookie},
+    )
+    assert resp.status_code == 403
+
+
 def test_ad_copy_endpoint_404_when_feature_disabled(client, seeded_db, monkeypatch):
     biz = _pick_seeded_business(seeded_db)
     cookie = _make_pro_business(seeded_db, biz)
