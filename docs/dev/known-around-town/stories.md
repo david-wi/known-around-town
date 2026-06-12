@@ -44,7 +44,7 @@
 |---------|--------|-------|
 | Stripe Checkout | ✅ Live | `POST /api/v1/billing/checkout` |
 | Founding Partner badge | ✅ Live | Permanent; first 25 paying owners |
-| Subscription webhook | ⚠️ Blocked | Needs `STRIPE_WEBHOOK_SECRET` (David action) |
+| Subscription webhook | ✅ Live | `STRIPE_WEBHOOK_SECRET` configured in production .env as of 2026-06-11 |
 | Cancellation handling | ✅ Code ready | Clears `stripe_subscription_id`, badge stays |
 | Customer portal (self-serve cancel) | ⚠️ Pending | Enable at stripe.com/settings/billing/portal |
 | Founding partner cap | ✅ Live | 25 slots, configurable via `FOUNDING_PARTNER_CAP` |
@@ -70,10 +70,9 @@
 
 | Item | Priority | Blocked On |
 |------|---------|-----------|
-| Stripe webhook secret | P0 | David: add key permission or create webhook manually |
 | Stripe customer portal | P1 | David: enable at stripe.com |
 | Google Search Console verification | P1 | David: verify using meta tag |
-| Public launch | P1 | Stripe webhook + David's go/no-go |
+| Public launch | P1 | David's go/no-go (turn off preview gate, send outreach) |
 | "Knows" vertical domains (9 available) | P2 | David: fund Dynadot account ($~196) |
 | Owner outreach email send | P2 | David sends from drafts at `/home/david/Spaces/posey/work/owner-outreach-email-draft.md` |
 | Resend domain verification (knowsbeauty.com) | P2 | SPF/DKIM/MX DNS records needed |
