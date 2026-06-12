@@ -1,0 +1,102 @@
+{% extends "admin/_layout.html" %}
+
+{% block title %}Sync · Admin · Known Around Town{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
+
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold text-stone-900">Google Ratings Sync</h1>
+    <p class="text-stone-500 mt-1 text-sm">Pull live star ratings and review counts from Google for every salon in the directory. Ratings appear on salon pages and in search results as rich snippets.</p>
+  </div>
+
+  {# ── Result banner ── #}
+  {% if result == 'ok' %}
+  <div class="mb-6 flex items-start gap-3 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm">
+    <svg class="w-4 h-4 flex-shrink-0 text-emerald-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+    </svg>
+    <div class="text-emerald-800">
+      <span class="font-semibold">Sync complete.</span>
+      {{ sync_updated }} salon{{ 's' if sync_updated != 1 else '' }} updated with fresh ratings.
+      {% if sync_no_match %}{{ sync_no_match }} had no Google match.{% endif %}
+      {% if sync_failed %}{{ sync_failed }} had temporary fetch errors (try again).{% endif %}
+    </div>
+  </div>
+  {% elif result == 'error:no-key' %}
+  <div class="mb-6 flex items-start gap-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+    <svg class="w-4 h-4 flex-shrink-0 text-red-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <span><span class="font-semibold">No API key configured.</span> Set <code class="font-mono bg-red-100 px-1 rounded">GOOGLE_PLACES_API_KEY</code> on the server and restart.</span>
+  </div>
+  {% endif %}
+
+  {# ── Status card ── #}
+  <div class="bg-white border border-stone-200 rounded-xl divide-y divide-stone-100 mb-8">
+    <div class="px-6 py-5">
+      <h2 class="font-semibold text-stone-900 mb-4">Coverage</h2>
+      <div class="grid grid-cols-3 gap-4 text-center">
+        <div class="bg-stone-50 rounded-lg px-4 py-4">
+          <div class="text-3xl font-bold text-stone-900">{{ total }}</div>
+          <div class="text-xs text-stone-500 mt-1 uppercase tracking-wider">Total salons</div>
+        </div>
+        <div class="bg-emerald-50 rounded-lg px-4 py-4">
+          <div class="text-3xl font-bold text-emerald-700">{{ with_rating }}</div>
+          <div class="text-xs text-emerald-600 mt-1 uppercase tracking-wider">Have Google rating</div>
+        </div>
+        <div class="bg-amber-50 rounded-lg px-4 py-4">
+          <div class="text-3xl font-bold text-amber-700">{{ without_rating }}</div>
+          <div class="text-xs text-amber-600 mt-1 uppercase tracking-wider">Need sync</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="px-6 py-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="font-medium text-stone-900">API connection</div>
+          <div class="text-sm text-stone-500 mt-0.5">
+            {% if api_configured %}
+            <span class="text-emerald-600 font-medium">✓ Google Places API key is configured</span>
+            {% else %}
+            <span class="text-red-600 font-medium">✗ GOOGLE_PLACES_API_KEY not set</span> — set it on the server, then restart the backend container.
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Action ── #}
+  <form method="post" action="/admin/sync/ratings">
+    <div class="bg-white border border-stone-200 rounded-xl px-6 py-5 mb-6">
+      <h2 class="font-semibold text-stone-900 mb-2">Sync all salons</h2>
+      <p class="text-sm text-stone-500 mb-4">Looks up every published salon on Google, matches by name and city, and stores the star rating and review count. Existing ratings are refreshed. Takes 30–90 seconds for the full directory.</p>
+      <p class="text-xs text-stone-400 mb-4">
+        <strong>Cost:</strong> Each salon without a Google Place ID costs 1 Places Text Search call (≈ $0.017). Salons with an existing Place ID cost 1 Place Details call (cheaper). Total cost for {{ total }} salons is under $2.
+      </p>
+      <button
+        type="submit"
+        {% if not api_configured %}disabled{% endif %}
+        class="px-5 py-2 rounded-lg {{ 'bg-rose-600 hover:bg-rose-700 text-white' if api_configured else 'bg-stone-200 text-stone-400 cursor-not-allowed' }} text-sm font-medium transition-colors"
+      >
+        {% if api_configured %}Sync Google ratings{% else %}API key required{% endif %}
+      </button>
+    </div>
+  </form>
+
+  {# ── How it works ── #}
+  <div class="bg-stone-50 border border-stone-200 rounded-xl px-6 py-5">
+    <h2 class="font-medium text-stone-900 mb-3">What syncing does</h2>
+    <ul class="space-y-2 text-sm text-stone-600">
+      <li class="flex items-start gap-2"><span class="text-rose-400 flex-shrink-0 mt-0.5">→</span> Searches Google for each salon by name and city</li>
+      <li class="flex items-start gap-2"><span class="text-rose-400 flex-shrink-0 mt-0.5">→</span> Stores the star rating (e.g. 4.7 ★) and review count in the salon's database record</li>
+      <li class="flex items-start gap-2"><span class="text-rose-400 flex-shrink-0 mt-0.5">→</span> Ratings appear immediately on salon pages — no restart needed</li>
+      <li class="flex items-start gap-2"><span class="text-rose-400 flex-shrink-0 mt-0.5">→</span> Google search results will start showing star snippets for salon pages (usually within a week of Google's next crawl)</li>
+    </ul>
+    <p class="text-xs text-stone-400 mt-4">Run this sync weekly, or after adding new salons to the directory. Ratings don't update automatically.</p>
+  </div>
+
+</div>
+{% endblock %}

@@ -27,6 +27,17 @@
       <div>
         <div class="text-[10px] uppercase tracking-[0.18em] text-stone-500 font-semibold mb-1">{% if primary_cat %}{{ (category_names.get(primary_cat) if category_names else None) or primary_cat|replace('-', ' ')|title }}{% endif %}{% if primary_cat and primary_nb %} · {% endif %}{% if primary_nb %}{{ (neighborhood_names.get(primary_nb) if neighborhood_names else None) or primary_nb|replace('-', ' ')|title }}{% endif %}</div>
         <h3 class="text-xl font-serif text-stone-900 leading-tight group-hover:{{ theme.accent_text_full }} transition-colors" style='font-family: Georgia, "Times New Roman", serif;'>{{ b.name }}</h3>
+        {#- WHY: rating displayed inline under the name so it's visible without
+            hover — Google star ratings are the single strongest trust signal
+            for a first-time visitor scanning a directory grid. Only shown when
+            a rating exists; blank is cleaner than a placeholder zero. #}
+        {% if b.google_rating %}
+        <div class="flex items-center gap-1 mt-1">
+          <span class="text-amber-500 text-[11px] leading-none">★</span>
+          <span class="text-[11px] font-semibold text-stone-700">{{ "%.1f"|format(b.google_rating) }}</span>
+          {% if b.google_review_count %}<span class="text-[11px] text-stone-400">({{ b.google_review_count }})</span>{% endif %}
+        </div>
+        {% endif %}
       </div>
       {% if b.price_cues %}<span class="text-xs text-stone-400 font-semibold whitespace-nowrap pt-1">{{ b.price_cues }}</span>{% endif %}
     </div>
