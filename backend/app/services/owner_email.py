@@ -612,14 +612,9 @@ async def send_subscription_confirmed_email(
                     "text": text_body,
                 },
             )
-        if response.status_code == 200:
-            logger.info("Subscription confirmation sent to %s for %s", email, business_name)
-            return True
-        logger.error(
-            "Email provider returned status %s for subscription confirmation",
-            response.status_code,
-        )
-        return False
+        response.raise_for_status()
+        logger.info("Subscription confirmation sent to %s for %s", email, business_name)
+        return True
     except Exception as exc:  # noqa: BLE001
         logger.error("Failed to send subscription confirmed email: %s", type(exc).__name__)
         return False
