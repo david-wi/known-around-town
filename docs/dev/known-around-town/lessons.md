@@ -224,6 +224,16 @@ Single-path entries belong in `_BYPASS_EXACT`. Using `_BYPASS_PREFIXES` for `/ro
 
 **Handler order matters.** Any preview-mode short-circuit in a handler must come BEFORE the `_require_tenant()` call.
 
+## Production feature flags use `_PROD` suffix — staging does not (2026-06-12)
+
+`docker-compose.prod.yml` passes two different environment variables for `MARKETING_AI_ENABLED`:
+- **Staging**: reads `${MARKETING_AI_ENABLED:-true}` — defaults to on so staging always has AI
+- **Production**: reads `${MARKETING_AI_ENABLED_PROD:-}` — defaults to empty/off
+
+This split is intentional: staging always has AI on; production stays off until explicitly enabled with the `_PROD`-suffixed variable. Setting `MARKETING_AI_ENABLED=true` in the production `.env` silently does nothing.
+
+**Rule**: When updating or checking any feature flag for production, verify against the `environment:` block in `docker-compose.prod.yml` to find the actual variable name the container reads. Don't assume staging and production read the same name.
+
 ## Never list a pricing feature that isn't built (2026-06-12)
 
 The pricing page advertised "Google Business Profile sync — hours, photos, services" as a Featured tier benefit. That feature was never built — no code for it exists anywhere in the codebase. It was removed in PR #187 after discovery.
