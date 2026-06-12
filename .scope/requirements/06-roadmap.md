@@ -52,4 +52,10 @@ to claim their listing. Drafts are prepared at
 **Acceptance:** Given the outreach campaign launched, when an owner clicks the link
 in the email, then they are taken directly to their business claim page with their
 name pre-filled.
-**Blocked on:** David sends the outreach emails (external communication rule applies).
+**Code status:** The server-side pre-fill is fully implemented. The `/owners?slug=<biz-slug>`
+route resolves the business record and passes `claim_prefill = {id, name, slug}` to the
+template, which shows a "Claiming: [Name]" banner and locks the name input as read-only.
+The email draft (updated 2026-06-11) now uses `miami.knowsbeauty.com/owners?slug=[slug]`
+as the primary CTA — a direct one-click path to the pre-filled form.
+**Blocked on:** (1) DNS cutover for `miami.knowsbeauty.com`; (2) David sends the outreach
+emails (external communication rule applies).
