@@ -61,6 +61,27 @@ computing the remaining list. Only then does it promote `remaining[0]` to hero.
 Checking after the fact (or skipping the check) will incorrectly reassign the
 hero on every delete, even when a non-hero photo is removed.
 
+## Preview gate: use exact-path bypass when sub-paths must stay gated
+
+The preview gate `_BYPASS_PREFIXES` tuple uses `startswith()` matching — any path that
+begins with a listed prefix passes through. For paths where you want to open the path
+itself but keep sub-paths gated, use `_BYPASS_EXACT` (a `frozenset`) instead:
+
+```python
+# WRONG for /owners — also bypasses /owners/login, /owners/me
+_BYPASS_PREFIXES = (..., "/owners")
+
+# RIGHT — only /owners itself is open; /owners/login stays gated
+_BYPASS_EXACT = frozenset({"/owners"})
+```
+
+Note: `request.url.path` does NOT include query parameters. So `/owners?slug=salon`
+has a path of `/owners` and is matched by the exact entry — no special casing needed.
+
+Introduced in PR #150 when the claim form (`/owners?slug=<slug>`) needed to bypass
+the preview gate for external salon owners clicking outreach email links, while
+`/owners/login` (the authenticated owner dashboard sign-in) needed to stay gated.
+
 ## Only CI workflow (no separate deploy workflow)
 
 The repo has one GitHub Actions workflow: `.github/workflows/ci.yml`. As of PR #115
