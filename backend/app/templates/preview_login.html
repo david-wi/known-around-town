@@ -137,6 +137,11 @@
     } catch (e) { return '/'; }
   })();
 
+  // WHY: persist code-request state in sessionStorage so if the user
+  // navigates to their email app and comes back, the code entry step
+  // is still shown rather than resetting to the email form.
+  var STORAGE_KEY = 'mkb_preview_email';
+
   function setLoading(btn, loading) {
     btn.disabled = loading;
     btn.querySelector('[data-label-default]').classList.toggle('hidden', loading);
@@ -158,8 +163,21 @@
     codeForm.dataset.email = email;
     stepEmail.classList.add('hidden');
     stepCode.classList.remove('hidden');
+    try { sessionStorage.setItem(STORAGE_KEY, email); } catch (e) {}
     setTimeout(function () { codeInput.focus(); }, 50);
   }
+
+  function clearCodeStep() {
+    try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  }
+
+  // On load: if we already requested a code this session, restore step 2.
+  (function restoreState() {
+    try {
+      var saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) { showCodeStep(saved); }
+    } catch (e) {}
+  })();
 
   emailForm.addEventListener('submit', async function (ev) {
     ev.preventDefault();
@@ -216,7 +234,8 @@
         setLoading(codeSubmit, false);
         return;
       }
-      // Cookie is set by the API response. Navigate to the original destination.
+      // Cookie is set by the API response. Clear saved state and navigate.
+      clearCodeStep();
       window.location.href = nextUrl;
     } catch (e) {
       showError(codeError, 'Network error. Please try again.');
@@ -226,6 +245,7 @@
 
   codeBack.addEventListener('click', function () {
     clearError(codeError);
+    clearCodeStep();
     stepCode.classList.add('hidden');
     stepEmail.classList.remove('hidden');
     setTimeout(function () { emailInput.focus(); }, 50);
