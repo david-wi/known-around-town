@@ -19,6 +19,8 @@ from typing import Optional
 
 import httpx
 
+from app.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,10 +42,11 @@ def _provider_api_key() -> Optional[str]:
 
 
 def _admin_notify_address() -> str:
-    # WHY: ADMIN_NOTIFY_EMAIL lets the operator route claim alerts to any
-    # inbox without a code change.  Defaults to the public support address
-    # which David monitors, so the feature works out-of-the-box.
-    return os.environ.get("ADMIN_NOTIFY_EMAIL", "hello@knowsbeauty.com").strip()
+    # WHY: ADMIN_NOTIFY_EMAIL lets the operator route claim alerts to a
+    # dedicated admin inbox without a code change.  Falls back to the
+    # configurable support_email setting so both use the same monitored
+    # address by default rather than a separate hardcoded value.
+    return os.environ.get("ADMIN_NOTIFY_EMAIL", get_settings().support_email).strip()
 
 
 async def send_admin_new_claim_email(
@@ -348,7 +351,7 @@ def _claim_confirmation_text(submitter_name: str, business_name: str) -> str:
         f"Hi {first},\n\n"
         f"We received your claim for {business_name} and will review it within one business day.\n\n"
         "Once verified you'll get a one-click link to your owner dashboard — no password to set.\n\n"
-        "Questions while you wait? Email hello@knowsbeauty.com.\n\n"
+        f"Questions while you wait? Email {get_settings().support_email}.\n\n"
         "— The Miami Knows Beauty team\n"
     )
 
@@ -368,7 +371,7 @@ def _claim_verified_text(
         "Want to stand out? Once you're in, you can upgrade to Featured — priority placement, "
         "a Pro badge, and our Instagram caption generator. "
         f"See pricing: {pricing_url}\n\n"
-        "Questions? Email hello@knowsbeauty.com.\n\n"
+        f"Questions? Email {get_settings().support_email}.\n\n"
         "— The Miami Knows Beauty team\n"
     )
 
@@ -422,7 +425,7 @@ def _claim_verified_html(
       Instagram caption generator. <a href="{pricing_url}" style="color: #f43f5e;">See pricing →</a>
     </p>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
-      Questions? Email <a href="mailto:hello@knowsbeauty.com" style="color: #be185d;">hello@knowsbeauty.com</a>.
+      Questions? Email <a href="mailto:{get_settings().support_email}" style="color: #be185d;">{get_settings().support_email}</a>.
     </p>
   </div>
 </body></html>"""
@@ -491,7 +494,7 @@ def _claim_rejected_text(submitter_name: str, business_name: str) -> str:
         "This sometimes happens when we can't confirm the connection between the submitter "
         "and the business — it doesn't necessarily mean your claim is wrong.\n\n"
         "If you think this is a mistake or want to provide more information, please email "
-        "hello@knowsbeauty.com and we'll take another look.\n\n"
+        f"{get_settings().support_email} and we'll take another look.\n\n"
         "— The Miami Knows Beauty team\n"
     )
 
@@ -525,7 +528,7 @@ def _claim_rejected_html(submitter_name: str, business_name: str) -> str:
       take another look.
     </p>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
-      Email us at <a href="mailto:hello@knowsbeauty.com" style="color: #be185d;">hello@knowsbeauty.com</a>
+      Email us at <a href="mailto:{get_settings().support_email}" style="color: #be185d;">{get_settings().support_email}</a>
       and we'll review it together.
     </p>
   </div>
@@ -557,7 +560,7 @@ def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:
     </p>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
       Questions while you wait?
-      Email <a href="mailto:hello@knowsbeauty.com" style="color: #be185d;">hello@knowsbeauty.com</a>.
+      Email <a href="mailto:{get_settings().support_email}" style="color: #be185d;">{get_settings().support_email}</a>.
     </p>
   </div>
 </body></html>"""
@@ -630,7 +633,7 @@ def _subscription_confirmed_text(first: str, business_name: str, dashboard_url: 
         "• Instagram caption generator — describe your post, get a polished caption with hashtags\n"
         "• Google & Meta ad copy — describe what you're promoting, get 20 ready-to-run ad variations\n\n"
         f"Head to your dashboard to see your listing and start using these features:\n{dashboard_url}\n\n"
-        "Questions? Email hello@knowsbeauty.com and we'll get back to you same day.\n\n"
+        f"Questions? Email {get_settings().support_email} and we'll get back to you same day.\n\n"
         "— The Miami Knows Beauty team\n"
     )
 
@@ -680,7 +683,7 @@ def _subscription_confirmed_html(first: str, business_name: str, dashboard_url: 
     </a>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
       Questions? Email
-      <a href="mailto:hello@knowsbeauty.com" style="color: #be185d;">hello@knowsbeauty.com</a>
+      <a href="mailto:{get_settings().support_email}" style="color: #be185d;">{get_settings().support_email}</a>
       &mdash; we reply same day.
     </p>
   </div>

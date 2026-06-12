@@ -40,6 +40,10 @@ log = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+# WHY: global makes support_email available in every template without
+# threading it through each individual route's context dict. A route that
+# doesn't explicitly pass it still gets the right value.
+templates.env.globals["support_email"] = settings.support_email
 
 app = FastAPI(title="Known Around Town", version="0.1.0")
 
@@ -57,6 +61,13 @@ app.add_middleware(
 async def on_startup() -> None:
     await ensure_indexes()
     await run_startup_migrations()
+    # WHY: the Jinja2 global was set from the env var at module load time, before
+    # the DB is available. Now that the DB is ready, load the admin-saved value
+    # (if any) so a support_email change made via the admin UI survives a container
+    # restart without needing to set the env var or re-save the settings page.
+    from app.services.site_settings import get_support_email
+    db_support_email = await get_support_email()
+    templates.env.globals["support_email"] = db_support_email
     log.info("Indexes ensured. Tenant domains: %s", settings.parse_network_domains())
 
 
