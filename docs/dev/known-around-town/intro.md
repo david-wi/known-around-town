@@ -29,7 +29,7 @@ David (the operator) sends outreach emails to Miami salon owners. Owners click a
 - **Dev/staging domain**: `miami.knowsbeauty.ai.devintensive.com`
 - **Preview mode**: ON — only allowed emails (@expertly.com, @webintensive.com, aggiewaggie06@gmail.com, karissa.ostoski@gmail.com) can access the site; turn off to launch publicly
 - **Stripe billing**: fully live — checkout and webhook processing both active as of 2026-06-11
-- **Directory size**: 20 verified beauty businesses (post-cleanup; 30 ghost/closed listings archived 2026-06-12); wellness network at miami.knowswellness.com has ~50 businesses
+- **Directory size**: 19 verified beauty businesses (post-cleanup; 31 ghost/closed listings archived 2026-06-12); wellness network at miami.knowswellness.com has 48 businesses (audited 2026-06-12; all have web presence)
 - **Founding Partner cap**: 25 subscribers (configurable via `FOUNDING_PARTNER_CAP` env var)
 - **Second vertical**: miami.knowswellness.com is live in the database behind the preview gate; ready to open alongside beauty
 - **Ghost removal audit**: 30 confirmed ghost listings archived 2026-06-12; full evidence at `~/Spaces/posey/notes/ghost-removals-evidence.md`
