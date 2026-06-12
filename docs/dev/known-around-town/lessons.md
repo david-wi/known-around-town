@@ -241,3 +241,40 @@ The pricing page advertised "Google Business Profile sync — hours, photos, ser
 **How to catch this in future:** Before publishing any pricing copy, grep the codebase for the feature. If no routes, services, or models implement it, do not ship the copy.
 
 **Related:** The `MARKETING_AI_ENABLED` feature flag was blank on production even though the AI caption and ad copy endpoints were built and advertised. Subscribers who paid $29/month would hit a 404. Always verify every feature flag that controls advertised functionality is actually enabled before launch. See the Feature Flags section in `operations.md`. `_require_tenant()` does a DB lookup and raises HTTP 404 for unknown hosts (like test client hosts), so putting the preview check after it causes test failures for handlers that have been bypassed. Put preview checks first so they work unconditionally.
+
+## Tailwind pre-compiled CSS: peer-checked variants not available (2026-06-12)
+
+`reference.css` is a pre-compiled Tailwind CSS file. It only contains utilities that
+were present in templates at compilation time. When adding new templates, Tailwind
+`peer-*` interactive variants (e.g. `peer-checked:bg-rose-500`, `peer-focus:ring-2`)
+will NOT be available — they're not in the compiled file.
+
+**Fix:** For toggles and other interactive elements in new templates, use one of:
+1. **Inline styles** server-rendered from the template variable for the initial state:
+   `style="background-color: {{ '#f43f5e' if enabled else '#d6d3d1' }}"`
+2. **Small JS onchange handler** to update visual state on click
+3. **Rebuild reference.css** by running the Tailwind CLI with the new template in scope
+
+The settings page toggle (PR #191) uses inline styles + JS onchange as the simplest
+approach that doesn't require a CSS rebuild.
+
+## site_settings MongoDB collection: DB-first / env-var-fallback pattern (2026-06-12)
+
+Feature flags that need to be toggled without a server restart are stored in the
+`site_settings` collection (single document, `_id: "global"`). The pattern:
+
+1. `get_site_setting(key, default=None)` — reads from DB, returns `default` if not set
+2. `update_site_settings(updates: dict)` — upserts into the global doc
+3. Each feature's "check" function reads DB first, falls back to the env var
+
+This means: no DB value → env var behavior unchanged (safe default). Once the admin
+toggles it, DB value takes effect immediately without restart. The toggle persists
+across container restarts.
+
+**Example:** `get_marketing_ai_enabled()` in `services/site_settings.py`:
+- If `site_settings["marketing_ai_enabled"]` exists → use it
+- Otherwise → call `ai_caption.feature_enabled()` (reads `MARKETING_AI_ENABLED` env var)
+
+**HTML checkbox POST body gotcha:** Unchecked checkboxes send nothing in a POST body.
+Never use `Form(...)` parameters for checkboxes — they'll be missing and FastAPI will
+raise a 422. Always use `request.form()` and check `form.get("field") == "on"`.
