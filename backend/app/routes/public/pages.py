@@ -1400,12 +1400,7 @@ async def owners_login_page(request: Request) -> HTMLResponse:
 
 @router.get("/owners/me", response_class=HTMLResponse)
 async def owners_me_page(request: Request) -> HTMLResponse:
-    """Placeholder 'you're signed in' page.
-
-    This is the dashboard stub: it confirms the cookie works end-to-end
-    and gives the owner a logout button. The actual dashboard will
-    replace this template in a follow-up change.
-    """
+    """Owner dashboard — shows listing details, edit form, and subscription state."""
     tenant = await _require_tenant(request)
     cookie = request.cookies.get(SESSION_COOKIE_NAME)
     session = verify_session(cookie) if cookie else None
@@ -1444,9 +1439,29 @@ async def owners_me_page(request: Request) -> HTMLResponse:
         ctx["meta_description"] = (
             f"Manage your {business.get('name', 'salon')} listing on Knows Beauty."
         )
+        # WHY: stripe_subscription_id is the authoritative signal that the owner
+        # has an active paid subscription. We expose it as a clean boolean so
+        # the template doesn't need to know the Stripe-specific field name, and
+        # so route-level tests can assert on ctx directly without parsing HTML.
+        ctx["is_subscribed"] = bool(business.get("stripe_subscription_id"))
     else:
         ctx["seo_title"] = "Your account"
         ctx["meta_description"] = "Your Knows Beauty owner account."
+        ctx["is_subscribed"] = False
+
+    # WHY: Stripe redirects the owner back to /owners/me?subscribed=1 after a
+    # successful checkout. We detect this server-side so we can render a
+    # prominent confirmation banner in the HTML (no JavaScript required).
+    # We also require is_subscribed=True so that an owner who bookmarks this
+    # URL doesn't see a stale "you just subscribed" banner on every visit.
+    # In the rare case where the Stripe webhook fires AFTER the browser
+    # redirect (is_subscribed is still False on this load), the JS toast in
+    # the template acts as a fallback — it reads ?subscribed=1 from the URL
+    # and shows a floating confirmation regardless of subscription state.
+    ctx["show_subscribed_banner"] = (
+        request.query_params.get("subscribed") == "1"
+        and ctx["is_subscribed"]
+    )
     response = _templates.TemplateResponse("owner_me.html", ctx)
     # WHY: rolling 30-day expiry. Reissue the cookie on every successful
     # visit so an active owner never has to sign in again. The freshly
