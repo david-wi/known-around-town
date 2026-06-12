@@ -208,12 +208,28 @@ class TestBypassPaths:
         assert not _is_bypassed("/api/v1/networks")
         assert not _is_bypassed("/api/v1/businesses")
 
+    def test_owner_claim_form_bypassed(self):
+        # WHY: outreach emails link salon owners directly to /owners?slug=<slug>.
+        # Those owners have no preview account and must reach the claim form
+        # without going through the preview login page. Query params are part of
+        # the URL but NOT of request.url.path, so the path is always "/owners".
+        from app.middleware.preview_gate import _is_bypassed
+        assert _is_bypassed("/owners")
+        assert _is_bypassed("/owners")   # same path regardless of ?slug= param
+
     def test_owner_login_not_bypassed(self):
-        # WHY: /owners/login is the OWNER sign-in page, which is protected
-        # by the preview gate — owners are internal users who must also pass
-        # the preview gate before signing in to manage their listing.
+        # WHY: /owners/login is the owner dashboard sign-in page for existing
+        # owners managing their listings — they are internal users who must also
+        # pass the preview gate. The claim-form bypass uses an exact path match
+        # ("/owners") specifically so this sub-path stays gated.
         from app.middleware.preview_gate import _is_bypassed
         assert not _is_bypassed("/owners/login")
+
+    def test_owner_dashboard_not_bypassed(self):
+        # WHY: /owners/me (the owner dashboard) is gated — only authenticated
+        # owners may view it. Only the top-level claim form (/owners) is open.
+        from app.middleware.preview_gate import _is_bypassed
+        assert not _is_bypassed("/owners/me")
 
 
 class TestMiddlewareRedirection:

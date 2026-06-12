@@ -12,6 +12,9 @@ Paths that bypass the gate:
   - /api/v1/billing/webhook  — Stripe calls this directly; it must never be gated
   - /assets/*       — static CSS/JS/images needed to render the login page
   - /favicon.*      — browser favicon probes
+  - /owners         — owner claim form (exact path only); linked from outreach emails
+                      sent to external salon owners who have no preview account and
+                      should never need one. /owners/login stays gated.
 
 Design choice — middleware vs. route dependency:
   WHY middleware: a route-level dependency only protects routes we explicitly
@@ -50,9 +53,17 @@ _BYPASS_PREFIXES = (
     "/favicon",             # browser favicon probes
 )
 
+# WHY: exact-path bypass for paths where sub-paths must stay gated. The claim
+# form lives at /owners (with optional query params like ?slug=salon-name).
+# /owners/login is the authenticated owner dashboard sign-in and must remain
+# gated — so a prefix match on "/owners" would be too broad.
+_BYPASS_EXACT = frozenset({
+    "/owners",
+})
+
 
 def _is_bypassed(path: str) -> bool:
-    return any(path.startswith(prefix) for prefix in _BYPASS_PREFIXES)
+    return path in _BYPASS_EXACT or any(path.startswith(prefix) for prefix in _BYPASS_PREFIXES)
 
 
 class PreviewGateMiddleware(BaseHTTPMiddleware):
