@@ -104,6 +104,17 @@ _BYPASS_EXACT = frozenset({
     "/owners",
     "/owners/login",
     "/owners/me",
+    # WHY: robots.txt and sitemap.xml must reach search engine crawlers even
+    # while the preview gate is active. Without this bypass, Googlebot receives
+    # a 302 redirect to /preview-login instead of a valid robots.txt — so it
+    # has no signal about what to crawl and wastes budget hitting gated pages.
+    # Both handlers return minimal / empty responses when preview mode is enabled
+    # (robots.txt returns "Disallow: /", sitemap returns an empty urlset), giving
+    # crawlers an accurate "site is private" signal. Neither file exposes any
+    # private content. These are exact paths — no sub-paths exist to stay gated —
+    # so they belong in _BYPASS_EXACT rather than _BYPASS_PREFIXES.
+    "/robots.txt",
+    "/sitemap.xml",
 })
 
 
