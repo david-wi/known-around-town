@@ -135,6 +135,18 @@ that requirement is the safety net, do not remove it. `backfill_founding_partner
 is intentionally NOT guarded (it only `update_many`s a flag, deletes nothing, and is
 run against production by design).
 
+## Traefik TLS cert CN mismatch when mixing .com and dev domains in one router (2026-06-12)
+
+**Symptom:** New `.com` hostnames were routing correctly but serving a TLS cert with a dev subdomain CN (e.g., `CN=miami.knowswellness.ai.devintensive.com` for a request to `miami.knowswellness.com`). Browsers didn't error because the `.com` domain appeared as a SAN on the cert — but it's architecturally wrong.
+
+**Root cause:** Traefik's certResolver generates one cert per router and uses the **first `Host()` entry** as the cert's main domain (CN). The old routers listed dev subdomains first, so the dev subdomain became the CN even for certs that also covered `.com` domains.
+
+**Fix (PR #163):** Split each vertical into two routers — `kat-<network>-com` (public `.com` domains only) and `kat-<network>-dev` (dev subdomains only). Each gets its own cert with the correct CN for its audience.
+
+**Apply compose file changes:** Watchtower only applies image changes automatically. After editing `docker-compose.prod.yml`, you must restart the backend manually: `docker compose -f docker-compose.prod.yml up -d --no-deps backend`. Traefik picks up the new router labels within seconds. If Traefik still serves stale certs after a backend restart, try `docker restart traefik`.
+
+**Cert in acme.json but wrong cert served:** Even when the correct cert is in `/opt/traefik/acme.json`, Traefik may serve an older cert that also covers the requested hostname (via SAN). A `docker restart traefik` usually forces re-evaluation of cert-to-router assignments.
+
 ## Preview gate — bypass the PAGES and ALL API CALLS for any owner journey (2026-06-12)
 
 This pattern burned us twice in the same session. The principle: when you add a

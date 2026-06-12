@@ -26,13 +26,28 @@
 
 ## Multi-Tenant Architecture
 
-The platform supports multiple "networks" (e.g., beauty, wellness, health) and multiple cities per network. Each combination gets its own subdomain. Currently only Miami/Beauty is active.
+The platform supports multiple "networks" (e.g., beauty, wellness, health) and multiple cities per network. Each combination gets its own subdomain.
 
 **Domain routing**: `NETWORK_DOMAINS` env var maps `slug:domain` pairs separated by commas. The app reads the incoming `Host` header and resolves the matching network slug. This determines which city/neighborhood/category data to serve.
 
-**Currently configured domains** (in docker-compose.prod.yml):
-- `beauty:knowsbeauty.ai.devintensive.com`
-- `beauty:knowsbeauty.com` (production via `miami` subdomain)
+**Active networks** (as of 2026-06-12):
+- `beauty:knowsbeauty.com` and `beauty:knowsbeauty.ai.devintensive.com` — Miami beauty, 27 verified businesses
+- `wellness:knowswellness.com` and `wellness:knowswellness.ai.devintensive.com` — Miami wellness, no businesses yet
+- `health:knowshealth.ai.devintensive.com` — Miami health, no businesses yet (knowshealth.com DNS not configured)
+
+**Subdomains as city slugs**: Any subdomain that doesn't match a known city slug is treated as a city lookup. `miami.knowsbeauty.com` → city=`miami`, network=`beauty`. Adding a new city requires a seed script + DNS record only — no code changes.
+
+**`stage-` prefix support**: `stage-miami.knowsbeauty.com` routes to the same Miami beauty content as `miami.knowsbeauty.com`. The `_match_suffix()` function in `tenant.py` strips the `stage-` prefix before the city lookup. This is purely a code-staging mechanism — the same production DB is used; there's no separate staging dataset.
+
+## Traefik Router Structure
+
+**Split routers per domain type** (PR #163, 2026-06-12): Each vertical has two Traefik routers:
+- `kat-<network>-com` — the public `.com` domains (e.g., `miami.knowsbeauty.com`, `www.miami.knowsbeauty.com`, `stage-miami.knowsbeauty.com`)
+- `kat-<network>-dev` — the internal dev subdomains (e.g., `miami.knowsbeauty.ai.devintensive.com`)
+
+**Why split**: Traefik's certResolver uses the **first `Host()` entry** in a router rule as the main domain for the TLS cert it issues. If dev and `.com` domains share one router, the cert's CN becomes the dev subdomain — browsers don't error (the `.com` domains are still in the SANs) but it's architecturally wrong. Separate routers ensure each group gets a cert whose CN matches the primary audience.
+
+**Adding a new vertical's `.com` domain**: Add a `kat-<network>-com` router block to `docker-compose.prod.yml`, configure DNS, then `docker compose -f docker-compose.prod.yml up -d --no-deps backend` on the server to reload Traefik labels. Watchtower does NOT pick up compose file changes.
 
 ## Data Model (MongoDB Collections)
 
