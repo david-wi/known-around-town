@@ -1,23 +1,28 @@
 """Marketing-AI endpoints for Featured-tier business owners.
 
-Currently exposes one operation:
+Currently exposes two operations:
 
   POST /api/v1/marketing-ai/instagram-caption
     Generate an Instagram caption (2-3 sentences + hashtags + emoji)
     for a claimed business, tuned to the business's voice and category.
 
-The endpoint is feature-flagged. When ``MARKETING_AI_ENABLED`` is not
-set to a truthy value the route returns 404 — pretending the feature
-does not exist in this environment. This lets stage and production
-share the same image while still gating the feature.
+  POST /api/v1/marketing-ai/ad-copy
+    Generate 3 short ad copy variations (headline + description each)
+    ready to paste into Google Ads, Facebook, or Instagram Ads.
 
-Auth is intentionally light for this stage of the project: the path is
-admin-gated via ``require_admin`` (same pattern as every other write
-endpoint here). Once the owner-auth workstream lands a real session
-cookie, we will swap ``require_admin`` for the owner session and
-require that the caller actually owns the business they are generating
-captions for. See the docstring on ``_resolve_business`` for the
-ownership story.
+Auth requirements (owner sessions are live):
+- Caller must present a valid ``kb_owner_session`` cookie (401 if missing
+  or invalid).
+- The session's ``business_id`` must match the ``business_id`` in the
+  request body (403 if mismatched — prevents one owner generating content
+  for another owner's business).
+- The business must have an active Featured subscription, indicated by the
+  presence of ``stripe_subscription_id`` on the business document (402 if
+  not subscribed — the dashboard shows an upgrade prompt on 402).
+
+Feature flag: when ``MARKETING_AI_ENABLED`` is falsy the routes return 404,
+hiding the feature entirely. This lets stage and production share the same
+image while gating the feature.
 """
 
 from __future__ import annotations
@@ -25,11 +30,12 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.services import ai_caption
+from app.services.owner_auth import SESSION_COOKIE_NAME, verify_session
 
 log = logging.getLogger(__name__)
 
@@ -80,17 +86,54 @@ def _feature_required() -> None:
         raise HTTPException(status_code=404, detail="Not found")
 
 
-async def _resolve_business(business_id: str) -> Dict[str, Any]:
-    """Load the business doc and 404 if it doesn't exist.
+async def _require_pro_owner(request: Request, business_id: str) -> Dict[str, Any]:
+    """Authenticate the request and verify the caller is a Featured subscriber.
 
-    Lives as its own function because the eventual owner-auth swap
-    will need to check ``business.owner_user_id == session.user_id``
-    right here. Centralising the lookup means that check lands in
-    exactly one place.
+    Raises:
+        401 -- no valid owner session cookie
+        403 -- the authenticated owner's business does not match business_id
+        404 -- the business doesn't exist in the database
+        402 -- the business exists and is owned by the caller but has no active
+               Featured subscription (stripe_subscription_id is absent)
+
+    WHY: centralised so both caption and ad-copy endpoints share identical
+    auth logic without duplication. Any future Marketing-AI endpoint should
+    call this helper rather than re-implementing the checks.
+
+    Auth design: owner sessions store the owner's email (not business_id).
+    The canonical ownership link is business.claimed_email == session.email,
+    mirroring the pattern in owner_profile.py. We verify ownership by loading
+    the business by id and comparing claimed_email to the session email, rather
+    than looking up by email and accepting whatever business comes back -- this
+    prevents a session from generating content for a business whose claimed_email
+    changed after the session was issued.
     """
+    cookie_value = request.cookies.get(SESSION_COOKIE_NAME)
+    session = verify_session(cookie_value) if cookie_value else None
+    if not session:
+        raise HTTPException(status_code=401, detail="Owner session required")
+
     doc = await get_db().businesses.find_one({"_id": business_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Business not found")
+
+    # WHY: compare the business's claimed_email to the session email rather than
+    # trusting a business_id in the cookie. Owner sessions only embed the email;
+    # business_id is provided by the caller, so we must verify the two agree via
+    # the database's claimed_email field.
+    session_email = session.get("email", "").lower()
+    if doc.get("claimed_email", "").lower() != session_email:
+        raise HTTPException(status_code=403, detail="Not your business")
+
+    # WHY: stripe_subscription_id is written by the Stripe webhook on successful
+    # payment and cleared on cancellation -- it's the authoritative subscription
+    # signal, more reliable than featured.tier which can be set manually by admins.
+    if not doc.get("stripe_subscription_id"):
+        raise HTTPException(
+            status_code=402,
+            detail="Featured subscription required to use AI tools",
+        )
+
     return doc
 
 
@@ -121,31 +164,25 @@ async def _resolve_city(city_id: str) -> Optional[Dict[str, Any]]:
 @router.post(
     "/instagram-caption",
     response_model=InstagramCaptionResponse,
-    # WHY: NOT admin-gated. The endpoint is feature-flagged with
-    # MARKETING_AI_ENABLED, and the only environment where the flag is
-    # truthy is stage (production keeps it off by default). Admin auth
-    # on top of the flag would block the preview page's same-origin
-    # fetch and give no real protection — anyone who can hit the URL
-    # already passed the flag gate. When owner sessions ship, we'll
-    # add a dependency that requires the calling owner to own the
-    # business in the body.
+    # WHY: no FastAPI Depends() for auth -- we call _require_pro_owner() inline
+    # so the 404 feature-flag check always fires first, avoiding information
+    # disclosure about whether the endpoint exists in this environment.
 )
 async def generate_instagram_caption(
+    request: Request,
     body: InstagramCaptionRequest,
 ) -> InstagramCaptionResponse:
     """Generate an Instagram caption for a business.
 
-    Returns 404 when the feature flag is off (hiding the surface),
-    when the business doesn't exist, or when its category lookups
-    can't be resolved enough to build a useful prompt.
-
-    Returns 502 when the AI gateway is unreachable or returns an
-    error — the dashboard surfaces a "Couldn't reach the model, try
-    again" message in that case.
+    Returns 401 when the caller has no valid owner session.
+    Returns 402 when the owner's business has no Featured subscription.
+    Returns 403 when the session belongs to a different business.
+    Returns 404 when the feature flag is off or the business doesn't exist.
+    Returns 502 when the AI gateway is unreachable.
     """
     _feature_required()
 
-    business = await _resolve_business(body.business_id)
+    business = await _require_pro_owner(request, body.business_id)
     city_id = business.get("city_id")
     if not city_id:
         # Shouldn't happen for real seeded data; defend against partial records.
@@ -179,7 +216,7 @@ async def generate_instagram_caption(
     try:
         caption = await ai_caption.generate_caption(ctx)
     except ai_caption.CaptionFeatureDisabled:
-        # Defensive — feature_required() already checked, but a race
+        # Defensive -- feature_required() already checked, but a race
         # between flag-check and use can happen during a config flip.
         raise HTTPException(status_code=404, detail="Not found")
     except ai_caption.CaptionGenerationError as exc:
@@ -195,7 +232,7 @@ async def generate_instagram_caption(
 class AdCopyRequest(BaseModel):
     """Input shape for the ad copy endpoint.
 
-    Mirrors InstagramCaptionRequest — same business_id + free-text prompt
+    Mirrors InstagramCaptionRequest -- same business_id + free-text prompt
     pattern. The prompt here describes what the owner wants to promote
     (e.g. "summer specials, 20% off color services through July").
     """
@@ -209,7 +246,7 @@ class AdCopyRequest(BaseModel):
     prompt: str = Field(
         ...,
         min_length=1,
-        # WHY: Same 600-char cap as captions — enough for a promo description
+        # WHY: Same 600-char cap as captions -- enough for a promo description
         # without letting the prompt balloon into a token-cost attack.
         max_length=600,
         description="What the owner wants to advertise.",
@@ -224,7 +261,7 @@ class AdCopyResponse(BaseModel):
     separated by blank lines. The dashboard displays this verbatim.
     """
 
-    # WHY: Named "ad_copy" not "copy" — "copy" shadows BaseModel.copy(), a
+    # WHY: Named "ad_copy" not "copy" -- "copy" shadows BaseModel.copy(), a
     # Pydantic method, which causes UserWarning and subtle behaviour in v2.
     ad_copy: str
     business_id: str
@@ -233,23 +270,28 @@ class AdCopyResponse(BaseModel):
 @router.post(
     "/ad-copy",
     response_model=AdCopyResponse,
-    # WHY: Not admin-gated, same reasoning as /instagram-caption. The feature
-    # flag (MARKETING_AI_ENABLED) gates the surface; owner-auth ownership check
-    # is deferred until owner sessions ship. See the caption endpoint comment.
+    # WHY: same auth-inline pattern as /instagram-caption -- feature flag
+    # check fires before session/subscription checks to avoid disclosure.
 )
 async def generate_ad_copy(
+    request: Request,
     body: AdCopyRequest,
 ) -> AdCopyResponse:
     """Generate 3 short ad copy variations for a business.
 
     Each variation includes a headline (under 30 chars) and a description
-    (under 90 chars) — ready to paste into Google Ads, Facebook, or
-    Instagram Ads. Returns 404 when the feature flag is off, 502 when the
-    AI gateway is unreachable.
+    (under 90 chars) -- ready to paste into Google Ads, Facebook, or
+    Instagram Ads.
+
+    Returns 401 when the caller has no valid owner session.
+    Returns 402 when the owner's business has no Featured subscription.
+    Returns 403 when the session belongs to a different business.
+    Returns 404 when the feature flag is off or the business doesn't exist.
+    Returns 502 when the AI gateway is unreachable.
     """
     _feature_required()
 
-    business = await _resolve_business(body.business_id)
+    business = await _require_pro_owner(request, body.business_id)
     city_id = business.get("city_id")
     if not city_id:
         raise HTTPException(status_code=409, detail="Business has no city")

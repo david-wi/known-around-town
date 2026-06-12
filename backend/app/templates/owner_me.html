@@ -480,9 +480,13 @@
 </section>
 
 {# ── Instagram caption generator ─────────────────────────────────── #}
-{# WHY: Always safe to render inside the dashboard — the feature flag check
-   happens server-side and the API returns 404 when MARKETING_AI_ENABLED is
-   off; the JS shows a friendly "not enabled yet" message in that case. #}
+{# WHY: Gated behind is_subscribed so only Featured owners can use the tool.
+   Free-tier owners see a locked state with an upgrade CTA — this turns the
+   AI tools into a conversion driver rather than a silent broken experience.
+   The API also enforces the subscription check server-side (returns 402 if
+   not subscribed), so the template gate is a UX improvement not the only
+   security boundary. #}
+{% if is_subscribed %}
 <section class="bg-stone-50/40 border-t border-stone-100">
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
     <h2 class="text-base font-semibold text-stone-900 mb-1">Instagram caption generator</h2>
@@ -521,11 +525,45 @@
     </div>
   </div>
 </section>
+{% else %}
+{# ── Instagram caption — locked upgrade prompt (free-tier owners) ─── #}
+<section class="bg-stone-50/40 border-t border-stone-100">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
+    <h2 class="text-base font-semibold text-stone-900 mb-1">Instagram caption generator</h2>
+    <p class="text-sm text-stone-500 mb-6">
+      Describe what you want to post about and we&rsquo;ll write a caption tailored to your salon and neighborhood.
+    </p>
+    {# WHY: Show a locked state rather than hiding the tool — seeing the tool
+       but knowing it requires an upgrade is more motivating than never
+       knowing it exists. Same pattern used in SaaS upsell flows. #}
+    <div class="rounded-2xl border border-stone-200 bg-white p-6 relative overflow-hidden">
+      <div class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl">
+        <div class="text-center px-6">
+          <p class="text-sm font-semibold text-stone-900 mb-1">Featured listing required</p>
+          <p class="text-xs text-stone-500 mb-4 max-w-[20rem]">Upgrade to Featured to unlock AI-written Instagram captions for your salon.</p>
+          <button id="caption-upgrade-btn" type="button"
+                  class="inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-5 py-2.5 rounded-full text-sm transition">
+            Get Featured — $29/month
+          </button>
+          <p id="caption-upgrade-error" class="hidden text-xs text-rose-700 mt-2 max-w-[14rem] mx-auto" role="alert" aria-live="polite"></p>
+        </div>
+      </div>
+      {# Blurred preview of the tool beneath the overlay #}
+      <textarea rows="3" disabled aria-hidden="true"
+                placeholder="e.g. fall hair color promo, 20% off balayage this weekend"
+                class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-400 placeholder-stone-300 resize-none pointer-events-none"></textarea>
+      <div class="flex mt-4">
+        <span class="inline-flex items-center gap-2 bg-stone-300 text-white font-medium px-5 py-2.5 rounded-full text-sm opacity-40 pointer-events-none">Generate caption</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}{# /if is_subscribed (caption) #}
 
 {# ── Ad copy generator ─────────────────────────────────────────────── #}
-{# WHY: Three short ad variations (headline + description each) the owner
-   can paste directly into Google Ads, Facebook, or Instagram promotions.
-   Feature flag handled by the JS (404 path), same as the caption section. #}
+{# WHY: Same subscription gate as the caption section — both tools are
+   Featured-tier benefits. The same locked-state/upgrade-CTA pattern applies. #}
+{% if is_subscribed %}
 <section class="bg-white border-t border-stone-100">
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
     <h2 class="text-base font-semibold text-stone-900 mb-1">Ad copy generator</h2>
@@ -565,6 +603,37 @@
     </div>
   </div>
 </section>
+{% else %}
+{# ── Ad copy — locked upgrade prompt (free-tier owners) ────────────── #}
+<section class="bg-white border-t border-stone-100">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
+    <h2 class="text-base font-semibold text-stone-900 mb-1">Ad copy generator</h2>
+    <p class="text-sm text-stone-500 mb-6">
+      Describe what you want to promote and we&rsquo;ll write 3 short ad variations — ready to use on Google, Facebook, or Instagram promotions.
+    </p>
+    <div class="rounded-2xl border border-stone-200 bg-white p-6 relative overflow-hidden">
+      <div class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl">
+        <div class="text-center px-6">
+          <p class="text-sm font-semibold text-stone-900 mb-1">Featured listing required</p>
+          <p class="text-xs text-stone-500 mb-4 max-w-[20rem]">Upgrade to Featured to unlock AI-written ad copy for your salon.</p>
+          <button id="adcopy-upgrade-btn" type="button"
+                  class="inline-flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-5 py-2.5 rounded-full text-sm transition">
+            Get Featured — $29/month
+          </button>
+          <p id="adcopy-upgrade-error" class="hidden text-xs text-rose-700 mt-2 max-w-[14rem] mx-auto" role="alert" aria-live="polite"></p>
+        </div>
+      </div>
+      {# Blurred preview beneath overlay #}
+      <textarea rows="3" disabled aria-hidden="true"
+                placeholder="e.g. summer blowout special, 20% off color through July"
+                class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-400 placeholder-stone-300 resize-none pointer-events-none"></textarea>
+      <div class="flex mt-4">
+        <span class="inline-flex items-center gap-2 bg-stone-300 text-white font-medium px-5 py-2.5 rounded-full text-sm opacity-40 pointer-events-none">Generate ad copy</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}{# /if is_subscribed (ad copy) #}
 
 {# ── Visitor inquiries ────────────────────────────────────────────── #}
 {# WHY: Owners need to see who tried to contact them through their listing.
@@ -877,7 +946,9 @@
         try { detail = (await resp.json()).detail || ''; } catch (ex) {}
         capErrEl.textContent = resp.status === 404
           ? "Caption tool isn’t enabled yet — check back soon."
-          : (detail || 'Something went wrong. Please try again.');
+          : resp.status === 402
+          ? "Featured subscription required — upgrade to unlock this tool."
+          : (detail || ‘Something went wrong. Please try again.’);
         capErrEl.classList.remove('hidden');
         return;
       }
@@ -976,6 +1047,8 @@
         try { detail = (await resp.json()).detail || ''; } catch (ex) {}
         acErrEl.textContent = resp.status === 404
           ? "Ad copy tool isn't enabled yet — check back soon."
+          : resp.status === 402
+          ? "Featured subscription required — upgrade to unlock this tool."
           : resp.status === 502
           ? (detail || "Couldn't reach the model right now. Please try again.")
           : (detail || 'Something went wrong. Please try again.');
@@ -1099,6 +1172,38 @@
         errEl.classList.remove('hidden');
       }
     }
+  });
+})();
+
+/* ── Upgrade buttons in AI tool locked overlays ────────────── */
+/* WHY: The caption and ad copy sections show a locked overlay for free-tier
+   owners. These handlers wire the "Get Featured" buttons in those overlays
+   to the same checkout flow as the main upgrade card, so the path to
+   purchase is equally accessible from wherever the owner sees it. */
+(function () {
+  var ids = ['caption-upgrade-btn', 'adcopy-upgrade-btn'];
+  ids.forEach(function (id) {
+    var btn   = document.getElementById(id);
+    var errEl = document.getElementById(id.replace('-btn', '-error'));
+    if (!btn) return;
+    btn.addEventListener('click', async function () {
+      if (errEl) errEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = 'Redirecting to checkout…';
+      try {
+        var r = await fetch('/api/v1/billing/checkout', { method: 'POST' });
+        var body = await r.json().catch(function () { return {}; });
+        if (!r.ok) throw new Error(body.detail || 'Error ' + r.status);
+        window.location.href = body.url;
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Get Featured — $29/month';
+        if (errEl) {
+          errEl.textContent = err.message || 'Could not start checkout. Please try again.';
+          errEl.classList.remove('hidden');
+        }
+      }
+    });
   });
 })();
 
