@@ -306,6 +306,37 @@ class TestMiddlewareRedirection:
                        follow_redirects=False)
         assert r.status_code == 302
 
+    def test_valid_admin_key_bypasses_gate(self, client, monkeypatch):
+        """X-API-Key matching ADMIN_API_KEY must pass through the preview gate.
+
+        WHY: admin tooling (scripts, internal APIs) runs outside a browser and
+        cannot present a preview_token cookie. The gate must let these requests
+        through before the cookie check so route-level admin auth can run.
+        """
+        from app.config import get_settings
+
+        monkeypatch.setenv("ADMIN_API_KEY", "test-admin-key-xyz")
+        get_settings.cache_clear()
+        try:
+            r = client.get("/health", headers={"X-API-Key": "test-admin-key-xyz"},
+                           follow_redirects=False)
+            assert r.status_code == 200
+        finally:
+            get_settings.cache_clear()
+
+    def test_wrong_admin_key_still_redirects(self, client, monkeypatch):
+        """An unrecognised API key does NOT bypass the preview gate."""
+        from app.config import get_settings
+
+        monkeypatch.setenv("ADMIN_API_KEY", "real-key-abc")
+        get_settings.cache_clear()
+        try:
+            r = client.get("/", headers={"X-API-Key": "wrong-key"},
+                           follow_redirects=False)
+            assert r.status_code == 302
+        finally:
+            get_settings.cache_clear()
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 3.  POST /api/v1/preview/login/request

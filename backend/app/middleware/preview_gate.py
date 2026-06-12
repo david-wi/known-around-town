@@ -84,12 +84,21 @@ class PreviewGateMiddleware(BaseHTTPMiddleware):
         # (lru_cache on get_settings) so it costs nothing in production, but
         # allows tests to toggle the flag via monkeypatch + cache_clear.
         from app.config import get_settings as _get_settings
-        if not _get_settings().preview_mode_enabled:
+        settings = _get_settings()
+        if not settings.preview_mode_enabled:
             return await call_next(request)
 
         path = request.url.path
 
         if _is_bypassed(path):
+            return await call_next(request)
+
+        # WHY: requests bearing the admin API key bypass the preview gate.
+        # Admin tools (scripts, internal APIs) run outside a browser and
+        # cannot present a preview_token cookie; the admin key is sufficient
+        # proof of identity for these callers.
+        api_key = request.headers.get("X-API-Key", "")
+        if api_key and api_key == settings.admin_api_key:
             return await call_next(request)
 
         token = request.cookies.get(PREVIEW_COOKIE_NAME, "")
