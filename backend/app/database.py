@@ -129,6 +129,29 @@ async def ensure_indexes() -> None:
     # `ran_at` lets ops quickly query migration history in order.
     await db.app_migrations.create_index("ran_at")
 
+    # Preview gate: one-time access codes (email + 6-digit numeric code).
+    # WHY: lookup is "most recent unused unexpired code for this email", so
+    # we index (email, created_at desc). The TTL on created_at auto-removes
+    # codes 900 seconds after issue (15-minute lifetime).
+    await db.preview_codes.create_index([("email", 1), ("created_at", -1)])
+    await db.preview_codes.create_index(
+        "expires_at",
+        expireAfterSeconds=0,
+        # WHY: expireAfterSeconds=0 tells MongoDB to remove the document
+        # at the datetime stored in expires_at rather than N seconds after
+        # insertion. This matches our code_expires_at() logic exactly.
+    )
+
+    # Preview gate: long-lived session tokens (32-byte hex, stored hashed).
+    # WHY: cookie-auth path looks up the session by its hashed token; the
+    # token hash is unique because each login issues a fresh random value.
+    await db.preview_sessions.create_index("token_hash", unique=True)
+    # WHY: MongoDB TTL index removes expired sessions automatically. Using
+    # expireAfterSeconds=0 with the expires_at field deletes documents at
+    # their stored expiry time (30 days after issue), keeping the collection
+    # small without a manual cleanup job.
+    await db.preview_sessions.create_index("expires_at", expireAfterSeconds=0)
+
 
 async def run_startup_migrations() -> None:
     """One-time data migrations, each guarded by a record in app_migrations."""
