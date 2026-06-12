@@ -468,12 +468,19 @@ def test_copy_block_override(client, seeded_db):
     assert "An editors&#39; guide for Miami" in r.text or "An editors' guide for Miami" in r.text
 
 
-def test_founding_partner_badge_on_business_detail(client):
-    """A business that's been flagged as a Founding Partner shows the
-    badge label on its detail page. Ayesha Beauty Studio in Wynwood is
-    one of the five mock founding partners seeded for the design-partner
-    outreach demo — if this fails, check `is_founding_partner` is still
-    set on it in `_real_businesses.json`."""
+def test_founding_partner_badge_on_business_detail(client, seeded_db):
+    """A business explicitly flagged as a Founding Partner shows the badge
+    on its detail page. The flag is set directly in this test — the seed
+    data no longer sets it, since the badge should only be granted by the
+    Stripe webhook or admin claim verification, never by seed data."""
+    import asyncio
+    # Explicitly grant the badge to test the rendering path.
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"slug": "ayesha-beauty-studio-wynwood"},
+            {"$set": {"is_founding_partner": True}},
+        )
+    )
     r = client.get(
         "/b/ayesha-beauty-studio-wynwood",
         headers={"host": "miami.knowsbeauty.localhost"},
@@ -484,12 +491,17 @@ def test_founding_partner_badge_on_business_detail(client):
     assert "Founding member of Miami Knows Beauty" in r.text
 
 
-def test_founding_partner_badge_on_trending_row(client):
-    """The home page's trending row also surfaces the Founding Partner
-    badge for any business that has the flag. Three of the five mock
-    founding partners are in the Miami Beauty trending list
-    (Ayesha, Vanity Projects, IGK), so the badge text should appear on
-    the home page."""
+def test_founding_partner_badge_on_trending_row(client, seeded_db):
+    """The home page's trending row also surfaces the Founding Partner badge
+    for any business that has the flag. The flag is set directly in this
+    test — the seed data no longer sets it."""
+    import asyncio
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"slug": "ayesha-beauty-studio-wynwood"},
+            {"$set": {"is_founding_partner": True}},
+        )
+    )
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
     assert "Founding Partner" in r.text

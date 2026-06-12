@@ -209,3 +209,57 @@ async def run_startup_migrations() -> None:
             migration_id,
             published_count,
         )
+
+    # ------------------------------------------------------------------
+    # Migration: clear is_founding_partner on businesses that never
+    # legitimately earned it (no payment, no verified claim).
+    #
+    # WHY: is_founding_partner should only be set by the Stripe checkout
+    # webhook (when an owner pays) or by the admin claim-verification flow.
+    # During development the seed data and a backfill script incorrectly
+    # set this flag on five demo businesses, causing the pricing page to
+    # show "20 Founding Partner spots left" even before a single owner had
+    # subscribed (5 fake slots consumed out of the 25-slot cap).
+    # The backfill script has been deleted and the seed data cleaned up.
+    # This migration clears any stale flags so a future seed accident can't
+    # re-introduce them. The badge is permanent for real earners — see the
+    # inline comment below for how legitimate holders are identified.
+    # ------------------------------------------------------------------
+    migration_id = "clear-seeded-founding-partner-flags-20260611"
+    if not await db.app_migrations.find_one({"_id": migration_id}):
+        cleared = 0
+        async for biz in db.businesses.find({"is_founding_partner": True}):
+            # WHY: the badge is permanent — it persists even after a subscriber
+            # cancels (by design, stripe_billing.py line 221). So the guard is
+            # "was this badge ever legitimately earned", not "is the sub active
+            # today". Two legitimate paths:
+            #   (a) stripe_customer_id is set — the business completed checkout
+            #       at some point. stripe_customer_id is never cleared, even on
+            #       cancellation (unlike stripe_subscription_id which IS cleared).
+            #   (b) a verified business_claims record exists — admin-verified
+            #       owners also receive the badge per the claims flow.
+            # Seed/demo data has neither, so this safely targets only fake flags.
+            has_paid = bool(biz.get("stripe_customer_id"))
+            has_verified_claim = bool(
+                await db.business_claims.find_one(
+                    {"business_id": biz["_id"], "status": "verified"}
+                )
+            )
+            if not has_paid and not has_verified_claim:
+                await db.businesses.update_one(
+                    {"_id": biz["_id"]},
+                    {"$unset": {"is_founding_partner": ""}},
+                )
+                cleared += 1
+        await db.app_migrations.insert_one(
+            {
+                "_id": migration_id,
+                "ran_at": datetime.now(timezone.utc),
+                "cleared_count": cleared,
+            }
+        )
+        log.info(
+            "Migration %s: cleared is_founding_partner from %d businesses with no payment history and no verified claim",
+            migration_id,
+            cleared,
+        )
