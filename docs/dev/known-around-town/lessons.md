@@ -292,3 +292,19 @@ across container restarts.
 **HTML checkbox POST body gotcha:** Unchecked checkboxes send nothing in a POST body.
 Never use `Form(...)` parameters for checkboxes — they'll be missing and FastAPI will
 raise a 422. Always use `request.form()` and check `form.get("field") == "on"`.
+
+## Bypassed handlers must use the same DB-backed helper as the rest of the app (2026-06-12)
+
+When a route (like `robots.txt` or `sitemap.xml`) is in the preview gate's bypass list,
+it runs outside the gate — so the gate's DB-backed preview check doesn't help it. If
+the handler reads `get_settings().preview_mode_enabled` (env var) instead of
+`await get_preview_mode_enabled()` (DB-backed), the admin toggle works for visitors
+(gate opens) but the bypassed handler still sees the old env var value.
+
+**Consequence:** David toggles the admin UI to open the site. Visitors can access pages.
+But `robots.txt` still returns `Disallow: /` (env var says private) — Google thinks the
+site is still private and won't index it.
+
+**Rule:** Every handler that inspects `preview_mode_enabled` must call the DB-backed
+`get_preview_mode_enabled()` helper, whether it's inside or outside the bypass list.
+Caught in CODEREVIEW for PR #197 before it shipped.
