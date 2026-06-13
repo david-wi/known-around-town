@@ -2888,6 +2888,55 @@ async def test_owner_me_shows_subscribed_banner_on_stripe_return(seeded_db):
         "Banner close/dismiss button missing — "
         "owner has no way to clear the banner once they've seen it"
     )
+    # WHY: amber colour matches the beauty theme's 'Featured' badge on the same page;
+    # the old bg-emerald-700 (generic green) was visually inconsistent.
+    assert "bg-amber" in r.text, (
+        "Banner does not use amber colour class — "
+        "it should match the beauty theme's amber 'Featured' design language"
+    )
+
+
+async def test_owner_me_banner_has_auto_dismiss_js(seeded_db):
+    """The post-payment banner page must include the 10-second auto-dismiss JavaScript.
+
+    WHY: The task requires the banner to disappear automatically after 10 seconds
+    so the page doesn't stay cluttered for owners who don't notice the × button.
+    This test confirms the auto-dismiss timer code is rendered into the page HTML
+    whenever the banner is present."""
+    from app.main import app
+    from app.services.owner_auth import SESSION_COOKIE_NAME, sign_session
+    from fastapi.testclient import TestClient
+
+    email = "subscribed-autodismiss@example.com"
+    await seeded_db.businesses.insert_one({
+        "_id": "biz-sub-autodismiss",
+        "name": "Glow Studio AD",
+        "slug": "glow-studio-ad",
+        "claimed_email": email,
+        "stripe_subscription_id": "sub_test_autodismiss",
+        "featured": {"tier": "pro", "enabled": True},
+    })
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.get(
+        "/owners/me?subscribed=1",
+        headers={"host": "miami.knowsbeauty.localhost"},
+        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+    )
+    assert r.status_code == 200, r.text
+    # WHY: The auto-dismiss JS is always included in the template (not conditional on
+    # the banner), but it returns early if 'subscribed-banner-close' is not in the DOM.
+    # The timer value (10000 ms) is the canonical spec for when the banner fades.
+    assert "10000" in r.text, (
+        "10-second auto-dismiss timer (10000 ms) not found in page HTML — "
+        "banner will not automatically fade after 10 seconds as required"
+    )
+    assert "autoDismissTimer" in r.text, (
+        "autoDismissTimer variable not found — auto-dismiss JavaScript block is missing"
+    )
+    assert "clearTimeout" in r.text, (
+        "clearTimeout not found — clicking × will not cancel the auto-dismiss timer, "
+        "causing a double-dismiss attempt 10 seconds after the owner manually dismissed"
+    )
 
 
 async def test_owner_me_no_banner_without_subscribed_param(seeded_db):
