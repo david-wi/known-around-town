@@ -1456,27 +1456,6 @@
     return div;
   }
 
-/* ── Listing performance stats ─────────────────────────────── */
-(function () {
-  var viewsEl = document.getElementById('stat-views');
-  var errEl   = document.getElementById('stats-error');
-  if (!viewsEl) return;   /* not rendered when owner has no listing */
-
-  fetch('/api/v1/owner/stats')
-    .then(function (r) {
-      if (!r.ok) throw new Error('Error ' + r.status);
-      return r.json();
-    })
-    .then(function (data) {
-      viewsEl.textContent = (data.page_view_count || 0).toLocaleString();
-    })
-    .catch(function () {
-      viewsEl.textContent = '—';
-      errEl.textContent = 'Could not load stats. Please refresh the page.';
-      errEl.classList.remove('hidden');
-    });
-})();
-
   fetch('/api/v1/owner/inquiries')
     .then(function (r) {
       if (!r.ok) throw new Error('Error ' + r.status);
@@ -1497,6 +1476,32 @@
       loadingEl.classList.add('hidden');
       errorEl.textContent = 'Could not load inquiries. Please refresh the page.';
       errorEl.classList.remove('hidden');
+    });
+})();
+
+/* ── Listing performance stats ─────────────────────────────── */
+/* WHY: kept as a separate top-level IIFE so it runs independently of the
+   inquiries panel.  The previous code had this block nested inside the
+   inquiries IIFE — if that panel's early-exit guard fired (e.g. element
+   not in DOM), stats would never load even though they were separately
+   rendered on the same page. */
+(function () {
+  var viewsEl = document.getElementById('stat-views');
+  var errEl   = document.getElementById('stats-error');
+  if (!viewsEl) return;   /* not rendered when owner has no listing */
+
+  fetch('/api/v1/owner/stats')
+    .then(function (r) {
+      if (!r.ok) throw new Error('Error ' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      viewsEl.textContent = (data.page_view_count || 0).toLocaleString();
+    })
+    .catch(function () {
+      viewsEl.textContent = '—';
+      errEl.textContent = 'Could not load stats. Please refresh the page.';
+      errEl.classList.remove('hidden');
     });
 })();
 </script>
