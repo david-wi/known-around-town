@@ -102,6 +102,11 @@ _BYPASS_PREFIXES = (
     # require an active owner session at the route level; bypassing the preview
     # gate here does not allow unauthenticated access.
     "/api/v1/marketing-ai/",
+    # WHY: the owner journey PDF is a shareable document sent to prospective
+    # salon owners. Same logic as /walkthrough — recipients have no preview
+    # account and should never hit a login wall when downloading the PDF.
+    # The file contains only marketing copy; no private data is exposed.
+    "/static/walkthrough/",
 )
 
 # WHY: exact-path bypass for paths where sub-paths must stay gated. The claim
