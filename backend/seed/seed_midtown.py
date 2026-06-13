@@ -450,162 +450,181 @@ BUSINESSES: List[Dict[str, Any]] = [
 ]
 
 
-# ── Seed helpers ──────────────────────────────────────────────────────────────
-
-CITY_SLUG = "midtown"
-CITY_NAME = "Midtown & Design District"
-CITY_DESCRIPTION = (
-    "Miami's art-and-design corridor stretches from the Design District's Palm Court "
-    "luxury precinct south through Midtown Miami's walkable mixed-use blocks to the "
-    "edge of Edgewater on Biscayne Bay. The neighborhood draws two overlapping "
-    "crowds — the high-design world of architects, gallery owners, and fashion "
-    "professionals who live and work near NE 39th Street, and the younger creative "
-    "class filling Midtown's new residential towers along N Miami Avenue. Beauty "
-    "businesses here run the full spectrum, from the international prestige of "
-    "IGK Salon and Dr. Barbara Sturm to the deeply local award-winning craft of "
-    "Aurora Nails Bar — all within walking distance of some of the best "
-    "architecture and public art in the city."
-)
-
-BEAUTY_NETWORK_SLUG = "beauty"
-
-CATEGORIES = [
-    ("hair",      "Hair Salons"),
-    ("nails",     "Nail Salons"),
-    ("spa",       "Spas"),
-    ("lash-brow", "Lash & Brow"),
-    ("med-spa",   "Med Spas"),
-    ("barber",    "Barbers"),
-    ("makeup",    "Makeup"),
-    ("waxing",    "Waxing"),
-]
-
-
-async def _seed(db: Any) -> None:
+async def seed_midtown() -> None:
+    db = get_db()
     assert_seed_target_allowed()
-    now = datetime.now(timezone.utc)
 
-    # ── Network ───────────────────────────────────────────────────────────────
-    network = await db.networks.find_one({"slug": BEAUTY_NETWORK_SLUG})
+    # WHY: look up by known network ID first; fall back to slug in case the ID
+    # differs across environments — same pattern as seed_brickell.py.
+    BEAUTY_NETWORK_ID = "eb913a29-f2d2-4f86-af0f-2deca3be3578"
+    network = await db.networks.find_one({"_id": BEAUTY_NETWORK_ID})
     if not network:
-        raise RuntimeError(
-            f"Network '{BEAUTY_NETWORK_SLUG}' not found — run seed_networks.py first."
-        )
-    network_id = str(network["_id"])
-    print(f"Found beauty network: id={network_id}")
+        network = await db.networks.find_one({"slug": "beauty"})
+    if not network:
+        print("ERROR: beauty network not found — run seed_networks.py first.")
+        return
+    network_id = network["_id"]
+    print("Found beauty network: id=%s" % network_id)
+
+    now = datetime.now(timezone.utc)
 
     # ── City ──────────────────────────────────────────────────────────────────
     city_doc = {
-        "slug":        CITY_SLUG,
-        "name":        CITY_NAME,
-        "description": CITY_DESCRIPTION,
-        "network_id":  network_id,
-        "updated_at":  now,
+        "_id": str(uuid.uuid4()),
+        "network_id": network_id,
+        "slug": "midtown",
+        "name": "Midtown & Design District",
+        "state": "FL",
+        "country": "US",
+        "timezone": "America/New_York",
+        "tagline": "Midtown's most trusted beauty addresses.",
+        "hero_description": (
+            "Miami's art-and-design corridor stretches from the Design District's "
+            "Palm Court luxury precinct south through Midtown Miami's walkable "
+            "mixed-use blocks to the edge of Edgewater on Biscayne Bay. Beauty "
+            "businesses here span the full spectrum — from the international prestige "
+            "of IGK Salon and Dr. Barbara Sturm to the deeply local, award-winning "
+            "craft of Aurora Nails Bar — all within walking distance of some of the "
+            "best architecture and public art in the city."
+        ),
+        "seo_title": "Midtown Miami Knows Beauty",
+        "meta_description": (
+            "The curated beauty directory for Midtown Miami and the Design District "
+            "— salons, spas, lash studios, nail bars, and med spas discovered by "
+            "locals. Covering Palm Court, NE 2nd Ave, Midtown Row, and the "
+            "Edgewater border."
+        ),
+        "editorial_headlines": [
+            {"headline": "Midtown's most trusted beauty addresses.", "is_default": True}
+        ],
+        "domain_override": "midtown.knowsbeauty.com",
+        "status": "live",
+        "created_at": now,
+        "updated_at": now,
     }
-    city_id = await upsert(db.cities, {"slug": CITY_SLUG, "network_id": network_id}, city_doc)
-    print(f"Upserted city: {CITY_SLUG} (id={city_id})")
-
-    # ── Categories ────────────────────────────────────────────────────────────
-    cat_id_map: Dict[str, str] = {}
-    for cat_slug, cat_name in CATEGORIES:
-        cat_doc = {
-            "slug":       cat_slug,
-            "name":       cat_name,
-            "network_id": network_id,
-            "updated_at": now,
-        }
-        cat_id = await upsert(
-            db.categories,
-            {"slug": cat_slug, "network_id": network_id},
-            cat_doc,
-        )
-        cat_id_map[cat_slug] = str(cat_id)
-    print(f"Upserted {len(CATEGORIES)} categories.")
+    city = await upsert("cities", {"network_id": network_id, "slug": "midtown"}, city_doc)
+    city_id = city["_id"]
+    print("Upserted city: midtown (id=%s)" % city_id)
 
     # ── Neighborhoods ─────────────────────────────────────────────────────────
-    nbhd_id_map: Dict[str, str] = {}
-    for slug, name, vibe, listed in NEIGHBORHOODS:
-        nbhd_doc = {
-            "slug":        slug,
-            "name":        name,
-            "vibe":        vibe,
-            "description": NEIGHBORHOOD_DESCRIPTIONS.get(slug, ""),
-            "listed_count": listed,
-            "city_id":     str(city_id),
-            "network_id":  network_id,
-            "updated_at":  now,
+    for i, (slug, name, vibe, listed_count) in enumerate(NEIGHBORHOODS):
+        nb_doc = {
+            "_id": str(uuid.uuid4()),
+            "city_id": city_id,
+            "slug": slug,
+            "name": name,
+            "description": vibe,
+            "hero_description": NEIGHBORHOOD_DESCRIPTIONS.get(slug),
+            "listed_count": listed_count,
+            "photo_url": None,
+            "order": i,
+            "status": "live",
+            "created_at": now,
+            "updated_at": now,
         }
-        nbhd_id = await upsert(
-            db.neighborhoods,
-            {"slug": slug, "city_id": str(city_id)},
-            nbhd_doc,
-        )
-        nbhd_id_map[slug] = str(nbhd_id)
-    print(f"Upserted {len(NEIGHBORHOODS)} neighborhoods.")
+        await upsert("neighborhoods", {"city_id": city_id, "slug": slug}, nb_doc)
+    print("Upserted %d neighborhoods." % len(NEIGHBORHOODS))
+
+    # ── Categories (city-scoped instances of the network's master categories) ─
+    for order, group in enumerate(network.get("category_map") or []):
+        cat_doc = {
+            "_id": str(uuid.uuid4()),
+            "network_id": network_id,
+            "city_id": city_id,
+            "slug": group["slug"],
+            "parent_slug": None,
+            "name": group["name"],
+            "description": group.get("description"),
+            "meta_description": group.get("meta_description"),
+            "examples": group.get("examples", []),
+            "order": order,
+            "status": "live",
+            "created_at": now,
+            "updated_at": now,
+        }
+        await upsert("categories", {"city_id": city_id, "slug": group["slug"]}, cat_doc)
+    print("Upserted %d categories." % len(network.get("category_map") or []))
 
     # ── Businesses ────────────────────────────────────────────────────────────
     inserted = 0
     updated = 0
     for biz in BUSINESSES:
-        biz_slug = biz["slug"]
-        cat_slugs = biz.get("category_slugs", [])
-        nbhd_slugs = biz.get("neighborhood_slugs", [])
+        photo_url = _CATEGORY_FALLBACK_PHOTOS.get(biz["category_slugs"][0])
+        photos = [{"url": photo_url, "alt": biz["name"], "order": 0, "is_hero": True}] if photo_url else []
+        socials: Dict[str, Any] = {}
+        if biz.get("instagram"):
+            socials["instagram"] = biz["instagram"]
 
-        # Primary category
-        primary_cat_slug = cat_slugs[0] if cat_slugs else "hair"
-        fallback_key = primary_cat_slug.split("-")[0]
-        fallback_photo = _CATEGORY_FALLBACK_PHOTOS.get(
-            fallback_key, _CATEGORY_FALLBACK_PHOTOS["hair"]
-        )
-
-        biz_doc = {
-            "slug":              biz_slug,
-            "name":              biz["name"],
-            "address":           biz.get("address", {}),
-            "phone":             biz.get("phone"),
-            "website":           biz.get("website"),
-            "instagram":         biz.get("instagram"),
-            "short_description": biz.get("short_description", ""),
-            "price_cues":        biz.get("price_cues", "$$"),
-            "editors_pick":      biz.get("editors_pick", False),
+        biz_doc: Dict[str, Any] = {
+            "_id": str(uuid.uuid4()),
+            "network_id": network_id,
+            "city_id": city_id,
+            "slug": biz["slug"],
+            "name": biz["name"],
+            "category_slugs": biz["category_slugs"],
+            "neighborhood_slugs": biz.get("neighborhood_slugs", []),
+            "address": biz.get("address", {}),
+            "phone": biz.get("phone"),
+            "website": biz.get("website"),
+            "socials": socials,
+            "short_description": biz.get("short_description"),
+            "known_for": biz.get("short_description"),
+            "price_cues": biz.get("price_cues"),
+            "editors_pick": biz.get("editors_pick", False),
             "editors_pick_reason": biz.get("editors_pick_reason"),
-            "category_ids":      [cat_id_map[s] for s in cat_slugs if s in cat_id_map],
-            "neighborhood_ids":  [nbhd_id_map[s] for s in nbhd_slugs if s in nbhd_id_map],
-            "city_id":           str(city_id),
-            "network_id":        network_id,
-            "photo_url":         fallback_photo,
-            "updated_at":        now,
+            "is_founding_partner": False,
+            "featured": {"enabled": False, "tier": "free"},
+            "claim_status": "unclaimed",
+            "data_source": "editorial",
+            "quality_score": 90 if biz.get("editors_pick") else 60,
+            "index_status": "indexed",
+            "index_override": "auto",
+            "schema_org_type": "LocalBusiness",
+            "status": "live",
+            "photos": photos,
+            "hours": [],
+            "services": [],
+            "created_at": now,
+            "updated_at": now,
         }
 
-        existing = await db.businesses.find_one(
-            {"slug": biz_slug, "city_id": str(city_id)}
-        )
+        # WHY: preserve owner claim data, billing fields, hours, and services
+        # on re-seed so that any owner who has already claimed their listing
+        # doesn't lose their work — same pattern as every other city seed.
+        existing = await db.businesses.find_one({"city_id": city_id, "slug": biz["slug"]})
         if existing:
-            await db.businesses.update_one(
-                {"_id": existing["_id"]}, {"$set": biz_doc}
-            )
+            for _preserve in (
+                "claim_status", "claimed_email", "claimed_by_user_id",
+                "claimed_at", "verified_at",
+                "stripe_customer_id", "stripe_subscription_id",
+                "is_founding_partner", "hours",
+            ):
+                if _preserve in existing:
+                    biz_doc[_preserve] = existing[_preserve]
+            existing_services = existing.get("services") or []
+            if existing_services:
+                biz_doc["services"] = existing_services
+            biz_doc["_id"] = existing["_id"]
+            biz_doc["created_at"] = existing.get("created_at", biz_doc["created_at"])
+            await db.businesses.replace_one({"_id": existing["_id"]}, biz_doc)
             updated += 1
         else:
-            biz_doc["_id"] = str(uuid.uuid4())
-            biz_doc["created_at"] = now
             await db.businesses.insert_one(biz_doc)
             inserted += 1
 
-    print(
-        f"Businesses: {inserted} inserted, {updated} updated.\n"
-        f"\nMidtown seed complete:\n"
-        f"  City:          {CITY_SLUG} (id={city_id})\n"
-        f"  Network:       {BEAUTY_NETWORK_SLUG} (id={network_id})\n"
-        f"  Neighborhoods: {len(NEIGHBORHOODS)}\n"
-        f"  Categories:    {len(CATEGORIES)}\n"
-        f"  Businesses:    {inserted + updated} total ({inserted} new, {updated} updated)"
-    )
+    print("Businesses: %d inserted, %d updated." % (inserted, updated))
+    print("")
+    print("Midtown seed complete:")
+    print("  City:          midtown (id=%s)" % city_id)
+    print("  Network:       beauty (id=%s)" % network_id)
+    print("  Neighborhoods: %d" % len(NEIGHBORHOODS))
+    print("  Categories:    %d" % len(network.get("category_map") or []))
+    print("  Businesses:    %d total (%d new, %d updated)" % (len(BUSINESSES), inserted, updated))
 
 
 async def main() -> None:
     await ensure_indexes()
-    db = get_db()
-    await _seed(db)
+    await seed_midtown()
 
 
 if __name__ == "__main__":
