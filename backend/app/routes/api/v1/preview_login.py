@@ -15,10 +15,13 @@ are on the list.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
@@ -152,6 +155,10 @@ async def request_preview_code(payload: LoginRequest) -> OkResponse:
         }
         await db.preview_codes.insert_one(doc)
         await send_preview_code_email(email=email, code=code)
+        # WHY: log the code at INFO so an admin can retrieve it from
+        # container logs when Resend delivery is delayed or filtered.
+        # Safe for this internal preview gate — logs are server-admin only.
+        logger.info("Preview code for %s: %s", email, code)
 
     return OkResponse(ok=True)
 

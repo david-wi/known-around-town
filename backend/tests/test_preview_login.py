@@ -521,6 +521,49 @@ class TestRequestCode:
         )
         assert len(docs) == 1
 
+    def test_code_logged_at_route_level_when_resend_is_configured(
+        self, client, mock_db, monkeypatch, caplog
+    ):
+        """Route logs the cleartext code so an admin can recover it from
+        container logs when Resend delivery is delayed or filtered.
+
+        WHY: this test sets a fake RESEND_API_KEY and mocks the HTTP call so
+        the route believes Resend is configured — it will take the real-send
+        path instead of the dev-fallback path. We assert that the route-level
+        log line appears even in that case, proving an admin can always look at
+        container logs rather than waiting for an email.
+        """
+        import app.services.preview_email as email_svc
+
+        monkeypatch.setenv("RESEND_API_KEY", "re_fake_key_for_test")
+
+        async def _fake_send(*, email: str, code: str) -> bool:
+            return True  # simulate Resend accepting the call
+
+        monkeypatch.setattr(email_svc, "send_preview_code_email", _fake_send)
+
+        caplog.clear()
+        with caplog.at_level(
+            logging.INFO,
+            logger="app.routes.api.v1.preview_login",
+        ):
+            r = client.post(
+                "/api/v1/preview/login/request",
+                json={"email": "alice@expertly.com"},
+            )
+        assert r.status_code == 200
+
+        matched = [
+            rec
+            for rec in caplog.records
+            if rec.name == "app.routes.api.v1.preview_login"
+            and re.search(r"Preview code for \S+: \d{6}", rec.getMessage())
+        ]
+        assert matched, (
+            "Expected a route-level 'Preview code for ...: XXXXXX' log entry "
+            f"but found none. Records: {caplog.records}"
+        )
+
     def test_code_expiry_is_roughly_fifteen_minutes(self, client, mock_db):
         client.post(
             "/api/v1/preview/login/request",
