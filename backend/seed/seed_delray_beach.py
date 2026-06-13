@@ -125,6 +125,12 @@ BUSINESSES: List[Dict[str, Any]] = [
             "massage therapy. The signature seaweed wrap uses local Gulf-source kelp "
             "and is a frequent gift card purchase for Atlantic Avenue visitors."
         ),
+        "editors_pick":     True,
+        "editors_pick_reason": (
+            "One of South Florida's most storied hotel spas — the Colony Hotel has been "
+            "a Delray institution since 1926, and its spa lives up to the legacy. "
+            "The signature seaweed wrap is a genuine local tradition."
+        ),
         "photos": [],
         "services": [],
     },
@@ -228,6 +234,12 @@ BUSINESSES: List[Dict[str, Any]] = [
             "training. Delray's most-reviewed med spa for natural-looking injectables "
             "and CoolSculpting body contouring."
         ),
+        "editors_pick":     True,
+        "editors_pick_reason": (
+            "Delray Beach's go-to for natural-looking injectables — board-certified PA "
+            "and the highest review count among local med spas. The standard for "
+            "subtle, refined results on the coast."
+        ),
         "photos": [],
         "services": [],
     },
@@ -249,6 +261,12 @@ BUSINESSES: List[Dict[str, Any]] = [
             "fantasy color and precision lived-in blondes. The owner trained under "
             "a Miami colorist before opening this intimate 3-chair studio in 2021. "
             "Long wait-lists; worth booking 6 weeks ahead."
+        ),
+        "editors_pick":     True,
+        "editors_pick_reason": (
+            "The only 5-star salon in Delray Beach — and the waitlist proves it. "
+            "An intimate, appointment-only studio with a colorist whose lived-in blondes "
+            "and fantasy color work travel well beyond South Florida."
         ),
         "photos": [],
         "services": [],
@@ -333,6 +351,12 @@ BUSINESSES: List[Dict[str, Any]] = [
             "trained in South Korea and maintains a small clientele for detailed, "
             "true-to-skin work. Booking opens monthly."
         ),
+        "editors_pick":     True,
+        "editors_pick_reason": (
+            "South Korean-trained microblading artistry in an intimate Pineapple Grove "
+            "studio — a genuinely rare find in South Florida. Bookings open monthly "
+            "and fill within hours. Worth planning ahead."
+        ),
         "photos": [],
         "services": [],
     },
@@ -396,6 +420,12 @@ BUSINESSES: List[Dict[str, Any]] = [
             "treatment plans — HydraFacials, chemical peels, microneedling, and "
             "LED light therapy. Aesthetician team has combined 30+ years of "
             "South Florida practice. Downtown location ideal for lunch-hour appointments."
+        ),
+        "editors_pick":     True,
+        "editors_pick_reason": (
+            "Thirty-plus combined years of South Florida skin expertise — these are "
+            "clinicians who build actual treatment plans, not just upsell add-ons. "
+            "The downtown location makes a lunch-hour HydraFacial genuinely doable."
         ),
         "photos": [],
         "services": [],
