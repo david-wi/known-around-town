@@ -114,7 +114,7 @@ BUSINESSES = [
             "staff and a consistently polished experience set this apart."
         ),
         "price_range": "$$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "coastal-nail-lounge",
@@ -147,7 +147,7 @@ BUSINESSES = [
             "like a proper treat."
         ),
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "lash-luxe-pompano",
@@ -175,7 +175,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "european-wax-center-pompano",
@@ -202,7 +202,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "glamour-touch-salon-pompano",
@@ -229,7 +229,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "tranquility-day-spa-pompano",
@@ -261,7 +261,7 @@ BUSINESSES = [
             "Book the facial-and-massage combo for the full experience."
         ),
         "price_range": "$$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "quick-brow-bar-atlantic",
@@ -289,7 +289,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "nails-by-the-beach-pompano",
@@ -317,7 +317,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     # ── Sample Road ────────────────────────────────────────────────────────────
     {
@@ -351,7 +351,7 @@ BUSINESSES = [
             "treatment add-on."
         ),
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "perfect-10-nails-sample",
@@ -378,7 +378,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "massage-envy-pompano-sample",
@@ -406,7 +406,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "lashes-by-mariana-pompano",
@@ -433,7 +433,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "hair-gallery-sample-road",
@@ -461,7 +461,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     # ── Downtown Pompano ───────────────────────────────────────────────────────
     {
@@ -495,7 +495,7 @@ BUSINESSES = [
             "for themselves within a few visits."
         ),
         "price_range": "$$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "the-mane-collective-pompano",
@@ -523,7 +523,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "polish-and-press-downtown",
@@ -551,7 +551,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "brow-and-glow-pompano",
@@ -579,7 +579,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$$",
-        "status": "active",
+        "status": "live",
     },
     # ── North Pompano ──────────────────────────────────────────────────────────
     {
@@ -608,7 +608,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "north-pompano-hair-studio",
@@ -636,7 +636,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "serenity-lash-and-wax-north",
@@ -664,7 +664,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
 ]
 
@@ -690,7 +690,7 @@ async def seed_pompano_beach() -> None:
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
         "domain_override": DOMAIN_OVERRIDE,
-        "status": "active",
+        "status": "live",
         "updated_at": now,
     }
     city = await upsert("cities", {"network_id": network_id, "slug": CITY_SLUG}, city_doc)
