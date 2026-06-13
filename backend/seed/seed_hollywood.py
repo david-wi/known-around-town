@@ -518,7 +518,7 @@ BUSINESSES: List[Dict[str, Any]] = [
 # ── Seed function ─────────────────────────────────────────────────────────────
 
 async def seed_hollywood() -> None:
-    db = await get_db()
+    db = get_db()
     now = datetime.now(timezone.utc)
 
     network = await db.networks.find_one({"slug": "kat-beauty-com"})
