@@ -83,11 +83,14 @@
 |------|-----------|--------|-----------|
 | Miami | 50 | ✅ Live | `miami.knowsbeauty.com` |
 | Boca Raton | 28 | ✅ Live | `boca-raton.knowsbeauty.com` |
-| Fort Lauderdale | 25+ | ✅ Live | `fort-lauderdale.knowsbeauty.com` |
+| Fort Lauderdale | 39 | ✅ Live | `fort-lauderdale.knowsbeauty.com` |
 | Aventura | 23 | ✅ Live | `aventura.knowsbeauty.com` |
 | Coral Gables | 25 | ✅ Live | `coral-gables.knowsbeauty.com` |
 | Coconut Grove | 18 | ⚠️ DNS needed | `coconut-grove.knowsbeauty.com` |
-| Hollywood, FL | 20 | ⚠️ DNS needed | `hollywood.knowsbeauty.com` |
+| South Beach | 20 | ⚠️ DNS needed | `south-beach.knowsbeauty.com` |
+| Hollywood, FL | 17 | ⚠️ DNS needed | `hollywood.knowsbeauty.com` |
+| Wynwood | 19 | ⚠️ DNS needed | `wynwood.knowsbeauty.com` |
+| Brickell | 18 | ⚠️ DNS needed | `brickell.knowsbeauty.com` |
 
 Each city gets its own subdomain, DNS record, Traefik routing, and seed script. Adding a new city requires only: a seed script + DNS record + Traefik label entry. No code changes needed.
 
