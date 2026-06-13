@@ -10,11 +10,10 @@ Run (production):
     KAT_ALLOW_PRODUCTION_RESET=true python -m seed.seed_doral
 """
 
-from asyncio import run
 from datetime import datetime, timezone
 
-from seed._helpers import assert_seed_target_allowed, ensure_indexes, upsert
-from app.db import get_db
+from app.database import ensure_indexes, get_db
+from seed._helpers import assert_seed_target_allowed, run, upsert
 
 CITY_SLUG = "doral"
 CITY_NAME = "Doral"
