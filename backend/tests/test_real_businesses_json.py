@@ -87,6 +87,41 @@ def test_little_havana_business_correct_neighborhood(real_data, slug):
     )
 
 
+NEW_KEY_BISCAYNE_SLUGS = [
+    "ceci-spa-hair-and-nails-key-biscayne",
+    "prestige-beauty-salon-and-spa-key-biscayne",
+    "b-care-salon-and-nails-spa-key-biscayne",
+    "the-spot-barbershop-key-biscayne",
+    "key-beauty-by-yeny-key-biscayne",
+]
+
+
+@pytest.mark.parametrize("slug", NEW_KEY_BISCAYNE_SLUGS)
+def test_key_biscayne_business_present(beauty_slugs, slug):
+    """All new Key Biscayne businesses must be present in the beauty array."""
+    assert slug in beauty_slugs, f"New business {slug!r} is missing from _real_businesses.json"
+
+
+@pytest.mark.parametrize("slug", NEW_KEY_BISCAYNE_SLUGS)
+def test_key_biscayne_business_required_fields(real_data, slug):
+    """Each new Key Biscayne business must have all fields the seed code reads."""
+    biz = next((b for b in real_data["beauty"] if b["slug"] == slug), None)
+    assert biz is not None, f"{slug!r} not found"
+    for field in REQUIRED_FIELDS:
+        assert field in biz and biz[field], (
+            f"{slug!r} is missing required field {field!r}"
+        )
+
+
+@pytest.mark.parametrize("slug", NEW_KEY_BISCAYNE_SLUGS)
+def test_key_biscayne_business_correct_neighborhood(real_data, slug):
+    """All Key Biscayne businesses must have neighborhood_slug='key-biscayne'."""
+    biz = next(b for b in real_data["beauty"] if b["slug"] == slug)
+    assert biz["neighborhood_slug"] == "key-biscayne", (
+        f"{slug!r} has neighborhood_slug={biz['neighborhood_slug']!r}, expected 'key-biscayne'"
+    )
+
+
 # ── seed_miami.py spotlight/trending slugs must resolve ──────────────────────
 
 # Slugs referenced in seed_miami.py editorial placements — if they don't exist
