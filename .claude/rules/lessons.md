@@ -25,6 +25,16 @@ As of PR #205, every issued code is also logged at INFO level to the container â
 
 The allowed email list is in `backend/app/services/preview_auth.py` (`ALLOWED_EMAILS` + `ALLOWED_DOMAINS`). David's personal emails (`david@bodnick.com`, `david@wisdev.com`) are already in it.
 
+## Removing closed businesses from seed data (2026-06-13)
+
+The upsert archived-status guard (PR #206) only protects businesses that ALREADY exist in the DB as archived. A business defined in `_real_businesses.json` with no `status` field gets freshly INSERTED as "live" on every seed run, bypassing the guard entirely.
+
+Permanent fix: remove closed businesses from `_real_businesses.json` entirely. The nightly seed cannot re-insert what isn't in the source data.
+
+After removing a business from the JSON, its DB record persists as "archived" (protected by the upsert guard). That's the correct final state: visible in DB for historical audit, but never re-surfaced live.
+
+When updating smoke tests to remove a closed business as a test target, pick a replacement that: (a) exists in the seed, and (b) for homepage-trending tests, also appears in `trending_business_slugs` in `seed_miami.py`.
+
 ## Support email configuration (2026-06-12)
 
 The support email `hello@knowsbeauty.com` was hardcoded in ~15 places across templates and email service code. The domain has no mail records so every message to it bounced. The pattern used to make it configurable:
