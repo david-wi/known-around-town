@@ -91,3 +91,18 @@ async def get_google_site_verification() -> str:
     if db_val is not None:
         return str(db_val).strip()
     return get_settings().google_site_verification
+
+
+async def get_support_email() -> str:
+    """Return the public-facing support email address.
+
+    DB value takes precedence. Falls back to the SUPPORT_EMAIL env var (default
+    hello@knowsbeauty.com) so the site keeps working before the admin UI has
+    been used to set a real address.
+    """
+    from app.config import get_settings
+
+    db_val = await get_site_setting("support_email", default=None)
+    if db_val is not None:
+        return str(db_val).strip()
+    return get_settings().support_email

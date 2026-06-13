@@ -110,6 +110,13 @@ class Settings(BaseSettings):
     # — the rest of the app continues to work normally.
     google_places_api_key: str = ""
 
+    # WHY: the public-facing support email shown throughout the site and in
+    # outbound emails. Configurable so David can point it at a working inbox
+    # (e.g. a Google Workspace address or forwarding address) via one env-var
+    # change and a container restart, without a code deploy. The default is
+    # hello@knowsbeauty.com — update to a real monitored address before launch.
+    support_email: str = "hello@knowsbeauty.com"
+
     port: int = 8000
     log_level: str = "INFO"
 

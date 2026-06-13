@@ -21,6 +21,7 @@ from app.services.site_settings import (
     get_google_site_verification,
     get_marketing_ai_enabled,
     get_preview_mode_enabled,
+    get_support_email,
     update_site_settings,
 )
 
@@ -48,6 +49,7 @@ async def settings_page(
     marketing_ai_enabled = await get_marketing_ai_enabled()
     preview_mode_enabled = await get_preview_mode_enabled()
     google_site_verification = await get_google_site_verification()
+    support_email = await get_support_email()
 
     return _templates.TemplateResponse(
         "admin/settings.html",
@@ -56,6 +58,7 @@ async def settings_page(
             "marketing_ai_enabled": marketing_ai_enabled,
             "preview_mode_enabled": preview_mode_enabled,
             "google_site_verification": google_site_verification,
+            "support_email": support_email,
             "saved": saved == "1",
         },
     )
@@ -81,11 +84,27 @@ async def update_settings(
     # WHY: strip whitespace so a stray space in the pasted GSC code doesn't
     # silently break verification (Google requires an exact match).
     google_site_verification = str(form.get("google_site_verification") or "").strip()
+    # WHY: strip whitespace for the same reason as GSC — a trailing space in an
+    # email address would produce a broken mailto: link on every page.
+    support_email = str(form.get("support_email") or "").strip()
 
     await update_site_settings({
         "marketing_ai_enabled": marketing_ai_enabled,
         "preview_mode_enabled": preview_mode_enabled,
         "google_site_verification": google_site_verification,
+        "support_email": support_email,
     })
+
+    # WHY: the Jinja2 global was set at startup from the env-var value.
+    # When the admin saves a new address via the settings page, we update
+    # the global in-process so templates on the NEXT request immediately
+    # reflect the new address — no container restart required.
+    # If the field was cleared, fall back to the env-var default so the
+    # site always shows a real address rather than an empty mailto: link.
+    if _templates is not None:
+        from app.config import get_settings as _get_settings
+        _templates.env.globals["support_email"] = (
+            support_email or _get_settings().support_email
+        )
 
     return RedirectResponse(url="/admin/settings?saved=1", status_code=303)

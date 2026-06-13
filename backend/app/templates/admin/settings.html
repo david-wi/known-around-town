@@ -128,6 +128,31 @@
         {% endif %}
       </div>
 
+      {# ── Support email ── #}
+      <div class="px-6 py-5">
+        <label for="support-email" class="block font-medium text-stone-900 mb-1">
+          Support email address
+        </label>
+        <p class="text-sm text-stone-500 mb-3">
+          The email address shown on public pages (owner sign-up, pricing, walkthrough) and included
+          in every automated email sent to business owners. Change this to a real monitored inbox —
+          messages sent to an address with no mail records set up bounce silently and owners never
+          get a reply.
+        </p>
+        <input
+          type="email"
+          id="support-email"
+          name="support_email"
+          value="{{ support_email }}"
+          placeholder="e.g. hello@miami.knowsbeauty.com"
+          class="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
+        >
+        <p class="mt-1 text-xs text-stone-400">
+          Takes effect immediately — no server restart needed. Can also be set via the
+          <code class="font-mono bg-stone-100 px-1 rounded">SUPPORT_EMAIL</code> environment variable.
+        </p>
+      </div>
+
     </div>
 
     <div class="mt-6 flex justify-end">

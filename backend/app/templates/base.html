@@ -20,7 +20,15 @@
   {% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}
   <meta property="og:title" content="{{ seo_title or ((city.name ~ ' Knows ' ~ vertical_word) if city else network.name) }}">
   {% if meta_description %}<meta property="og:description" content="{{ meta_description }}">{% endif %}
-  <meta property="og:type" content="website">
+  {#- WHY: og:type is a block so business pages can override to "business.business",
+      which enables richer Facebook share cards for local listings. All other pages
+      use the "website" default. #}
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  {#- WHY: The "robots" context variable lets any route flag a page as noindex
+      without touching every template individually. Preview pages and owner
+      demo pages set this to "noindex, nofollow" so Google never surfaces a
+      mockup as a real product page. #}
+  {% if robots %}<meta name="robots" content="{{ robots }}">{% endif %}
   {#- WHY: og:url tells Facebook, LinkedIn, and Slack which URL is canonical
       for this page so shares accumulate likes/comments on one URL instead of
       fragmenting across variants with different query strings. Without it
