@@ -1,6 +1,6 @@
 """Seed Fort Lauderdale for the Beauty network.
 
-22 curated, web-verified businesses across 8 neighborhoods.
+32 curated, web-verified businesses across 10 neighborhoods.
 Run inside the backend container after seed_networks.py and seed_miami.py:
     KAT_ALLOW_PRODUCTION_RESET=true python -m seed.seed_fort_lauderdale
 """
@@ -18,15 +18,15 @@ from seed._helpers import assert_seed_target_allowed, run, upsert
 # ── Neighborhoods ────────────────────────────────────────────────────────────
 # (slug, display name, vibe description, listed_count)
 NEIGHBORHOODS: List[tuple] = [
-    ("las-olas",              "Las Olas",                    "Walkable & upscale",           5),
+    ("las-olas",              "Las Olas",                    "Walkable & upscale",           3),
     ("victoria-park",         "Victoria Park",               "Neighborhood & chic",          5),
     ("wilton-manors",         "Wilton Manors",               "Welcoming & creative",         4),
     ("flagler-village",       "Flagler Village",             "Arts district & emerging",     3),
     ("se-17th-street",        "SE 17th Street",              "Marina & residential",         2),
     ("downtown-fort-lauderdale", "Downtown Fort Lauderdale", "Urban & revitalizing",         3),
     ("north-fort-lauderdale", "North Fort Lauderdale",       "Coastal & accessible",         4),
-    ("oakland-park",          "Oakland Park",                "Community & local",            1),
-    ("lauderdale-by-the-sea", "Lauderdale-by-the-Sea",       "Beachy & laid-back",           1),
+    ("oakland-park",          "Oakland Park",                "Community & local",            5),
+    ("lauderdale-by-the-sea", "Lauderdale-by-the-Sea",       "Beachy & laid-back",           3),
     ("pompano-beach",         "Pompano Beach",               "Coastal & growing",            0),
 ]
 
@@ -328,6 +328,90 @@ BUSINESSES: List[Dict[str, Any]] = [
         "editors_pick": False,
     },
 
+    # ── OAKLAND PARK NAILS ──────────────────────────────────────────────────
+    {
+        "name": "K&K Nails and Spa",
+        "slug": "kk-nails-and-spa-oakland-park",
+        "category_slugs": ["nails"],
+        "neighborhood_slugs": ["oakland-park"],
+        "address": {"street": "169 E Oakland Park Blvd", "city": "Oakland Park", "state": "FL", "postal_code": "33334", "country": "US"},
+        "phone": "(954) 530-0602",
+        "website": None,
+        "short_description": (
+            "A dependable neighborhood nail salon on Oakland Park Blvd known for "
+            "clean technique on manicures, pedicures, and gel services — "
+            "the kind of place regulars return to without hesitation."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "name": "D'Nails & Spa",
+        "slug": "dnails-and-spa-oakland-park",
+        "category_slugs": ["nails"],
+        "neighborhood_slugs": ["oakland-park"],
+        "address": {"street": "840 E Oakland Park Blvd, Suite 116", "city": "Oakland Park", "state": "FL", "postal_code": "33334", "country": "US"},
+        "phone": "(954) 396-0860",
+        "website": None,
+        "short_description": (
+            "A full-service nail salon and spa on Oakland Park Blvd offering "
+            "manicures, pedicures, waxing, and facials — local staff with consistent "
+            "reviews for care and cleanliness."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "name": "Paradise Nails & Spa",
+        "slug": "paradise-nails-and-spa-oakland-park",
+        "category_slugs": ["nails"],
+        "neighborhood_slugs": ["oakland-park"],
+        "address": {"street": "1323 E Commercial Blvd", "city": "Oakland Park", "state": "FL", "postal_code": "33334", "country": "US"},
+        "phone": "(954) 999-0483",
+        "website": None,
+        "short_description": (
+            "An Oakland Park nail spa on Commercial Blvd with a loyal local following — "
+            "gel, acrylic, and spa pedicures in a clean, welcoming space where "
+            "the staff remembers what you had last time."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    # ── OAKLAND PARK BARBER ─────────────────────────────────────────────────
+    {
+        "name": "Randy's Barbershop",
+        "slug": "randys-barbershop-oakland-park",
+        "category_slugs": ["barber"],
+        "neighborhood_slugs": ["oakland-park"],
+        "address": {"street": "3656 N Andrews Ave", "city": "Oakland Park", "state": "FL", "postal_code": "33309", "country": "US"},
+        "phone": "(954) 317-7089",
+        "website": None,
+        "short_description": (
+            "A trusted Oakland Park barbershop where fades, tapers, and beard "
+            "work are done by barbers who've been at it long enough to have "
+            "a waiting room full of familiar faces."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
+    # ── LAUDERDALE-BY-THE-SEA NAILS ──────────────────────────────────────────
+    {
+        "name": "Oceans Nail Spa",
+        "slug": "oceans-nail-spa-lauderdale-by-the-sea",
+        "category_slugs": ["nails"],
+        "neighborhood_slugs": ["lauderdale-by-the-sea"],
+        "address": {"street": "4741 N Ocean Dr", "city": "Lauderdale-by-the-Sea", "state": "FL", "postal_code": "33308", "country": "US"},
+        "phone": "(954) 788-1891",
+        "website": None,
+        "short_description": (
+            "A neighborhood nail spa steps from the beach in Lauderdale-by-the-Sea "
+            "offering manicures, pedicures, and gel services with the unhurried "
+            "pace the town is known for."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+
     # ── SPA & MASSAGE (maps to 'spa' category slug) ──────────────────────────
     {
         "name": "Majesty Day Spa",
@@ -389,6 +473,24 @@ BUSINESSES: List[Dict[str, Any]] = [
             "A luxury day spa on North Federal offering full-body massage, skin-rejuvenating "
             "facials, and waxing in a calm, beautifully appointed space — open seven days "
             "a week with extended evening hours."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": False,
+    },
+
+    # ── LAUDERDALE-BY-THE-SEA SPA ────────────────────────────────────────────
+    {
+        "name": "Acqua Salon & Spa",
+        "slug": "acqua-salon-and-spa-lauderdale-by-the-sea",
+        "category_slugs": ["spa"],
+        "neighborhood_slugs": ["lauderdale-by-the-sea"],
+        "address": {"street": "218 Commercial Blvd, Unit 108", "city": "Lauderdale-by-the-Sea", "state": "FL", "postal_code": "33308", "country": "US"},
+        "phone": "(754) 236-0597",
+        "website": None,
+        "short_description": (
+            "A full-service salon and spa in the heart of Lauderdale-by-the-Sea "
+            "offering hair, skin, and massage treatments steps from the beach — "
+            "a complete beauty stop in a town that moves at its own relaxed pace."
         ),
         "price_cues": "$$$",
         "editors_pick": False,

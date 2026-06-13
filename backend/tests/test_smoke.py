@@ -475,15 +475,17 @@ def test_founding_partner_badge_on_business_detail(client, seeded_db):
     data no longer sets it, since the badge should only be granted by the
     Stripe webhook or admin claim verification, never by seed data."""
     import asyncio
-    # Explicitly grant the badge to test the rendering path.
+    # WHY: igk-salon-south-beach is a stable seed business confirmed present;
+    # the previous target (ayesha-beauty-studio-wynwood) was removed from the
+    # seed when the business closed.
     asyncio.run(
         seeded_db.businesses.update_one(
-            {"slug": "ayesha-beauty-studio-wynwood"},
+            {"slug": "igk-salon-south-beach"},
             {"$set": {"is_founding_partner": True}},
         )
     )
     r = client.get(
-        "/b/ayesha-beauty-studio-wynwood",
+        "/b/igk-salon-south-beach",
         headers={"host": "miami.knowsbeauty.localhost"},
     )
     assert r.status_code == 200, r.text
@@ -497,9 +499,13 @@ def test_founding_partner_badge_on_trending_row(client, seeded_db):
     for any business that has the flag. The flag is set directly in this
     test — the seed data no longer sets it."""
     import asyncio
+    # WHY: igk-salon-south-beach is in the trending_business_slugs list in
+    # seed_miami.py, so it appears on the homepage trending row — needed for
+    # this badge-visibility test. The previous target (ayesha-beauty-studio-wynwood)
+    # was removed from the seed when the business closed.
     asyncio.run(
         seeded_db.businesses.update_one(
-            {"slug": "ayesha-beauty-studio-wynwood"},
+            {"slug": "igk-salon-south-beach"},
             {"$set": {"is_founding_partner": True}},
         )
     )
