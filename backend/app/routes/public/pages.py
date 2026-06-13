@@ -409,6 +409,22 @@ async def home(request: Request) -> HTMLResponse:
     if not tenant.city:
         if tenant.city_slug:
             raise HTTPException(404, "City not found")
+        # WHY: when the visitor lands on the bare root domain (knowsbeauty.com)
+        # and only one city is live, redirect straight to that city's subdomain
+        # rather than showing a one-item "pick a city" landing page. The landing
+        # page becomes useful once multiple cities are live; until then a redirect
+        # is a better first impression. Using 302 (not 301) so browsers don't
+        # cache it — this condition changes as new cities are seeded.
+        live_cities = await content_svc.list_cities(tenant.network["_id"])
+        if len(live_cities) == 1:
+            scheme = request.url.scheme or "https"
+            suffix = tenant.network_domain_suffix
+            slug = live_cities[0].get("slug", "")
+            if slug and suffix:
+                return RedirectResponse(
+                    url=f"{scheme}://{slug}.{suffix}/",
+                    status_code=302,
+                )
         return await _render_network_landing(request, tenant)
 
     city = tenant.city
