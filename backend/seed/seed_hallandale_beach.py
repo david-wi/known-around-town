@@ -145,7 +145,7 @@ BUSINESSES: List[Dict[str, Any]] = [
             "a loyal return clientele."
         ),
         "price_cues": "$$",
-        "editors_pick": False,
+        "editors_pick": True,
     },
     {
         "name": "Bliss Nail Spa Hallandale",
@@ -193,13 +193,13 @@ BUSINESSES: List[Dict[str, Any]] = [
         "website": "",
         "instagram": "@browbar_hallandale",
         "short_description": (
-            "A brow-first beauty studio in east Hallandale focusing on precision "
-            "threading, waxing, and tinting — plus lash lifts and lamination "
+            "The brow destination on Hallandale Beach Blvd — precision "
+            "threading, waxing, and tinting with lash lifts and lamination "
             "for clients who want polished, natural-looking results without "
             "the commitment of extensions."
         ),
         "price_cues": "$",
-        "editors_pick": False,
+        "editors_pick": True,
     },
     {
         "name": "Hallandale Beach Barbershop",
@@ -291,7 +291,7 @@ BUSINESSES: List[Dict[str, Any]] = [
             "without leaving the mainland."
         ),
         "price_cues": "$$$",
-        "editors_pick": False,
+        "editors_pick": True,
     },
     {
         "name": "Radiant Wax Gulfstream",
