@@ -595,13 +595,19 @@ async def seed_network(network_slug: str) -> None:
         }
         await upsert("categories", {"city_id": city["_id"], "slug": group["slug"]}, cat_doc)
 
-    # Wipe stale businesses from earlier seeds so the editorial list on the
-    # home page matches the reference exactly (no leftover "Stillwater Spa"
-    # or "Gables Cosmetic Dentistry" from prior runs).
+    # Wipe stale EDITORIAL businesses from earlier seeds so the editorial list
+    # on the home page matches the reference exactly (no leftover "Stillwater
+    # Spa" or "Gables Cosmetic Dentistry" from prior runs).
+    # WHY: only delete editorial records — Fresha imports, manual additions,
+    # and claimed businesses have data_source != 'editorial' (or claim_status
+    # != 'unclaimed') and must survive across seed runs so they aren't wiped
+    # when the seed refreshes the handcrafted list.
     canonical_biz_slugs = [b["slug"] for b in businesses]
     await db.businesses.delete_many({
         "city_id": city["_id"],
         "slug": {"$nin": canonical_biz_slugs},
+        "data_source": "editorial",
+        "claim_status": "unclaimed",
     })
 
     # Businesses
