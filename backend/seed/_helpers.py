@@ -95,6 +95,12 @@ async def upsert(collection_name: str, query: Dict[str, Any], doc: Dict[str, Any
     if existing:
         # Preserve _id and created_at on update, refresh everything else.
         doc = {**doc, "_id": existing["_id"], "created_at": existing.get("created_at", doc.get("created_at"))}
+        # WHY: a listing manually archived by an admin must stay archived even
+        # when the seed re-runs and would restore it as "live". Overwriting
+        # archived status caused previously-confirmed-closed businesses to
+        # reappear on the live directory every time the seed ran.
+        if existing.get("status") == "archived" and doc.get("status") == "live":
+            doc["status"] = "archived"
         await db[collection_name].replace_one({"_id": existing["_id"]}, doc)
         return doc
     await db[collection_name].insert_one(doc)
