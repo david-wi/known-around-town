@@ -291,7 +291,7 @@ def _html_body(code: str) -> str:
 
 async def send_claim_verified_email(
     *, email: str, submitter_name: str, business_name: str, login_url: str,
-    site_base_url: str = "https://miamiknowsbeauty.com",
+    site_base_url: str = "https://miami.knowsbeauty.com",
 ) -> bool:
     """Notify the owner that their claim has been verified and they can now log in.
 
