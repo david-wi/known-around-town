@@ -103,6 +103,7 @@ services:
         Host(`aventura.knowsbeauty.com`) ||
         Host(`coral-gables.knowsbeauty.com`) ||
         Host(`coconut-grove.knowsbeauty.com`) ||
+        Host(`hollywood.knowsbeauty.com`) ||
         Host(`south-beach.knowsbeauty.com`)
       traefik.http.routers.kat-beauty-com.tls: "true"
       traefik.http.routers.kat-beauty-com.tls.certresolver: "letsencrypt"
