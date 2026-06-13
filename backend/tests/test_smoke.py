@@ -540,8 +540,10 @@ def test_home_hero_has_owner_entry_point(client):
     # "Own a" is the start of "Own a salon in Miami?" — the owner nudge phrase
     assert "Own a" in body
     # The link arrow "→" distinguishes the hero micro-CTA from other claim
-    # buttons on the page, which render without an arrow character.
-    assert "Claim your listing →" in body
+    # buttons on the page, which render without an arrow character. The word
+    # "free" is included here to address the owner's first question (does
+    # claiming cost money?) right above the fold.
+    assert "Claim your listing free →" in body
 
 
 def test_business_detail_has_og_image_when_photos_exist(client, seeded_db):
