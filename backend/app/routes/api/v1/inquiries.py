@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.config import get_settings
 from app.database import get_db
 from app.models import BusinessInquiry
 from app.routes.api.v1._auth import require_admin
@@ -12,9 +13,14 @@ from app.services.owner_email import send_admin_inquiry_email, send_owner_inquir
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/inquiries", tags=["inquiries"])
 
-# WHY: dashboard URL is fixed per deployment — the owner's session cookie
-# identifies which business they manage, so one URL covers every owner.
-_DASHBOARD_URL = "https://miami.knowsbeauty.ai.devintensive.com/owners/me"
+
+def _dashboard_url() -> str:
+    # WHY: read from canonical_base_url at call time so the link in owner
+    # emails uses the public hostname (miami.knowsbeauty.com) rather than
+    # the Docker-internal dev domain.  A module-level constant baked the
+    # dev URL into every inquiry notification sent in production.
+    base = (get_settings().canonical_base_url or "https://miami.knowsbeauty.com").rstrip("/")
+    return f"{base}/owners/me"
 
 
 async def _notify_about_inquiry(business: Dict[str, Any], doc: Dict[str, Any]) -> None:
@@ -58,7 +64,7 @@ async def _notify_about_inquiry(business: Dict[str, Any], doc: Dict[str, Any]) -
             visitor_email=visitor_email,
             visitor_phone=visitor_phone,
             message=message,
-            dashboard_url=_DASHBOARD_URL,
+            dashboard_url=_dashboard_url(),
         )
     else:
         await send_admin_inquiry_email(
