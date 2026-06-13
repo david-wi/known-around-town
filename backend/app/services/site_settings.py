@@ -39,10 +39,24 @@ async def get_site_setting(key: str, default: Any = None) -> Any:
 
 
 async def update_site_settings(updates: Dict[str, Any]) -> None:
-    """Persist one or more settings values. Creates the document if it doesn't exist."""
+    """Persist one or more settings values. Creates the document if it doesn't exist.
+
+    Values that are None are removed from the document (``$unset``) so the
+    callers that read them fall back to the corresponding env-var default.
+    This prevents saving an empty string that silently overrides the default.
+    """
+    set_ops = {k: v for k, v in updates.items() if v is not None}
+    unset_ops = {k: "" for k, v in updates.items() if v is None}
+    update_doc: Dict[str, Any] = {}
+    if set_ops:
+        update_doc["$set"] = set_ops
+    if unset_ops:
+        update_doc["$unset"] = unset_ops
+    if not update_doc:
+        return
     await get_db().site_settings.update_one(
         {"_id": _SETTINGS_ID},
-        {"$set": updates},
+        update_doc,
         upsert=True,
     )
 

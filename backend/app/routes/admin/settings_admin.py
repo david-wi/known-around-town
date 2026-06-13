@@ -82,11 +82,14 @@ async def update_settings(
     # "private (preview on)", absent means "public (preview off)".
     preview_mode_enabled = form.get("preview_mode_enabled") == "on"
     # WHY: strip whitespace so a stray space in the pasted GSC code doesn't
-    # silently break verification (Google requires an exact match).
-    google_site_verification = str(form.get("google_site_verification") or "").strip()
-    # WHY: strip whitespace for the same reason as GSC — a trailing space in an
-    # email address would produce a broken mailto: link on every page.
-    support_email = str(form.get("support_email") or "").strip()
+    # silently break verification (Google requires an exact match). Storing
+    # None (not "") when blank lets update_site_settings $unset the field so
+    # the env-var default kicks in — an empty string in the DB would override
+    # the default and expose a broken (empty) value everywhere on the site.
+    google_site_verification = str(form.get("google_site_verification") or "").strip() or None
+    # WHY: same reasoning — blank input means "use the default address", not
+    # "set the support email to nothing".
+    support_email = str(form.get("support_email") or "").strip() or None
 
     await update_site_settings({
         "marketing_ai_enabled": marketing_ai_enabled,
