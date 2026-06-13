@@ -308,3 +308,47 @@ site is still private and won't index it.
 **Rule:** Every handler that inspects `preview_mode_enabled` must call the DB-backed
 `get_preview_mode_enabled()` helper, whether it's inside or outside the bypass list.
 Caught in CODEREVIEW for PR #197 before it shipped.
+
+## Multi-city Traefik routing — wildcard HostRegexp works better than explicit Host() lists (2026-06-13)
+
+When adding a new city subdomain (e.g., `boca-raton.knowsbeauty.com`), the Traefik
+router rule must include it. Rather than maintaining an ever-growing explicit list like
+`Host(`miami.knowsbeauty.com`) || Host(`boca-raton.knowsbeauty.com`) || ...`, use:
+
+```yaml
+rule: "HostRegexp(`{subdomain:[a-z0-9-]+}.knowsbeauty.com`)"
+```
+
+This matches any subdomain automatically. The app already does city lookup from the
+`Host` header, so no code change is needed per city — the router just needs to pass
+the request through.
+
+**Why not do this from day one:** Wildcard TLS certs require the DNS-01 ACME challenge
+(Traefik needs Cloudflare/Dynadot API access), whereas explicit Host() rules use
+HTTP-01 which works out of the box. For now we enumerate known cities until
+DNS-01 is wired up. Add each new city's subdomain to the Traefik router rule in
+`docker-compose.prod.yml`.
+
+## PDF generation from Jinja2 templates — render locally, print with Playwright (2026-06-13)
+
+The Owner Journey PDF is a static file committed to the repo. To regenerate it after
+template changes:
+
+1. Read the theme dict from `pages.py` (`_NETWORK_THEMES["beauty"]`)
+2. Use Jinja2 directly (no FastAPI server needed) to render `walkthrough.html`
+3. Strip `{% extends %}` / `{% block content %}` wrappers and embed CSS inline
+4. Write standalone HTML to `/tmp/walkthrough_rendered.html`
+5. Use Playwright `page.pdf(format='Letter', print_background=True)` to print it
+6. Save to `backend/app/static/walkthrough/mkb-owner-journey.pdf` and commit
+
+The key: set `print_background=True` otherwise Tailwind's background colors are stripped.
+No margins needed at the PDF level since the template has its own padding.
+
+## Inline HTML mockups for gated features (2026-06-13)
+
+When a tool requires a real subscription/session to demo (e.g., Marketing AI needs
+a Featured subscription), don't try to take screenshots with a test account. Instead,
+build inline HTML mockups directly in the template using the same Tailwind classes
+and design patterns as the real tool. They render identically in the browser and in
+the PDF, look completely authentic, and let you control the example content to be
+maximally compelling. Much faster and more reliable than any screenshot approach.

@@ -55,6 +55,7 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Instagram caption generator | ✅ Live | `/api/v1/marketing-ai/instagram-caption`; gated on `MARKETING_AI_ENABLED` |
+| Ad copy generator | ✅ Live | `/api/v1/marketing-ai/ad-copy`; returns 3 variations (Google/FB/Instagram-sized) |
 | Marketing AI toggle | ✅ Live | `/admin/settings` → Feature Flags section |
 
 ## Admin Tools
@@ -76,6 +77,26 @@
 | Startup migrations | ✅ Live | Idempotent, tracked in `app_migrations` |
 | Preview gate | ✅ Live | Email + code, 30-day cookie |
 
+## Multi-City Expansion
+
+| City | Businesses | Status | Subdomain |
+|------|-----------|--------|-----------|
+| Miami | 50 | ✅ Live | `miami.knowsbeauty.com` |
+| Boca Raton | 28 | ✅ Live | `boca-raton.knowsbeauty.com` |
+| Fort Lauderdale | 25+ | ✅ Live | `fort-lauderdale.knowsbeauty.com` |
+| Aventura | 23 | ✅ Live | `aventura.knowsbeauty.com` |
+| Coral Gables | 25 | ✅ Live | `coral-gables.knowsbeauty.com` |
+
+Each city gets its own subdomain, DNS record, Traefik routing, and seed script. Adding a new city requires only: a seed script + DNS record + Traefik label entry. No code changes needed.
+
+## Owner Journey / Walkthrough
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Walkthrough landing page | ✅ Live | `/walkthrough` — HTML + PDF link |
+| PDF download | ✅ Live | `mkb-owner-journey.pdf` — 7 pages, publicly downloadable |
+| Marketing AI tool mockups in PDF | ✅ Live | PR #218 — Instagram caption + ad copy generators shown with sample output |
+
 ## Roadmap / Pending
 
 | Item | Priority | Blocked On |
@@ -85,7 +106,6 @@
 | Google Search Console verification | P1 | David: verify using meta tag |
 | Public launch | P1 | David's go/no-go (set `PREVIEW_MODE_ENABLED=false` via `/admin/settings`) |
 | Owner outreach email send | P1 | David sends from drafts at `/home/david/Spaces/posey/work/owner-outreach-email-draft.md` |
-| "Knows" vertical domains (9 available) | P2 | David: fund Dynadot account ($~196) |
 | Resend domain verification (knowsbeauty.com) | P2 | SPF/DKIM/MX DNS records needed |
 | GPS coordinates on listings | P3 | Geocoding at import time |
-| Multi-city expansion | P3 | Platform ready; needs data |
+| More city expansion | P3 | Platform and infrastructure ready; add seed scripts |
