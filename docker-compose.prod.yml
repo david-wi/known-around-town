@@ -105,7 +105,8 @@ services:
         Host(`coconut-grove.knowsbeauty.com`) ||
         Host(`hollywood.knowsbeauty.com`) ||
         Host(`south-beach.knowsbeauty.com`) ||
-        Host(`wynwood.knowsbeauty.com`)
+        Host(`wynwood.knowsbeauty.com`) ||
+        Host(`brickell.knowsbeauty.com`)
       traefik.http.routers.kat-beauty-com.tls: "true"
       traefik.http.routers.kat-beauty-com.tls.certresolver: "letsencrypt"
       traefik.http.routers.kat-beauty-com.service: "known-around-town"
