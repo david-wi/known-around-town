@@ -50,7 +50,9 @@ The submission is stored as a `business_inquiry` document and an email notificat
 is sent to the owner and admin.
 **Acceptance:** Given a visitor who submits the inquiry form, when the form is
 submitted, then a confirmation message is shown, the inquiry appears in the admin
-view, and the owner receives an email notification.
+view, and the owner receives an email notification. The form requires at least one
+contact method (email or phone) — submitting with neither is blocked with a clear
+error so the salon always has a way to reply. Either field alone is sufficient.
 
 ### KAT-017 — Editorial guides · V1 · implemented
 **Persona:** Salon Seeker.

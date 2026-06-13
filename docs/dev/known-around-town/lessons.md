@@ -344,6 +344,67 @@ template changes:
 The key: set `print_background=True` otherwise Tailwind's background colors are stripped.
 No margins needed at the PDF level since the template has its own padding.
 
+## Static files are served under /assets/, not /static/ (2026-06-13)
+
+`backend/app/static/` is mounted at the `/assets/` URL prefix in `main.py`. Any
+code that references `/static/...` for this app's own static files will get a 404.
+
+Affected areas:
+- `preview_gate.py` bypass list: the Owner Journey PDF is at `/assets/walkthrough/`
+  (not `/static/walkthrough/`). Fixed in PR #256.
+- Any template or inline script that builds URLs to static files must use `/assets/`.
+
+**How to verify:** The `StaticFiles` mount in `main.py` reads:
+`app.mount("/assets", StaticFiles(directory="app/static"), name="static")`
+
+## Search chips: onclick must traverse DOM to find the form (2026-06-13)
+
+The home page search chips live *outside* the `<form>` closing tag (they're in a
+following `<div>` inside the same `<section>`). `this.form` doesn't work.
+
+The reliable pattern:
+```html
+onclick="var f=this.closest('section').querySelector('form');
+         f.querySelector('input[name=q]').value=this.textContent.trim();f.submit();"
+```
+
+`this.closest('section')` walks up to the shared parent, then `.querySelector('form')`
+finds the form. This survives any amount of intermediate `<div>` nesting.
+
+## Dead dropdowns: remove before launch, don't try to wire (2026-06-13)
+
+Category and neighborhood pages had Tier and Sort dropdowns with no `onchange`
+handlers — selecting an option did nothing. The decision was to **remove** them
+pre-launch rather than implement server-side filtering in a rush.
+
+Rule: any `<select>` on a visitor-facing page must have a working `onchange` or a
+form submission target. A `<select>` that changes nothing is worse than no filter at
+all — it signals a broken directory to first-time visitors.
+
+## Inquiry form contact validation: client-side only (2026-06-13)
+
+`BusinessInquiry` model (`models.py`) has `email: Optional[str] = None` and
+`phone: Optional[str] = None` — the API layer accepts submissions with neither.
+The "at least one contact method" rule is enforced client-side in the form's
+JavaScript submit handler.
+
+If you ever need server-side enforcement, add a Pydantic `@model_validator(mode='after')`
+to `BusinessInquiry` that raises a `ValueError` when both are None/empty.
+
+## Playwright admin key bypass for preview-gated pages (2026-06-13)
+
+All public pages are behind the preview gate. Playwright automation can bypass it
+via the admin API key header:
+
+```python
+ctx = browser.new_context(
+    extra_http_headers={"X-API-Key": ADMIN_KEY},
+)
+```
+
+This works because the preview gate checks `X-API-Key` before the cookie check.
+The key value is in the production `.env` as `ADMIN_API_KEY`.
+
 ## Inline HTML mockups for gated features (2026-06-13)
 
 When a tool requires a real subscription/session to demo (e.g., Marketing AI needs
