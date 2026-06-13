@@ -629,6 +629,88 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$$",
         "editors_pick": False,
     },
+
+    # ── POMPANO BEACH ────────────────────────────────────────────────────────
+    {
+        "name": "Artistic Hair & Nails",
+        "slug": "artistic-hair-and-nails-pompano-beach",
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": ["pompano-beach"],
+        "address": {"street": "732 E McNab Rd", "city": "Pompano Beach", "state": "FL", "postal_code": "33060", "country": "US"},
+        "phone": "(954) 771-6245",
+        "website": None,
+        "short_description": (
+            "A long-standing Pompano Beach salon on McNab Road offering haircuts, color, "
+            "and nail services under one roof — the kind of reliable neighborhood spot "
+            "that regulars have been returning to for years."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "name": "The Studio Salon & Day Spa",
+        "slug": "the-studio-salon-day-spa-pompano-beach",
+        "category_slugs": ["spa"],
+        "neighborhood_slugs": ["pompano-beach"],
+        "address": {"street": "1403 S Federal Hwy", "city": "Pompano Beach", "state": "FL", "postal_code": "33062", "country": "US"},
+        "phone": "(954) 788-2662",
+        "website": None,
+        "short_description": (
+            "A full-service day spa on South Federal Highway bringing salon and spa "
+            "services together — haircuts, coloring, facials, and massage for Pompano "
+            "Beach residents who want everything in one appointment."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "name": "Luxe Nail Spa",
+        "slug": "luxe-nail-spa-pompano-beach",
+        "category_slugs": ["nails"],
+        "neighborhood_slugs": ["pompano-beach"],
+        "address": {"street": "808 N Federal Hwy", "city": "Pompano Beach", "state": "FL", "postal_code": "33062", "country": "US"},
+        "phone": "(954) 657-8375",
+        "website": None,
+        "short_description": (
+            "A nail spa on North Federal Highway in Pompano Beach with a reputation "
+            "for clean work and a calm atmosphere — manicures, pedicures, and gel "
+            "sets done by a team that takes the time to get the details right."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "name": "LS Nails & Spa",
+        "slug": "ls-nails-and-spa-pompano-beach",
+        "category_slugs": ["nails"],
+        "neighborhood_slugs": ["pompano-beach"],
+        "address": {"street": "2101 N Federal Hwy Ste D103", "city": "Pompano Beach", "state": "FL", "postal_code": "33062", "country": "US"},
+        "phone": "(954) 960-2447",
+        "website": None,
+        "short_description": (
+            "A well-reviewed nail spa in the North Federal Highway corridor, LS Nails "
+            "offers manicures, pedicures, acrylic sets, and waxing in a comfortable "
+            "shop that keeps a loyal Pompano Beach following."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "name": "European Wax Center Pompano Beach",
+        "slug": "european-wax-center-pompano-beach",
+        "category_slugs": ["waxing"],
+        "neighborhood_slugs": ["pompano-beach"],
+        "address": {"street": "1700 NE 23rd St Suite 104", "city": "Pompano Beach", "state": "FL", "postal_code": "33062", "country": "US"},
+        "phone": "(954) 820-7086",
+        "website": "https://www.waxcenter.com/locations/pompano-beach",
+        "short_description": (
+            "The Pompano Beach outpost of the national waxing specialist, using their "
+            "proprietary Comfort Wax formula and a strip-free technique that regulars "
+            "say is noticeably gentler than traditional waxing services."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
 ]
 
 

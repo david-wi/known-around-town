@@ -141,6 +141,12 @@ NEIGHBORHOOD_DESCRIPTIONS: Dict[str, Dict[str, str]] = {
             "anchor, part creative outlet — and the best ones have been doing it for decades, "
             "long before the rest of Miami started paying attention."
         ),
+        "key-biscayne": (
+            "Separated from the city by the Rickenbacker Causeway, Key Biscayne moves at "
+            "its own unhurried pace. The handful of salons here serve a tight-knit "
+            "residential community — expect personalized attention, familiar faces, "
+            "and a clientele that has been coming back for years."
+        ),
         "sunny-isles-beach": (
             "With one of the most multilingual client bases in Miami, Sunny Isles salons are "
             "fluent in global beauty standards — Russian, Portuguese, Spanish, and the "
