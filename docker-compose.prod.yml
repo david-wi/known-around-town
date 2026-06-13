@@ -99,7 +99,9 @@ services:
         Host(`www.miami.knowsbeauty.com`) ||
         Host(`stage-miami.knowsbeauty.com`) ||
         Host(`fort-lauderdale.knowsbeauty.com`) ||
-        Host(`boca-raton.knowsbeauty.com`)
+        Host(`boca-raton.knowsbeauty.com`) ||
+        Host(`aventura.knowsbeauty.com`) ||
+        Host(`coral-gables.knowsbeauty.com`)
       traefik.http.routers.kat-beauty-com.tls: "true"
       traefik.http.routers.kat-beauty-com.tls.certresolver: "letsencrypt"
       traefik.http.routers.kat-beauty-com.service: "known-around-town"
