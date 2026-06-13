@@ -86,6 +86,7 @@
 | Fort Lauderdale | 25+ | ✅ Live | `fort-lauderdale.knowsbeauty.com` |
 | Aventura | 23 | ✅ Live | `aventura.knowsbeauty.com` |
 | Coral Gables | 25 | ✅ Live | `coral-gables.knowsbeauty.com` |
+| Coconut Grove | 18 | ⚠️ DNS needed | `coconut-grove.knowsbeauty.com` |
 
 Each city gets its own subdomain, DNS record, Traefik routing, and seed script. Adding a new city requires only: a seed script + DNS record + Traefik label entry. No code changes needed.
 
