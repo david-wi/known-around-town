@@ -367,47 +367,39 @@ def test_unknown_host_404(client):
     assert r.status_code == 404
 
 
-def test_bare_apex_beauty_returns_200(client):
-    """The bare network host (no city subdomain) must render a real landing
-    page, not a 403 / 404. Before this fix it silently fell through to a
-    near-empty stub and the upstream proxy was returning 403 on HEAD probes;
-    we now serve the network_landing template with a real city tile so
-    visitors who land on the apex have somewhere to click."""
-    r = client.get("/", headers={"host": "knowsbeauty.localhost"})
-    assert r.status_code == 200, r.text
+def test_bare_apex_beauty_redirects_to_only_city(client):
+    """When the bare network host has exactly one live city, it must redirect
+    to that city's subdomain rather than showing a one-item city-picker page.
+    This gives visitors a better first impression — they land directly on the
+    Miami directory, not on an intermediate 'pick a city' screen."""
+    r = client.get("/", headers={"host": "knowsbeauty.localhost"}, follow_redirects=False)
+    assert r.status_code == 302, r.text
+    # Must redirect to the Miami city subdomain, not back to the apex.
+    assert "miami.knowsbeauty.localhost" in r.headers.get("location", "")
 
 
-def test_bare_apex_renders_network_landing_with_city_tile(client):
-    """The bare-apex landing page must list the live cities for the network
-    and link each tile to its own city subdomain (not back to the apex)."""
-    r = client.get("/", headers={"host": "knowsbeauty.localhost"})
+def test_bare_apex_redirect_resolves_to_city_home(client):
+    """Following the bare-apex redirect must land on the Miami city home page."""
+    r = client.get("/", headers={"host": "knowsbeauty.localhost"}, follow_redirects=True)
+    # After the redirect the final response is the Miami city home.
     assert r.status_code == 200, r.text
     body = r.text
-    # Brand chrome present.
     assert "Knows Beauty" in body
-    # City tile for the only currently-live city in the seed.
-    assert "Miami Beauty" in body
-    # City tile is a real link to the city subdomain — not a relative URL
-    # that would route back to the apex.
-    assert "miami.knowsbeauty.localhost" in body
-    # The "Cities" section eyebrow shows we're on the landing page, not the
-    # bare network_home stub.
-    assert "CITIES" in body
-    # The planned-expansion section surfaces at least one "coming soon" city.
-    assert "Austin Beauty" in body
-    assert "Coming 202" in body  # year prefix shared by all ETAs
+    # Miami-specific content — not the network landing page.
+    assert "Miami" in body
 
 
-def test_bare_apex_wellness_and_health_also_render(client):
-    """Bare apex must work for every network, not just Beauty."""
-    for host, expected_brand in [
-        ("knowswellness.localhost", "Knows Wellness"),
-        ("knowshealth.localhost", "Knows Health"),
+def test_bare_apex_wellness_and_health_also_redirect(client):
+    """Bare apex redirects for every network when each has exactly one city."""
+    for host, city_prefix in [
+        ("knowswellness.localhost", "miami.knowswellness.localhost"),
+        ("knowshealth.localhost", "miami.knowshealth.localhost"),
     ]:
-        r = client.get("/", headers={"host": host})
-        assert r.status_code == 200, f"{host}: {r.text}"
-        assert expected_brand in r.text
-        assert "miami." in r.text  # the live Miami city tile must link out
+        r = client.get("/", headers={"host": host}, follow_redirects=False)
+        assert r.status_code == 302, f"{host}: {r.text}"
+        assert city_prefix in r.headers.get("location", ""), (
+            f"{host} redirect location should contain {city_prefix}"
+        )
 
 
 def test_unknown_city_renders_404(client):
@@ -416,13 +408,14 @@ def test_unknown_city_renders_404(client):
     assert r.status_code == 404
 
 
-def test_bare_network_host_renders_city_landing(client):
-    r = client.get("/", headers={"host": "knowsbeauty.localhost"})
-    assert r.status_code == 200, r.text
-    assert "KNOWS BEAUTY" in r.text
-    assert "Miami" in r.text
-    assert "http://miami.knowsbeauty.localhost/" in r.text
-    assert "Austin" in r.text
+def test_bare_network_host_redirects_to_city(client):
+    """Single-city network root must redirect, not render a city-picker page."""
+    r = client.get("/", headers={"host": "knowsbeauty.localhost"}, follow_redirects=False)
+    assert r.status_code == 302, r.text
+    location = r.headers.get("location", "")
+    assert "miami.knowsbeauty.localhost" in location, (
+        f"Expected redirect to miami subdomain, got: {location}"
+    )
 
 
 def test_sitemap_includes_business(client):
