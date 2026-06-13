@@ -94,6 +94,7 @@
 | Midtown Miami | 18 | ⚠️ DNS needed | `midtown.knowsbeauty.com` |
 | Delray Beach | 20 | ⚠️ DNS needed | `delray-beach.knowsbeauty.com` |
 | Hallandale Beach | 18 | ⚠️ DNS needed | `hallandale-beach.knowsbeauty.com` |
+| Doral | 22 | ⚠️ DNS needed | `doral.knowsbeauty.com` |
 
 Each city gets its own subdomain, DNS record, Traefik routing, and seed script. Adding a new city requires only: a seed script + DNS record + Traefik label entry. No code changes needed.
 
