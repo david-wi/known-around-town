@@ -482,7 +482,7 @@ CATEGORIES = [
 
 
 async def _seed(db: Any) -> None:
-    assert_seed_target_allowed(db)
+    assert_seed_target_allowed()
     now = datetime.now(timezone.utc)
 
     # ── Network ───────────────────────────────────────────────────────────────
@@ -602,9 +602,11 @@ async def _seed(db: Any) -> None:
     )
 
 
-def main() -> None:
-    run(_seed)
+async def main() -> None:
+    await ensure_indexes()
+    db = get_db()
+    await _seed(db)
 
 
 if __name__ == "__main__":
-    main()
+    run(main())
