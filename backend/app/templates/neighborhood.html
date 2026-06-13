@@ -91,15 +91,8 @@
     {#- WHY: Claim-status filter removed — the dropdown was non-functional (no JS
         wired to it) and showing "Unclaimed" as a consumer-facing option signalled
         that listings were abandoned, which hurts trust in the directory. #}
-    <div class="ml-auto flex items-center gap-2">
-      <span class="text-xs uppercase tracking-wide text-stone-500 font-semibold">Sort</span>
-      <select class="text-sm bg-stone-100 hover:bg-stone-200 transition border-0 rounded-full px-4 py-2 font-medium text-stone-700 focus:outline-none focus:ring-2 {{ theme.focus_ring }}">
-        <option value="editor">Editor's Picks</option>
-        <option value="alpha">A to Z</option>
-        <option value="price-low">Price: Low to high</option>
-        <option value="price-high">Price: High to low</option>
-      </select>
-    </div>
+    {#- WHY: Sort dropdown removed pre-launch — had no onchange handler, so selecting
+        any option did nothing. Remove until server-side sorting is implemented. #}
   </div>
 </section>
 

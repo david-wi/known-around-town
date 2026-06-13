@@ -106,7 +106,8 @@ _BYPASS_PREFIXES = (
     # salon owners. Same logic as /walkthrough — recipients have no preview
     # account and should never hit a login wall when downloading the PDF.
     # The file contains only marketing copy; no private data is exposed.
-    "/static/walkthrough/",
+    # Static files are mounted under /assets/ (not /static/) in main.py.
+    "/assets/walkthrough/",
 )
 
 # WHY: exact-path bypass for paths where sub-paths must stay gated. The claim

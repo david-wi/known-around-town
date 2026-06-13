@@ -575,14 +575,14 @@
                  placeholder="Jane Smith">
         </div>
         <div>
-          <label for="inq-email" class="block text-xs font-semibold text-stone-600 uppercase tracking-wide mb-1">Email</label>
+          <label for="inq-email" class="block text-xs font-semibold text-stone-600 uppercase tracking-wide mb-1">Email <span class="text-rose-500" aria-hidden="true">*</span></label>
           <input id="inq-email" name="email" type="email" autocomplete="email"
                  class="w-full border border-stone-300 rounded-xl px-4 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent placeholder-stone-400"
                  placeholder="jane@example.com">
         </div>
       </div>
       <div>
-        <label for="inq-phone" class="block text-xs font-semibold text-stone-600 uppercase tracking-wide mb-1">Phone</label>
+        <label for="inq-phone" class="block text-xs font-semibold text-stone-600 uppercase tracking-wide mb-1">Phone <span class="text-stone-400 font-normal normal-case tracking-normal">(or email above)</span></label>
         <input id="inq-phone" name="phone" type="tel" autocomplete="tel"
                class="w-full border border-stone-300 rounded-xl px-4 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent placeholder-stone-400"
                placeholder="(305) 555-0100">
@@ -619,9 +619,22 @@
 
     var name = form.querySelector('[name=name]').value.trim();
     var message = form.querySelector('[name=message]').value.trim();
+    var email = form.querySelector('[name=email]').value.trim();
+    var phone = form.querySelector('[name=phone]').value.trim();
+
     if (!name || !message) {
       errorBox.textContent = 'Please fill in your name and message.';
       errorBox.classList.remove('hidden');
+      return;
+    }
+    // WHY: email and phone are individually optional, but the salon needs at least
+    // one way to reply to the visitor. Without this check, a visitor could submit
+    // with no contact info and the inquiry would arrive with no return address,
+    // making it impossible for the owner to respond.
+    if (!email && !phone) {
+      errorBox.textContent = 'Please provide an email address or phone number so the salon can reach you.';
+      errorBox.classList.remove('hidden');
+      form.querySelector('[name=email]').focus();
       return;
     }
 
@@ -630,8 +643,6 @@
       name: name,
       message: message,
     };
-    var email = form.querySelector('[name=email]').value.trim();
-    var phone = form.querySelector('[name=phone]').value.trim();
     if (email) payload.email = email;
     if (phone) payload.phone = phone;
 

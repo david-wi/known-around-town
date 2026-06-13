@@ -96,7 +96,14 @@
       <div class="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2">
         <span class="text-[10px] uppercase tracking-[0.25em] text-white/55 font-medium">Searched tonight</span>
         {% for chip in search_chips %}
-        <button class="text-white/85 text-sm italic hover:text-amber-100 underline underline-offset-[6px] decoration-white/25 hover:decoration-amber-200 transition" style="font-family: Georgia, serif;">{{ chip }}</button>
+        {#- WHY: type="button" prevents accidental form submission if a browser decides
+            these are inside a form context. The onclick finds the search form within
+            the same <section>, fills the text input, and submits — so clicking a chip
+            works like typing that term and pressing Find. #}
+        <button type="button"
+                onclick="var f=this.closest('section').querySelector('form');f.querySelector('input[name=q]').value=this.textContent.trim();f.submit();"
+                class="text-white/85 text-sm italic hover:text-amber-100 underline underline-offset-[6px] decoration-white/25 hover:decoration-amber-200 transition cursor-pointer"
+                style="font-family: Georgia, serif;">{{ chip }}</button>
         {% endfor %}
       </div>
       {% endif %}
