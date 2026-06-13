@@ -435,13 +435,18 @@
     function showSuccess(businessName, email) {
       var tmpl = document.getElementById('claim-form__success-template');
       var node = tmpl.content.cloneNode(true);
-      node.getElementById('claim-form__success-business').textContent = businessName;
-      node.getElementById('claim-form__success-email').textContent = email;
+      // WHY: use querySelector('#id') rather than node.getElementById('#id').
+      // DocumentFragment.getElementById was only added in Chrome 123 / Firefox 128 /
+      // Safari 18 (all late 2024). Older iPhones running Safari 17 would throw a
+      // TypeError here and leave the form stuck in "Submitting…" despite the claim
+      // reaching the server. querySelector('#id') is universally supported.
+      node.querySelector('#claim-form__success-business').textContent = businessName;
+      node.querySelector('#claim-form__success-email').textContent = email;
 
       // WHY: If the slug was resolved from the directory during the match
-      // phase (resolveBusinessId sets bizIdInput.value), capture it now so
-      // the "view it now" link points at the correct listing page.  We look
-      // up the slug from the DIRECTORY entry that matches the resolved id
+      // phase (bizIdInput.value is set by the submit handler or suggestion click),
+      // capture it now so the "view it now" link points at the correct listing page.
+      // We look up the slug from the DIRECTORY entry that matches the resolved id
       // rather than trusting the free-text input directly.
       if (!window._claimBusinessSlug) {
         var resolvedId = (bizIdInput.value || '').trim();
@@ -455,7 +460,7 @@
         }
       }
 
-      var listingLink = node.getElementById('claim-success-listing-link');
+      var listingLink = node.querySelector('#claim-success-listing-link');
       if (listingLink && window._claimBusinessSlug) {
         listingLink.href = '/b/' + window._claimBusinessSlug;
       } else if (listingLink) {
@@ -497,12 +502,21 @@
       var businessId = resolveBusinessId(businessName);
       if (!businessId) {
         showError(
-          "We couldn't find a listing matching “" + businessName +
-          "”. Try the exact name as it appears in your storefront.",
-          true  // show "Browse directory" link so they can find the right name
+          “We couldn't find a listing matching “” + businessName +
+          “”. Try the exact name as it appears in your storefront.”,
+          true  // show “Browse directory” link so they can find the right name
         );
         bizNameInput.focus();
         return;
+      }
+
+      // WHY: resolveBusinessId returns the id but never writes it back to the
+      // hidden input. showSuccess reads bizIdInput.value to look up the slug
+      // for the “view it now” link — without this write, free-text matches
+      // (not the ?slug= prefill path, not the suggestion-button click path)
+      // always hide the link even though the business was successfully resolved.
+      if (!bizIdInput.value) {
+        bizIdInput.value = businessId;
       }
 
       submitBtn.disabled = true;
