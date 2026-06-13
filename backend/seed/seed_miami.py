@@ -229,7 +229,7 @@ NETWORK_CITY_CONFIG = {
         "footer_also_in": "Also in Lahore · Austin · Orlando",
         "footer_publication_label": "A Knows Beauty publication.",
         "footer_owners_label": "SALONS",
-        "footer_owners_items": ["List your salon", "Owner login", "Pricing"],
+        "footer_owners_items": ["List your salon", "Pricing"],
         "footer_legal": "© 2026 Miami Knows Beauty · A local-first directory for beauty professionals.",
         "footer_made_in": "Made in Miami · Powered by Expertly",
         "seo_title": "Miami Knows Beauty",
