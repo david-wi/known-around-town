@@ -14,7 +14,7 @@
         <p class="text-stone-400 text-sm leading-relaxed max-w-sm">{{ footer_about_body or network.description or '' }}</p>
         {% if footer_also_in or footer_publication_label %}
         <p class="text-stone-500 text-xs mt-6 tracking-wide">
-          {% if footer_publication_label %}<span class="italic">{{ footer_publication_label }}.</span> {% endif %}
+          {% if footer_publication_label %}<span class="italic">{{ footer_publication_label }}</span> {% endif %}
           {% if footer_also_in %}{{ footer_also_in }}{% endif %}
         </p>
         {% endif %}
