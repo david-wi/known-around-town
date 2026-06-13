@@ -109,7 +109,8 @@ services:
         Host(`brickell.knowsbeauty.com`) ||
         Host(`midtown.knowsbeauty.com`) ||
         Host(`delray-beach.knowsbeauty.com`) ||
-        Host(`hallandale-beach.knowsbeauty.com`)
+        Host(`hallandale-beach.knowsbeauty.com`) ||
+        Host(`doral.knowsbeauty.com`)
       traefik.http.routers.kat-beauty-com.tls: "true"
       traefik.http.routers.kat-beauty-com.tls.certresolver: "letsencrypt"
       traefik.http.routers.kat-beauty-com.service: "known-around-town"
