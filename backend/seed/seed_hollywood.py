@@ -521,7 +521,7 @@ async def seed_hollywood() -> None:
     db = get_db()
     now = datetime.now(timezone.utc)
 
-    network = await db.networks.find_one({"slug": "kat-beauty-com"})
+    network = await db.networks.find_one({"slug": "beauty"})
     if not network:
         raise RuntimeError("Beauty network not found — run seed_networks.py first.")
     network_id = network["_id"]
