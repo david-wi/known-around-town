@@ -226,7 +226,7 @@ NETWORK_CITY_CONFIG = {
         "spotlight_description": "Street-art murals meet experimental beauty studios.",
         "spotlight_business_slugs": ["wynwood-hair-co", "nue-studio-wynwood", "the-spot-barbershop-wynwood"],
         "footer_blurb": "The curated directory of Miami's best salons, spas, and beauty professionals. Discovered by locals, loved by visitors.",
-        "footer_also_in": "Also in Lahore · Austin · Orlando",
+        "footer_also_in": "Also in Boca Raton",
         "footer_publication_label": "A Knows Beauty publication.",
         "footer_owners_label": "SALONS",
         "footer_owners_items": ["List your salon", "Pricing"],

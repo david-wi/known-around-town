@@ -1,7 +1,7 @@
 {#-
   Dark footer — same on every page type. Categories column, neighborhoods column,
   and an Owners column. Brand line repeats the wordmark in serif italic. Sister-city
-  line lists "Also in <city> · <city>" if present.
+  line renders footer_also_in verbatim (e.g. "Also in Boca Raton") if present.
 -#}
 <footer class="bg-stone-950 text-stone-300 mt-32">
   <div class="max-w-7xl mx-auto px-6 lg:px-10 py-20">
@@ -15,7 +15,7 @@
         {% if footer_also_in or footer_publication_label %}
         <p class="text-stone-500 text-xs mt-6 tracking-wide">
           {% if footer_publication_label %}<span class="italic">{{ footer_publication_label }}.</span> {% endif %}
-          {% if footer_also_in %}Also in {{ footer_also_in }}{% endif %}
+          {% if footer_also_in %}{{ footer_also_in }}{% endif %}
         </p>
         {% endif %}
       </div>
