@@ -336,10 +336,11 @@
 {# ── Claim CTA ───────────────────────────────────────────────────── #}
 {# WHY: shown for listings that have no active claim so owners who Google
    their salon see an obvious path to take ownership. Hidden for 'verified'
-   (claim approved) and 'claimed' (claim pending admin review — a second
-   submission would create a confusing duplicate). The ?slug= param tells
-   /owners to pre-fill the claim form for this specific business. #}
-{% if business.claim_status not in ('verified', 'claimed') %}
+   (claim approved), 'claimed' (legacy status), and 'pending' (a claim has
+   been submitted and is awaiting admin review — a second submission would
+   create a confusing duplicate). The ?slug= param tells /owners to pre-fill
+   the claim form for this specific business. #}
+{% if business.claim_status not in ('verified', 'claimed', 'pending') %}
 <section class="bg-amber-50/60 border-b border-amber-200/50">
   {#- WHY: The claim CTA uses a full-height padded button (px-6 py-3 text-base)
       rather than the smaller pill that CTAs elsewhere use (px-5 py-2.5 text-sm).
@@ -669,8 +670,10 @@
     This sticky bar stays visible throughout the scroll, slides up only after they
     pass the static banner (so it doesn't double up), and can be dismissed so it
     doesn't annoy visitors who aren't the owner. SessionStorage remembers the
-    dismiss so refreshing the page doesn't re-surface it on the same browser tab. #}
-{% if business.claim_status not in ('verified', 'claimed') %}
+    dismiss so refreshing the page doesn't re-surface it on the same browser tab.
+    WHY 'pending' excluded: same reason as the static banner above — a claim is
+    already under review; surfacing the CTA again would invite duplicate submissions. #}
+{% if business.claim_status not in ('verified', 'claimed', 'pending') %}
 <div id="claim-sticky-bar"
      class="fixed bottom-0 left-0 right-0 z-50 transform translate-y-full transition-transform duration-300 ease-in-out"
      role="complementary"
