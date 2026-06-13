@@ -105,11 +105,90 @@
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Detailed visitor stats (views, inquiries, click-throughs)</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>A full description you write and control</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Direct booking and website links prominently displayed</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong class="font-medium text-stone-700">Marketing AI:</strong> Instagram captions and ad copy — drafted for your {{ listing_word_singular or 'business' }}, ready in seconds</span></li>
         </ul>
         <p class="text-stone-500 text-sm mt-4">$29/month. Cancel anytime — no long-term contract.</p>
         <a href="/pricing" class="inline-flex items-center gap-1.5 mt-4 text-sm {{ theme.accent_text_full }} {{ theme.accent_hover_text }} font-medium">
           See full pricing <span aria-hidden="true">→</span>
         </a>
+      </div>
+    </div>
+
+    {# Marketing AI showcase — inline mockups of the two live AI tools #}
+    <div class="flex gap-8 items-start">
+      <div class="flex-shrink-0 w-12 h-12 rounded-full {{ theme.button_bg }} text-white flex items-center justify-center font-semibold" style="font-size: 1.25rem;">✦</div>
+      <div class="w-full min-w-0">
+        <p class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-2">Included with Featured</p>
+        <h2 class="text-2xl font-light text-stone-900 mb-3" style='font-family: Georgia, "Times New Roman", serif;'>Marketing AI — see it in action</h2>
+        <p class="text-stone-600 leading-relaxed mb-6">
+          Two tools that write on-brand marketing for you. Tell us what you want to promote, and we'll generate a polished Instagram caption or ad copy in your {{ listing_word_singular or 'business' }}'s voice.
+        </p>
+
+        {# --- Instagram Caption Tool Mockup --- #}
+        <div class="rounded-2xl border border-stone-200 bg-stone-50/40 p-6 mb-5">
+          <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-1">Instagram</p>
+          <p class="text-base font-medium text-stone-900 mb-4" style='font-family: Georgia, "Times New Roman", serif;'>Generate caption</p>
+
+          <p class="text-xs font-medium text-stone-600 mb-1.5">What's the post about?</p>
+          <div class="rounded-xl border border-stone-300 bg-white px-4 py-3 text-stone-500 text-sm mb-4 italic">
+            e.g. fall balayage special — $30 off full highlights this month
+          </div>
+
+          <div class="inline-flex items-center gap-2 bg-stone-900 text-white font-medium px-5 py-2 rounded-full text-xs tracking-wide mb-5 cursor-default select-none">
+            Generate caption
+          </div>
+
+          {# Sample generated caption result #}
+          <div>
+            <p class="text-[10px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-2">Caption</p>
+            <div class="rounded-xl border border-stone-200 bg-white px-5 py-4 text-stone-800 text-sm leading-relaxed">
+              🍂 Fall is here — and so is your season glow-up. ✨<br><br>
+              This month we're offering $30 off full highlights and balayage services. Whether you're going sun-kissed or diving into rich autumn tones, our stylists are ready for you.<br><br>
+              Swipe to see our latest color transformations 💛 Book through the link in bio — spots are filling up fast!<br><br>
+              <span class="{{ theme.accent_text_full }}">#MiamiHair #FallHairColor #BalaygeMiami #HairGoals #SalonMiami</span>
+            </div>
+            <p class="mt-2 text-xs text-stone-400">The tool gives you a fresh caption every time — copy it straight into Instagram.</p>
+          </div>
+        </div>
+
+        {# --- Ad Copy Tool Mockup --- #}
+        <div class="rounded-2xl border border-stone-200 bg-stone-50/40 p-6">
+          <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-1">Ads</p>
+          <p class="text-base font-medium text-stone-900 mb-4" style='font-family: Georgia, "Times New Roman", serif;'>Generate ad copy</p>
+
+          <p class="text-xs font-medium text-stone-600 mb-1.5">What do you want to advertise?</p>
+          <div class="rounded-xl border border-stone-300 bg-white px-4 py-3 text-stone-500 text-sm mb-4 italic">
+            e.g. summer keratin special, 20% off through August — mention us on Instagram
+          </div>
+
+          <div class="inline-flex items-center gap-2 bg-stone-900 text-white font-medium px-5 py-2 rounded-full text-xs tracking-wide mb-5 cursor-default select-none">
+            Generate ad copy
+          </div>
+
+          {# Three ad copy variations #}
+          <div>
+            <p class="text-[10px] uppercase tracking-[0.25em] text-stone-500 font-semibold mb-3">3 variations — ready for Google, Facebook, or Instagram Ads</p>
+            <div class="space-y-3">
+              <div class="rounded-xl border border-stone-200 bg-white px-5 py-3.5 text-sm">
+                <p class="font-semibold text-stone-900 text-xs uppercase tracking-wide mb-1">Variation 1</p>
+                <p class="font-medium text-stone-800">Smooth, Shiny Hair This Summer</p>
+                <p class="text-stone-600 mt-0.5">Expert keratin treatments in Miami. 20% off through August — mention us on Instagram. Book your spot today.</p>
+              </div>
+              <div class="rounded-xl border border-stone-200 bg-white px-5 py-3.5 text-sm">
+                <p class="font-semibold text-stone-900 text-xs uppercase tracking-wide mb-1">Variation 2</p>
+                <p class="font-medium text-stone-800">Miami's Summer Keratin Special</p>
+                <p class="text-stone-600 mt-0.5">Frizz-free, salon-smooth results all summer. Limited appointments at 20% off — tag us on Instagram and save.</p>
+              </div>
+              <div class="rounded-xl border border-stone-200 bg-white px-5 py-3.5 text-sm">
+                <p class="font-semibold text-stone-900 text-xs uppercase tracking-wide mb-1">Variation 3</p>
+                <p class="font-medium text-stone-800">Your Best Hair, All Season Long</p>
+                <p class="text-stone-600 mt-0.5">Keratin treatments by Miami's trusted stylists. Mention this on Instagram for 20% off. Spots filling fast.</p>
+              </div>
+            </div>
+            <p class="mt-3 text-xs text-stone-400">Each variation has a headline under 30 characters and a description under 90 — sized to fit Google, Facebook, and Instagram ads as-is.</p>
+          </div>
+        </div>
+
       </div>
     </div>
 
