@@ -30,8 +30,10 @@ admin page is first used.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
+from bson import ObjectId
+from bson.errors import InvalidId
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
@@ -120,7 +122,16 @@ async def _require_pro_owner(request: Request, business_id: str) -> Dict[str, An
     if not session:
         raise HTTPException(status_code=401, detail="Owner session required")
 
-    doc = await get_db().businesses.find_one({"_id": business_id})
+    # WHY: Businesses created before the UUID migration have ObjectId _id values.
+    # The template serialises _id via str(), so the request body always contains
+    # the string representation. We try ObjectId first (24-hex-char string), then
+    # fall back to the raw string for UUID-keyed businesses.
+    try:
+        id_query: Union[ObjectId, str] = ObjectId(business_id)
+    except (InvalidId, TypeError):
+        id_query = business_id
+
+    doc = await get_db().businesses.find_one({"_id": id_query})
     if not doc:
         raise HTTPException(status_code=404, detail="Business not found")
 
