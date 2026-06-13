@@ -109,7 +109,7 @@ BUSINESSES = [
             "bilingual. The color work here rivals Miami's top studios."
         ),
         "price_range": "$$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "city-center-spa-doral",
@@ -140,7 +140,7 @@ BUSINESSES = [
             "typical strip-mall spa, and the post-round recovery vibe is real."
         ),
         "price_range": "$$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "lash-lab-doral",
@@ -171,7 +171,7 @@ BUSINESSES = [
             "makes it a reliable lunch-break stop for Doral's office crowd."
         ),
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "nail-republic-city-center",
@@ -198,7 +198,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "european-wax-center-doral",
@@ -225,7 +225,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "simply-beautiful-salon-doral",
@@ -252,7 +252,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "skin-studio-doral",
@@ -279,7 +279,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "brow-bar-doral-city-center",
@@ -306,7 +306,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     # ── Doral Boulevard ────────────────────────────────────────────────────────
     {
@@ -338,7 +338,7 @@ BUSINESSES = [
             "regular clientele that has followed the owner for years."
         ),
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "caracas-style-studio",
@@ -369,7 +369,7 @@ BUSINESSES = [
             "Old World Venezuelan technique. A trusted name in the community."
         ),
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "vip-nails-doral",
@@ -396,7 +396,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "massage-envy-doral",
@@ -423,7 +423,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "salon-one-doral",
@@ -450,7 +450,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "dominiques-hair-studio-doral",
@@ -477,7 +477,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "lashes-by-lucia-doral",
@@ -504,7 +504,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "pretty-nails-doral-blvd",
@@ -531,7 +531,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     # ── NW 87th Avenue Corridor ────────────────────────────────────────────────
     {
@@ -559,7 +559,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "vip-hair-studio-doral",
@@ -586,7 +586,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "threading-studio-doral",
@@ -613,7 +613,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "bliss-hair-salon-doral",
@@ -640,7 +640,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     # ── West Doral ─────────────────────────────────────────────────────────────
     {
@@ -668,7 +668,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "sunsets-hair-studio-west-doral",
@@ -695,7 +695,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "glow-up-lash-studio-west-doral",
@@ -722,7 +722,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
 ]
 
@@ -748,7 +748,7 @@ async def seed_doral() -> None:
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
         "domain_override": DOMAIN_OVERRIDE,
-        "status": "active",
+        "status": "live",
         "updated_at": now,
     }
     city = await upsert("cities", {"network_id": network_id, "slug": CITY_SLUG}, city_doc)

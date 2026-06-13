@@ -111,7 +111,7 @@ BUSINESSES = [
             "the Palm Avenue strip."
         ),
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "unas-perfectas-hialeah",
@@ -138,7 +138,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "glamour-cuban-beauty-salon",
@@ -169,7 +169,7 @@ BUSINESSES = [
             "Regulars have been coming here since the 90s."
         ),
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "centro-de-belleza-hialeah",
@@ -196,7 +196,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "lashes-by-maria-hialeah",
@@ -227,7 +227,7 @@ BUSINESSES = [
             "A hidden gem worth the week-out wait."
         ),
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "nail-art-studio-hialeah",
@@ -254,7 +254,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "belleza-latina-hialeah",
@@ -281,7 +281,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "waxing-the-city-hialeah-palm",
@@ -308,7 +308,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     # ── Westland Mall Area ────────────────────────────────────────────────────
     {
@@ -340,7 +340,7 @@ BUSINESSES = [
             "massage is worth the appointment."
         ),
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "great-clips-westland",
@@ -367,7 +367,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "european-wax-center-hialeah",
@@ -394,7 +394,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "nails-plus-westland",
@@ -421,7 +421,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "glam-studio-westland",
@@ -448,7 +448,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "beauty-bar-westland",
@@ -475,7 +475,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     # ── Hialeah Gardens ───────────────────────────────────────────────────────
     {
@@ -503,7 +503,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "venus-nails-hialeah-gardens",
@@ -530,7 +530,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "cuban-style-studio-hialeah-gardens",
@@ -557,7 +557,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "glow-nails-spa-hialeah-gardens",
@@ -584,7 +584,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     # ── East Hialeah ──────────────────────────────────────────────────────────
     {
@@ -617,7 +617,7 @@ BUSINESSES = [
             "defies inflation, and roller sets done exactly right."
         ),
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "nails-by-rosa-east-hialeah",
@@ -645,7 +645,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "blowout-bar-hialeah",
@@ -672,7 +672,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$",
-        "status": "active",
+        "status": "live",
     },
     {
         "slug": "elite-lash-studio-hialeah",
@@ -699,7 +699,7 @@ BUSINESSES = [
         "editors_pick": False,
         "editors_note": "",
         "price_range": "$$",
-        "status": "active",
+        "status": "live",
     },
 ]
 
@@ -727,7 +727,7 @@ async def seed_hialeah() -> None:
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
         "domain_override": DOMAIN_OVERRIDE,
-        "status": "active",
+        "status": "live",
         "updated_at": now,
     }
     city = await upsert("cities", {"network_id": network_id, "slug": CITY_SLUG}, city_doc)
