@@ -63,7 +63,7 @@
     </div>
     <div class="mt-16 pt-8 border-t border-stone-800 flex flex-col md:flex-row justify-between gap-4 text-xs text-stone-500">
       <p>{{ footer_legal or ('© ' ~ now.year ~ ' ' ~ (city.name if city else '') ~ ' Knows ' ~ vertical_word ~ ' · A local-first directory.') }}</p>
-      <p class="italic">{{ footer_made_in or 'Made in Miami · Powered by Expertly' }}</p>
+      <p class="italic">{{ footer_made_in or ('Made in ' ~ (city.name if city else 'South Florida') ~ ' · Powered by Expertly') }}</p>
     </div>
   </div>
 </footer>

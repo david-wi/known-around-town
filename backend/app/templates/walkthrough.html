@@ -147,7 +147,7 @@
               🍂 Fall is here — and so is your season glow-up. ✨<br><br>
               This month we're offering $30 off full highlights and balayage services. Whether you're going sun-kissed or diving into rich autumn tones, our stylists are ready for you.<br><br>
               Swipe to see our latest color transformations 💛 Book through the link in bio — spots are filling up fast!<br><br>
-              <span class="{{ theme.accent_text_full }}">#MiamiHair #FallHairColor #BalaygeMiami #HairGoals #SalonMiami</span>
+              <span class="{{ theme.accent_text_full }}">#{{ (city.name if city else 'Miami')|replace(' ', '') }}Hair #FallHairColor #Balayage{{ (city.name if city else 'Miami')|replace(' ', '') }} #HairGoals #SalonLife</span>
             </div>
             <p class="mt-2 text-xs text-stone-400">The tool gives you a fresh caption every time — copy it straight into Instagram.</p>
           </div>
@@ -174,17 +174,17 @@
               <div class="rounded-xl border border-stone-200 bg-white px-5 py-3.5 text-sm">
                 <p class="font-semibold text-stone-900 text-xs uppercase tracking-wide mb-1">Variation 1</p>
                 <p class="font-medium text-stone-800">Smooth, Shiny Hair This Summer</p>
-                <p class="text-stone-600 mt-0.5">Expert keratin treatments in Miami. 20% off through August — mention us on Instagram. Book your spot today.</p>
+                <p class="text-stone-600 mt-0.5">Expert keratin treatments in {{ city.name if city else 'Miami' }}. 20% off through August — mention us on Instagram. Book your spot today.</p>
               </div>
               <div class="rounded-xl border border-stone-200 bg-white px-5 py-3.5 text-sm">
                 <p class="font-semibold text-stone-900 text-xs uppercase tracking-wide mb-1">Variation 2</p>
-                <p class="font-medium text-stone-800">Miami's Summer Keratin Special</p>
+                <p class="font-medium text-stone-800">{{ (city.name if city else 'Miami') }}'s Summer Keratin Special</p>
                 <p class="text-stone-600 mt-0.5">Frizz-free, salon-smooth results all summer. Limited appointments at 20% off — tag us on Instagram and save.</p>
               </div>
               <div class="rounded-xl border border-stone-200 bg-white px-5 py-3.5 text-sm">
                 <p class="font-semibold text-stone-900 text-xs uppercase tracking-wide mb-1">Variation 3</p>
                 <p class="font-medium text-stone-800">Your Best Hair, All Season Long</p>
-                <p class="text-stone-600 mt-0.5">Keratin treatments by Miami's trusted stylists. Mention this on Instagram for 20% off. Spots filling fast.</p>
+                <p class="text-stone-600 mt-0.5">Keratin treatments by {{ (city.name if city else 'Miami') }}'s trusted stylists. Mention this on Instagram for 20% off. Spots filling fast.</p>
               </div>
             </div>
             <p class="mt-3 text-xs text-stone-400">Each variation has a headline under 30 characters and a description under 90 — sized to fit Google, Facebook, and Instagram ads as-is.</p>
