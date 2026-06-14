@@ -25,33 +25,78 @@
 {% block content %}
 
 <section class="bg-stone-50/60 border-b border-stone-200/60">
-  <div class="max-w-5xl mx-auto px-6 lg:px-10 py-20 lg:py-28">
-    <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-5">For Business Owners</p>
-    <h1 class="font-light text-stone-900 leading-[1.05] tracking-tight mb-6"
-        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 300;'>
-      Run a {{ listing_word_singular or 'business' }} in {{ city.name if city else 'town' }}?<br>
-      <em class="italic text-stone-500">Your listing's already here.</em>
-    </h1>
-    <p class="text-lg text-stone-600 leading-relaxed max-w-2xl mb-8">
-      Every credible {{ listing_word_singular or 'business' }} in {{ city.name if city else 'the city' }} starts out listed in
-      {{ city.name ~ ' Knows ' ~ vertical_word if city else network.name }}. Free. No claim required.
-      Claim yours to take control of the profile, get found by people
-      searching tonight, and unlock the tools that bring bookings to the door.
-    </p>
+  {#- WHY: Switched from single-column max-w-5xl to a 2-column grid. At 1440px
+      the single-column form left 40%+ of the section empty, which read as a
+      layout error and reduced visual confidence in the product. Now the pitch
+      copy fills the left column and the claim form anchors the right column —
+      the classic landing-page pattern that keeps a visitor's eye moving toward
+      the form rather than hitting dead whitespace. #}
+  <div class="max-w-6xl mx-auto px-6 lg:px-10 py-20 lg:py-28">
+    <div class="grid lg:grid-cols-2 gap-12 lg:gap-20 items-start">
 
-    {#- WHY: Social proof addresses the "is this real?" hesitation a first-time
-        visitor has before committing to a claim. Using the live claim_directory
-        count rather than a hardcoded number so the figure stays accurate as
-        the directory grows. The Founding Partner mention creates genuine
-        scarcity — the badge already appears on listing pages but is never
-        named as a benefit on the owners pitch page, so this is the first
-        place it's positioned as something worth wanting. #}
-    <p class="text-sm text-stone-500 mb-8">
-      Join {{ claim_directory|length }}+ {{ city.name if city else '' }} {{ listing_word_plural }} already in the directory — early claimers get
-      <strong class="text-stone-700 font-semibold">Founding Partner</strong> status on their profile while it lasts.
-    </p>
+      {# Left column: pitch copy and trust signals #}
+      <div>
+        <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-5">For Business Owners</p>
+        <h1 class="font-light text-stone-900 leading-[1.05] tracking-tight mb-6"
+            style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.25rem, 4vw, 3.5rem); font-weight: 300;'>
+          Run a {{ listing_word_singular or 'business' }} in {{ city.name if city else 'town' }}?<br>
+          <em class="italic text-stone-500">Your listing's already here.</em>
+        </h1>
+        <p class="text-lg text-stone-600 leading-relaxed mb-8">
+          Every credible {{ listing_word_singular or 'business' }} in {{ city.name if city else 'the city' }} starts out listed in
+          {{ city.name ~ ' Knows ' ~ vertical_word if city else network.name }}. Free. No claim required.
+          Claim yours to take control of the profile, get found by people
+          searching tonight, and unlock the tools that bring bookings to the door.
+        </p>
 
-    {% include 'partials/claim_form.html' %}
+        {#- WHY: Social proof addresses the "is this real?" hesitation a first-time
+            visitor has before committing to a claim. Using the live claim_directory
+            count rather than a hardcoded number so the figure stays accurate as
+            the directory grows. The Founding Partner mention creates genuine
+            scarcity — the badge already appears on listing pages but is never
+            named as a benefit on the owners pitch page, so this is the first
+            place it's positioned as something worth wanting. #}
+        <p class="text-sm text-stone-500 mb-10">
+          Join {{ claim_directory|length }}+ {{ city.name if city else '' }} {{ listing_word_plural }} already in the directory — early claimers get
+          <strong class="text-stone-700 font-semibold">Founding Partner</strong> status on their profile while it lasts.
+        </p>
+
+        {#- WHY: Three concise trust signals in a visual grid break the reading
+            pattern and give the eye a place to land before scrolling to the form.
+            These mirror what the form card's benefit strip says, but here they are
+            presented as outcomes (what the owner gets), not just features (what's
+            included). Two different framings for the same benefits reinforce retention. #}
+        <div class="space-y-4">
+          <div class="flex items-start gap-3">
+            <span class="{{ theme.accent_text_full }} text-base mt-0.5" aria-hidden="true">✦</span>
+            <div>
+              <p class="text-sm font-medium text-stone-800">Get found tonight</p>
+              <p class="text-sm text-stone-500 mt-0.5">Your profile is already live. Claim it to control what visitors see and surface above unclaimed listings.</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="{{ theme.accent_text_full }} text-base mt-0.5" aria-hidden="true">✦</span>
+            <div>
+              <p class="text-sm font-medium text-stone-800">AI tools built for beauty</p>
+              <p class="text-sm text-stone-500 mt-0.5">Generate Instagram captions and ad copy from your profile in one click — no copywriter needed.</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="{{ theme.accent_text_full }} text-base mt-0.5" aria-hidden="true">✦</span>
+            <div>
+              <p class="text-sm font-medium text-stone-800">Free to claim, $29/month to feature</p>
+              <p class="text-sm text-stone-500 mt-0.5">Claiming is always free. Upgrade to Featured anytime — cancel just as easily.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Right column: claim form #}
+      <div>
+        {% include 'partials/claim_form.html' %}
+      </div>
+
+    </div>
   </div>
 </section>
 
