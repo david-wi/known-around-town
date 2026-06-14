@@ -23,12 +23,40 @@
       {% if sync_failed %}{{ sync_failed }} had temporary fetch errors (try again).{% endif %}
     </div>
   </div>
+  {% elif result == 'started' %}
+  <div class="mb-6 flex items-start gap-3 rounded-lg bg-sky-50 border border-sky-200 px-4 py-3 text-sm">
+    <svg class="w-4 h-4 flex-shrink-0 text-sky-500 mt-0.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+    </svg>
+    <div class="text-sky-800">
+      <span class="font-semibold">Sync started.</span>
+      Ratings are being updated in the background for all {{ total }} salons — this takes about 2 minutes.
+      Refresh this page when it's done to see updated coverage numbers.
+    </div>
+  </div>
+  {% elif result == 'already-running' %}
+  <div class="mb-6 flex items-start gap-3 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+    <svg class="w-4 h-4 flex-shrink-0 text-amber-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <span><span class="font-semibold">Sync already in progress.</span> Wait for the current sync to finish, then refresh to see updated coverage.</span>
+  </div>
   {% elif result == 'error:no-key' %}
   <div class="mb-6 flex items-start gap-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
     <svg class="w-4 h-4 flex-shrink-0 text-red-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
     </svg>
     <span><span class="font-semibold">No API key configured.</span> Set <code class="font-mono bg-red-100 px-1 rounded">GOOGLE_PLACES_API_KEY</code> on the server and restart.</span>
+  </div>
+  {% endif %}
+
+  {# ── In-progress indicator (persists beyond the redirect, based on server state) ── #}
+  {% if sync_running and result != 'started' %}
+  <div class="mb-6 flex items-start gap-3 rounded-lg bg-sky-50 border border-sky-200 px-4 py-3 text-sm text-sky-800">
+    <svg class="w-4 h-4 flex-shrink-0 text-sky-500 mt-0.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+    </svg>
+    <span><span class="font-semibold">Sync running.</span> Ratings are still being updated in the background. Refresh in a moment to check progress.</span>
   </div>
   {% endif %}
 
@@ -72,16 +100,16 @@
   <form method="post" action="/admin/sync/ratings">
     <div class="bg-white border border-stone-200 rounded-xl px-6 py-5 mb-6">
       <h2 class="font-semibold text-stone-900 mb-2">Sync all salons</h2>
-      <p class="text-sm text-stone-500 mb-4">Looks up every published salon on Google, matches by name and city, and stores the star rating, review count, and opening hours. Existing data is refreshed. Takes 30–90 seconds for the full directory.</p>
+      <p class="text-sm text-stone-500 mb-4">Looks up every published salon on Google, matches by name and city, and stores the star rating, review count, and opening hours. Existing data is refreshed. Runs in the background — the page responds immediately and coverage numbers update within about 2 minutes.</p>
       <p class="text-xs text-stone-400 mb-4">
         <strong>Cost:</strong> Each salon without a Google Place ID costs 1 Places Text Search call (≈ $0.017). Salons with an existing Place ID cost 1 Place Details call (cheaper). Total cost for {{ total }} salons is under $2.
       </p>
       <button
         type="submit"
-        {% if not api_configured %}disabled{% endif %}
-        class="px-5 py-2 rounded-lg {{ 'bg-rose-600 hover:bg-rose-700 text-white' if api_configured else 'bg-stone-200 text-stone-400 cursor-not-allowed' }} text-sm font-medium transition-colors"
+        {% if not api_configured or sync_running %}disabled{% endif %}
+        class="px-5 py-2 rounded-lg {{ 'bg-rose-600 hover:bg-rose-700 text-white' if (api_configured and not sync_running) else 'bg-stone-200 text-stone-400 cursor-not-allowed' }} text-sm font-medium transition-colors"
       >
-        {% if api_configured %}Sync ratings & hours{% else %}API key required{% endif %}
+        {% if not api_configured %}API key required{% elif sync_running %}Sync in progress…{% else %}Sync ratings & hours{% endif %}
       </button>
     </div>
   </form>
