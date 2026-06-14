@@ -3665,6 +3665,54 @@ def test_neighborhoods_with_zero_businesses_hidden_from_navigation(client, seede
     )
 
 
+@pytest.mark.asyncio
+async def test_upsert_preserves_google_rating_on_reseed(seeded_db):
+    """Calling upsert() on a business that already has a Google rating must
+    preserve the rating, even when the incoming seed doc doesn't include it.
+
+    WHY: every time a seed script runs (e.g. to fix a business name or swap a
+    photo), it calls upsert() which does replace_one under the hood.  Before
+    this fix, replace_one would wipe google_rating, google_place_id, and the
+    other Google-sync fields because seed dicts never include them.  A single
+    re-seed after a sync was enough to drop coverage from 87% back to near-zero
+    and require another expensive Google Places API run.
+    """
+    from seed._helpers import upsert
+
+    biz_id = "test-preserve-rating-slug"
+    await seeded_db.businesses.insert_one({
+        "_id": biz_id,
+        "name": "Test Salon",
+        "slug": biz_id,
+        "status": "live",
+        "google_place_id": "ChIJrTLr-GyuEmsRBfy61i59si0",
+        "google_rating": 4.7,
+        "google_review_count": 312,
+        "google_rating_synced_at": "2026-06-14T12:00:00Z",
+        "hours": [{"day": "Monday", "open": "9:00", "close": "18:00"}],
+    })
+
+    # Upsert with a doc that omits all Google fields — exactly what seed scripts
+    # do when they update a business name or photo.
+    await upsert("businesses", {"_id": biz_id}, {
+        "_id": biz_id,
+        "name": "Test Salon (Renamed)",
+        "slug": biz_id,
+        "status": "live",
+    })
+
+    updated = await seeded_db.businesses.find_one({"_id": biz_id})
+    assert updated["name"] == "Test Salon (Renamed)", "Name should be updated"
+    assert updated.get("google_rating") == 4.7, (
+        "google_rating was wiped by upsert — seed re-runs must not reset Google data"
+    )
+    assert updated.get("google_place_id") == "ChIJrTLr-GyuEmsRBfy61i59si0", (
+        "google_place_id was wiped — forces expensive re-discovery on next sync"
+    )
+    assert updated.get("google_review_count") == 312, "google_review_count was wiped"
+    assert updated.get("hours"), "opening hours from Google sync were wiped"
+
+
 async def test_neighborhoods_with_zero_businesses_hidden_from_navigation(seeded_db):
     """Neighborhoods with listed_count == 0 must not appear in city navigation.
 
