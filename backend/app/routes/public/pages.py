@@ -1729,11 +1729,17 @@ async def robots_txt(request: Request) -> HTMLResponse:
     # budget on pages that always redirect to login or require authentication. The
     # public-facing content pages (/, /b/*, /c/*, /n/*, /owners, /pricing) remain
     # fully crawlable — only the private account flow is excluded.
+    # WHY: /owners/verify was removed — that route never existed in this codebase.
+    # Having a Disallow for a non-existent URL makes SEO audit tools (Screaming
+    # Frog, Semrush, Google Search Console) flag it as a misconfiguration without
+    # protecting anything useful. The real owner auth routes are /owners/login
+    # (magic-code sign-in form), /owners/auth (the POST endpoint that sends the
+    # code), and /owners/me (the authenticated listing dashboard).
     disallowed = "\n".join(
         [
             "Disallow: /owners/login",
+            "Disallow: /owners/auth",
             "Disallow: /owners/me",
-            "Disallow: /owners/verify",
         ]
     )
     canonical_base = get_settings().canonical_base_url.rstrip("/")

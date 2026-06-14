@@ -54,6 +54,50 @@ _CATEGORY_PHOTOS: Dict[str, List[str]] = {
 
 _PHOTO_BASE = "https://images.unsplash.com/photo-{}?w=1600&q=80&auto=format&fit=crop"
 
+# WHY: mirrors the keyword chain in business.html so seed scripts can populate
+# schema_org_type at insert time with the same logic the template uses at render
+# time. Having one canonical function here prevents the two from drifting apart.
+# Keys are substrings checked against the primary category slug (lowercase).
+# Dict is ordered most-specific first so earlier entries win on ambiguous slugs
+# (e.g. "med-spa" must match before the generic "spa" catch further down).
+_SLUG_SCHEMA_TYPE: Dict[str, str] = {
+    "barber":       "BarberShop",
+    "med-spa":      "MedicalSpa",
+    "medspa":       "MedicalSpa",
+    "medical-spa":  "MedicalSpa",
+    "hair":         "HairSalon",
+    "blowout":      "HairSalon",
+    "blow-dry":     "HairSalon",
+    "color":        "HairSalon",
+    "nails":        "NailSalon",
+    "nail":         "NailSalon",
+    "manicure":     "NailSalon",
+    "pedicure":     "NailSalon",
+    "spa":          "DaySpa",
+    "massage":      "DaySpa",
+    "wellness":     "DaySpa",
+}
+
+
+def schema_org_type_for_slug(primary_category_slug: str) -> str:
+    """Return the most specific schema.org type for a category slug.
+
+    Used by seed scripts to populate schema_org_type at insert time, so the
+    stored value is already accurate and the template's keyword-matching fallback
+    is not needed for newly seeded businesses.
+
+    WHY: returns "BeautySalon" (not "LocalBusiness") as the catch-all — the
+    "LocalBusiness" default on the Business model is intentionally treated as
+    "not yet classified". Seed helpers should always write a specific type.
+    """
+    slug = (primary_category_slug or "").lower()
+    for keyword, schema_type in _SLUG_SCHEMA_TYPE.items():
+        if keyword in slug:
+            return schema_type
+    # WHY: BeautySalon is the schema.org catch-all for beauty businesses without
+    # a more specific subtype (lash bars, waxing studios, makeup artists, etc.).
+    return "BeautySalon"
+
 
 def pick_category_photo(slug: str, category: str) -> Optional[str]:
     """Return a deterministic variety photo for a business based on its slug.
