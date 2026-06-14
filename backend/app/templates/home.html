@@ -187,7 +187,7 @@
                data, and the reference.css is pre-compiled without those specific gradient shades. #}
             <div class="absolute inset-0" style="background: linear-gradient(135deg, {{ theme.card_gradient_color_from | default('#1c1917') }} 0%, #0c0a09 100%);"></div>
             {% endif %}
-            <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/30 to-transparent group-hover:from-stone-950/95 transition-colors"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/5 to-transparent group-hover:from-stone-950/95 transition-colors"></div>
             <div class="absolute inset-0 p-4 flex flex-col justify-between">
               {% if n.listed_count %}<span class="text-[9px] uppercase tracking-[0.2em] text-white/75 font-medium">{{ n.listed_count }} listed</span>{% else %}<span></span>{% endif %}
               <div>
