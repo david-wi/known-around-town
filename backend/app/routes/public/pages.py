@@ -1141,6 +1141,14 @@ async def expertly_voice_page(request: Request) -> HTMLResponse:
     return _templates.TemplateResponse("expertly_voice.html", ctx)
 
 
+# WHY: Any link to /owners/claim (marketing emails, social posts, ads) would
+# hit a 404 — the claim form lives at /owners#claim-form. Redirect so those
+# links still land the owner on the right page.
+@router.get("/owners/claim", response_class=HTMLResponse)
+async def owners_claim_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/owners#claim-form", status_code=301)
+
+
 @router.get("/owners", response_class=HTMLResponse)
 async def owners_page(
     request: Request,
