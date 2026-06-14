@@ -124,7 +124,9 @@ services:
         Host(`bal-harbour.knowsbeauty.com`) ||
         Host(`key-biscayne.knowsbeauty.com`) ||
         Host(`pinecrest.knowsbeauty.com`) ||
-        Host(`sunny-isles-beach.knowsbeauty.com`)
+        Host(`sunny-isles-beach.knowsbeauty.com`) ||
+        Host(`downtown-miami.knowsbeauty.com`) ||
+        Host(`north-miami-beach.knowsbeauty.com`)
       traefik.http.routers.kat-beauty-com.tls: "true"
       traefik.http.routers.kat-beauty-com.tls.certresolver: "letsencrypt"
       traefik.http.routers.kat-beauty-com.service: "known-around-town"
