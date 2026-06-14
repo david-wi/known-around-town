@@ -546,6 +546,11 @@ async def seed_hallandale_beach() -> None:
                 "claim_status", "is_founding_partner", "featured",
                 "stripe_customer_id", "stripe_subscription_id",
                 "photos", "hours",
+                # WHY: preserve Google sync data — these fields are expensive to
+                # re-fetch (~$0.017/call) and the seed file has no way to know
+                # the correct values. A re-seed must not wipe cached Google ratings.
+                "google_place_id", "google_rating", "google_review_count",
+                "google_rating_synced_at",
             ) if k in existing}
             biz_doc.update(preserve)
             biz_doc["_id"] = existing["_id"]

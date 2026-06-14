@@ -668,7 +668,15 @@ async def seed_network(network_slug: str) -> None:
                 # a re-seed should never override that decision.
                 "is_founding_partner",
                 "hours",
-            ):
+                # WHY: preserve Google sync data — these fields are expensive to
+                # re-fetch (~$0.017/call) and the seed file has no way to know
+                # the correct values. A re-seed that updates a name or photo
+                # must not wipe out the cached Google star rating.
+                "google_place_id",
+                "google_rating",
+                "google_review_count",
+                "google_rating_synced_at",
+                ):
                 if _preserve in existing_biz:
                     biz_doc[_preserve] = existing_biz[_preserve]
             # WHY: services are a special case — only preserve the DB copy when it is
