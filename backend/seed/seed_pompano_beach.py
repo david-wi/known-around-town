@@ -910,6 +910,14 @@ async def seed_pompano_beach() -> None:
             for preserve_key in (
                 "claimed", "claim_status", "owner_id",
                 "stripe_customer_id", "stripe_subscription_id", "subscription_tier",
+                # WHY: preserve Google sync data — these fields are expensive to
+                # re-fetch (~$0.017/call) and the seed file has no way to know
+                # the correct values. A re-seed that updates a name or photo
+                # must not wipe out the cached Google star rating.
+                "google_place_id",
+                "google_rating",
+                "google_review_count",
+                "google_rating_synced_at",
             ):
                 if preserve_key in existing:
                     biz_doc[preserve_key] = existing[preserve_key]

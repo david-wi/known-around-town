@@ -660,7 +660,7 @@ async def seed_brickell() -> None:
                 "claim_status", "claimed_email", "claimed_by_user_id",
                 "claimed_at", "verified_at",
                 "stripe_customer_id", "stripe_subscription_id",
-                "is_founding_partner", "hours",
+                "is_founding_partner", "hours", "google_place_id", "google_rating", "google_review_count", "google_rating_synced_at",
             ):
                 if _preserve in existing:
                     biz_doc[_preserve] = existing[_preserve]
