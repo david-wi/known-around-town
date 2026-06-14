@@ -1,0 +1,142 @@
+{#-
+  Admin edit form for a single business.
+
+  Currently exposes only the hide_ratings flag. The form can grow to cover
+  other per-business flags (is_featured, editors_pick, etc.) in the future.
+
+  Note on Tailwind: this file only uses complete class names — no dynamically
+  assembled strings — because Tailwind's JIT purges any class whose name is
+  built at runtime. All colour variants are either hardcoded or applied via
+  inline styles.
+-#}
+{% extends 'admin/_layout.html' %}
+
+{% block title %}Edit {{ business.name }} · Admin{% endblock %}
+
+{% block content %}
+<section class="bg-stone-50/60 border-b border-stone-200/60">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
+    <a href="/admin/businesses" class="inline-flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-900 mb-6 transition">
+      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+      Back to businesses
+    </a>
+    <p class="text-[11px] uppercase tracking-[0.3em] text-rose-600 font-semibold mb-3">Edit business</p>
+    <h1 class="font-light text-stone-900 leading-[1.05] tracking-tight mb-2"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.75rem, 3.5vw, 2.5rem); font-weight: 300;'>
+      {{ business.name }}
+    </h1>
+    {% set addr = business.get('address') or {} %}
+    {% if addr.get('city') %}
+    <p class="text-stone-500 text-sm">{{ addr.get('city') }}{% if addr.get('state') %}, {{ addr.get('state') }}{% endif %}</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="bg-white">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-10">
+
+    {% if saved %}
+    <div class="mb-6 flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-emerald-800 text-sm">
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+      </svg>
+      Saved. Changes take effect immediately — no server restart needed.
+    </div>
+    {% endif %}
+
+    {# Quick-reference for the business's current rating data #}
+    <div class="mb-8 rounded-xl border border-stone-200 bg-stone-50 px-5 py-4 text-sm text-stone-700">
+      <p class="font-medium text-stone-900 mb-2">Current Google rating data</p>
+      {% if business.google_rating %}
+        <p>Rating: <strong>{{ business.google_rating }}★</strong> from <strong>{{ business.google_review_count or 0 }}</strong> reviews</p>
+      {% else %}
+        <p class="text-stone-500">No Google rating synced yet.</p>
+      {% endif %}
+      {% if business.google_rating_synced_at %}
+        <p class="mt-1 text-xs text-stone-500">Last synced: {{ business.google_rating_synced_at.strftime('%b %-d, %Y %-I:%M %p UTC') if business.google_rating_synced_at else '—' }}</p>
+      {% endif %}
+      {% if business.slug %}
+        <p class="mt-2">
+          <a href="/b/{{ business.slug }}" target="_blank" rel="noopener"
+             class="text-rose-600 underline decoration-rose-300 hover:decoration-rose-600 text-xs">
+            View public listing ↗
+          </a>
+        </p>
+      {% endif %}
+    </div>
+
+    <form method="post" action="/admin/businesses/{{ business._id }}/edit">
+
+      <div class="bg-white border border-stone-200 rounded-xl divide-y divide-stone-100">
+
+        {# ── Ratings flag ── #}
+        <div class="px-6 py-5 flex items-start justify-between gap-6">
+          <div class="flex-1 min-w-0">
+            <label for="toggle-hide-ratings" class="block font-medium text-stone-900 cursor-pointer">
+              Hide star ratings (don't show Google ratings for this business)
+            </label>
+            <p class="mt-1 text-sm text-stone-500">
+              When <strong>on</strong>, this business's Google star rating and review count are hidden
+              from its listing card and detail page — regardless of the site-wide minimum review
+              threshold. Use this when a business owner has asked to have their ratings removed,
+              or when the synced rating belongs to a similarly-named place rather than the actual
+              salon. Turning it <strong>off</strong> restores the rating immediately.
+            </p>
+            {% if business.hide_ratings %}
+            <p class="mt-2 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-block">
+              Ratings are currently hidden for this business
+            </p>
+            {% else %}
+            <p class="mt-2 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 inline-block">
+              Ratings are shown (if the business meets the review threshold)
+            </p>
+            {% endif %}
+          </div>
+          <div class="flex-shrink-0 pt-1">
+            {# WHY: same toggle widget as the settings page — visually consistent
+               and already tested across browsers. Inline style used for the
+               dynamic colour/translate because Tailwind JIT purges any class
+               whose name is assembled dynamically at runtime (see admin-templates.md). #}
+            <label class="relative inline-flex items-center" style="cursor:pointer;">
+              <input
+                type="checkbox"
+                id="toggle-hide-ratings"
+                name="hide_ratings"
+                value="on"
+                {% if business.hide_ratings %}checked{% endif %}
+                style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"
+                onchange="
+                  var track=this.nextElementSibling;
+                  var thumb=track.firstElementChild;
+                  track.style.backgroundColor=this.checked?'#f43f5e':'#d6d3d1';
+                  thumb.style.transform=this.checked?'translateX(20px)':'translateX(0)';
+                "
+              >
+              <div style="width:44px;height:24px;border-radius:9999px;position:relative;transition:background-color 0.2s;background-color:{{ '#f43f5e' if business.hide_ratings else '#d6d3d1' }};">
+                <div style="position:absolute;top:2px;left:2px;width:20px;height:20px;background-color:white;border-radius:9999px;box-shadow:0 1px 3px rgba(0,0,0,0.2);transition:transform 0.2s;transform:{{ 'translateX(20px)' if business.hide_ratings else 'translateX(0)' }};"></div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="mt-6 flex items-center justify-between">
+        <a href="/admin/businesses" class="text-sm text-stone-500 hover:text-stone-900 transition">
+          ← Back to search
+        </a>
+        <button
+          type="submit"
+          class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium transition-colors"
+        >
+          Save changes
+        </button>
+      </div>
+
+    </form>
+
+  </div>
+</section>
+{% endblock %}

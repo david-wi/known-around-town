@@ -31,7 +31,7 @@ from app.routes.api.v1 import (
     owner_stats as api_owner_stats,
     stripe_billing as api_stripe_billing,
 )
-from app.routes.admin import claims_admin, analytics_admin, settings_admin, sync_admin
+from app.routes.admin import claims_admin, analytics_admin, settings_admin, sync_admin, businesses_admin
 from app.routes.public import pages as public_pages, media as public_media
 
 settings = get_settings()
@@ -143,6 +143,7 @@ claims_admin.attach_templates(templates)
 analytics_admin.attach_templates(templates)
 settings_admin.attach_templates(templates)
 sync_admin.attach_templates(templates)
+businesses_admin.attach_templates(templates)
 
 
 @app.get("/preview-login", include_in_schema=False, response_class=HTMLResponse)
@@ -166,6 +167,7 @@ app.include_router(claims_admin.router)
 app.include_router(analytics_admin.router)
 app.include_router(settings_admin.router)
 app.include_router(sync_admin.router)
+app.include_router(businesses_admin.router)
 
 # WHY: media route is registered before the public SSR catch-all so /media/{id}
 # is served by the GridFS streaming route and not handed to the 404 template.

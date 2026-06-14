@@ -1,0 +1,118 @@
+{#-
+  Admin business search page.
+
+  Lets the admin find a business by name, then click through to the edit form
+  to adjust per-business flags (currently just hide_ratings). No results are
+  shown until the admin types a search term so the page doesn't try to load
+  every business in the database on open.
+-#}
+{% extends 'admin/_layout.html' %}
+
+{% block title %}Businesses · Admin{% endblock %}
+
+{% block content %}
+<section class="bg-stone-50/60 border-b border-stone-200/60">
+  <div class="max-w-4xl mx-auto px-6 lg:px-10 py-12">
+    <p class="text-[11px] uppercase tracking-[0.3em] text-rose-600 font-semibold mb-3">Businesses</p>
+    <h1 class="font-light text-stone-900 leading-[1.05] tracking-tight mb-3"
+        style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 300;'>
+      Find a business
+    </h1>
+    <p class="text-stone-600 leading-relaxed max-w-2xl">
+      Search by name to find the business you want to edit. From the results you
+      can open the edit form to hide or show Google ratings for that specific salon.
+    </p>
+  </div>
+</section>
+
+<section class="bg-white">
+  <div class="max-w-4xl mx-auto px-6 lg:px-10 py-10">
+
+    <form method="get" action="/admin/businesses" class="mb-8">
+      <div class="flex gap-3">
+        <input
+          type="search"
+          name="q"
+          value="{{ q }}"
+          placeholder="Search by business name…"
+          autofocus
+          class="flex-1 border border-stone-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
+        >
+        <button
+          type="submit"
+          class="px-5 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium transition-colors"
+        >
+          Search
+        </button>
+      </div>
+    </form>
+
+    {% if q and not businesses %}
+      <div class="rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-8 py-16 text-center">
+        <p class="text-stone-600">No businesses found matching <strong>"{{ q }}"</strong>. Try a shorter or different search.</p>
+      </div>
+    {% elif businesses %}
+      <div class="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+        <table class="min-w-full divide-y divide-stone-200 text-sm">
+          <thead class="bg-stone-50 text-stone-600">
+            <tr>
+              <th class="px-5 py-3 text-left text-[11px] uppercase tracking-[0.15em] font-semibold">Name</th>
+              <th class="px-5 py-3 text-left text-[11px] uppercase tracking-[0.15em] font-semibold">City</th>
+              <th class="px-5 py-3 text-left text-[11px] uppercase tracking-[0.15em] font-semibold">Status</th>
+              <th class="px-5 py-3 text-left text-[11px] uppercase tracking-[0.15em] font-semibold">Ratings</th>
+              <th class="px-5 py-3 text-right text-[11px] uppercase tracking-[0.15em] font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-stone-100">
+            {% for biz in businesses %}
+            <tr class="align-middle">
+              <td class="px-5 py-4">
+                <div class="font-medium text-stone-900">{{ biz.name }}</div>
+                <div class="text-xs text-stone-500 mt-0.5 font-mono">{{ biz.slug }}</div>
+              </td>
+              <td class="px-5 py-4 text-stone-700">
+                {{ (biz.get('address') or {}).get('city', '—') }}
+              </td>
+              <td class="px-5 py-4">
+                {% if biz.status == 'live' %}
+                  <span class="inline-block text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5">Live</span>
+                {% elif biz.status == 'archived' %}
+                  <span class="inline-block text-xs font-medium text-stone-500 bg-stone-100 border border-stone-200 rounded px-2 py-0.5">Archived</span>
+                {% else %}
+                  <span class="inline-block text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">{{ biz.status or '?' }}</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-4">
+                {% if biz.hide_ratings %}
+                  <span class="inline-block text-xs font-medium text-stone-500 bg-stone-100 border border-stone-200 rounded px-2 py-0.5">Hidden</span>
+                {% elif biz.google_rating %}
+                  <span class="inline-block text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5">{{ biz.google_rating }}★ ({{ biz.google_review_count or 0 }})</span>
+                {% else %}
+                  <span class="text-xs text-stone-400">None</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-4 text-right whitespace-nowrap">
+                <a
+                  href="/admin/businesses/{{ biz._id }}/edit"
+                  class="inline-flex items-center gap-1.5 rounded-full bg-white hover:bg-stone-50 border border-stone-300 text-stone-700 font-medium px-4 py-1.5 text-xs transition"
+                >
+                  Edit
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if businesses|length == 50 %}
+      <p class="mt-3 text-xs text-stone-500">Showing first 50 results — narrow your search if you don't see the business you're looking for.</p>
+      {% endif %}
+    {% elif not q %}
+      <div class="rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-8 py-16 text-center">
+        <p class="text-stone-600">Type a business name above to search.</p>
+      </div>
+    {% endif %}
+
+  </div>
+</section>
+{% endblock %}
