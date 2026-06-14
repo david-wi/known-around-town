@@ -106,62 +106,71 @@ async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> 
                 biz.get("name"), city_id,
             )
         city_name = city_names.get(city_id, "Miami")
-        async with sem:
-            rating_result = await google_places.lookup_rating(
-                business_name=biz.get("name", ""),
-                city=city_name,
-                existing_place_id=biz.get("google_place_id"),
-            )
-            # WHY: 0.1s sleep inside the semaphore block paces each slot so
-            # concurrent slots don't all fire requests at the same millisecond.
-            await asyncio.sleep(0.1)
+        try:
+            async with sem:
+                rating_result = await google_places.lookup_rating(
+                    business_name=biz.get("name", ""),
+                    city=city_name,
+                    existing_place_id=biz.get("google_place_id"),
+                )
+                # WHY: 0.1s sleep inside the semaphore block paces each slot so
+                # concurrent slots don't all fire requests at the same millisecond.
+                await asyncio.sleep(0.1)
 
-            # WHY: neighborhood-name fallback for businesses in sub-cities.
-            # Some Google-registered cities (Wilton Manors, Flagler Village, Las Olas)
-            # are neighborhoods of Fort Lauderdale but have their own Places listings.
-            # Searching "Business Name Fort Lauderdale FL" fails to match them; trying
-            # the neighborhood name (slug converted to title-case) as the city finds
-            # the correct Places record. Only runs when no existing place_id is cached
-            # (discovery phase) and the city search returned nothing.
-            if rating_result is None and not biz.get("google_place_id"):
-                # WHY cap at 3: bounding the fallback loop prevents one business
-                # with many neighborhood slugs from holding the semaphore slot for
-                # an unbounded time.
-                nbhd_slugs = (biz.get("neighborhood_slugs") or [])[:3]
-                for nbhd_slug in nbhd_slugs:
-                    nbhd_name = nbhd_slug.replace("-", " ").title()
-                    if nbhd_name.lower() == city_name.lower():
-                        continue
-                    rating_result = await google_places.lookup_rating(
-                        business_name=biz.get("name", ""),
-                        city=nbhd_name,
-                    )
-                    await asyncio.sleep(0.1)
-                    if rating_result:
-                        log.info(
-                            "Found %r via neighborhood fallback %r (primary city %r had no match)",
-                            biz.get("name"), nbhd_name, city_name,
+                # WHY: neighborhood-name fallback for businesses in sub-cities.
+                # Some Google-registered cities (Wilton Manors, Flagler Village, Las Olas)
+                # are neighborhoods of Fort Lauderdale but have their own Places listings.
+                # Searching "Business Name Fort Lauderdale FL" fails to match them; trying
+                # the neighborhood name (slug converted to title-case) as the city finds
+                # the correct Places record. Only runs when no existing place_id is cached
+                # (discovery phase) and the city search returned nothing.
+                if rating_result is None and not biz.get("google_place_id"):
+                    # WHY cap at 3: bounding the fallback loop prevents one business
+                    # with many neighborhood slugs from holding the semaphore slot for
+                    # an unbounded time.
+                    nbhd_slugs = (biz.get("neighborhood_slugs") or [])[:3]
+                    for nbhd_slug in nbhd_slugs:
+                        nbhd_name = nbhd_slug.replace("-", " ").title()
+                        if nbhd_name.lower() == city_name.lower():
+                            continue
+                        rating_result = await google_places.lookup_rating(
+                            business_name=biz.get("name", ""),
+                            city=nbhd_name,
                         )
-                        break
+                        await asyncio.sleep(0.1)
+                        if rating_result:
+                            log.info(
+                                "Found %r via neighborhood fallback %r (primary city %r had no match)",
+                                biz.get("name"), nbhd_name, city_name,
+                            )
+                            break
 
-            # WHY: name-suffix stripping fallback. ~40 businesses include the city
-            # name at the end of their stored name ("Allure Medspa Aventura") or use
-            # a pipe/dash separator ("DIPLOMATIC IV | Brickell"). Google's listing
-            # omits these extras, so searching the full stored name fails. Try a
-            # cleaned name before giving up.
-            if rating_result is None:
-                stripped_name = _strip_city_suffix(biz.get("name", ""), city_name)
-                if stripped_name:
-                    rating_result = await google_places.lookup_rating(
-                        business_name=stripped_name,
-                        city=city_name,
-                    )
-                    await asyncio.sleep(0.1)
-                    if rating_result:
-                        log.info(
-                            "Found %r via stripped-name fallback (tried %r in %r)",
-                            biz.get("name"), stripped_name, city_name,
+                # WHY: name-suffix stripping fallback. ~40 businesses include the city
+                # name at the end of their stored name ("Allure Medspa Aventura") or use
+                # a pipe/dash separator ("DIPLOMATIC IV | Brickell"). Google's listing
+                # omits these extras, so searching the full stored name fails. Try a
+                # cleaned name before giving up.
+                if rating_result is None:
+                    stripped_name = _strip_city_suffix(biz.get("name", ""), city_name)
+                    if stripped_name:
+                        rating_result = await google_places.lookup_rating(
+                            business_name=stripped_name,
+                            city=city_name,
                         )
+                        await asyncio.sleep(0.1)
+                        if rating_result:
+                            log.info(
+                                "Found %r via stripped-name fallback (tried %r in %r)",
+                                biz.get("name"), stripped_name, city_name,
+                            )
+
+        except google_places.RateLimitError:
+            # WHY: RateLimitError means the daily API quota is exhausted — not that
+            # this business has no Google listing. Count as failed (transient) so it
+            # stays in the unrated queue and gets retried on the next sync run,
+            # rather than as no_match (permanent absence from Google).
+            failed += 1
+            return
 
         if rating_result is None:
             if biz.get("google_place_id"):
