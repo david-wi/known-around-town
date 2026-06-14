@@ -43,6 +43,9 @@ class FeaturedTier(str, Enum):
     free = "free"
     enhanced = "enhanced"
     premium = "premium"
+    # WHY: Concierge is the top tier — adds a dedicated AI phone receptionist
+    # provisioned via VAPI so callers can reach the salon 24/7 without hold music.
+    concierge = "concierge"
 
 
 class IndexStatus(str, Enum):
@@ -300,6 +303,13 @@ class Business(BaseModel):
     # a second lookup table. Both stay null until the owner subscribes.
     stripe_customer_id: Optional[str] = None
     stripe_subscription_id: Optional[str] = None
+    # WHY: voice_phone_number is the formatted public number callers dial, e.g.
+    # "(669) 232-8894". vapi_phone_number_id and vapi_assistant_id are VAPI's
+    # internal UUIDs needed for deprovisioning (DELETE calls to VAPI's API).
+    # All three are null until admin provisions the Concierge tier for this salon.
+    voice_phone_number: Optional[str] = None
+    vapi_phone_number_id: Optional[str] = None
+    vapi_assistant_id: Optional[str] = None
     # WHY: tracks cumulative real-human page views (bots excluded at the route
     # layer). Gives owners a concrete ROI signal on their dashboard so they
     # have a reason to renew their subscription.
