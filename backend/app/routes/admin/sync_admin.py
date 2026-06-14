@@ -21,7 +21,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -205,6 +205,7 @@ async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> 
 async def sync_page(
     request: Request,
     result: Optional[str] = None,
+    unrated_only: Optional[int] = None,
     updated: Optional[int] = None,
     no_match: Optional[int] = None,
     failed: Optional[int] = None,
@@ -232,6 +233,7 @@ async def sync_page(
             "without_rating": without_rating,
             "api_configured": google_places.is_configured(),
             "result": result,
+            "unrated_only": bool(unrated_only),
             "sync_updated": updated,
             "sync_no_match": no_match,
             "sync_failed": failed,
@@ -244,13 +246,18 @@ async def sync_page(
 async def sync_ratings(
     request: Request,
     background_tasks: BackgroundTasks,
+    unrated_only: bool = Form(False),
     _admin=Depends(require_admin),
 ):
-    """Trigger a Google Places sync for all published businesses.
+    """Trigger a Google Places sync for published businesses.
 
     Fetches ratings in parallel (3 at a time) in a background task so the
-    HTTP response is returned immediately — avoiding Traefik's read timeout
-    on the 2-minute sync. Redirects to the sync page with result=started.
+    HTTP response is returned immediately — avoiding Traefik's read timeout.
+    Redirects to the sync page with result=started.
+
+    unrated_only=True targets only businesses with no Google rating yet.
+    WHY: conserves daily API quota — avoids re-fetching the ~880 businesses
+    that already have ratings when the goal is filling in new additions.
     """
     global _sync_running
 
@@ -268,10 +275,21 @@ async def sync_ratings(
     city_docs = await db.cities.find({}, {"_id": 1, "name": 1}).to_list(1000)
     city_names: Dict[str, str] = {c["_id"]: c.get("name", "") for c in city_docs}
 
+    # WHY: when unrated_only=True, filter to businesses with no Google rating.
+    # Use $or to catch both documents where the field is absent and where it is
+    # explicitly null — both mean "never synced." This conserves daily API quota
+    # by skipping the ~880 businesses that already have ratings.
+    biz_filter: dict = {"status": "live"}
+    if unrated_only:
+        biz_filter["$or"] = [
+            {"google_rating": {"$exists": False}},
+            {"google_rating": None},
+        ]
+
     # WHY: cap at 5000 to avoid runaway memory usage. Log a warning if we hit
     # it so the operator knows they need to re-run or implement pagination.
     businesses = await db.businesses.find(
-        {"status": "live"},
+        biz_filter,
         {"_id": 1, "name": 1, "city_id": 1, "google_place_id": 1, "neighborhood_slugs": 1},
     ).to_list(5000)
 
@@ -281,7 +299,8 @@ async def sync_ratings(
         )
 
     log.info(
-        "Queuing Google ratings sync for %d businesses (background task)", len(businesses)
+        "Queuing Google ratings sync for %d businesses (unrated_only=%s) (background task)",
+        len(businesses), unrated_only,
     )
 
     # WHY: set the flag BEFORE add_task so there is no window between the flag
@@ -290,7 +309,7 @@ async def sync_ratings(
     _sync_running = True
     background_tasks.add_task(_run_sync_background, city_names, businesses)
 
-    # WHY: redirect immediately — the sync continues in the background and the
-    # admin page refreshes coverage counts from the DB on every GET load, so
-    # the operator can reload the page after a few minutes to see updated numbers.
-    return RedirectResponse(url="/admin/sync?result=started", status_code=303)
+    # WHY: include unrated_only in the redirect so the banner can tell the
+    # operator exactly what mode was queued and how long it will take.
+    suffix = "&unrated_only=1" if unrated_only else ""
+    return RedirectResponse(url=f"/admin/sync?result=started{suffix}", status_code=303)

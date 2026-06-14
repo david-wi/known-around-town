@@ -30,7 +30,11 @@
     </svg>
     <div class="text-sky-800">
       <span class="font-semibold">Sync started.</span>
-      Ratings are being updated in the background for all {{ total }} salons — this takes about 2 minutes.
+      {% if unrated_only %}
+        Fetching ratings for the {{ without_rating }} salons that don't have one yet — should finish in under a minute.
+      {% else %}
+        Ratings are being updated in the background for all {{ total }} salons — this takes about 2 minutes.
+      {% endif %}
       Refresh this page when it's done to see updated coverage numbers.
     </div>
   </div>
@@ -97,22 +101,45 @@
   </div>
 
   {# ── Action ── #}
-  <form method="post" action="/admin/sync/ratings">
-    <div class="bg-white border border-stone-200 rounded-xl px-6 py-5 mb-6">
-      <h2 class="font-semibold text-stone-900 mb-2">Sync all salons</h2>
-      <p class="text-sm text-stone-500 mb-4">Looks up every published salon on Google, matches by name and city, and stores the star rating, review count, and opening hours. Existing data is refreshed. Runs in the background — the page responds immediately and coverage numbers update within about 2 minutes.</p>
-      <p class="text-xs text-stone-400 mb-4">
-        <strong>Cost:</strong> Each salon without a Google Place ID costs 1 Places Text Search call (≈ $0.017). Salons with an existing Place ID cost 1 Place Details call (cheaper). Total cost for {{ total }} salons is under $2.
-      </p>
-      <button
-        type="submit"
-        {% if not api_configured or sync_running %}disabled{% endif %}
-        class="px-5 py-2 rounded-lg {{ 'bg-rose-600 hover:bg-rose-700 text-white' if (api_configured and not sync_running) else 'bg-stone-200 text-stone-400 cursor-not-allowed' }} text-sm font-medium transition-colors"
-      >
-        {% if not api_configured %}API key required{% elif sync_running %}Sync in progress…{% else %}Sync ratings & hours{% endif %}
-      </button>
-    </div>
-  </form>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+
+    {# Unrated only — recommended daily option #}
+    <form method="post" action="/admin/sync/ratings">
+      <input type="hidden" name="unrated_only" value="1">
+      <div class="bg-white border-2 border-rose-200 rounded-xl px-6 py-5 h-full flex flex-col">
+        <div class="flex items-center gap-2 mb-2">
+          <h2 class="font-semibold text-stone-900">Sync unrated only</h2>
+          <span class="text-xs bg-rose-100 text-rose-700 font-medium px-2 py-0.5 rounded-full">Recommended</span>
+        </div>
+        <p class="text-sm text-stone-500 mb-3 flex-1">Only fetches ratings for the {{ without_rating }} salons that don't have one yet. Saves API quota and finishes in under a minute.</p>
+        <p class="text-xs text-stone-400 mb-4">Cost: roughly {{ without_rating }} Places calls (≈ ${{ "%.2f"|format(without_rating * 0.017) }})</p>
+        <button
+          type="submit"
+          {% if not api_configured or sync_running %}disabled{% endif %}
+          class="px-5 py-2 rounded-lg {{ 'bg-rose-600 hover:bg-rose-700 text-white' if (api_configured and not sync_running) else 'bg-stone-200 text-stone-400 cursor-not-allowed' }} text-sm font-medium transition-colors w-full"
+        >
+          {% if not api_configured %}API key required{% elif sync_running %}Sync in progress…{% else %}Sync {{ without_rating }} unrated salons{% endif %}
+        </button>
+      </div>
+    </form>
+
+    {# Full sync — weekly refresh #}
+    <form method="post" action="/admin/sync/ratings">
+      <div class="bg-white border border-stone-200 rounded-xl px-6 py-5 h-full flex flex-col">
+        <h2 class="font-semibold text-stone-900 mb-2">Sync all salons</h2>
+        <p class="text-sm text-stone-500 mb-3 flex-1">Refreshes ratings for all {{ total }} salons. Use weekly to pick up rating changes. Takes about 2 minutes.</p>
+        <p class="text-xs text-stone-400 mb-4">Cost: roughly {{ total }} Places calls (≈ ${{ "%.2f"|format(total * 0.017) }})</p>
+        <button
+          type="submit"
+          {% if not api_configured or sync_running %}disabled{% endif %}
+          class="px-5 py-2 rounded-lg {{ 'bg-stone-700 hover:bg-stone-800 text-white' if (api_configured and not sync_running) else 'bg-stone-200 text-stone-400 cursor-not-allowed' }} text-sm font-medium transition-colors w-full"
+        >
+          {% if not api_configured %}API key required{% elif sync_running %}Sync in progress…{% else %}Sync all {{ total }} salons{% endif %}
+        </button>
+      </div>
+    </form>
+
+  </div>
 
   {# ── How it works ── #}
   <div class="bg-stone-50 border border-stone-200 rounded-xl px-6 py-5">

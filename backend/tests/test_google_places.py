@@ -746,6 +746,59 @@ class TestSyncRatingsPost:
         )
         assert rated_count > 0, "Background sync should have updated at least one business"
 
+    def test_unrated_only_skips_already_rated_businesses(self, mock_db, monkeypatch):
+        """unrated_only=True only calls lookup_rating for businesses with no google_rating.
+
+        WHY: confirms the quota-conservation feature works — the ~880 salons that
+        already have ratings must NOT be passed to lookup_rating when unrated_only
+        is set. Only the businesses without a rating (or with null) should be synced.
+        """
+        import asyncio
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.admin.sync_admin as sync_mod
+        import app.routes.api.v1._auth as _auth_module
+        import app.services.google_places as gp
+        from app.services.google_places import PlaceRating
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+        monkeypatch.setattr(gp, "is_configured", lambda: True)
+        monkeypatch.setattr(sync_mod, "_sync_running", False)
+
+        # Seed: one business WITH a rating, one WITHOUT
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.cities.insert_one({"_id": "city-test", "name": "Miami", "slug": "miami"})
+        )
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.networks.insert_one({"_id": "net-test", "name": "Beauty", "domain_suffix": "knowsbeauty.localhost"})
+        )
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.insert_many([
+                {"_id": "biz-rated", "name": "Already Rated Salon", "slug": "rated", "city_id": "city-test",
+                 "network_id": "net-test", "status": "live", "google_rating": 4.5, "google_place_id": "ChIJ_already"},
+                {"_id": "biz-unrated", "name": "Needs Rating Salon", "slug": "unrated", "city_id": "city-test",
+                 "network_id": "net-test", "status": "live"},
+            ])
+        )
+
+        synced_names = []
+
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            synced_names.append(business_name)
+            return PlaceRating(place_id="ChIJ_new", rating=4.2, review_count=50)
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        client = TestClient(app, follow_redirects=False)
+        r = client.post("/admin/sync/ratings", data={"unrated_only": "1"})
+
+        assert r.status_code == 303
+        assert "unrated_only=1" in r.headers["location"], "redirect should include unrated_only flag"
+
+        # Only the unrated business should have been synced
+        assert "Needs Rating Salon" in synced_names, "unrated business should be synced"
+        assert "Already Rated Salon" not in synced_names, "already-rated business should be skipped"
+
 
 # ── Business model hide_ratings field ────────────────────────────────────────
 
