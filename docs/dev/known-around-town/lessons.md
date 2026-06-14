@@ -413,3 +413,26 @@ build inline HTML mockups directly in the template using the same Tailwind class
 and design patterns as the real tool. They render identically in the browser and in
 the PDF, look completely authentic, and let you control the example content to be
 maximally compelling. Much faster and more reliable than any screenshot approach.
+
+## Always add redirect routes for marketing-linked URLs (2026-06-14)
+
+When a URL might appear in marketing materials (emails, social posts, ads), add a
+301 redirect from the "obvious" path to the actual page even if the obvious path was
+never officially announced. The redirect pattern in `pages.py` is:
+
+```python
+@router.get("/owners/claim", response_class=HTMLResponse)
+async def owners_claim_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/owners#claim-form", status_code=301)
+```
+
+PR #259 caught `/owners/claim` returning 404. Any link in the wild would have
+dead-ended there. Audit likely marketing paths early and add redirects defensively.
+
+## Pricing page conversion: CTA placement matters (2026-06-14)
+
+On the pricing page, the "Claim your listing" button was below 12 feature bullets —
+completely off-screen at a standard 1440×900 viewport. Owners who didn't scroll never
+saw a way to act. Add the primary CTA immediately after the price (before the feature
+list). Keep a second CTA at the bottom for thorough readers. Two CTAs on a pricing
+card is correct UX, not redundant.

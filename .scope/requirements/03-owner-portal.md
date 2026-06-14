@@ -49,3 +49,12 @@ notifications when new inquiries arrive.
 **Acceptance:** Given an owner with 3 past inquiries, when they view `/owners/me`,
 then "3 inquiries" is displayed; given a new inquiry submitted today, then the owner
 receives an email notification.
+
+### KAT-036 — /owners/claim redirect · V1 · implemented
+**Persona:** Salon Owner (arriving from a marketing link).
+Any request to `/owners/claim` is permanently redirected (HTTP 301) to
+`/owners#claim-form`. This ensures marketing emails, social posts, or ads that
+link to `/owners/claim` always land the owner on the correct page instead of
+returning a 404.
+**Acceptance:** Given a GET request to `/owners/claim`, when the response is
+received, then the client is redirected to `/owners#claim-form` with status 301.
