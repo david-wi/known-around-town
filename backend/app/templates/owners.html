@@ -164,7 +164,7 @@
 <section class="bg-amber-50 border-t border-amber-100 py-10">
   <div class="max-w-xl mx-auto px-6 text-center">
     <p class="text-lg font-semibold text-stone-900 mb-1">Not ready to claim yet?</p>
-    <p class="text-stone-600 text-sm mb-4">Drop your email — we'll send tips for getting your Miami salon found online.</p>
+    <p class="text-stone-600 text-sm mb-4">Drop your email — we'll send tips for getting your {{ listing_word_singular or 'salon' }} in {{ city.name if city else 'your city' }} found online.</p>
     <form id="owner-lead-form" class="flex gap-2 max-w-sm mx-auto">
       <input type="email" id="owner-lead-email" required placeholder="your@email.com"
         class="flex-1 border border-stone-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
@@ -243,7 +243,7 @@
           </button>
         </dt>
         <dd class="faq-answer hidden mt-3 text-stone-600 text-sm leading-relaxed">
-          We list every established beauty business in Miami as a starting point for the directory — similar to how Google Maps lists businesses it finds. No one can edit your listing until you claim it. Claiming puts you in control: you can update your photos, hours, services, and any details that are out of date.
+          We list every established {{ vertical_word | lower }} business in {{ city.name if city else 'the city' }} as a starting point for the directory — similar to how Google Maps lists businesses it finds. No one can edit your listing until you claim it. Claiming puts you in control: you can update your photos, hours, services, and any details that are out of date.
         </dd>
       </div>
 
@@ -372,7 +372,7 @@
       "name": "My business is already listed — did someone add it without asking me?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "We list every established beauty business in Miami as a starting point — similar to how Google Maps lists businesses it finds. No one can edit your listing until you claim it."
+        "text": "We list every established {{ vertical_word | lower }} business in {{ city.name if city else 'the city' }} as a starting point — similar to how Google Maps lists businesses it finds. No one can edit your listing until you claim it."
       }
     },
     {
