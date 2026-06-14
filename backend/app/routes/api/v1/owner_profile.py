@@ -81,6 +81,11 @@ class OwnerProfileUpdate(BaseModel):
     # WHY: capped at 30 — a reasonable upper bound for a salon's service
     # menu that prevents a malformed client from bloating the document.
     services: Optional[list[ServiceEntry]] = Field(None, max_length=30)
+    # WHY: 300 chars — comfortably longer than any real Instagram handle
+    # (30 char limit) or Facebook page URL, with headroom for owner mistakes
+    # (full URLs) that the validator normalises down to just the handle.
+    instagram: Optional[str] = Field(None, max_length=300)
+    facebook: Optional[str] = Field(None, max_length=300)
 
     @field_validator("email")
     @classmethod
@@ -98,10 +103,57 @@ class OwnerProfileUpdate(BaseModel):
             raise ValueError("Website must start with http:// or https://")
         return v
 
+    @field_validator("instagram")
+    @classmethod
+    def normalize_instagram(cls, v: Optional[str]) -> Optional[str]:
+        """Strip to a bare handle — no @, no URL prefix.
+
+        WHY: the public listing template already reads `business.instagram`
+        and renders it with `|replace('@','')`, expecting a plain handle like
+        "mysalon". Storing the canonical form here means the template never
+        needs to parse URLs, and owners can paste their full profile URL or
+        type their handle with or without the @ — we handle all three forms.
+        """
+        if not v:
+            return v
+        v = v.strip()
+        if not v:
+            return v
+        # Strip full URL prefix (https://instagram.com/handle or http://www.instagram.com/handle)
+        for prefix in (
+            "https://www.instagram.com/",
+            "http://www.instagram.com/",
+            "https://instagram.com/",
+            "http://instagram.com/",
+        ):
+            if v.lower().startswith(prefix):
+                v = v[len(prefix):]
+                break
+        # Strip trailing slashes and query strings left over from a pasted URL
+        v = v.split("?")[0].rstrip("/")
+        # Strip leading @ (owners sometimes type @mysalon)
+        v = v.lstrip("@")
+        return v
+
+    @field_validator("facebook")
+    @classmethod
+    def normalize_facebook(cls, v: Optional[str]) -> Optional[str]:
+        """Trim whitespace; store whatever the owner entered.
+
+        WHY: Facebook page identifiers are more varied than Instagram handles
+        (numeric IDs, short names, full page URLs) and the public listing
+        template does not currently display facebook, so there is no stored
+        format to conform to. We simply strip whitespace and pass the value
+        through rather than risk mangling a valid page URL.
+        """
+        if not v:
+            return v
+        return v.strip()
+
 
 # Fields that owners may update. All other fields (name, slug, admin flags,
 # Stripe ids, etc.) are never touched by this endpoint.
-_OWNER_SAFE_FIELDS = {"phone", "website", "email", "description", "hours", "services"}
+_OWNER_SAFE_FIELDS = {"phone", "website", "email", "description", "hours", "services", "instagram", "facebook"}
 
 
 def _safe_response(doc: dict) -> dict:
@@ -121,6 +173,8 @@ def _safe_response(doc: dict) -> dict:
         "description": doc.get("description"),
         "hours": doc.get("hours"),
         "services": doc.get("services"),
+        "instagram": doc.get("instagram"),
+        "facebook": doc.get("facebook"),
         "updated_at": doc.get("updated_at"),
     }
 

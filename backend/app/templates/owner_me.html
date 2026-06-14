@@ -229,6 +229,15 @@
           <span class="text-stone-500"> — two sentences about what makes you special. The "About your salon" field in the edit form is a great place to start.</span>
         </div>
       </li>
+      {% if not owner_business.instagram %}
+      <li class="flex items-start gap-3">
+        <span class="text-lg leading-none mt-0.5">📸</span>
+        <div>
+          <strong class="font-semibold">Add your Instagram</strong>
+          <span class="text-stone-500"> — visitors click through to your Instagram profile. Add it in the Social Links section of the edit form below.</span>
+        </div>
+      </li>
+      {% endif %}
     </ol>
   </div>
 </section>
@@ -290,6 +299,26 @@
                value="{{ owner_business.email or '' }}"
                placeholder="hello@yoursalon.com"
                class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition" />
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-6">
+        <div>
+          <label for="op-instagram" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Instagram <span class="text-stone-400 normal-case">(optional)</span></label>
+          <div class="flex items-center rounded-lg border border-stone-200 bg-stone-50 overflow-hidden focus-within:ring-2 {{ theme.focus_ring }} focus-within:border-transparent transition">
+            <span class="px-3 py-2.5 text-sm text-stone-400 border-r border-stone-200 shrink-0 select-none">instagram.com/</span>
+            <input id="op-instagram" name="instagram" type="text"
+                   value="{{ owner_business.instagram|replace('@','')|default('') if owner_business else '' }}"
+                   placeholder="yoursalon"
+                   class="flex-1 bg-transparent px-3 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none" />
+          </div>
+        </div>
+        <div>
+          <label for="op-facebook" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Facebook <span class="text-stone-400 normal-case">(optional)</span></label>
+          <input id="op-facebook" name="facebook" type="url"
+                 value="{{ owner_business.facebook or '' if owner_business else '' }}"
+                 placeholder="https://facebook.com/yoursalon"
+                 class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition" />
+        </div>
       </div>
 
       <div>
@@ -878,6 +907,8 @@
       website:     form.querySelector('[name=website]').value.trim(),
       email:       form.querySelector('[name=email]').value.trim(),
       description: form.querySelector('[name=description]').value.trim(),
+      instagram:   form.querySelector('[name=instagram]').value.trim(),
+      facebook:    form.querySelector('[name=facebook]').value.trim(),
     };
     var hours = collectHours();
     if (hours !== undefined) payload.hours = hours;
