@@ -21,7 +21,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -35,10 +35,118 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 _templates: Optional[Jinja2Templates] = None
 
+# WHY module-level flag (not DB-backed): a simple bool avoids a round-trip on
+# every GET to /admin/sync. It resets on container restart, which is acceptable
+# because a restart would also abort any in-progress sync.
+_sync_running: bool = False
+
 
 def attach_templates(t: Jinja2Templates) -> None:
     global _templates
     _templates = t
+
+
+async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> None:
+    """Background coroutine: sync ratings for all businesses then log results.
+
+    Called via FastAPI BackgroundTasks so the HTTP response returns immediately
+    and Traefik's read timeout cannot abort a 2-minute sync of 1000+ businesses.
+    """
+    global _sync_running
+    db = get_db()
+
+    # WHY: semaphore of 3 (down from 5) to reduce burst rate. Combined with
+    # the 0.1s inter-request sleep below, peak throughput is ~30 req/s —
+    # well under Google's 100 QPS limit but far enough from the edge to
+    # avoid triggering 429s on large syncs.
+    sem = asyncio.Semaphore(3)
+    updated = 0
+    failed = 0
+    no_match = 0
+
+    async def _sync_one(biz: dict) -> None:
+        nonlocal updated, failed, no_match
+        city_id = biz.get("city_id", "")
+        if city_id and city_id not in city_names:
+            log.warning(
+                "Business %r has unknown city_id %r — falling back to Miami",
+                biz.get("name"), city_id,
+            )
+        city_name = city_names.get(city_id, "Miami")
+        async with sem:
+            rating_result = await google_places.lookup_rating(
+                business_name=biz.get("name", ""),
+                city=city_name,
+                existing_place_id=biz.get("google_place_id"),
+            )
+            # WHY: 0.1s sleep inside the semaphore block paces each slot so
+            # concurrent slots don't all fire requests at the same millisecond.
+            await asyncio.sleep(0.1)
+
+            # WHY: neighborhood-name fallback for businesses in sub-cities.
+            # Some Google-registered cities (Wilton Manors, Flagler Village, Las Olas)
+            # are neighborhoods of Fort Lauderdale but have their own Places listings.
+            # Searching "Business Name Fort Lauderdale FL" fails to match them; trying
+            # the neighborhood name (slug converted to title-case) as the city finds
+            # the correct Places record. Only runs when no existing place_id is cached
+            # (discovery phase) and the city search returned nothing.
+            if rating_result is None and not biz.get("google_place_id"):
+                # WHY cap at 3: bounding the fallback loop prevents one business
+                # with many neighborhood slugs from holding the semaphore slot for
+                # an unbounded time.
+                nbhd_slugs = (biz.get("neighborhood_slugs") or [])[:3]
+                for nbhd_slug in nbhd_slugs:
+                    nbhd_name = nbhd_slug.replace("-", " ").title()
+                    if nbhd_name.lower() == city_name.lower():
+                        continue
+                    rating_result = await google_places.lookup_rating(
+                        business_name=biz.get("name", ""),
+                        city=nbhd_name,
+                    )
+                    await asyncio.sleep(0.1)
+                    if rating_result:
+                        log.info(
+                            "Found %r via neighborhood fallback %r (primary city %r had no match)",
+                            biz.get("name"), nbhd_name, city_name,
+                        )
+                        break
+
+        if rating_result is None:
+            if biz.get("google_place_id"):
+                # Had a place_id but fetch failed — transient error; keep old data
+                failed += 1
+            else:
+                no_match += 1
+            return
+
+        update_fields: dict = {
+            "google_place_id": rating_result.place_id,
+            "google_rating": rating_result.rating,
+            "google_review_count": rating_result.review_count,
+            "google_rating_synced_at": datetime.now(timezone.utc),
+        }
+        # WHY: only overwrite hours when Places returned data. An empty list means
+        # Google had no hour data for this business — preserving any manually-entered
+        # hours is better than blanking them.
+        if rating_result.hours:
+            update_fields["hours"] = [h.model_dump() for h in rating_result.hours]
+
+        await db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": update_fields},
+        )
+        updated += 1
+
+    try:
+        await asyncio.gather(*[_sync_one(b) for b in businesses])
+        log.info(
+            "Google ratings sync complete: updated=%d no_match=%d failed=%d",
+            updated, no_match, failed,
+        )
+    finally:
+        # WHY: always clear the flag so the admin page doesn't stay stuck in
+        # "running" state if the sync raises an unexpected error.
+        _sync_running = False
 
 
 @router.get("/sync")
@@ -75,6 +183,7 @@ async def sync_page(
             "sync_updated": updated,
             "sync_no_match": no_match,
             "sync_failed": failed,
+            "sync_running": _sync_running,
         },
     )
 
@@ -82,22 +191,28 @@ async def sync_page(
 @router.post("/sync/ratings")
 async def sync_ratings(
     request: Request,
+    background_tasks: BackgroundTasks,
     _admin=Depends(require_admin),
 ):
     """Trigger a Google Places sync for all published businesses.
 
-    Fetches ratings in parallel (3 at a time) and writes updates directly to
-    the business documents. Redirects back to the sync page with a summary.
+    Fetches ratings in parallel (3 at a time) in a background task so the
+    HTTP response is returned immediately — avoiding Traefik's read timeout
+    on the 2-minute sync. Redirects to the sync page with result=started.
     """
+    global _sync_running
+
     if not google_places.is_configured():
         # WHY: redirect-then-GET so browser back/refresh doesn't re-POST the form
         return RedirectResponse(url="/admin/sync?result=error:no-key", status_code=303)
+
+    if _sync_running:
+        return RedirectResponse(url="/admin/sync?result=already-running", status_code=303)
 
     db = get_db()
 
     # WHY: load city names once for lookup in the sync loop — avoids N
     # separate city queries when building the Places search query per business.
-    # Limit is generous (1000) because city counts are small in practice.
     city_docs = await db.cities.find({}, {"_id": 1, "name": 1}).to_list(1000)
     city_names: Dict[str, str] = {c["_id"]: c.get("name", "") for c in city_docs}
 
@@ -113,106 +228,17 @@ async def sync_ratings(
             "sync_ratings hit the 5000-business cap — some businesses were not synced"
         )
 
-    log.info("Starting Google ratings sync for %d businesses", len(businesses))
-
-    # WHY: semaphore of 3 (down from 5) to reduce burst rate. Combined with
-    # the 0.1s inter-request sleep below, peak throughput is ~30 req/s —
-    # well under Google's 100 QPS limit but far enough from the edge to
-    # avoid triggering 429s on large syncs. The google_places module now also
-    # retries on 429 with backoff, so this is defense-in-depth.
-    sem = asyncio.Semaphore(3)
-    updated = 0
-    failed = 0
-    no_match = 0
-
-    async def _sync_one(biz: dict) -> None:
-        nonlocal updated, failed, no_match
-        city_id = biz.get("city_id", "")
-        if city_id and city_id not in city_names:
-            log.warning(
-                "Business %r has unknown city_id %r — falling back to Miami",
-                biz.get("name"), city_id,
-            )
-        city_name = city_names.get(city_id, "Miami")
-        async with sem:
-            rating_result = await google_places.lookup_rating(
-                business_name=biz.get("name", ""),
-                city=city_name,
-                existing_place_id=biz.get("google_place_id"),
-            )
-            # WHY: 0.1s sleep inside the semaphore block paces each slot so
-            # concurrent slots don't all fire requests at the same millisecond.
-            # At semaphore=3 and 0.1s hold this caps burst throughput at ~30 req/s.
-            await asyncio.sleep(0.1)
-
-            # WHY: neighborhood-name fallback for businesses in sub-cities.
-            # Some Google-registered cities (Wilton Manors, Flagler Village, Las Olas)
-            # are neighborhoods of Fort Lauderdale but have their own Places listings.
-            # Searching "Business Name Fort Lauderdale FL" fails to match them; trying
-            # the neighborhood name (slug converted to title-case) as the city finds
-            # the correct Places record. Only runs when no existing place_id is cached
-            # (discovery phase) and the city search returned nothing.
-            if rating_result is None and not biz.get("google_place_id"):
-                # WHY cap at 3: bounding the fallback loop prevents one business
-                # with many neighborhood slugs from holding the semaphore slot for
-                # an unbounded time. 3 covers the real-world cases (e.g., Fort
-                # Lauderdale businesses may be in Wilton Manors, Las Olas, or
-                # Flagler Village) without materializing a runaway rate spike.
-                nbhd_slugs = (biz.get("neighborhood_slugs") or [])[:3]
-                for nbhd_slug in nbhd_slugs:
-                    nbhd_name = nbhd_slug.replace("-", " ").title()
-                    if nbhd_name.lower() == city_name.lower():
-                        # Same as primary city — would repeat the same query
-                        continue
-                    # WHY no existing_place_id: the guard above already requires
-                    # biz["google_place_id"] to be absent; passing None is a no-op.
-                    rating_result = await google_places.lookup_rating(
-                        business_name=biz.get("name", ""),
-                        city=nbhd_name,
-                    )
-                    await asyncio.sleep(0.1)
-                    if rating_result:
-                        log.info(
-                            "Found %r via neighborhood fallback %r (primary city %r had no match)",
-                            biz.get("name"), nbhd_name, city_name,
-                        )
-                        break
-
-        if rating_result is None:
-            if biz.get("google_place_id"):
-                # Had a place_id but fetch failed — transient error; keep old data
-                failed += 1
-            else:
-                no_match += 1
-            return
-
-        update_fields: dict = {
-            "google_place_id": rating_result.place_id,
-            "google_rating": rating_result.rating,
-            "google_review_count": rating_result.review_count,
-            "google_rating_synced_at": datetime.now(timezone.utc),
-        }
-        # WHY: only overwrite hours when Places returned data. An empty list means
-        # Google had no hour data for this business — preserving any manually-entered
-        # hours is better than blanking them. A non-empty list from the API is
-        # authoritative and replaces whatever was there before.
-        if rating_result.hours:
-            update_fields["hours"] = [h.model_dump() for h in rating_result.hours]
-
-        await db.businesses.update_one(
-            {"_id": biz["_id"]},
-            {"$set": update_fields},
-        )
-        updated += 1
-
-    await asyncio.gather(*[_sync_one(b) for b in businesses])
-
     log.info(
-        "Google ratings sync complete: updated=%d no_match=%d failed=%d",
-        updated, no_match, failed,
+        "Queuing Google ratings sync for %d businesses (background task)", len(businesses)
     )
 
-    return RedirectResponse(
-        url=f"/admin/sync?result=ok&updated={updated}&no_match={no_match}&failed={failed}",
-        status_code=303,
-    )
+    # WHY: set the flag BEFORE add_task so there is no window between the flag
+    # being False and the background task starting where a second POST could
+    # trigger a duplicate sync.
+    _sync_running = True
+    background_tasks.add_task(_run_sync_background, city_names, businesses)
+
+    # WHY: redirect immediately — the sync continues in the background and the
+    # admin page refreshes coverage counts from the DB on every GET load, so
+    # the operator can reload the page after a few minutes to see updated numbers.
+    return RedirectResponse(url="/admin/sync?result=started", status_code=303)

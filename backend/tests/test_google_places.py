@@ -702,15 +702,24 @@ class TestSyncRatingsPost:
         assert "error:no-key" in r.headers["location"]
 
     def test_sync_runs_and_redirects_when_configured(self, seeded_db, monkeypatch):
-        """With API key configured and mocked lookup, sync completes and redirects."""
+        """POST /admin/sync/ratings queues a background sync and redirects immediately.
+
+        The route now returns result=started right away — the actual sync runs
+        as a FastAPI BackgroundTask. TestClient executes background tasks
+        synchronously, so we can verify the DB was updated after the request.
+        """
+        import asyncio
         from app.main import app
         from fastapi.testclient import TestClient
+        import app.routes.admin.sync_admin as sync_mod
         import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
         from app.services.google_places import PlaceRating
 
         monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: True)
+        # Ensure the running-flag is clear before the test (module-level state)
+        monkeypatch.setattr(sync_mod, "_sync_running", False)
 
         async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
             return PlaceRating(
@@ -723,9 +732,19 @@ class TestSyncRatingsPost:
 
         client = TestClient(app, follow_redirects=False)
         r = client.post("/admin/sync/ratings")
+
+        # Route redirects immediately with result=started (sync runs in background)
         assert r.status_code == 303
         assert "/admin/sync" in r.headers["location"]
-        assert "updated=" in r.headers["location"]
+        assert "result=started" in r.headers["location"]
+
+        # TestClient runs background tasks synchronously, so the DB is updated
+        # by the time we reach this assertion.
+        db = seeded_db
+        rated_count = asyncio.get_event_loop().run_until_complete(
+            db.businesses.count_documents({"status": "live", "google_rating": {"$ne": None}})
+        )
+        assert rated_count > 0, "Background sync should have updated at least one business"
 
 
 # ── Business model hide_ratings field ────────────────────────────────────────
