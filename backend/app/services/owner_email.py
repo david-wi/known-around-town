@@ -37,6 +37,14 @@ def _from_address() -> str:
     return f"{name} <{addr}>"
 
 
+def _owner_reply_to() -> str:
+    # WHY: Reply-To lets owners reply directly to a monitored inbox
+    # (hello@knowsbeauty.com) without requiring Resend domain verification for
+    # the FROM address.  The FROM stays on expertly.com (already verified); the
+    # Reply-To tells email clients to route replies to the knowsbeauty.com inbox.
+    return os.environ.get("OWNER_EMAIL_REPLY_TO", "hello@knowsbeauty.com").strip()
+
+
 def _provider_api_key() -> Optional[str]:
     key = os.environ.get("RESEND_API_KEY", "").strip()
     return key or None
@@ -169,6 +177,7 @@ async def send_claim_confirmation_email(
                 },
                 json={
                     "from": _from_address(),
+                    "reply_to": _owner_reply_to(),
                     "to": email,
                     "subject": subject,
                     "html": html_body,
@@ -225,6 +234,7 @@ async def send_owner_code_email(*, email: str, code: str) -> bool:
                 },
                 json={
                     "from": _from_address(),
+                    "reply_to": _owner_reply_to(),
                     "to": email,
                     "subject": subject,
                     "html": html_body,
@@ -335,6 +345,7 @@ async def send_claim_verified_email(
                 },
                 json={
                     "from": _from_address(),
+                    "reply_to": _owner_reply_to(),
                     "to": email,
                     "subject": subject,
                     "html": html_body,
@@ -516,6 +527,7 @@ async def send_claim_rejected_email(
                 },
                 json={
                     "from": _from_address(),
+                    "reply_to": _owner_reply_to(),
                     "to": email,
                     "subject": subject,
                     "html": html_body,
@@ -659,6 +671,7 @@ async def send_subscription_confirmed_email(
                 },
                 json={
                     "from": _from_address(),
+                    "reply_to": _owner_reply_to(),
                     "to": email,
                     "subject": subject,
                     "html": html_body,
