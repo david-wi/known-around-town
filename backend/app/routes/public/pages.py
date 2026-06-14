@@ -998,7 +998,7 @@ async def search_page(request: Request, q: Optional[str] = None) -> HTMLResponse
             "query": query,
             "businesses": businesses,
             "result_count": len(businesses),
-            "seo_title": f"Search{': ' + query if query else ''} — {tenant.network.get('name')}",
+            "seo_title": f"Search {city.get('name')}{': ' + query if query else ''} — {tenant.network.get('name')}",
             "meta_description": (
                 f"{len(businesses)} result{'s' if len(businesses) != 1 else ''} for '{query}' "
                 f"in {city.get('name')} — {tenant.network.get('name')}."
