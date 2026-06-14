@@ -447,6 +447,121 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$$",
         "editors_pick": False,
     },
+    {
+        "slug": "midtown-blow-dry-bar",
+        "name": "Midtown Blow Dry Bar",
+        "neighborhood_slugs": ["midtown-miami"],
+        "category_slugs": ["hair"],
+        "address": {
+            "street": "3250 NE 1st Ave Suite 102",
+            "city": "Miami",
+            "state": "FL",
+            "zip": "33137",
+        },
+        "phone": "(305) 573-0100",
+        "website": "https://www.midtownblowdrybar.com",
+        "instagram": "@midtownblowdry",
+        "short_description": (
+            "Express blowouts, braids, and updos for the Midtown and Design "
+            "District working crowd. Walk-ins slot in between appointments "
+            "and the turnaround is fast — a full blowout averages 35 minutes "
+            "and the results hold through a long evening out."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "second-ave-nail-lounge-midtown",
+        "name": "Second Ave Nail Lounge",
+        "neighborhood_slugs": ["midtown-miami"],
+        "category_slugs": ["nails"],
+        "address": {
+            "street": "195 NE 40th St Suite 4",
+            "city": "Miami",
+            "state": "FL",
+            "zip": "33137",
+        },
+        "phone": "(305) 576-0220",
+        "website": "",
+        "instagram": "@secondavenaillounge",
+        "short_description": (
+            "A calm, well-lit nail lounge near the Design District boundary "
+            "where gel manicures, pedicures, dip powder, and nail art share "
+            "equal billing. No loud music, no upsell pressure — just "
+            "reliable technicians and a clean, relaxed environment."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "edgewater-lash-studio",
+        "name": "Edgewater Lash Studio",
+        "neighborhood_slugs": ["edgewater"],
+        "category_slugs": ["lash-brow"],
+        "address": {
+            "street": "2750 Biscayne Blvd Suite 201",
+            "city": "Miami",
+            "state": "FL",
+            "zip": "33137",
+        },
+        "phone": "(786) 347-0330",
+        "website": "https://www.edgewaterlashstudio.com",
+        "instagram": "@edgewaterlash",
+        "short_description": (
+            "A dedicated lash and brow studio on Biscayne's arts corridor "
+            "offering classic, volume, and hybrid sets alongside brow lamination "
+            "and tinting. The Edgewater clientele appreciates the artist's "
+            "precision and the studio's quiet, appointment-only atmosphere."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "design-district-wax-bar",
+        "name": "Design District Wax Bar",
+        "neighborhood_slugs": ["design-district"],
+        "category_slugs": ["waxing"],
+        "address": {
+            "street": "4040 NE 2nd Ave Suite 201",
+            "city": "Miami",
+            "state": "FL",
+            "zip": "33137",
+        },
+        "phone": "(305) 576-0450",
+        "website": "https://www.designdistrictwaxbar.com",
+        "instagram": "@ddwaxbar",
+        "short_description": (
+            "Waxing services — Brazilian, bikini, facial, leg, full-body — "
+            "in a sharp, minimal studio that fits the Design District's "
+            "aesthetic. Hard and soft wax options, hygienic single-use "
+            "applicators, and an experienced staff that turns over appointments quickly."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "midtown-barber-co",
+        "name": "Midtown Barber Co.",
+        "neighborhood_slugs": ["midtown-miami"],
+        "category_slugs": ["barber"],
+        "address": {
+            "street": "3300 Biscayne Blvd Suite 1",
+            "city": "Miami",
+            "state": "FL",
+            "zip": "33137",
+        },
+        "phone": "(305) 573-0660",
+        "website": "https://www.midtownbarberco.com",
+        "instagram": "@midtownbarberco",
+        "short_description": (
+            "A modern barbershop anchored at the Biscayne corridor gateway "
+            "serving Midtown's creative and professional residents. Fades, "
+            "tapers, lineups, beard sculpting, and classic cuts — delivered "
+            "by barbers who blend speed with detail for clients on tight schedules."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
 ]
 
 

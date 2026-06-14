@@ -380,6 +380,121 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$$$",
         "editors_pick": False,
     },
+    {
+        "slug": "the-key-village-salon",
+        "name": "The Key Village Salon",
+        "neighborhood_slugs": ["key-biscayne-village"],
+        "category_slugs": ["hair"],
+        "address": {
+            "street": "260 Crandon Blvd Suite 32",
+            "city": "Key Biscayne",
+            "state": "FL",
+            "zip": "33149",
+        },
+        "phone": "(305) 365-0100",
+        "website": "https://www.thekeyvillagesalon.com",
+        "instagram": "@thekeyvillagesalon",
+        "short_description": (
+            "A full-service hair salon in the heart of the Village Square "
+            "offering cuts, color, balayage, and blowouts with an unhurried, "
+            "island pace. Walk-ins fit in around a loyal book of regulars — "
+            "locals who've been coming here since the salon opened."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "island-nail-studio-key-biscayne",
+        "name": "Island Nail Studio",
+        "neighborhood_slugs": ["key-biscayne-village"],
+        "category_slugs": ["nails"],
+        "address": {
+            "street": "328 Crandon Blvd Suite 110",
+            "city": "Key Biscayne",
+            "state": "FL",
+            "zip": "33149",
+        },
+        "phone": "(305) 365-0330",
+        "website": "",
+        "instagram": "@islandnailkb",
+        "short_description": (
+            "The island's most reliable nail destination — gel manicures, "
+            "pedicures with hot stone massages, dip powder, and nail art "
+            "offered in a breezy studio steps from Crandon Park. Favored by "
+            "residents who appreciate the consistent quality and short wait times."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "key-biscayne-wax-bar",
+        "name": "Key Biscayne Wax Bar",
+        "neighborhood_slugs": ["key-biscayne-village"],
+        "category_slugs": ["waxing"],
+        "address": {
+            "street": "260 Crandon Blvd Suite 15",
+            "city": "Key Biscayne",
+            "state": "FL",
+            "zip": "33149",
+        },
+        "phone": "(305) 361-0220",
+        "website": "",
+        "instagram": "@kbwaxbar",
+        "short_description": (
+            "A discreet, appointment-preferred waxing studio serving Key "
+            "Biscayne's active, beach-forward community. Brazilian, bikini, "
+            "leg, and facial waxing — performed efficiently with hard wax "
+            "and high hygiene standards that regulars mention in every review."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "harbor-drive-lash-lounge",
+        "name": "Harbor Drive Lash Lounge",
+        "neighborhood_slugs": ["harbor-drive-residential"],
+        "category_slugs": ["lash-brow"],
+        "address": {
+            "street": "100 Harbor Dr Suite 205",
+            "city": "Key Biscayne",
+            "state": "FL",
+            "zip": "33149",
+        },
+        "phone": "(305) 361-0445",
+        "website": "https://www.harbordrivelash.com",
+        "instagram": "@harbordrivelash",
+        "short_description": (
+            "An intimate lash extension and brow studio tucked into a residential "
+            "pocket near the marina. Offers classic, hybrid, and volume sets along "
+            "with lash lifts and brow lamination for clients who want polished, "
+            "low-maintenance results that survive island humidity."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "crandon-barber-co",
+        "name": "Crandon Barber Co.",
+        "neighborhood_slugs": ["key-biscayne-village"],
+        "category_slugs": ["barber"],
+        "address": {
+            "street": "260 Crandon Blvd Suite 28",
+            "city": "Key Biscayne",
+            "state": "FL",
+            "zip": "33149",
+        },
+        "phone": "(305) 365-0512",
+        "website": "",
+        "instagram": "@crandonbarberco",
+        "short_description": (
+            "A genuine neighborhood barbershop where the Key's men and boys "
+            "have been getting cuts for years. Scissors and clippers, "
+            "hot-towel shaves, and beard trims — no pretense, no music "
+            "too loud, just good work by barbers who remember your name."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
 ]
 
 
