@@ -204,6 +204,26 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         nav_categories = await content_svc.list_categories(city["_id"])
         nav_neighborhoods = await content_svc.list_neighborhoods(city["_id"])
 
+    # Cross-city footer links — all sibling cities on the same network, ordered
+    # alphabetically, each pointing at the root of their city subdomain.
+    # WHY: cross-linking every page to every sibling city signals to Google that
+    # the pages form a coherent site network; authority flows between them, and
+    # Google understands the geographic breadth of the publication without having
+    # to crawl through sitemaps to discover the relationship.
+    network_cities: List[Dict[str, Any]] = []
+    if network:
+        suffix = tenant.network_domain_suffix
+        current_city_id = city["_id"] if city else None
+        if suffix:
+            all_network_cities = await content_svc.list_cities(network["_id"])
+            # WHY: exclude the current city — a link back to the page the visitor
+            # is already on adds noise rather than helpful navigation.
+            network_cities = [
+                {"name": c["name"], "url": f"https://{c['slug']}.{suffix}/"}
+                for c in all_network_cities
+                if c.get("_id") != current_city_id
+            ]
+
     now = datetime.now(timezone.utc)
 
     footer_owners_items_raw = await copy.get("footer.owners.items") or ""
@@ -305,6 +325,7 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "footer_publication_label": await copy.get("footer.publication_label"),
         "footer_owners_label": await copy.get("footer.owners.label") or "OWNERS",
         "footer_owners_items": footer_owners_items,
+        "network_cities": network_cities,
         "page_featured_disclosure": await copy.get("page.featured_disclosure"),
         "owners_header_cta": await copy.get("header.owners_cta") or "For Owners",
         # WHY: GA4 is injected here (the shared base context) so every page
