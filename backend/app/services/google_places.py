@@ -75,6 +75,18 @@ _MAX_RETRY_ATTEMPTS = 3
 _RETRY_BACKOFF_SECONDS = 2.0
 
 
+class RateLimitError(Exception):
+    """Raised when Google's API returns 429 after all retry attempts are exhausted.
+
+    WHY a distinct exception rather than returning None: the sync loop buckets
+    None as "no Google match" (permanent — this business has no listing).
+    A quota exhaustion is temporary — the daily limit resets overnight and the
+    business should be retried. Raising lets the caller count it as a transient
+    failure instead of a permanent no-match, so it stays in the unrated queue
+    and gets picked up on the next sync run.
+    """
+
+
 @dataclass
 class PlaceRating:
     place_id: str
@@ -241,7 +253,7 @@ async def _search_and_fetch(
                 "Rate-limited searching %r after %d retries — giving up",
                 query, _MAX_RETRY_ATTEMPTS,
             )
-            return None
+            raise RateLimitError(f"Rate limit exhausted for query {query!r}")
         try:
             r.raise_for_status()
             data = r.json()
@@ -321,7 +333,7 @@ async def _fetch_by_place_id(
                 "Rate-limited for place_id=%r after %d retries — giving up",
                 place_id, _MAX_RETRY_ATTEMPTS,
             )
-            return None
+            raise RateLimitError(f"Rate limit exhausted for place_id {place_id!r}")
         try:
             r.raise_for_status()
             data = r.json()

@@ -377,14 +377,19 @@ class TestLookupRating:
 
     @pytest.mark.asyncio
     async def test_gives_up_after_max_retries_on_429(self, respx_mock):
-        """lookup_rating returns None after exhausting all retry attempts on 429.
+        """lookup_rating raises RateLimitError after exhausting all retry attempts on 429.
 
         WHY: verifies the retry limit is actually enforced and the function
         doesn't loop forever. With _MAX_RETRY_ATTEMPTS = 3, we expect 4 total
-        attempts (original + 3 retries), all returning 429, then None.
+        attempts (original + 3 retries), all returning 429, then RateLimitError.
+        Raising an exception (rather than returning None) lets the sync loop
+        distinguish "quota exhausted" from "business not on Google" so it can
+        retry the business on the next sync run instead of treating it as a
+        permanent no-match.
         """
+        import pytest as _pytest
         from app.services import google_places
-        from app.services.google_places import _MAX_RETRY_ATTEMPTS
+        from app.services.google_places import _MAX_RETRY_ATTEMPTS, RateLimitError
         from unittest.mock import AsyncMock
 
         with patch("app.services.google_places.get_settings") as mock_settings, \
@@ -396,11 +401,11 @@ class TestLookupRating:
                 "https://places.googleapis.com/v1/places/ChIJ_always_rate_limited"
             ).return_value = httpx.Response(429, json={"error": "RESOURCE_EXHAUSTED"})
 
-            result = await google_places.lookup_rating(
-                "Test Salon", "Miami", existing_place_id="ChIJ_always_rate_limited"
-            )
+            with _pytest.raises(RateLimitError):
+                await google_places.lookup_rating(
+                    "Test Salon", "Miami", existing_place_id="ChIJ_always_rate_limited"
+                )
 
-        assert result is None, "should give up after max retries"
         # sleep was called _MAX_RETRY_ATTEMPTS times (once per retry, not on the final give-up)
         assert mock_sleep.call_count == _MAX_RETRY_ATTEMPTS
 
@@ -860,6 +865,57 @@ class TestSyncRatingsPost:
         # Only the unrated business should have been synced
         assert "Needs Rating Salon" in synced_names, "unrated business should be synced"
         assert "Already Rated Salon" not in synced_names, "already-rated business should be skipped"
+
+    def test_rate_limit_error_counted_as_failed_not_no_match(self, mock_db, monkeypatch):
+        """RateLimitError from lookup_rating counts as failed (transient), not no_match (permanent).
+
+        WHY: quota exhaustion resets overnight; the business still needs a sync tomorrow.
+        Counting it as no_match would permanently drop it from future unrated-only syncs.
+
+        WHY test _run_sync_background directly: it owns the failed/no_match counters and
+        emits the summary log line. Going through the HTTP layer adds TestClient background-
+        task scheduling complexity without covering any additional logic.
+        """
+        import asyncio
+        import logging
+        import app.services.google_places as gp
+        from app.routes.admin.sync_admin import _run_sync_background
+
+        async def mock_lookup_raises(*args, **kwargs):
+            raise gp.RateLimitError("quota exhausted")
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup_raises)
+
+        businesses = [
+            {"_id": "biz-rl", "name": "Rate Limited Salon", "city_id": "city-rl", "status": "live"},
+        ]
+        city_names = {"city-rl": "Miami"}
+
+        log_records = []
+
+        class LogCapture(logging.Handler):
+            def emit(self, record):
+                log_records.append(record.getMessage())
+
+        handler = LogCapture()
+        handler.setLevel(logging.DEBUG)
+        sync_logger = logging.getLogger("app.routes.admin.sync_admin")
+        orig_level = sync_logger.level
+        sync_logger.setLevel(logging.DEBUG)
+        sync_logger.addHandler(handler)
+        try:
+            asyncio.get_event_loop().run_until_complete(
+                _run_sync_background(city_names, businesses)
+            )
+        finally:
+            sync_logger.removeHandler(handler)
+            sync_logger.setLevel(orig_level)
+
+        complete_msgs = [m for m in log_records if "sync complete" in m]
+        assert complete_msgs, f"Sync complete log not found. Got: {log_records}"
+        summary = complete_msgs[0]
+        assert "failed=1" in summary, f"Expected failed=1 (transient); got: {summary}"
+        assert "no_match=0" in summary, f"Expected no_match=0 (not permanent); got: {summary}"
 
 
 # ── Business model hide_ratings field ────────────────────────────────────────
