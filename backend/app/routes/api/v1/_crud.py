@@ -32,7 +32,9 @@ def to_doc(model: BaseModel) -> Dict[str, Any]:
 
 
 def from_doc(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """Return the doc as-is — Mongo already has `_id` as a string UUID."""
+    """Return the doc as-is.  Some collections use string UUIDs for _id,
+    others still have BSON ObjectId values; MongoSafeJSONResponse in main.py
+    handles serialization of either."""
     return doc
 
 
