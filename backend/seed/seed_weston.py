@@ -733,6 +733,118 @@ BUSINESSES = [
         "price_range": "$$",
         "status": "live",
     },
+    {
+        "slug": "the-nail-lounge-weston-town-center",
+        "name": "The Nail Lounge Weston",
+        "neighborhood_slug": "weston-town-center",
+        "categories": ["nails"],
+        "address": "1737 Main St, Weston, FL 33326",
+        "phone": "(954) 389-5000",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Popular nail destination in Weston Town Center offering gel manicures, "
+            "pedicures, and nail art in a modern, bright setting popular with "
+            "Weston's professional community."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "10am–5pm",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$$",
+        "status": "live",
+    },
+    {
+        "slug": "patrick-taleb-salon-spa-weston",
+        "name": "Patrick Taleb Salon & Spa",
+        "neighborhood_slug": "weston-town-center",
+        "categories": ["hair", "spa"],
+        "address": "1585 Northpark Dr, Weston, FL 33326",
+        "phone": "(954) 389-4600",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Upscale full-service salon and spa in Weston Town Center offering "
+            "precision cuts, color, keratin treatments, and spa services for "
+            "Weston's discerning clientele."
+        ),
+        "hours": {
+            "Mon": "Closed",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "Closed",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$$$",
+        "status": "live",
+    },
+    {
+        "slug": "aura-beauty-weston-savanna",
+        "name": "Aura Beauty Weston",
+        "neighborhood_slug": "savanna",
+        "categories": ["nails", "lash-brow"],
+        "address": "2214 Weston Rd, Weston, FL 33326",
+        "phone": "(754) 301-5951",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Neighborhood beauty studio on Weston Road serving the Savanna "
+            "community with nail services, lash lifts, and brow shaping in "
+            "a friendly, relaxed setting."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "10am–4pm",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$$",
+        "status": "live",
+    },
+    {
+        "slug": "vogue-nail-bar-indian-trace",
+        "name": "Vogue Nail Bar",
+        "neighborhood_slug": "indian-trace",
+        "categories": ["nails"],
+        "address": "1661 Bonaventure Blvd, Weston, FL 33326",
+        "phone": "(954) 451-5009",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Friendly nail bar on Bonaventure Blvd in eastern Weston offering "
+            "classic and gel manicures, pedicures, and acrylic extensions for "
+            "the Indian Trace community."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "10am–5pm",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$",
+        "status": "live",
+    },
 ]
 
 

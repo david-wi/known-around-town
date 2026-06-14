@@ -495,6 +495,40 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$",
         "editors_pick": False,
     },
+
+    # ── NAILS / SPA — BISCAYNE BLVD CORRIDOR ────────────────────────────────
+    {
+        "name": "Ocean Breeze Beauty Salon & Spa",
+        "slug": "ocean-breeze-beauty-salon-spa-biscayne-blvd",
+        "category_slugs": ["nails", "spa"],
+        "neighborhood_slugs": ["biscayne-blvd-corridor"],
+        "address": {"street": "19575 Biscayne Blvd Suite 399", "city": "Aventura", "state": "FL", "postal_code": "33180", "country": "US"},
+        "phone": "(786) 440-7764",
+        "website": None,
+        "instagram": None,
+        "short_description": (
+            "Full-service nail salon and spa on busy Biscayne Blvd offering manicures, "
+            "pedicures, waxing, and spa treatments in a modern setting."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "name": "The Spa Formula",
+        "slug": "the-spa-formula-biscayne-blvd",
+        "category_slugs": ["spa"],
+        "neighborhood_slugs": ["biscayne-blvd-corridor"],
+        "address": {"street": "19020 NE 29th Ave", "city": "Aventura", "state": "FL", "postal_code": "33180", "country": "US"},
+        "phone": "(305) 877-6747",
+        "website": None,
+        "instagram": None,
+        "short_description": (
+            "Boutique skincare and beauty studio tucked into the residential corridor "
+            "west of Biscayne, offering facials, nail services, and spa treatments."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
 ]
 
 

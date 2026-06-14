@@ -713,6 +713,115 @@ BUSINESSES = [
         "price_range": "$",
         "status": "live",
     },
+    {
+        "slug": "bliss-nail-lounge-broward-blvd",
+        "name": "Bliss Nail Lounge",
+        "neighborhood_slug": "broward-mall-area",
+        "categories": ["nails"],
+        "address": "6927 W Broward Blvd, Plantation, FL 33317",
+        "phone": "(954) 316-7500",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Contemporary nail lounge near Broward Mall offering gel manicures, "
+            "pedicures, and nail art in a clean, spa-inspired setting popular "
+            "with local shoppers."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "10am–5pm",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$$",
+        "status": "live",
+    },
+    {
+        "slug": "elite-nails-spa-nob-hill",
+        "name": "Elite Nails and Spa",
+        "neighborhood_slug": "broward-mall-area",
+        "categories": ["nails", "waxing"],
+        "address": "817 N Nob Hill Rd, Plantation, FL 33324",
+        "phone": "(954) 727-9401",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Friendly neighborhood nail salon on Nob Hill Road offering full "
+            "nail services, waxing, and spa pedicures in a relaxed atmosphere."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "Closed",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$",
+        "status": "live",
+    },
+    {
+        "slug": "lacqua-nail-spa-university-dr",
+        "name": "L'Acqua Nail Spa",
+        "neighborhood_slug": "university-drive",
+        "categories": ["nails", "spa"],
+        "address": "1467 S University Dr, Plantation, FL 33324",
+        "phone": "(954) 870-7437",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Upscale nail spa on University Drive offering premium manicures, "
+            "pedicures, and spa services in a sophisticated, European-inspired setting."
+        ),
+        "hours": {
+            "Mon": "9am–7:30pm",
+            "Tue": "9am–7:30pm",
+            "Wed": "9am–7:30pm",
+            "Thu": "9am–7:30pm",
+            "Fri": "9am–7:30pm",
+            "Sat": "9am–7:30pm",
+            "Sun": "10am–5pm",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$$$",
+        "status": "live",
+    },
+    {
+        "slug": "bella-donna-hair-salon-sunrise-blvd",
+        "name": "Bella Donna Hair Salon",
+        "neighborhood_slug": "sunrise-blvd",
+        "categories": ["hair"],
+        "address": "11925 W Sunrise Blvd, Plantation, FL 33323",
+        "phone": "(954) 766-4356",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Full-service hair salon on Sunrise Boulevard offering cuts, color, "
+            "highlights, and styling for women and men in a welcoming neighborhood setting."
+        ),
+        "hours": {
+            "Mon": "Closed",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "Closed",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$$",
+        "status": "live",
+    },
 ]
 
 

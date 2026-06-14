@@ -779,6 +779,89 @@ BUSINESSES = [
         "price_range": "$$",
         "status": "live",
     },
+    {
+        "slug": "the-nail-lounge-sunset-lakes",
+        "name": "The Nail Lounge Miramar",
+        "neighborhood_slug": "sunset-lakes",
+        "categories": ["nails"],
+        "address": "12717 Miramar Pkwy, Miramar, FL 33027",
+        "phone": "(954) 432-6781",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Established nail art destination on western Miramar Pkwy with over "
+            "a decade serving Broward County — specializing in intricate gel nail "
+            "art and spa pedicures in a comfortable, spa-style setting."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "10am–5pm",
+        },
+        "price_range": "$$",
+        "editors_pick": True,
+        "editors_note": (
+            "Voted #1 nail art salon in South Florida by Miami New Times — "
+            "a standout destination for intricate gel work."
+        ),
+        "status": "live",
+    },
+    {
+        "slug": "toi-spa-miramar",
+        "name": "Tôi Spa Miramar",
+        "neighborhood_slug": "sunset-lakes",
+        "categories": ["nails", "spa"],
+        "address": "12647 Miramar Pkwy, Miramar, FL 33027",
+        "phone": "(754) 551-2371",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Modern Vietnamese-owned nail and spa studio on Miramar Pkwy offering "
+            "high-quality gel, acrylic, and spa services in a relaxing atmosphere."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "10am–5pm",
+        },
+        "price_range": "$$",
+        "editors_pick": False,
+        "status": "live",
+    },
+    {
+        "slug": "bliss-nails-spa-miramar-town-center",
+        "name": "Bliss Nails & Spa",
+        "neighborhood_slug": "miramar-town-center",
+        "categories": ["nails", "waxing"],
+        "address": "3131 SW 160th Ave, Miramar, FL 33027",
+        "phone": "(954) 431-0221",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Full-service nail salon near Miramar Town Center offering manicures, "
+            "pedicures, acrylics, and waxing in a comfortable neighborhood setting."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "10am–5pm",
+        },
+        "price_range": "$",
+        "editors_pick": False,
+        "status": "live",
+    },
 ]
 
 
