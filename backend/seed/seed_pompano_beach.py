@@ -689,6 +689,16 @@ async def seed_pompano_beach() -> None:
         "name": CITY_NAME,
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
+        "hero_description": (
+            "An index of the colorists, nail artists, lash stylists, and estheticians "
+            "Pompano Beach locals actually book — from the shops along Atlantic Boulevard "
+            "to beachside studios near the Pompano Beach Pier."
+        ),
+        "meta_description": (
+            "The curated beauty directory for Pompano Beach, Florida — salons, spas, "
+            "nail bars, and lash studios discovered by locals. Covering Atlantic "
+            "Boulevard, Sample Road, the Pier area, and North Pompano."
+        ),
         "domain_override": DOMAIN_OVERRIDE,
         "status": "live",
         "updated_at": now,

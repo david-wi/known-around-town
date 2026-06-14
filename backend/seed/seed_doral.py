@@ -747,6 +747,16 @@ async def seed_doral() -> None:
         "name": CITY_NAME,
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
+        "hero_description": (
+            "An index of the colorists, estheticians, lash artists, and nail stylists "
+            "Doral locals actually book — from the upscale boutiques of City Center to "
+            "the Latin beauty corridor along Doral Boulevard."
+        ),
+        "meta_description": (
+            "The curated beauty directory for Doral, Florida — salons, spas, lash studios, "
+            "and nail bars discovered by locals. Covering City Center, Doral Boulevard, and "
+            "Doral's Latin American beauty scene."
+        ),
         "domain_override": DOMAIN_OVERRIDE,
         "status": "live",
         "updated_at": now,

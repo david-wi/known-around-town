@@ -542,6 +542,14 @@ async def seed_hollywood() -> None:
             "barbers in Hollywood, Florida. Curated listings from Downtown "
             "Hollywood to the Broadwalk."
         ),
+        "hero_description": (
+            "An index of the colorists, nail artists, lash stylists, and estheticians "
+            "Hollywood locals actually book — from the craft studios of Young Circle and "
+            "Downtown Hollywood to the beach-adjacent spots along the Broadwalk and "
+            "Federal Highway."
+        ),
+        "tagline": "Hollywood's most trusted beauty addresses.",
+        "seo_title": "Hollywood Knows Beauty",
         "created_at": now,
         "updated_at": now,
     }
