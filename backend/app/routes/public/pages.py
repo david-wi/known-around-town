@@ -227,6 +227,7 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "footer_business_title": await copy.get("footer.business.title"),
         "footer_business_body": await copy.get("footer.business.body"),
         "footer_also_in": await copy.get("footer.also_in"),
+        "footer_also_in_url": await copy.get("footer.also_in_url"),
         "footer_publication_label": await copy.get("footer.publication_label"),
         "footer_owners_label": await copy.get("footer.owners.label") or "OWNERS",
         "footer_owners_items": footer_owners_items,
@@ -521,9 +522,10 @@ async def home(request: Request) -> HTMLResponse:
             "search_chips": search_chips,
             "is_home": True,
             # Stats
-            "stat_count_listings": (
-                await copy.get("home.stat.listings.count") or str(len(all_live))
-            ),
+            # WHY: always count live businesses dynamically so the stat stays
+            # accurate as businesses are added — the copy override was seeded
+            # with an early-launch hardcoded value ("29") that drifted stale.
+            "stat_count_listings": str(len(all_live)),
             "stat_label_listings": (
                 await copy.get("home.stat.listings.label") or "LISTINGS"
             ),
