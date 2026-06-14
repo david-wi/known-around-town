@@ -701,6 +701,87 @@ BUSINESSES = [
         "price_range": "$$",
         "status": "live",
     },
+    {
+        "slug": "moonlight-beauty-salon-palm-ave",
+        "name": "Moonlight Beauty Salon",
+        "neighborhood_slug": "palm-avenue",
+        "categories": ["hair", "nails"],
+        "address": "1368 Palm Ave, Hialeah, FL 33010",
+        "phone": "(305) 888-1710",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Neighborhood beauty salon on historic Palm Avenue serving Hialeah's "
+            "tight-knit community with hair and nail services at accessible prices."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "10am–5pm",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$",
+        "status": "live",
+    },
+    {
+        "slug": "crystal-nails-spa-hialeah",
+        "name": "Crystal Nails & Spa",
+        "neighborhood_slug": "westland",
+        "categories": ["nails", "lash-brow", "waxing"],
+        "address": "1557 W 49th St, Hialeah, FL 33012",
+        "phone": "(305) 826-4147",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Well-established spa-style nail salon in the Westland area offering "
+            "a full menu of nail, lash, and waxing services in a clean, modern environment."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "10am–5pm",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$$",
+        "status": "live",
+    },
+    {
+        "slug": "fingers-toes-nail-salon-hialeah",
+        "name": "Fingers & Toes Nail Salon",
+        "neighborhood_slug": "westland",
+        "categories": ["nails"],
+        "address": "3798 W 12th Ave Ste B, Hialeah, FL 33012",
+        "phone": "(786) 362-6004",
+        "website": None,
+        "instagram": None,
+        "description": (
+            "Friendly neighborhood nail salon in western Hialeah offering manicures, "
+            "pedicures, and gel services at community-friendly prices."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–7pm",
+            "Sun": "Closed",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$",
+        "status": "live",
+    },
 ]
 
 
