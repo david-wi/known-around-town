@@ -328,7 +328,12 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         Share
       </button>
-      {% if business.booking_url or business.phone %}<a href="{{ business.booking_url or ('tel:' ~ business.phone) }}" class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-semibold px-5 py-2.5 rounded-full text-sm transition">{{ cta_book or 'Book now' }}</a>{% endif %}
+      {#- WHY: when the business has no online booking URL the href falls back to
+          tel:phone, which dials the number rather than opening a booking form.
+          Labeling a dial-action "Book now" confuses mobile visitors who expect
+          to see a calendar. Show "Call" when there is no booking URL so the label
+          matches what actually happens when the button is tapped. #}
+      {% if business.booking_url %}<a href="{{ business.booking_url }}" class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-semibold px-5 py-2.5 rounded-full text-sm transition">{{ cta_book or 'Book now' }}</a>{% elif business.phone %}<a href="tel:{{ business.phone }}" class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-semibold px-5 py-2.5 rounded-full text-sm transition">{{ cta_call or 'Call' }}</a>{% endif %}
     </div>
   </div>
 </section>

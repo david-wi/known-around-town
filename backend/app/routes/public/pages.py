@@ -608,6 +608,22 @@ async def home(request: Request) -> HTMLResponse:
     return _templates.TemplateResponse("home.html", ctx)
 
 
+# WHY: /categories is a natural URL visitors and links use to browse by service
+# type, but the site has no categories index page — category browsing lives on
+# the home page. 301 so search engines update any indexed links.
+@router.get("/categories")
+async def redirect_categories() -> RedirectResponse:
+    return RedirectResponse(url="/", status_code=301)
+
+
+# WHY: old URL scheme used /{city}/salon/{slug} (e.g. /miami/salon/rossano-ferretti).
+# The current scheme is /b/{slug}. Permanently redirect the old pattern so any
+# external links or bookmarks resolve to the correct listing page.
+@router.get("/{city}/salon/{slug}")
+async def redirect_city_salon(city: str, slug: str) -> RedirectResponse:
+    return RedirectResponse(url=f"/b/{slug}", status_code=301)
+
+
 # WHY: /c/hair-salon is a common mis-hit — dozens of requests per hour arrive
 # at this path from a monitoring tool or stale bookmark. The correct slug is
 # /c/hair. A permanent (301) redirect fixes the 404 for these callers and
