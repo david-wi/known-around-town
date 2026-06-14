@@ -60,6 +60,30 @@ async def _build_copy(tenant: TenantContext) -> CopyResolver:
     )
 
 
+def _dedup_photos(businesses: list[dict]) -> list[dict]:
+    """Remove duplicate photo URLs so no image appears twice on one page.
+
+    WHY: When multiple businesses share the same stock photo URL (common in
+    seeded data with a small image pool), the listing grid looks like the
+    same photo was copy-pasted. Showing a neutral gray placeholder is better
+    than visual repetition — the card still renders correctly, just without
+    a hero image.
+    """
+    seen: set[str] = set()
+    result = []
+    for b in businesses:
+        photos = b.get("photos") or []
+        if photos:
+            first = photos[0]
+            url = first.get("url", "") if isinstance(first, dict) else (first or "")
+            if url and url in seen:
+                b = {**b, "photos": []}
+            elif url:
+                seen.add(url)
+        result.append(b)
+    return result
+
+
 def _vertical_word(network: Dict[str, Any]) -> str:
     """Pull the trailing word from the network name ("Knows Beauty" -> "Beauty")."""
     name = network.get("name", "")
@@ -515,6 +539,13 @@ async def home(request: Request) -> HTMLResponse:
                 b for b in all_live if spotlight_slug in (b.get("neighborhood_slugs") or [])
             ][:3]
 
+    # Deduplicate photos across all home-page sections so the same stock image
+    # never appears twice on the page. Sequential order matters: a URL seen in
+    # editor_picks is also suppressed in trending and spotlight.
+    editor_picks = _dedup_photos(editor_picks)
+    trending = _dedup_photos(trending)
+    spotlight_businesses = _dedup_photos(spotlight_businesses)
+
     # Two-column neighborhood mini-lists (city-configured only — wellness and
     # health intentionally don't show this section on the reference).
     columns: List[Dict[str, Any]] = []
@@ -522,7 +553,7 @@ async def home(request: Request) -> HTMLResponse:
         nb = await content_svc.get_neighborhood(city["_id"], col["slug"])
         if not nb:
             continue
-        nb_biz = _resolve_by_slug(all_live, col.get("business_slugs") or [])
+        nb_biz = _dedup_photos(_resolve_by_slug(all_live, col.get("business_slugs") or []))
         columns.append({"name": nb["name"], "slug": col["slug"], "businesses": nb_biz})
 
     search_chips = city.get("search_chips") or []
@@ -706,9 +737,9 @@ async def category_page(request: Request, category_slug: str) -> HTMLResponse:
     )
 
     ctx = await _base_context(request, tenant)
-    businesses = await content_svc.list_businesses(
+    businesses = _dedup_photos(await content_svc.list_businesses(
         city["_id"], category_slug=category_slug, limit=120
-    )
+    ))
     ctx.update(
         {
             "category": category,
@@ -796,9 +827,9 @@ async def neighborhood_page(request: Request, neighborhood_slug: str) -> HTMLRes
     )
 
     ctx = await _base_context(request, tenant)
-    businesses = await content_svc.list_businesses(
+    businesses = _dedup_photos(await content_svc.list_businesses(
         city["_id"], neighborhood_slug=neighborhood_slug, limit=120
-    )
+    ))
     ctx.update(
         {
             "neighborhood": nb,
@@ -861,13 +892,13 @@ async def neighborhood_category_page(
     )
 
     ctx = await _base_context(request, tenant)
-    businesses = [
+    businesses = _dedup_photos([
         b
         for b in await content_svc.list_businesses(
             city["_id"], category_slug=category_slug, limit=200
         )
         if neighborhood_slug in (b.get("neighborhood_slugs") or [])
-    ]
+    ])
     ctx.update(
         {
             "neighborhood": nb,
