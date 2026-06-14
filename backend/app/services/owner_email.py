@@ -292,6 +292,7 @@ def _html_body(code: str) -> str:
 async def send_claim_verified_email(
     *, email: str, submitter_name: str, business_name: str, login_url: str,
     site_base_url: str = "https://miami.knowsbeauty.com",
+    founding_partner_spots_left: int = 0,
 ) -> bool:
     """Notify the owner that their claim has been verified and they can now log in.
 
@@ -300,11 +301,18 @@ async def send_claim_verified_email(
     The only way in is to guess that they should go back to the site and
     try logging in.  This email closes the loop and gives them a direct
     link to the login page.
+
+    founding_partner_spots_left: passed in so the email can show real-time
+    urgency ("only 3 spots left") without a second database round-trip.
     """
     subject = f"Your listing for {business_name} is verified — log in now"
     pricing_url = site_base_url.rstrip("/") + "/pricing"
-    text_body = _claim_verified_text(submitter_name, business_name, login_url, pricing_url)
-    html_body = _claim_verified_html(submitter_name, business_name, login_url, pricing_url)
+    text_body = _claim_verified_text(
+        submitter_name, business_name, login_url, pricing_url, founding_partner_spots_left
+    )
+    html_body = _claim_verified_html(
+        submitter_name, business_name, login_url, pricing_url, founding_partner_spots_left
+    )
 
     api_key = _provider_api_key()
     if not api_key:
@@ -357,9 +365,16 @@ def _claim_confirmation_text(submitter_name: str, business_name: str) -> str:
 
 
 def _claim_verified_text(
-    submitter_name: str, business_name: str, login_url: str, pricing_url: str
+    submitter_name: str, business_name: str, login_url: str, pricing_url: str,
+    founding_partner_spots_left: int = 0,
 ) -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
+    urgency = ""
+    if founding_partner_spots_left > 0:
+        urgency = (
+            f"\n⭐ FOUNDING PARTNER — only {founding_partner_spots_left} spot"
+            f"{'s' if founding_partner_spots_left != 1 else ''} left at the founding price.\n"
+        )
     return (
         f"Hi {first},\n\n"
         f"Great news — your claim for {business_name} has been verified.\n\n"
@@ -368,18 +383,35 @@ def _claim_verified_text(
         "1. Add a cover photo — listings with photos get far more clicks\n"
         "2. Set your hours — visitors decide whether to visit based on this\n"
         "3. Write two sentences about what makes your salon special\n\n"
-        "Want to stand out? Once you're in, you can upgrade to Featured — priority placement, "
-        "a Pro badge, and our Instagram caption generator. "
-        f"See pricing: {pricing_url}\n\n"
+        "─────────────────────────────────\n"
+        "Stand out with Featured — $29/month\n"
+        f"{urgency}"
+        "• Priority placement at the top of every page\n"
+        "• Verified Pro badge on your listing\n"
+        "• AI Instagram caption generator (50/month)\n"
+        f"See pricing and sign up: {pricing_url}\n"
+        "─────────────────────────────────\n\n"
         f"Questions? Email {get_settings().support_email}.\n\n"
         "— The Miami Knows Beauty team\n"
     )
 
 
 def _claim_verified_html(
-    submitter_name: str, business_name: str, login_url: str, pricing_url: str
+    submitter_name: str, business_name: str, login_url: str, pricing_url: str,
+    founding_partner_spots_left: int = 0,
 ) -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
+    # WHY: urgency badge only shown when founding partner slots are actually
+    # available — once the cap is hit we drop the scarcity language so the
+    # email stays accurate.
+    urgency_html = ""
+    if founding_partner_spots_left > 0:
+        spot_word = "spot" if founding_partner_spots_left == 1 else "spots"
+        urgency_html = (
+            f'<p style="font-size: 12px; font-weight: 700; color: #dc2626; '
+            f'margin: 0 0 12px; letter-spacing: 0.02em; text-transform: uppercase;">'
+            f'🔥 Only {founding_partner_spots_left} founding partner {spot_word} left</p>'
+        )
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
@@ -419,11 +451,24 @@ def _claim_verified_html(
         ✏️ <strong>Write two sentences</strong> about what makes your salon special
       </p>
     </div>
-    <p style="margin: 20px 0 8px; font-size: 15px; color: #57534e;">
-      <strong>Want to stand out more?</strong> Once you're in your dashboard, you can upgrade to a Featured listing —
-      priority placement at the top of every category and neighborhood page, a Pro badge, and our
-      Instagram caption generator. <a href="{pricing_url}" style="color: #f43f5e;">See pricing →</a>
-    </p>
+    <div style="background: linear-gradient(135deg, #fff1f2 0%, #fdf4ff 100%);
+                border: 1.5px solid #f43f5e; border-radius: 12px; padding: 20px 22px;
+                margin: 0 0 24px;">
+      {urgency_html}
+      <p style="font-size: 15px; font-weight: 700; color: #1c1917; margin: 0 0 4px;">
+        ⭐ Stand out with Featured — $29/month
+      </p>
+      <p style="font-size: 13px; color: #57534e; line-height: 1.6; margin: 0 0 14px;">
+        Priority placement at the top of every page, a verified Pro badge, and our
+        AI Instagram caption generator (50 captions/month).
+      </p>
+      <a href="{pricing_url}"
+         style="display: inline-block; background: #f43f5e; color: #ffffff; font-size: 14px;
+                font-weight: 600; text-decoration: none; padding: 11px 22px;
+                border-radius: 7px;">
+        Get Featured →
+      </a>
+    </div>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
       Questions? Email <a href="mailto:{get_settings().support_email}" style="color: #be185d;">{get_settings().support_email}</a>.
     </p>

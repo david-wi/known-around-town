@@ -117,6 +117,15 @@ async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
     # code-entry screen immediately rather than having to re-type their address.
     # One fewer step between "verified" and "inside the dashboard".
     login_url = base + "/owners/login?email=" + _url_quote(owner_email, safe="")
+    # WHY: compute founding partner spots AFTER the update so the count in the
+    # email reflects the current state (the just-verified owner may have become
+    # a founding partner themselves, or an earlier owner may have just taken the
+    # last slot).  This count is passed to the email so it can show real urgency
+    # without a second round-trip inside the email service.
+    settings = get_settings()
+    cap = settings.founding_partner_cap
+    fp_count = await db.businesses.count_documents({"is_founding_partner": True})
+    spots_left = max(0, cap - fp_count)
     asyncio.create_task(
         send_claim_verified_email(
             email=owner_email,
@@ -124,6 +133,7 @@ async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
             business_name=(business or {}).get("name", "your business"),
             login_url=login_url,
             site_base_url=base,
+            founding_partner_spots_left=spots_left,
         )
     )
     return {"status": "verified"}
