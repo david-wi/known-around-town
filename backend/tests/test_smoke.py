@@ -1331,6 +1331,45 @@ def test_search_page_shows_owner_banner_when_results(client, seeded_db):
     assert 'href="/owners"' in r.text
 
 
+def test_search_page_title_includes_city_name(client):
+    """The search page <title> must include the city name so Google knows
+    the page is specific to Miami, not a generic search across all cities.
+
+    WHY: 'Search — Knows Beauty' can't rank for 'hair salon search miami'
+    because the title has no location signal. 'Search Miami — Knows Beauty'
+    targets the city and helps with local SEO. The city name is already in
+    the page context (it's used for the h1 text), so including it in the
+    title costs nothing and lifts relevance significantly."""
+    import re
+
+    # No-query state: title should be 'Search Miami — Knows Beauty'
+    r = client.get("/search", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    m = re.search(r"<title>(.*?)</title>", r.text)
+    assert m, "Search page has no <title> tag"
+    title = m.group(1)
+    assert "Miami" in title, (
+        f"Search page title '{title}' is missing 'Miami' — "
+        "without the city name the title cannot rank for local search queries"
+    )
+    assert "Knows Beauty" in title, (
+        f"Search page title '{title}' is missing the network name 'Knows Beauty'"
+    )
+
+    # With-query state: title should include both the city and the query term
+    r2 = client.get("/search?q=nails", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r2.status_code == 200, r2.text
+    m2 = re.search(r"<title>(.*?)</title>", r2.text)
+    assert m2, "Search results page has no <title> tag"
+    title2 = m2.group(1)
+    assert "Miami" in title2, (
+        f"Search results title '{title2}' is missing 'Miami'"
+    )
+    assert "nails" in title2.lower(), (
+        f"Search results title '{title2}' is missing the query term 'nails'"
+    )
+
+
 def test_404_page_has_search_and_owner_cta(client):
     """A 404 should not be a dead end. The page must include a search bar
     (so a user can recover by searching) and an owner claim CTA (since many
@@ -1668,6 +1707,205 @@ def test_business_jsonld_schema_type_by_category(seeded_db, client):
         assert found_type == expected_type, (
             f"{slug}: {description} — got {found_type!r}"
         )
+
+
+def test_business_jsonld_emits_aggregate_rating_when_eligible(seeded_db, client):
+    """The LocalBusiness JSON-LD must include an aggregateRating block when the
+    business has a Google rating, a review count at or above the site threshold,
+    and hide_ratings is not set. Google shows gold stars in search results when
+    this block is present, increasing click-through rate by 15–30%.
+
+    WHY: the star-rating snippet is the highest-ROI structured-data addition for
+    a directory. Without aggregateRating in the JSON-LD, Google has no machine-
+    readable source for the stars even if they are displayed visually on the page.
+    The test uses a seeded business that meets all three conditions so the block
+    must appear. bestRating and worstRating are also required by Google's Rich
+    Results validator — omitting them suppresses the snippet."""
+    import asyncio, json, re
+
+    city = asyncio.run(seeded_db.cities.find_one({"slug": "miami"}))
+    assert city, "test seed missing miami city"
+    biz = asyncio.run(
+        seeded_db.businesses.find_one({"city_id": city["_id"], "slug": "blow-dry-bar-brickell"})
+    )
+    assert biz, "test seed missing blow-dry-bar-brickell"
+
+    # WHY: set rating + review count well above default threshold (20) and
+    # explicitly clear hide_ratings so this test is self-contained and not
+    # sensitive to how the seed record is initialised.
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {"google_rating": 4.7, "google_review_count": 150, "hide_ratings": False}},
+        )
+    )
+
+    r = client.get(
+        "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    blocks = re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>', r.text, re.DOTALL
+    )
+    lb_block = None
+    business_types = {
+        "HairSalon", "NailSalon", "DaySpa", "BeautySalon",
+        "BarberShop", "MedicalSpa", "LocalBusiness",
+    }
+    for block in blocks:
+        try:
+            data = json.loads(block.strip())
+        except json.JSONDecodeError:
+            continue
+        if data.get("@type") in business_types:
+            lb_block = data
+            break
+
+    assert lb_block is not None, "No LocalBusiness JSON-LD block found"
+    rating = lb_block.get("aggregateRating")
+    assert rating is not None, (
+        "aggregateRating missing from JSON-LD when google_rating=4.7, "
+        "google_review_count=150, hide_ratings=False"
+    )
+    assert rating.get("@type") == "AggregateRating", (
+        f"aggregateRating @type wrong: {rating.get('@type')!r}"
+    )
+    assert abs(rating.get("ratingValue", 0) - 4.7) < 0.01, (
+        f"ratingValue should be 4.7; got {rating.get('ratingValue')!r}"
+    )
+    assert rating.get("reviewCount") == 150, (
+        f"reviewCount should be 150; got {rating.get('reviewCount')!r}"
+    )
+    assert rating.get("bestRating") == "5", (
+        f"bestRating must be '5' (required by Google validator); got {rating.get('bestRating')!r}"
+    )
+    assert rating.get("worstRating") == "1", (
+        f"worstRating must be '1' (required by Google validator); got {rating.get('worstRating')!r}"
+    )
+
+
+def test_business_jsonld_omits_aggregate_rating_when_hidden(seeded_db, client):
+    """The LocalBusiness JSON-LD must NOT emit aggregateRating when hide_ratings
+    is True, to keep the visible UI and the machine-readable data consistent.
+
+    WHY: if the star badge is hidden on the page (because the owner opted out or
+    the data is disputed), emitting an aggregateRating in JSON-LD would make Google
+    show stars in search results that are invisible on the actual page — misleading
+    both Google and searchers. The JSON-LD and the visible UI must agree."""
+    import asyncio, json, re
+
+    city = asyncio.run(seeded_db.cities.find_one({"slug": "miami"}))
+    biz = asyncio.run(
+        seeded_db.businesses.find_one({"city_id": city["_id"], "slug": "blow-dry-bar-brickell"})
+    )
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {"google_rating": 4.7, "google_review_count": 150, "hide_ratings": True}},
+        )
+    )
+
+    r = client.get(
+        "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    blocks = re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>', r.text, re.DOTALL
+    )
+    business_types = {
+        "HairSalon", "NailSalon", "DaySpa", "BeautySalon",
+        "BarberShop", "MedicalSpa", "LocalBusiness",
+    }
+    for block in blocks:
+        try:
+            data = json.loads(block.strip())
+        except json.JSONDecodeError:
+            continue
+        if data.get("@type") in business_types:
+            assert "aggregateRating" not in data, (
+                "aggregateRating must be omitted when hide_ratings=True — "
+                "showing stars in search results that are hidden on the page is misleading"
+            )
+
+
+def test_business_jsonld_emits_opening_hours_when_hours_present(seeded_db, client):
+    """The LocalBusiness JSON-LD must include openingHoursSpecification entries
+    for each non-closed day that has both an opening and closing time. Google
+    shows 'Open · Closes 6pm' in Knowledge Panel results when this is present,
+    and uses it for voice search ('Is [salon] open right now?').
+
+    WHY: opening hours are the second-highest-value structured-data field after
+    image for local service businesses. Without them, Google has to scrape or
+    guess hours from the page text — which it often gets wrong. The schema.org
+    dayOfWeek field requires a full URL (https://schema.org/Monday), not a
+    bare string, or the validator rejects the block entirely."""
+    import asyncio, json, re
+
+    city = asyncio.run(seeded_db.cities.find_one({"slug": "miami"}))
+    biz = asyncio.run(
+        seeded_db.businesses.find_one({"city_id": city["_id"], "slug": "blow-dry-bar-brickell"})
+    )
+    assert biz, "test seed missing blow-dry-bar-brickell"
+
+    # WHY: insert explicit hours so the test is deterministic regardless of
+    # what the seed record contains. Closed Sunday (no entry) must not appear.
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {"hours": [
+                {"day": "mon", "opens_at": "09:00", "closes_at": "18:00", "closed": False},
+                {"day": "tue", "opens_at": "09:00", "closes_at": "18:00", "closed": False},
+                {"day": "wed", "opens_at": "09:00", "closes_at": "18:00", "closed": False},
+                {"day": "sun", "closed": True},
+            ]}},
+        )
+    )
+
+    r = client.get(
+        "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
+    )
+    assert r.status_code == 200, r.text
+    blocks = re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>', r.text, re.DOTALL
+    )
+    business_types = {
+        "HairSalon", "NailSalon", "DaySpa", "BeautySalon",
+        "BarberShop", "MedicalSpa", "LocalBusiness",
+    }
+    lb_block = None
+    for block in blocks:
+        try:
+            data = json.loads(block.strip())
+        except json.JSONDecodeError:
+            continue
+        if data.get("@type") in business_types:
+            lb_block = data
+            break
+
+    assert lb_block is not None, "No LocalBusiness JSON-LD block found"
+    hours = lb_block.get("openingHoursSpecification")
+    assert hours is not None, (
+        "openingHoursSpecification missing from JSON-LD when business has explicit hours"
+    )
+    assert len(hours) == 3, (
+        f"Expected 3 open days (mon/tue/wed), closed Sunday excluded; got {len(hours)} entries"
+    )
+    # Each entry must use the full schema.org URL for dayOfWeek
+    day_urls = {h["dayOfWeek"] for h in hours}
+    for url in day_urls:
+        assert url.startswith("https://schema.org/"), (
+            f"dayOfWeek must be a full schema.org URL, not a bare string; got {url!r}"
+        )
+    # Monday entry must have correct open/close times
+    mon_entry = next((h for h in hours if "Monday" in h["dayOfWeek"]), None)
+    assert mon_entry is not None, "Monday entry missing from openingHoursSpecification"
+    assert mon_entry["opens"] == "09:00", f"Monday opens wrong: {mon_entry['opens']!r}"
+    assert mon_entry["closes"] == "18:00", f"Monday closes wrong: {mon_entry['closes']!r}"
+    # Closed Sunday must not appear
+    sunday_entry = next((h for h in hours if "Sunday" in h["dayOfWeek"]), None)
+    assert sunday_entry is None, (
+        "Closed Sunday must be excluded from openingHoursSpecification"
+    )
 
 
 # ---------------------------------------------------------------------------
