@@ -137,7 +137,7 @@
       <div>
         <label for="claim-form__notes"
                class="block text-sm font-medium text-stone-700 mb-1.5">
-          Anything else? <span class="text-stone-400 font-normal">(optional)</span>
+          Note to our team <span class="text-stone-400 font-normal">(optional)</span>
         </label>
         <textarea id="claim-form__notes"
                   name="notes"
@@ -187,9 +187,14 @@
         <span aria-hidden="true">→</span>
       </button>
 
+      {#- WHY: Founding Partner status is a real, limited-time badge that appears
+          on claimed profiles. Mentioning it here — immediately below the submit
+          button, where the owner's eyes are already focused — converts hesitation
+          into action. The scarcity is genuine: the badge stops being awarded once
+          the city directory matures and early-claimer status no longer applies. #}
       <p class="text-xs text-stone-500 mt-3">
-        We'll email you to verify ownership before any changes go live.
-        Free to claim — never a charge.
+        <strong class="text-stone-700 font-medium">Founding Partner</strong> status is available now — claim before it's gone.
+        We'll email you to verify ownership. Free to claim, never a charge.
       </p>
     </form>
   </div>
