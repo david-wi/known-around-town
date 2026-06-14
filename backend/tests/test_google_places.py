@@ -468,6 +468,223 @@ class TestSyncPage:
         assert "GOOGLE_PLACES_API_KEY" in r.text or "API key required" in r.text
 
 
+class TestNeighborhoodFallback:
+    """Neighborhood-name fallback in the ratings sync.
+
+    Fort Lauderdale businesses (e.g., in Wilton Manors) fail a "Business Name
+    Fort Lauderdale FL" Places search because Google knows them by their sub-city
+    name. The fix tries each business neighborhood slug (converted to title case)
+    as a fallback city when the primary city search finds nothing.
+    """
+
+    @pytest.fixture
+    async def ft_laud_db(self, mock_db):
+        """Insert a Fort Lauderdale city and a Wilton Manors business into the mock DB."""
+        city_id = "city-ft-laud"
+        await mock_db.cities.insert_one({"_id": city_id, "name": "Fort Lauderdale", "slug": "fort-lauderdale", "status": "live"})
+        await mock_db.networks.insert_one({"_id": "net1", "name": "Beauty", "domain_suffix": "knowsbeauty.localhost"})
+        await mock_db.businesses.insert_one({
+            "_id": "biz-source-salon",
+            "name": "Source Salon",
+            "slug": "source-salon-wilton-manors",
+            "city_id": city_id,
+            "network_id": "net1",
+            "status": "live",
+            "neighborhood_slugs": ["wilton-manors"],
+        })
+        return mock_db
+
+    def test_fallback_called_with_neighborhood_name_when_city_fails(self, ft_laud_db, monkeypatch):
+        """lookup_rating is called with 'Wilton Manors' as city when Fort Lauderdale search fails.
+
+        WHY: verifies the core fix — the fallback fires on a city-search miss and
+        converts the slug to the title-cased name Google recognises.
+        """
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.api.v1._auth as _auth_module
+        import app.services.google_places as gp
+        from app.services.google_places import PlaceRating
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+        monkeypatch.setattr(gp, "is_configured", lambda: True)
+
+        call_log = []
+
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            call_log.append({"name": business_name, "city": city})
+            # Primary city "Fort Lauderdale" fails; neighborhood "Wilton Manors" succeeds
+            if city == "Wilton Manors":
+                return PlaceRating(place_id="ChIJ_source", rating=4.8, review_count=210)
+            return None
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        client = TestClient(app, follow_redirects=False)
+        r = client.post("/admin/sync/ratings")
+        assert r.status_code == 303
+
+        cities_tried = [c["city"] for c in call_log]
+        assert "Fort Lauderdale" in cities_tried, "primary city search was not attempted"
+        assert "Wilton Manors" in cities_tried, "neighborhood fallback was not tried"
+
+    def test_fallback_not_called_when_business_has_place_id(self, mock_db, monkeypatch):
+        """When a business already has a google_place_id, the neighborhood fallback is skipped.
+
+        WHY: existing place_id means the business was already matched — using the fast
+        place details endpoint skips discovery entirely. The fallback must not run
+        for these businesses or it wastes API quota.
+        """
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.api.v1._auth as _auth_module
+        import app.services.google_places as gp
+        from app.services.google_places import PlaceRating
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+        monkeypatch.setattr(gp, "is_configured", lambda: True)
+
+        import asyncio
+        asyncio.get_event_loop().run_until_complete(mock_db.cities.insert_one(
+            {"_id": "city-ft-laud2", "name": "Fort Lauderdale", "slug": "fort-lauderdale", "status": "live"}
+        ))
+        asyncio.get_event_loop().run_until_complete(mock_db.networks.insert_one(
+            {"_id": "net2", "name": "Beauty", "domain_suffix": "knowsbeauty.localhost"}
+        ))
+        asyncio.get_event_loop().run_until_complete(mock_db.businesses.insert_one({
+            "_id": "biz-already-matched",
+            "name": "Known Salon",
+            "slug": "known-salon-wilton-manors",
+            "city_id": "city-ft-laud2",
+            "network_id": "net2",
+            "status": "live",
+            "google_place_id": "ChIJ_already_known",
+            "neighborhood_slugs": ["wilton-manors", "las-olas"],
+        }))
+
+        call_log = []
+
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            call_log.append({"name": business_name, "city": city, "place_id": existing_place_id})
+            if existing_place_id:
+                return PlaceRating(place_id=existing_place_id, rating=4.5, review_count=100)
+            return None
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        client = TestClient(app, follow_redirects=False)
+        r = client.post("/admin/sync/ratings")
+        assert r.status_code == 303
+
+        # Only one call: the place_id details fetch. Fallback slug calls must not appear.
+        assert len(call_log) == 1
+        assert call_log[0]["place_id"] == "ChIJ_already_known"
+        nbhd_cities = [c["city"] for c in call_log if c["place_id"] is None]
+        assert nbhd_cities == [], f"unexpected fallback calls: {nbhd_cities}"
+
+    def test_fallback_caps_at_3_slugs(self, mock_db, monkeypatch):
+        """Fallback tries at most 3 neighborhood slugs even when more are present.
+
+        WHY: an uncapped loop holding the semaphore for many slugs would starve
+        concurrent sync slots and push total API calls beyond the intended ~30 req/s.
+        The cap of 3 matches the [:3] slice in the implementation.
+        """
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.api.v1._auth as _auth_module
+        import app.services.google_places as gp
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+        monkeypatch.setattr(gp, "is_configured", lambda: True)
+
+        import asyncio
+        asyncio.get_event_loop().run_until_complete(mock_db.cities.insert_one(
+            {"_id": "city-ft-laud3", "name": "Fort Lauderdale", "slug": "fort-lauderdale", "status": "live"}
+        ))
+        asyncio.get_event_loop().run_until_complete(mock_db.networks.insert_one(
+            {"_id": "net3", "name": "Beauty", "domain_suffix": "knowsbeauty.localhost"}
+        ))
+        asyncio.get_event_loop().run_until_complete(mock_db.businesses.insert_one({
+            "_id": "biz-many-slugs",
+            "name": "Multi Neighborhood Salon",
+            "slug": "multi-salon-ft-laud",
+            "city_id": "city-ft-laud3",
+            "network_id": "net3",
+            "status": "live",
+            "neighborhood_slugs": ["wilton-manors", "las-olas", "flagler-village", "victoria-park", "downtown-fort-lauderdale"],
+        }))
+
+        call_log = []
+
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            call_log.append(city)
+            return None  # Always fails to force full fallback loop
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        client = TestClient(app, follow_redirects=False)
+        r = client.post("/admin/sync/ratings")
+        assert r.status_code == 303
+
+        # 1 primary city + at most 3 neighborhood fallbacks = at most 4 total calls
+        # (Fort Lauderdale == city so no same-name skip here)
+        assert len(call_log) <= 4, (
+            f"Expected at most 4 lookup calls (1 primary + 3 fallbacks), got {len(call_log)}: {call_log}"
+        )
+
+    def test_fallback_stops_after_first_match(self, mock_db, monkeypatch):
+        """Once a neighborhood fallback finds a match, no further slugs are tried.
+
+        WHY: if slug[0] matches, we have the place_id we need — trying slug[1]
+        and slug[2] would waste API quota on a business already resolved.
+        """
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.api.v1._auth as _auth_module
+        import app.services.google_places as gp
+        from app.services.google_places import PlaceRating
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+        monkeypatch.setattr(gp, "is_configured", lambda: True)
+
+        import asyncio
+        asyncio.get_event_loop().run_until_complete(mock_db.cities.insert_one(
+            {"_id": "city-ft-laud4", "name": "Fort Lauderdale", "slug": "fort-lauderdale", "status": "live"}
+        ))
+        asyncio.get_event_loop().run_until_complete(mock_db.networks.insert_one(
+            {"_id": "net4", "name": "Beauty", "domain_suffix": "knowsbeauty.localhost"}
+        ))
+        asyncio.get_event_loop().run_until_complete(mock_db.businesses.insert_one({
+            "_id": "biz-early-match",
+            "name": "Wilton Salon",
+            "slug": "wilton-salon-ft-laud",
+            "city_id": "city-ft-laud4",
+            "network_id": "net4",
+            "status": "live",
+            "neighborhood_slugs": ["wilton-manors", "las-olas", "flagler-village"],
+        }))
+
+        call_log = []
+
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            call_log.append(city)
+            if city == "Wilton Manors":
+                return PlaceRating(place_id="ChIJ_wilton", rating=4.6, review_count=88)
+            return None
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        client = TestClient(app, follow_redirects=False)
+        r = client.post("/admin/sync/ratings")
+        assert r.status_code == 303
+
+        # Calls: "Fort Lauderdale" (miss) + "Wilton Manors" (hit) → stop
+        # "Las Olas" and "Flagler Village" must NOT be called
+        assert "Las Olas" not in call_log, f"should have stopped after Wilton Manors match; calls: {call_log}"
+        assert "Flagler Village" not in call_log, f"should have stopped after Wilton Manors match; calls: {call_log}"
+        assert "Wilton Manors" in call_log
+
+
 class TestSyncRatingsPost:
     def test_sync_redirects_with_error_when_no_api_key(self, seeded_db, monkeypatch):
         """Without an API key, POST redirects back to the sync page with an error flag."""
