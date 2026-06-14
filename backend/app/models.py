@@ -288,6 +288,13 @@ class Business(BaseModel):
     google_rating: Optional[float] = None
     google_review_count: Optional[int] = None
     google_rating_synced_at: Optional[datetime] = None
+    # WHY: hide_ratings lets the admin suppress Google ratings for a specific
+    # business without losing the stored data. Useful for businesses that ask
+    # to have ratings removed from their listing, or for edge cases where the
+    # fetched rating belongs to a similarly-named place rather than the actual
+    # business. False by default so new businesses get ratings displayed as
+    # soon as a sync populates them.
+    hide_ratings: bool = False
     # WHY: Stripe identifiers live on the business document so billing
     # webhooks and owner billing-portal links can find the listing without
     # a second lookup table. Both stay null until the owner subscribes.

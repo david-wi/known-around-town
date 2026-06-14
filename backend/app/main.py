@@ -44,6 +44,13 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 # threading it through each individual route's context dict. A route that
 # doesn't explicitly pass it still gets the right value.
 templates.env.globals["support_email"] = settings.support_email
+# WHY: ratings_min_review_count is injected as a global so every template
+# (home, category, neighborhood, search, business detail) gets the threshold
+# without each route handler needing to query the DB separately. The DB value
+# is loaded at startup (below in on_startup) to override this module-load
+# default of 20. The admin settings page refreshes it on save, same pattern
+# as support_email.
+templates.env.globals["ratings_min_review_count"] = 20
 
 app = FastAPI(title="Known Around Town", version="0.1.0")
 
@@ -65,9 +72,13 @@ async def on_startup() -> None:
     # the DB is available. Now that the DB is ready, load the admin-saved value
     # (if any) so a support_email change made via the admin UI survives a container
     # restart without needing to set the env var or re-save the settings page.
-    from app.services.site_settings import get_support_email
+    from app.services.site_settings import get_support_email, get_ratings_min_review_count
     db_support_email = await get_support_email()
     templates.env.globals["support_email"] = db_support_email
+    # WHY: load the DB-saved threshold (if any) at startup so a value set via
+    # the admin settings page survives a container restart without needing to
+    # touch the env var. Falls back to the module-load default of 20.
+    templates.env.globals["ratings_min_review_count"] = await get_ratings_min_review_count()
     log.info("Indexes ensured. Tenant domains: %s", settings.parse_network_domains())
 
 

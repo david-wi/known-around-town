@@ -143,7 +143,11 @@
       fallback when the real count is unknown would be factually wrong and risks
       Google penalising the snippet for inaccurate data. A business without a
       confirmed review count simply doesn't get the aggregateRating block. #}
-  {%- if business.google_rating and business.google_review_count %},"aggregateRating": {
+  {#- WHY: aggregateRating is only emitted when the same threshold as the visible
+      star widget is met — rating exists, min review count satisfied, and hide_ratings
+      is not set. Emitting the JSON-LD snippet when the visible badge is hidden would
+      be inconsistent and could mislead Google about whether the data is endorsed. #}
+  {%- if business.google_rating and business.google_review_count and not business.hide_ratings and business.google_review_count >= (ratings_min_review_count or 20) %},"aggregateRating": {
     "@type": "AggregateRating",
     "ratingValue": {{ business.google_rating }},
     "reviewCount": {{ business.google_review_count }},
@@ -263,7 +267,13 @@
               for visitors while the JSON-LD surfaces it for Google. Stars are
               rendered as Unicode ★ characters (filled) and ☆ (empty) computed
               from the rounded rating so the visual is immediately scannable. #}
-          {% if business.google_rating %}
+          {#- WHY: three conditions must all be true before we show the rating:
+              1. google_rating must exist (sync has run for this business)
+              2. google_review_count must meet the site-configurable minimum so
+                 a 5-star average from 2 friends doesn't masquerade as social proof
+              3. hide_ratings must not be True (admin can suppress per-business)
+              ratings_min_review_count comes from site settings (default: 20). #}
+          {% if business.google_rating and not business.hide_ratings and (business.google_review_count or 0) >= (ratings_min_review_count or 20) %}
           <div class="flex items-baseline justify-between">
             <span class="text-xs text-stone-500">Google rating</span>
             <span class="flex items-center gap-1">
