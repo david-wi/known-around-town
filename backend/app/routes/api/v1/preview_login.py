@@ -80,8 +80,19 @@ def _set_preview_cookie(response: Response, request: Request, token: str) -> Non
       navigation (click a link from email) working.
     - Max-Age matches SESSION_TTL_SECONDS so the browser evicts the cookie
       on the same schedule the server checks session expiry.
+    - Domain: set to .knowsbeauty.com (leading dot) so one login covers all
+      24 city subdomains. Omitted for localhost / bare IPs where there are no
+      shared subdomains — the browser default (exact hostname) is correct there.
     """
     is_secure = request.url.scheme == "https"
+    # WHY: strip the port before splitting so "localhost:8000" is treated as
+    # "localhost" (one part → no shared subdomains → no domain attribute).
+    host = (request.headers.get("host") or request.url.hostname or "").split(":")[0]
+    parts = host.split(".")
+    # WHY: require at least 2 parts AND the TLD must be alphabetic so bare IP
+    # addresses (e.g. "192.168.1.1") don't get a cookie_domain set — IP octets
+    # are all-numeric and would be misread as a hostname with no real TLD.
+    cookie_domain = f".{'.'.join(parts[-2:])}" if len(parts) >= 2 and parts[-1].isalpha() else None
     response.set_cookie(
         key=PREVIEW_COOKIE_NAME,
         value=token,
@@ -90,6 +101,7 @@ def _set_preview_cookie(response: Response, request: Request, token: str) -> Non
         secure=is_secure,
         samesite="lax",
         path="/",
+        domain=cookie_domain,
     )
 
 

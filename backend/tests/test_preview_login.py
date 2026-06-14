@@ -712,3 +712,82 @@ class TestVerifyCode:
         # 30 days ± 1 minute tolerance for slow runners.
         expected = 30 * 24 * 3600
         assert expected - 60 < delta < expected + 60
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5.  Cookie domain — cross-subdomain sharing
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestCookieDomain:
+    """Verify _set_preview_cookie scopes the cookie to the apex domain.
+
+    WHY: without a domain attribute the browser pins the cookie to the exact
+    hostname that set it. Logging in at miami.knowsbeauty.com would leave
+    fort-lauderdale.knowsbeauty.com ungated. Setting domain=.knowsbeauty.com
+    shares the session across all 24 city subdomains with a single login.
+    """
+
+    def _extract_cookie_domain(self, set_cookie_header: str) -> str | None:
+        """Pull the Domain= value out of a Set-Cookie header string, or None."""
+        for part in set_cookie_header.split(";"):
+            part = part.strip()
+            if part.lower().startswith("domain="):
+                return part.split("=", 1)[1]
+        return None
+
+    def test_subdomain_host_sets_apex_cookie_domain(self, client, caplog, mock_db):
+        """Login request from miami.knowsbeauty.com → Domain=.knowsbeauty.com."""
+        code = _request_and_extract_code(client, caplog, "alice@expertly.com")
+        r = client.post(
+            "/api/v1/preview/login/verify",
+            json={"email": "alice@expertly.com", "code": code},
+            # Simulate a browser hitting the Miami city subdomain.
+            headers={"host": "miami.knowsbeauty.com"},
+        )
+        assert r.status_code == 200
+        domain = self._extract_cookie_domain(r.headers.get("set-cookie", ""))
+        assert domain == ".knowsbeauty.com", (
+            f"Expected cookie Domain=.knowsbeauty.com, got {domain!r}. "
+            "A login at miami.knowsbeauty.com must share its cookie across all city subdomains."
+        )
+
+    def test_apex_host_sets_apex_cookie_domain(self, client, caplog, mock_db):
+        """Login request from bare knowsbeauty.com → Domain=.knowsbeauty.com."""
+        code = _request_and_extract_code(client, caplog, "alice@expertly.com")
+        r = client.post(
+            "/api/v1/preview/login/verify",
+            json={"email": "alice@expertly.com", "code": code},
+            headers={"host": "knowsbeauty.com"},
+        )
+        assert r.status_code == 200
+        domain = self._extract_cookie_domain(r.headers.get("set-cookie", ""))
+        assert domain == ".knowsbeauty.com"
+
+    def test_localhost_host_omits_cookie_domain(self, client, caplog, mock_db):
+        """Login request from localhost → no Domain attribute (browser default)."""
+        code = _request_and_extract_code(client, caplog, "alice@expertly.com")
+        r = client.post(
+            "/api/v1/preview/login/verify",
+            json={"email": "alice@expertly.com", "code": code},
+            headers={"host": "localhost"},
+        )
+        assert r.status_code == 200
+        domain = self._extract_cookie_domain(r.headers.get("set-cookie", ""))
+        # WHY: None means the Domain= attribute was absent from the Set-Cookie
+        # header, which is correct for localhost — the browser scopes the cookie
+        # to the exact hostname by default and local dev is a single host.
+        assert domain is None, (
+            f"Expected no cookie Domain attribute for localhost, got {domain!r}."
+        )
+
+    def test_localhost_with_port_omits_cookie_domain(self, client, caplog, mock_db):
+        """Host header 'localhost:8000' → port stripped → still no Domain."""
+        code = _request_and_extract_code(client, caplog, "alice@expertly.com")
+        r = client.post(
+            "/api/v1/preview/login/verify",
+            json={"email": "alice@expertly.com", "code": code},
+            headers={"host": "localhost:8000"},
+        )
+        assert r.status_code == 200
+        domain = self._extract_cookie_domain(r.headers.get("set-cookie", ""))
+        assert domain is None
