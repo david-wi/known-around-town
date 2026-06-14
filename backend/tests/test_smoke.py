@@ -3762,3 +3762,88 @@ async def test_neighborhoods_with_zero_businesses_hidden_from_navigation(seeded_
     assert "Ghost Test Neighborhood" in r2.text, (
         "Neighborhood with listed_count > 0 should appear in navigation"
     )
+
+
+def test_category_page_plain_url_photos_do_not_crash(client, seeded_db):
+    """Category, neighborhood, and search pages must not crash when a business
+    stores photos as plain URL strings instead of {url, ...} dicts.
+
+    WHY: the og:image expression did `b["photos"][0]["url"]` which raises
+    TypeError: string indices must be integers when photos[0] is a plain string.
+    The business detail page already guards with isinstance(p, dict); this
+    regression test ensures the same guard covers the other public list pages."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    biz = asyncio.run(
+        seeded_db.businesses.find_one({"city_id": city["_id"], "status": "live"})
+    )
+    assert biz is not None, "Need at least one live business in seed data"
+
+    # Store a plain URL string as the only photo — the old code crashes on this.
+    asyncio.run(seeded_db.businesses.update_one(
+        {"_id": biz["_id"]},
+        {"$set": {"photos": ["https://example.com/plain-string-photo.jpg"]}},
+    ))
+
+    cat_slug = (biz.get("category_slugs") or ["hair"])[0]
+    r = client.get(f"/c/{cat_slug}", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, (
+        f"Category page /c/{cat_slug} crashed with plain-URL photos: {r.text[:300]}"
+    )
+
+    nb_slug = ((biz.get("neighborhood_slugs") or []) + [None])[0]
+    if nb_slug:
+        r2 = client.get(f"/n/{nb_slug}", headers={"host": "miami.knowsbeauty.localhost"})
+        assert r2.status_code == 200, (
+            f"Neighborhood page /n/{nb_slug} crashed with plain-URL photos: {r2.text[:300]}"
+        )
+
+    r3 = client.get(
+        f"/search?q={biz.get('name', 'salon')[:10]}",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r3.status_code == 200, (
+        f"Search page crashed with plain-URL photos: {r3.text[:300]}"
+    )
+
+
+def test_business_directions_url_uses_full_address(client, seeded_db):
+    """The Get Directions link on a business page must include city, state, and
+    postal code — not just the street — so Google Maps picks the right location.
+
+    WHY: the old code passed only the street address to Google Maps, so Maps
+    would guess the city and often route to the wrong one. For example,
+    "1234 SW 8th St" resolves to dozens of cities; "1234 SW 8th St, Miami, FL
+    33135" always lands in the right neighborhood."""
+    import asyncio
+
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    biz = asyncio.run(
+        seeded_db.businesses.find_one({"city_id": city["_id"], "status": "live"})
+    )
+    assert biz is not None, "Need at least one live business in seed data"
+
+    asyncio.run(seeded_db.businesses.update_one(
+        {"_id": biz["_id"]},
+        {"$set": {"address": {
+            "street": "1234 SW 8th St",
+            "city": "Miami",
+            "state": "FL",
+            "postal_code": "33135",
+        }}},
+    ))
+
+    r = client.get(f"/b/{biz['slug']}", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # All four address parts must appear in the Maps link on the page.
+    assert "1234" in r.text, "Street number missing from Maps link"
+    assert "Miami" in r.text, "City missing from Maps link"
+    assert "FL" in r.text, "State missing from Maps link"
+    assert "33135" in r.text, "Postal code missing from Maps link"
