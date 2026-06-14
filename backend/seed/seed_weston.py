@@ -756,6 +756,11 @@ async def seed_weston() -> None:
         "name": CITY_NAME,
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
+        "meta_description": (
+            "The curated beauty directory for Weston, FL — salons, spas, lash studios, "
+            "and nail bars discovered by locals. Covering Weston Town Center, Emerald Estates, "
+            "Savanna, and Indian Trace in South Florida's most affluent planned community."
+        ),
         "domain_override": DOMAIN_OVERRIDE,
         "status": "live",
         "updated_at": now,

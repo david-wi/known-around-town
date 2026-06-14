@@ -802,6 +802,11 @@ async def seed_miramar() -> None:
         "name": CITY_NAME,
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
+        "meta_description": (
+            "The curated beauty directory for Miramar, FL — salons, spas, lash studios, "
+            "and nail bars discovered by locals. Covering Miramar Parkway, Silver Lakes, "
+            "Sunset Lakes, and Miramar Town Center in Broward County."
+        ),
         "domain_override": DOMAIN_OVERRIDE,
         "status": "live",
         "updated_at": now,
