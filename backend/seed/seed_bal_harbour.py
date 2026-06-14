@@ -411,6 +411,121 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$$$$",
         "editors_pick": False,
     },
+    {
+        "slug": "belair-beauty-bar-surfside",
+        "name": "Belair Beauty Bar",
+        "neighborhood_slugs": ["surfside-oceanfront"],
+        "category_slugs": ["hair"],
+        "address": {
+            "street": "9400 Harding Ave",
+            "city": "Surfside",
+            "state": "FL",
+            "zip": "33154",
+        },
+        "phone": "(305) 861-2200",
+        "website": "https://www.belairbeautybar.com",
+        "instagram": "@belairbeautybar",
+        "short_description": (
+            "A sun-drenched hair salon steps from the Surfside shore known for "
+            "its beach-wave blowouts, balayage, and keratin treatments. The "
+            "breezy, white-on-white interior and same-day availability make it "
+            "the go-to stop for pre-event polish along the Collins corridor."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "surfside-wax-threading-studio",
+        "name": "Surfside Wax & Threading Studio",
+        "neighborhood_slugs": ["surfside-oceanfront"],
+        "category_slugs": ["waxing"],
+        "address": {
+            "street": "9516 Harding Ave",
+            "city": "Surfside",
+            "state": "FL",
+            "zip": "33154",
+        },
+        "phone": "(305) 864-0177",
+        "website": "",
+        "instagram": "@surfsidewax",
+        "short_description": (
+            "A no-frills wax and threading studio that has served the Surfside "
+            "and Bal Harbour residential community for over a decade. Efficient "
+            "appointments, competitive pricing, and an experienced staff who "
+            "know their regulars make this a trusted neighborhood staple."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "bay-harbor-nails-spa",
+        "name": "Bay Harbor Nails & Spa",
+        "neighborhood_slugs": ["bay-harbor-islands"],
+        "category_slugs": ["nails", "spa"],
+        "address": {
+            "street": "1060 Kane Concourse",
+            "city": "Bay Harbor Islands",
+            "state": "FL",
+            "zip": "33154",
+        },
+        "phone": "(305) 868-3300",
+        "website": "https://www.bayharbornaилс.com",
+        "instagram": "@bayharbornaилс",
+        "short_description": (
+            "The island's most complete nail destination — gel, dip, acrylics, "
+            "pedicures, and express spa services — tucked into a quietly upscale "
+            "strip on Kane Concourse. Walk-ins welcome; regulars book online to "
+            "secure their preferred technician for longer appointments."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "bal-harbour-lash-brow-bar",
+        "name": "Bal Harbour Lash & Brow Bar",
+        "neighborhood_slugs": ["bal-harbour-shops-collins"],
+        "category_slugs": ["lash-brow"],
+        "address": {
+            "street": "10195 Collins Ave Suite 103",
+            "city": "Bal Harbour",
+            "state": "FL",
+            "zip": "33154",
+        },
+        "phone": "(305) 865-0444",
+        "website": "https://www.balharbourlashbrow.com",
+        "instagram": "@balharbourlashbrow",
+        "short_description": (
+            "A refined lash and brow studio catering to the Bal Harbour Shops "
+            "clientele. Offers classic to mega-volume lash extensions, lash "
+            "lifts, brow lamination, tinting, and microblading — all by "
+            "certified artists who understand the discretion this zip code demands."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "kane-concourse-barber",
+        "name": "Kane Concourse Barber",
+        "neighborhood_slugs": ["bay-harbor-islands"],
+        "category_slugs": ["barber"],
+        "address": {
+            "street": "1080 Kane Concourse",
+            "city": "Bay Harbor Islands",
+            "state": "FL",
+            "zip": "33154",
+        },
+        "phone": "(305) 867-0055",
+        "website": "",
+        "instagram": "@kaneconcoursebarber",
+        "short_description": (
+            "A classic barbershop on Bay Harbor's main shopping strip offering "
+            "cuts, straight-razor shaves, and beard trims in a relaxed setting. "
+            "Popular with the island's professional residents who prefer a "
+            "traditional barbershop experience without the Aventura-mall crowds."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
 ]
 
 

@@ -432,6 +432,106 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$",
         "editors_pick": False,
     },
+    {
+        "slug": "pinecrest-nail-spa",
+        "name": "Pinecrest Nail & Spa",
+        "neighborhood_slugs": ["us1-corridor"],
+        "address": {
+            "street": "11855 S Dixie Hwy",
+            "city": "Pinecrest",
+            "state": "FL",
+            "zip": "33156",
+        },
+        "phone": "(305) 235-9900",
+        "category_slugs": ["nails", "spa"],
+        "short_description": (
+            "A reliable nail and spa destination along South Dixie that draws steady "
+            "repeat business from the surrounding neighborhoods. Gel manicures, "
+            "pedicures, and waxing done with care and without the wait."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "pinecrest-med-spa",
+        "name": "Pinecrest Med Spa",
+        "neighborhood_slugs": ["us1-corridor"],
+        "address": {
+            "street": "12321 S Dixie Hwy Suite 102",
+            "city": "Pinecrest",
+            "state": "FL",
+            "zip": "33156",
+        },
+        "phone": "(305) 235-7700",
+        "category_slugs": ["med-spa"],
+        "short_description": (
+            "A boutique med spa on the US-1 corridor offering injectables, facials, "
+            "and laser treatments for Pinecrest and Palmetto Bay clients who want "
+            "clinical results without the drive to Brickell."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "the-franjo-salon",
+        "name": "The Franjo Salon",
+        "neighborhood_slugs": ["franjo-district"],
+        "address": {
+            "street": "9807 SW 67th Ave",
+            "city": "Pinecrest",
+            "state": "FL",
+            "zip": "33156",
+        },
+        "phone": "(305) 667-4411",
+        "category_slugs": ["hair"],
+        "short_description": (
+            "A well-established salon in the Franjo District with a loyal base of "
+            "Pinecrest residents. Known for precise haircuts and low-maintenance color "
+            "that looks good weeks later."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "snapper-creek-wax-brow-studio",
+        "name": "Snapper Creek Wax & Brow Studio",
+        "neighborhood_slugs": ["snapper-creek"],
+        "address": {
+            "street": "10055 Hammocks Blvd",
+            "city": "Pinecrest",
+            "state": "FL",
+            "zip": "33196",
+        },
+        "phone": "(305) 270-8833",
+        "category_slugs": ["waxing", "lash-brow"],
+        "short_description": (
+            "A small, focused studio tucked into the Snapper Creek area. Brow shaping "
+            "and body waxing by appointment, with results that clients say hold up "
+            "noticeably better than chain alternatives."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
+    {
+        "slug": "palmetto-bay-lash-bar-south-pinecrest",
+        "name": "Palmetto Bay Lash Bar",
+        "neighborhood_slugs": ["south-pinecrest"],
+        "address": {
+            "street": "17801 S Dixie Hwy Suite 4",
+            "city": "Palmetto Bay",
+            "state": "FL",
+            "zip": "33157",
+        },
+        "phone": "(305) 232-5544",
+        "category_slugs": ["lash-brow"],
+        "short_description": (
+            "Lash extensions and lifts on South Dixie serving the Palmetto Bay and "
+            "South Pinecrest stretch. The studio runs on a tight appointment schedule "
+            "and the results consistently impress."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
 ]
 
 

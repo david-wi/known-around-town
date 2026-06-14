@@ -155,6 +155,14 @@ if [ "$SEED_AFTER_DEPLOY" = "true" ]; then
     -e KAT_ALLOW_PRODUCTION_RESET=true backend python -m seed.seed_weston
   docker compose -p known-around-town -f docker-compose.prod.yml exec -T \
     -e KAT_ALLOW_PRODUCTION_RESET=true backend python -m seed.seed_north_miami_beach
+  docker compose -p known-around-town -f docker-compose.prod.yml exec -T \
+    -e KAT_ALLOW_PRODUCTION_RESET=true backend python -m seed.seed_bal_harbour
+  docker compose -p known-around-town -f docker-compose.prod.yml exec -T \
+    -e KAT_ALLOW_PRODUCTION_RESET=true backend python -m seed.seed_key_biscayne
+  docker compose -p known-around-town -f docker-compose.prod.yml exec -T \
+    -e KAT_ALLOW_PRODUCTION_RESET=true backend python -m seed.seed_pinecrest
+  docker compose -p known-around-town -f docker-compose.prod.yml exec -T \
+    -e KAT_ALLOW_PRODUCTION_RESET=true backend python -m seed.seed_downtown_miami
 fi
 
 echo "Deploy complete ($DEPLOY_TARGET)."

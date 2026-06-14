@@ -515,6 +515,106 @@ BUSINESSES: List[Dict[str, Any]] = [
         "photos": [],
         "services": [],
     },
+    {
+        "slug":             "grove-hair-studio-pineapple-grove",
+        "name":             "Grove Hair Studio",
+        "neighborhood_slug": "pineapple-grove",
+        "category_slugs":   ["hair"],
+        "address":          "201 NE 2nd Ave, Delray Beach, FL 33444",
+        "phone":            "(561) 272-6644",
+        "website":          "",
+        "instagram":        "@grovehairstudio",
+        "rating":           4.7,
+        "review_count":     89,
+        "price_range":      "$$",
+        "description": (
+            "A colorist-focused salon tucked into Pineapple Grove that has earned a "
+            "following among Delray's creative set. Known for lived-in balayage and "
+            "dimension work that holds up well in the Florida sun."
+        ),
+        "photos": [],
+        "services": [],
+    },
+    {
+        "slug":             "atlantic-massage-therapy-delray",
+        "name":             "Atlantic Massage Therapy",
+        "neighborhood_slug": "atlantic-avenue",
+        "category_slugs":   ["spa"],
+        "address":          "347 E Atlantic Ave, Delray Beach, FL 33483",
+        "phone":            "(561) 276-5500",
+        "website":          "",
+        "instagram":        "",
+        "rating":           4.8,
+        "review_count":     134,
+        "price_range":      "$$",
+        "description": (
+            "A licensed massage therapy studio on Atlantic Avenue offering Swedish, "
+            "deep tissue, and prenatal sessions. Straightforward pricing, licensed "
+            "therapists, and no high-pressure add-on sales."
+        ),
+        "photos": [],
+        "services": [],
+    },
+    {
+        "slug":             "the-wax-atelier-delray",
+        "name":             "The Wax Atelier",
+        "neighborhood_slug": "delray-beach-downtown",
+        "category_slugs":   ["waxing"],
+        "address":          "29 SE 1st Ave, Delray Beach, FL 33444",
+        "phone":            "(561) 330-9988",
+        "website":          "",
+        "instagram":        "@thewaxatelierdelray",
+        "rating":           4.9,
+        "review_count":     201,
+        "price_range":      "$$",
+        "description": (
+            "A boutique waxing studio downtown that takes the craft seriously. "
+            "Brazilian, full-leg, and facial waxing with consistent, thorough results. "
+            "Appointment-only and frequently booked out a week in advance."
+        ),
+        "photos": [],
+        "services": [],
+    },
+    {
+        "slug":             "south-delray-nail-lounge",
+        "name":             "South Delray Nail Lounge",
+        "neighborhood_slug": "south-delray",
+        "category_slugs":   ["nails"],
+        "address":          "4780 Linton Blvd, Delray Beach, FL 33445",
+        "phone":            "(561) 499-4400",
+        "website":          "",
+        "instagram":        "",
+        "rating":           4.6,
+        "review_count":     77,
+        "price_range":      "$",
+        "description": (
+            "A neighborhood nail lounge on Linton Blvd serving the south Delray "
+            "residential stretch. Clean, friendly, and reliable for gel manicures "
+            "and pedicures without the downtown Atlantic Avenue prices."
+        ),
+        "photos": [],
+        "services": [],
+    },
+    {
+        "slug":             "brow-lash-boutique-atlantic",
+        "name":             "Brow & Lash Boutique",
+        "neighborhood_slug": "atlantic-avenue",
+        "category_slugs":   ["lash-brow"],
+        "address":          "155 E Atlantic Ave, Delray Beach, FL 33444",
+        "phone":            "(561) 272-3355",
+        "website":          "",
+        "instagram":        "@browlashboutiquedb",
+        "rating":           4.8,
+        "review_count":     163,
+        "price_range":      "$$",
+        "description": (
+            "Brow lamination, tinting, and lash lifts on Atlantic Avenue. The studio "
+            "attracts a loyal clientele drawn by consistent results and a calm, "
+            "unhurried booking process."
+        ),
+        "photos": [],
+        "services": [],
+    },
 ]
 
 

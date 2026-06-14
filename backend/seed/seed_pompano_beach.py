@@ -666,6 +666,141 @@ BUSINESSES = [
         "price_range": "$$",
         "status": "live",
     },
+    {
+        "slug": "downtown-pompano-salon",
+        "name": "Downtown Pompano Salon",
+        "neighborhood_slug": "downtown-pompano",
+        "categories": ["hair"],
+        "address": "11 NW 1st Ave, Pompano Beach, FL 33060",
+        "phone": "(954) 942-5511",
+        "website": "",
+        "description": (
+            "A full-service salon in downtown Pompano serving the Arts District "
+            "neighborhood with cuts, color, and blow-outs. Relaxed atmosphere "
+            "with a team that keeps appointments running on time."
+        ),
+        "hours": {
+            "Mon": "9am–6pm",
+            "Tue": "9am–6pm",
+            "Wed": "9am–6pm",
+            "Thu": "9am–6pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–5pm",
+            "Sun": "Closed",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$",
+        "status": "live",
+    },
+    {
+        "slug": "arts-district-nail-bar-pompano",
+        "name": "Arts District Nail Bar",
+        "neighborhood_slug": "downtown-pompano",
+        "categories": ["nails"],
+        "address": "20 NE 2nd St, Pompano Beach, FL 33060",
+        "phone": "(954) 941-3388",
+        "website": "",
+        "description": (
+            "A well-maintained nail bar near the Pompano Arts District with a "
+            "straightforward menu of gel sets, dips, and pedicures. Clean, "
+            "friendly, and easy to book for a last-minute appointment."
+        ),
+        "hours": {
+            "Mon": "9:30am–6pm",
+            "Tue": "9:30am–6pm",
+            "Wed": "9:30am–6pm",
+            "Thu": "9:30am–6pm",
+            "Fri": "9:30am–7pm",
+            "Sat": "9am–5pm",
+            "Sun": "Closed",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$",
+        "status": "live",
+    },
+    {
+        "slug": "sample-road-spa-pompano",
+        "name": "Sample Road Spa",
+        "neighborhood_slug": "sample-road",
+        "categories": ["spa"],
+        "address": "3201 W Sample Rd, Pompano Beach, FL 33073",
+        "phone": "(954) 969-7700",
+        "website": "",
+        "description": (
+            "A mid-range day spa on Sample Road offering massages, facials, and "
+            "body treatments for the West Pompano community. Consistent service "
+            "and fair prices have kept a strong base of repeat clients."
+        ),
+        "hours": {
+            "Mon": "10am–7pm",
+            "Tue": "10am–7pm",
+            "Wed": "10am–7pm",
+            "Thu": "10am–7pm",
+            "Fri": "10am–7pm",
+            "Sat": "9am–6pm",
+            "Sun": "11am–5pm",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$$",
+        "status": "live",
+    },
+    {
+        "slug": "north-pompano-lash-bar",
+        "name": "North Pompano Lash Bar",
+        "neighborhood_slug": "north-pompano",
+        "categories": ["lash-brow"],
+        "address": "4850 Coconut Creek Pkwy, Pompano Beach, FL 33063",
+        "phone": "(954) 968-2200",
+        "website": "",
+        "description": (
+            "Lash extensions and brow services in North Pompano with consistent "
+            "results and a friendly, no-pressure approach. Classic and hybrid sets "
+            "available with fills offered on a flexible schedule."
+        ),
+        "hours": {
+            "Mon": "10am–6pm",
+            "Tue": "10am–6pm",
+            "Wed": "10am–6pm",
+            "Thu": "10am–6pm",
+            "Fri": "10am–6pm",
+            "Sat": "9am–5pm",
+            "Sun": "Closed",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$$",
+        "status": "live",
+    },
+    {
+        "slug": "atlantic-wax-center-pompano",
+        "name": "Atlantic Wax Center",
+        "neighborhood_slug": "atlantic-blvd",
+        "categories": ["waxing"],
+        "address": "1700 E Atlantic Blvd, Pompano Beach, FL 33060",
+        "phone": "(954) 785-8833",
+        "website": "",
+        "description": (
+            "A dedicated waxing center on Atlantic Boulevard handling everything "
+            "from face and brows to Brazilian and full-leg. Walk-ins welcome "
+            "between appointments and same-day booking usually works."
+        ),
+        "hours": {
+            "Mon": "9am–7pm",
+            "Tue": "9am–7pm",
+            "Wed": "9am–7pm",
+            "Thu": "9am–7pm",
+            "Fri": "9am–7pm",
+            "Sat": "9am–6pm",
+            "Sun": "10am–4pm",
+        },
+        "editors_pick": False,
+        "editors_note": "",
+        "price_range": "$",
+        "status": "live",
+    },
 ]
 
 
