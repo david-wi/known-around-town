@@ -35,6 +35,22 @@ After removing a business from the JSON, its DB record persists as "archived" (p
 
 When updating smoke tests to remove a closed business as a test target, pick a replacement that: (a) exists in the seed, and (b) for homepage-trending tests, also appears in `trending_business_slugs` in `seed_miami.py`.
 
+## Google ratings display (2026-06-14, PR #281)
+
+`google_rating`, `google_review_count`, `google_place_id`, `google_rating_synced_at` were already on the Business model and the admin sync UI was already built — nothing to re-implement there. Only `hide_ratings: bool = False` was missing.
+
+The ratings threshold (`ratings_min_review_count`) is a site setting injected as a Jinja2 global in `main.py` (same pattern as `support_email`). This makes it available on every template — home, category, neighborhood, search, business detail — without per-route DB queries. The global is set to 20 at module load, overwritten from the DB in `on_startup`, and refreshed in-process when the admin saves the settings page. No restart needed to change the threshold.
+
+Template condition used in both `business.html` and `business_card.html`:
+```jinja2
+{% if b.google_rating and not b.hide_ratings and (b.google_review_count or 0) >= (ratings_min_review_count or 20) %}
+```
+Note `business_card.html` uses `b` (not `business`) as the loop variable.
+
+**Admin business edit page added in PR #282.** Routes: `GET /admin/businesses` (search), `GET /admin/businesses/{id}/edit`, `POST /admin/businesses/{id}/edit`. Module: `backend/app/routes/admin/businesses_admin.py`, templates: `admin/businesses.html` and `admin/business_edit.html`. Follows the same `attach_templates()` + `require_admin` pattern as all other admin routers.
+
+**Docker compose restart gotcha (2026-06-14):** When you run `docker compose up -d` from the repo root without specifying `-f docker-compose.prod.yml`, Docker uses the dev `docker-compose.yml` which builds the image locally (not from GHCR) and exposes port 8000 directly without Traefik labels. The result: the app responds internally on port 8000 but Traefik can't route to it, so external requests return 404. Always use `docker compose -f docker-compose.prod.yml up -d backend` on the production server. If a container ends up with no Traefik labels and a direct port binding, pull and restart with the prod compose file.
+
 ## Support email configuration (2026-06-12)
 
 The support email `hello@knowsbeauty.com` was hardcoded in ~15 places across templates and email service code. The domain has no mail records so every message to it bounced. The pattern used to make it configurable:
