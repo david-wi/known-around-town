@@ -1208,7 +1208,7 @@ def test_claim_verified_email_function_exists_with_correct_content():
     html = _claim_verified_html("Maria Lopez", "Salon Bliss Miami", login_url, pricing_url)
     assert "Salon Bliss Miami" in html, "Business name missing from verified email HTML"
     assert login_url in html, "Login URL missing from verified email HTML"
-    assert "Log in to your dashboard" in html, "Login CTA missing from verified email HTML"
+    assert "Log in to your owner page" in html, "Login CTA missing from verified email HTML"
 
 
 def test_business_card_does_not_expose_unclaimed_to_consumers(client):
@@ -2556,7 +2556,7 @@ def test_claim_verified_email_login_url_contains_email():
     """The claim-verified email must include ?email= in the login link so owners
     land on the code-entry step immediately without retyping their address.
 
-    WHY: without the pre-filled email, the 'Log in to your dashboard →' button
+    WHY: without the pre-filled email, the 'Log in to your owner page →' button
     sends owners to a blank login form where they have to re-enter the same
     email address they just received the email at. That's an unnecessary friction
     step right after the owner's first approval — not a good first impression.

@@ -60,7 +60,7 @@ class TestClaimVerifiedHtml:
     def test_includes_login_button(self):
         html = _claim_verified_html("Maria", "Salon X", LOGIN_URL, PRICING_URL)
         assert LOGIN_URL in html
-        assert "Log in to your dashboard" in html
+        assert "Log in to your owner page" in html
 
     def test_includes_pricing_cta_button(self):
         html = _claim_verified_html("Maria", "Salon X", LOGIN_URL, PRICING_URL)
