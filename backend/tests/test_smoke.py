@@ -1443,7 +1443,7 @@ def test_business_jsonld_omits_empty_address_fields(client):
             data = json.loads(block.strip())
         except json.JSONDecodeError:
             continue
-        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "LocalBusiness"):
+        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "BarberShop", "MedicalSpa", "LocalBusiness"):
             addr = data.get("address", {})
             assert addr.get("addressRegion") != "", (
                 "addressRegion is an empty string in JSON-LD — must be omitted when unknown"
@@ -1492,7 +1492,7 @@ def test_business_jsonld_emits_address_region_when_state_present(seeded_db, clie
             data = json.loads(block.strip())
         except json.JSONDecodeError:
             continue
-        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "LocalBusiness"):
+        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "BarberShop", "MedicalSpa", "LocalBusiness"):
             lb_block = data
             break
 
@@ -1546,7 +1546,7 @@ def test_business_jsonld_emits_geo_when_coordinates_present(seeded_db, client):
             data = json.loads(block.strip())
         except json.JSONDecodeError:
             continue
-        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "LocalBusiness"):
+        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "BarberShop", "MedicalSpa", "LocalBusiness"):
             lb_block = data
             break
 
@@ -1580,7 +1580,7 @@ def test_business_jsonld_omits_geo_when_no_coordinates(client):
             data = json.loads(block.strip())
         except json.JSONDecodeError:
             continue
-        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "LocalBusiness"):
+        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "BarberShop", "MedicalSpa", "LocalBusiness"):
             assert "geo" not in data, (
                 "geo block must be omitted when no coordinates are stored; "
                 f"got: {data.get('geo')}"
@@ -1605,12 +1605,69 @@ def test_business_jsonld_address_always_has_country(client):
             data = json.loads(block.strip())
         except json.JSONDecodeError:
             continue
-        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "LocalBusiness"):
+        if data.get("@type") in ("HairSalon", "NailSalon", "DaySpa", "BeautySalon", "BarberShop", "MedicalSpa", "LocalBusiness"):
             addr = data.get("address")
             if addr:
                 assert addr.get("addressCountry"), (
                     "addressCountry must be present and non-empty in the address block"
                 )
+
+
+def test_business_jsonld_schema_type_by_category(seeded_db, client):
+    """Business listing pages must emit the most specific schema.org @type for
+    the business's primary category, not a generic fallback.
+
+    WHY: Google's rich-results system rewards specificity. A barber shop tagged
+    as "BeautySalon" gets generic Knowledge Panel fields; tagged as "BarberShop"
+    it can qualify for barber-specific fields. A med-spa tagged as "DaySpa"
+    misses the dedicated MedicalSpa entity type that Google indexes separately.
+    A lash/brow bar tagged as "HairSalon" (the old behaviour — 'lash-brow'
+    contains 'brow' which used to match the hair condition) was showing up
+    incorrectly in hair-salon rich results instead of general beauty results."""
+    import json, re
+
+    # WHY: slugs chosen from the Miami beauty seed (_real_businesses.json) that
+    # have the target category as their sole/primary category_slug. Using seeded
+    # slugs (not hand-crafted fixtures) ensures the test stays in sync with the
+    # actual data that ships to production.
+    _BEAUTY_HOST = {"host": "miami.knowsbeauty.localhost"}
+    cases = [
+        # (slug, expected_schema_type, human description of what must be true)
+        ("brickell-barbershop-brickell", "BarberShop",
+         "barber category must yield BarberShop, not BeautySalon"),
+        ("laseraway-aventura", "MedicalSpa",
+         "med-spa category must yield MedicalSpa, not DaySpa"),
+        ("the-broward-brow-studio-brickell", "BeautySalon",
+         "lash-brow category must yield BeautySalon, not HairSalon"),
+        ("blow-dry-bar-brickell", "HairSalon",
+         "hair category must yield HairSalon"),
+    ]
+
+    business_types = {
+        "HairSalon", "NailSalon", "DaySpa", "BeautySalon",
+        "BarberShop", "MedicalSpa", "LocalBusiness",
+    }
+
+    for slug, expected_type, description in cases:
+        r = client.get(f"/b/{slug}", headers=_BEAUTY_HOST)
+        assert r.status_code == 200, f"{slug}: expected 200, got {r.status_code}"
+        blocks = re.findall(
+            r'<script type="application/ld\+json">(.*?)</script>', r.text, re.DOTALL
+        )
+        found_type = None
+        for block in blocks:
+            try:
+                data = json.loads(block.strip())
+            except json.JSONDecodeError:
+                continue
+            # Look for the main LocalBusiness-family block (not BreadcrumbList etc.)
+            t = data.get("@type", "")
+            if t in business_types:
+                found_type = t
+                break
+        assert found_type == expected_type, (
+            f"{slug}: {description} — got {found_type!r}"
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -25,21 +25,45 @@
   "@context": "https://schema.org",
   {#- WHY: Google's rich-results guidelines for beauty businesses reward a
       more specific @type over the generic LocalBusiness. The mapping below
-      mirrors Google's Beauty & Personal Care category hierarchy:
-        - HairSalon   for hair-focused categories (cuts, color, blowouts)
-        - NailSalon   for nail/manicure/pedicure categories
-        - DaySpa      for spa and med-spa categories
-        - BeautySalon as the catch-all for anything else in the beauty vertical
-      More specific types surface additional Knowledge Panel fields (price
-      range, opening hours) that LocalBusiness alone does not trigger. #}
+      mirrors Google's Beauty & Personal Care category hierarchy AND the
+      schema.org type list. More specific types surface additional Knowledge
+      Panel fields (price range, opening hours) that LocalBusiness alone does
+      not trigger. Order matters — check the most-specific types first:
+        - BarberShop  for barber shops (schema.org/BarberShop). Checked
+                      first because "barber" doesn't match any other keyword
+                      in the list below, but it's the most precise type
+                      available and should never fall through to BeautySalon.
+        - MedicalSpa  for med-spa / aesthetic-medicine businesses.
+                      Google recognises MedicalSpa as a distinct entity type
+                      with specialised Knowledge Panel fields separate from
+                      DaySpa. Checked before the generic "spa" catch.
+        - HairSalon   for hair-focused categories (cuts, color, blowouts).
+                      WHY: "brow" removed from this condition — slug
+                      "lash-brow" contains "brow" but lash/brow bars are not
+                      hair salons. Leaving "brow" here caused those businesses
+                      to be mis-typed as HairSalon in search results.
+        - NailSalon   for nail/manicure/pedicure categories.
+        - DaySpa      for general spa / massage / wellness (non-medical).
+        - BeautySalon as the catch-all for lash-brow bars, waxing studios,
+                      makeup artists, and anything else without a schema.org
+                      subtype. #}
   {% set _cat = (business.category_slugs[0] if business.category_slugs else '') %}
-  {% if 'hair' in _cat or 'blowout' in _cat or 'color' in _cat or 'brow' in _cat %}
+  {% if 'barber' in _cat %}
+    {% set _schema_type = 'BarberShop' %}
+  {% elif 'med-spa' in _cat or 'medspa' in _cat or 'medical-spa' in _cat %}
+    {% set _schema_type = 'MedicalSpa' %}
+  {% elif 'hair' in _cat or 'blowout' in _cat or 'color' in _cat %}
+    {#- WHY: "brow" deliberately excluded — "lash-brow"/"brow-lash" slugs
+        should map to BeautySalon, not HairSalon. #}
     {% set _schema_type = 'HairSalon' %}
   {% elif 'nail' in _cat or 'mani' in _cat or 'pedi' in _cat %}
     {% set _schema_type = 'NailSalon' %}
-  {% elif 'spa' in _cat or 'med-spa' in _cat or 'medspa' in _cat or 'massage' in _cat %}
+  {% elif 'spa' in _cat or 'massage' in _cat or 'wellness' in _cat %}
     {% set _schema_type = 'DaySpa' %}
   {% else %}
+    {#- WHY: BeautySalon is the schema.org catch-all for lash/brow bars,
+        waxing studios, makeup artists, and other beauty businesses that
+        don't have their own schema.org subtype. #}
     {% set _schema_type = 'BeautySalon' %}
   {% endif %}
   "@type": {{ _schema_type|tojson }},
