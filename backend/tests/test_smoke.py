@@ -3376,3 +3376,103 @@ async def test_cross_city_footer_hidden_when_only_one_city(seeded_db):
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
     assert "More cities" not in r.text
+
+
+def test_neighborhoods_with_zero_businesses_hidden_from_navigation(client, seeded_db):
+    """Neighborhoods with listed_count == 0 must not appear in city navigation.
+
+    WHY: cities that have placeholder neighborhood records but no businesses
+    assigned to those neighborhoods would otherwise show empty neighborhood
+    pages in the nav — thin content pages that hurt SEO and confuse visitors.
+
+    Regression: list_neighborhoods() used to return all non-archived neighborhoods
+    regardless of listed_count, so 7 cities (Doral, Weston, Hialeah, Plantation,
+    Pembroke Pines, Miramar, Pompano Beach) showed empty neighborhood nav links.
+    """
+    import asyncio
+
+    # Find Miami's city_id from the seeded mock DB (same asyncio.run pattern
+    # used by test_claim_sends_confirmation_email and similar tests)
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    city_id = city["_id"]
+
+    # Insert a ghost neighborhood with listed_count = 0 — must be filtered out
+    asyncio.run(seeded_db.neighborhoods.insert_one({
+        "_id": "ghost-test-slug",
+        "city_id": city_id,
+        "slug": "ghost-test-neighborhood",
+        "name": "Ghost Test Neighborhood",
+        "listed_count": 0,
+        "status": "active",
+    }))
+
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "Ghost Test Neighborhood" not in r.text, (
+        "Neighborhood with listed_count=0 should be hidden from navigation"
+    )
+
+    # Bump listed_count to 5 — it must then appear in the nav
+    asyncio.run(seeded_db.neighborhoods.update_one(
+        {"_id": "ghost-test-slug"},
+        {"$set": {"listed_count": 5}},
+    ))
+    r2 = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r2.status_code == 200, r2.text
+    assert "Ghost Test Neighborhood" in r2.text, (
+        "Neighborhood with listed_count > 0 should appear in navigation"
+    )
+
+
+async def test_neighborhoods_with_zero_businesses_hidden_from_navigation(seeded_db):
+    """Neighborhoods with listed_count == 0 must not appear in city navigation.
+
+    WHY: cities that have placeholder neighborhood records but no businesses
+    assigned to those neighborhoods would otherwise show empty neighborhood
+    pages in the nav — thin content pages that hurt SEO and confuse visitors.
+
+    Regression: list_neighborhoods() used to return all non-archived neighborhoods
+    regardless of listed_count, so cities like Doral, Weston, and Hialeah showed
+    empty neighborhood nav links because they had neighborhood records but no
+    published businesses.
+    """
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    network = await seeded_db.networks.find_one({"slug": "beauty"})
+    city = await seeded_db.cities.find_one(
+        {"network_id": network["_id"], "slug": "miami"}
+    )
+    city_id = city["_id"]
+
+    # Insert a ghost neighborhood with no businesses (listed_count = 0)
+    await seeded_db.neighborhoods.insert_one({
+        "_id": "ghost-test-slug",
+        "city_id": city_id,
+        "slug": "ghost-test-neighborhood",
+        "name": "Ghost Test Neighborhood",
+        "listed_count": 0,
+        "status": "active",
+    })
+
+    client = TestClient(app)
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # The zero-count neighborhood must NOT appear in navigation
+    assert "Ghost Test Neighborhood" not in r.text, (
+        "Neighborhood with listed_count=0 should be hidden from navigation"
+    )
+
+    # Bump listed_count to 5 — it must now appear
+    await seeded_db.neighborhoods.update_one(
+        {"_id": "ghost-test-slug"},
+        {"$set": {"listed_count": 5}},
+    )
+    r2 = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r2.status_code == 200, r2.text
+    assert "Ghost Test Neighborhood" in r2.text, (
+        "Neighborhood with listed_count > 0 should appear in navigation"
+    )
