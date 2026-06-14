@@ -51,6 +51,10 @@ Note `business_card.html` uses `b` (not `business`) as the loop variable.
 
 **Docker compose restart gotcha (2026-06-14):** When you run `docker compose up -d` from the repo root without specifying `-f docker-compose.prod.yml`, Docker uses the dev `docker-compose.yml` which builds the image locally (not from GHCR) and exposes port 8000 directly without Traefik labels. The result: the app responds internally on port 8000 but Traefik can't route to it, so external requests return 404. Always use `docker compose -f docker-compose.prod.yml up -d backend` on the production server. If a container ends up with no Traefik labels and a direct port binding, pull and restart with the prod compose file.
 
+## Category slugs in the DB (2026-06-14)
+
+The real category slugs used in `category_slugs` on business documents are short single-word slugs: `hair`, `nails`, `lash-brow`, `barber`, `spa`, `waxing`, `makeup`, `med-spa`. They do NOT use the longer descriptive form (`hair-salons`, `nail-salons`, `lashes-brows`, etc.). Always verify against the `categories` collection before writing category slugs — mismatched slugs write silently but the category filter and card labels break. The `assign_categories.py` script in `backend/scripts/` documents the correct mapping.
+
 ## Support email configuration (2026-06-12)
 
 The support email `hello@knowsbeauty.com` was hardcoded in ~15 places across templates and email service code. The domain has no mail records so every message to it bounced. The pattern used to make it configurable:
