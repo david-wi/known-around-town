@@ -14,6 +14,14 @@ in Google's Knowledge Panel) and the hours display in the business listing itsel
 
 Ratings and hours are cached in the business document so page loads never block
 on a live API call. The admin sync endpoint refreshes them on demand.
+
+WHY Places API (New): The project uses Google's Places API (New)
+(places.googleapis.com), not the legacy Maps Platform Places API
+(maps.googleapis.com/maps/api/place/…). The two APIs require separate
+enablement in Google Cloud Console; keys created with only the new API active
+receive REQUEST_DENIED on legacy endpoints. The new API also provides
+regularOpeningHours with integer hour/minute fields instead of the legacy
+"0900" time string, so the hours parser differs accordingly.
 """
 
 from __future__ import annotations
@@ -30,11 +38,11 @@ from app.models import HoursEntry
 
 log = logging.getLogger(__name__)
 
-# WHY: Text Search endpoint rather than Nearby Search because we have the
-# business name and city — Text Search is tuned for this use case and returns
-# the highest-relevance match first.
-_PLACES_SEARCH_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-_PLACES_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
+# WHY: Places API (New) endpoints — not the legacy Maps Platform places endpoints.
+# Text Search: POST with JSON body; auth via X-Goog-Api-Key header.
+# Place Details: GET /v1/places/{place_id}; same header auth.
+_PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
+_PLACES_DETAILS_BASE = "https://places.googleapis.com/v1/places"
 
 # WHY: 8 seconds allows for transient network latency without blocking the
 # sync endpoint so long that the admin's browser times out. Google's API
@@ -104,19 +112,23 @@ def _name_similarity(a: str, b: str) -> float:
 
 
 def _parse_hours(opening_hours: dict) -> List[HoursEntry]:
-    """Convert a Places API opening_hours object to a HoursEntry list.
+    """Convert a Places API (New) regularOpeningHours object to a HoursEntry list.
 
     Returns an empty list when hours are unknown so callers can distinguish
     "unknown" (empty list → skip update) from "closed this day" (entry with
     closed=True → store explicitly).
 
-    WHY periods not weekday_text: periods gives machine-readable open/close
-    times we can store and re-render in any format; weekday_text is display-only
-    and may be localised.
+    WHY periods not weekdayDescriptions: periods gives machine-readable open/close
+    times we can store and re-render in any format; weekdayDescriptions is
+    display-only and may be localised.
 
     WHY return [] when day_map is empty after parsing: an empty periods list
     means Google has no hour data. Returning [] preserves any manually-entered
     hours rather than incorrectly overwriting them with "always closed".
+
+    WHY integer hour/minute fields: Places API (New) uses {day, hour, minute}
+    integers (e.g. {"day": 1, "hour": 9, "minute": 0}) rather than the legacy
+    "time": "0900" string format.
     """
     if not opening_hours:
         return []
@@ -127,13 +139,14 @@ def _parse_hours(opening_hours: dict) -> List[HoursEntry]:
         open_info = period.get("open") or {}
         close_info = period.get("close") or {}
         day_int = open_info.get("day")
-        opens = open_info.get("time", "")    # "0900"
-        closes = close_info.get("time", "")  # "1700"
-        if day_int is None or not opens or not closes:
+        open_hour = open_info.get("hour")
+        open_min = open_info.get("minute", 0)
+        close_hour = close_info.get("hour")
+        close_min = close_info.get("minute", 0)
+        if day_int is None or open_hour is None or close_hour is None:
             continue
-        # WHY: format "0900" → "09:00" to match HoursEntry convention
-        opens_fmt = f"{opens[:2]}:{opens[2:]}" if len(opens) == 4 else opens
-        closes_fmt = f"{closes[:2]}:{closes[2:]}" if len(closes) == 4 else closes
+        opens_fmt = f"{open_hour:02d}:{open_min:02d}"
+        closes_fmt = f"{close_hour:02d}:{close_min:02d}"
         day_map[day_int] = (opens_fmt, closes_fmt)
 
     # WHY: no valid open periods → hours unknown, not "all closed"
@@ -160,22 +173,32 @@ async def _search_and_fetch(
 ) -> Optional[PlaceRating]:
     """Look up a business by name + city, then fetch its rating and hours.
 
-    WHY no `type` filter: a `type=beauty_salon` filter would silently exclude
+    WHY no type restriction: a type=beauty_salon filter would silently exclude
     nail salons, barbershops, spas, waxing studios, and other business types
     that legitimately appear in a beauty directory. Leaving the type open and
     relying on name + city matching gives accurate results for the full range
     of beauty businesses.
 
-    WHY delegate to _fetch_by_place_id after text search: opening_hours is
-    not available in text search results — only Place Details returns it.
-    The extra Details call only occurs on first-time discovery; subsequent
-    syncs skip the text search entirely because place_id is already cached.
+    WHY delegate to _fetch_by_place_id after text search: rating + hours
+    come back in a single Details call with the full field set. On first
+    discovery we do two calls (search + details); on subsequent syncs we skip
+    the text search entirely because place_id is already cached.
+
+    WHY POST with JSON body: Places API (New) Text Search uses POST, not GET,
+    with the query in the JSON body and auth in the X-Goog-Api-Key header.
     """
     query = f"{business_name} {city} {state}"
     try:
-        r = await client.get(
+        r = await client.post(
             _PLACES_SEARCH_URL,
-            params={"query": query, "key": api_key},
+            json={"textQuery": query},
+            headers={
+                "X-Goog-Api-Key": api_key,
+                # WHY: field mask requests only the fields we need (id and
+                # display name for the match check). Rating + hours come from
+                # the subsequent Details call so are not requested here.
+                "X-Goog-FieldMask": "places.id,places.displayName",
+            },
         )
         r.raise_for_status()
         data = r.json()
@@ -183,15 +206,15 @@ async def _search_and_fetch(
         log.warning("Places text search failed for %r: %s", query, exc)
         return None
 
-    results = data.get("results") or []
-    if not results:
+    places = data.get("places") or []
+    if not places:
         log.info("No Places match for %r", query)
         return None
 
     # WHY: take the first result (highest-relevance match), but guard against
     # a completely wrong business ranking first for a short or common name.
-    top = results[0]
-    top_name = top.get("name", "")
+    top = places[0]
+    top_name = (top.get("displayName") or {}).get("text", "")
     similarity = _name_similarity(business_name, top_name)
     if similarity < _NAME_SIMILARITY_THRESHOLD:
         log.info(
@@ -200,14 +223,14 @@ async def _search_and_fetch(
         )
         return None
 
-    place_id = top.get("place_id")
+    place_id = top.get("id")
     if not place_id:
-        # WHY: a result without a place_id can't be stored usefully — without
-        # one we can't refresh on future syncs via the cheaper Details endpoint.
-        log.warning("Places result for %r missing place_id — skipping", query)
+        # WHY: a result without an id can't be stored usefully — without it we
+        # can't refresh on future syncs via the cheaper Details endpoint.
+        log.warning("Places result for %r missing id — skipping", query)
         return None
 
-    # Fetch details to get opening_hours (not available in text search results).
+    # Fetch full details (rating + hours) now that we have the place id.
     return await _fetch_by_place_id(client, place_id, api_key)
 
 
@@ -216,17 +239,20 @@ async def _fetch_by_place_id(
     place_id: str,
     api_key: str,
 ) -> Optional[PlaceRating]:
-    """Refresh rating and hours for a known place_id (faster, no name-match uncertainty)."""
+    """Refresh rating and hours for a known place_id (faster, no name-match uncertainty).
+
+    WHY GET /v1/places/{id}: Places API (New) Place Details uses a resource
+    path rather than a query parameter. The field mask header controls which
+    fields are returned (and billed for).
+    """
     try:
         r = await client.get(
-            _PLACES_DETAILS_URL,
-            params={
-                "place_id": place_id,
-                # WHY: opening_hours added alongside rating fields to get both in
-                # one Details call. The field adds minimal response size but enables
-                # structured-data hours and the hours display on listing pages.
-                "fields": "rating,user_ratings_total,opening_hours",
-                "key": api_key,
+            f"{_PLACES_DETAILS_BASE}/{place_id}",
+            headers={
+                "X-Goog-Api-Key": api_key,
+                # WHY: request rating, review count, and opening hours together
+                # in one call. Listing hours separately would double billing.
+                "X-Goog-FieldMask": "id,rating,userRatingCount,regularOpeningHours",
             },
         )
         r.raise_for_status()
@@ -235,13 +261,12 @@ async def _fetch_by_place_id(
         log.warning("Places details fetch failed for place_id=%r: %s", place_id, exc)
         return None
 
-    result = data.get("result") or {}
-    rating_val = result.get("rating")
+    rating_val = data.get("rating")
     if rating_val is None:
         return None
     return PlaceRating(
         place_id=place_id,
         rating=float(rating_val),
-        review_count=int(result.get("user_ratings_total", 0)),
-        hours=_parse_hours(result.get("opening_hours")),
+        review_count=int(data.get("userRatingCount", 0)),
+        hours=_parse_hours(data.get("regularOpeningHours")),
     )
