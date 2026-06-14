@@ -179,9 +179,13 @@
             {% if n.photo_url %}
             <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" style='background-image: url("{{ n.photo_url }}");'></div>
             {% else %}
-            {# WHY: Most cities have no neighborhood photos; without this the card renders as a flat black
-               rectangle. A warm gradient keeps the card looking intentional and on-brand. #}
-            <div class="absolute inset-0 bg-gradient-to-br from-stone-600 via-stone-800 to-stone-950"></div>
+            {# WHY: without a photo the card background defaults to flat stone-900 (near-black),
+               which looks like a loading failure. An inline diagonal gradient using the network's
+               accent colour makes each card look intentional — the brand hue gives the grid visual
+               texture even before real neighbourhood photos are sourced. Inline style is used
+               instead of Tailwind utilities because the colour values come from Python-side theme
+               data, and the reference.css is pre-compiled without those specific gradient shades. #}
+            <div class="absolute inset-0" style="background: linear-gradient(135deg, {{ theme.card_gradient_color_from | default('#1c1917') }} 0%, #0c0a09 100%);"></div>
             {% endif %}
             <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/30 to-transparent group-hover:from-stone-950/95 transition-colors"></div>
             <div class="absolute inset-0 p-4 flex flex-col justify-between">

@@ -100,6 +100,12 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "owners_blob_b":            "bg-amber-300",
         "owners_eyebrow_color":     "text-rose-700",
         "highlight_border":         "border-rose-300",
+        # WHY: neighbourhood cards without a photo fall back to this diagonal gradient
+        # instead of a plain black rectangle. The deep rose start colour matches the
+        # beauty network's brand so the card looks intentional even without a photo.
+        # Hex values are used (not Tailwind utilities) because the CSS is pre-compiled
+        # and these specific shades aren't in the reference.css safelist.
+        "card_gradient_color_from": "#2d0a12",  # deep rose-950-ish
     },
     "wellness": {
         "accent_text":              "text-emerald-600",
@@ -120,6 +126,10 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "owners_blob_b":            "bg-teal-300",
         "owners_eyebrow_color":     "text-emerald-700",
         "highlight_border":         "border-emerald-300",
+        # WHY: neighbourhood cards without a photo fall back to a deep emerald gradient
+        # matching the wellness network's brand colour. Hex (not Tailwind) for same
+        # reason as beauty: pre-compiled CSS doesn't include these specific shades.
+        "card_gradient_color_from": "#052e16",  # deep emerald-950-ish
     },
     "health": {
         "accent_text":              "text-sky-700",
@@ -140,6 +150,10 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "owners_blob_b":            "bg-amber-300",
         "owners_eyebrow_color":     "text-sky-800",
         "highlight_border":         "border-sky-300",
+        # WHY: neighbourhood cards without a photo fall back to a deep sky-blue gradient
+        # matching the health network's brand colour. Hex (not Tailwind) for same
+        # reason as beauty: pre-compiled CSS doesn't include these specific shades.
+        "card_gradient_color_from": "#082f49",  # deep sky-950-ish
     },
 }
 
