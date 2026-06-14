@@ -3898,3 +3898,91 @@ def test_business_directions_url_uses_full_address(client, seeded_db):
     assert "Miami" in r.text, "City missing from Maps link"
     assert "FL" in r.text, "State missing from Maps link"
     assert "33135" in r.text, "Postal code missing from Maps link"
+
+
+# ── Regression tests for owner form empty-field save bugs ─────────────────────
+
+def test_collect_services_returns_empty_array_not_undefined():
+    """When an owner removes all their services and saves, the JS must send an
+    empty array [] — not nothing at all — so the backend clears the list.
+
+    WHY: The backend uses exclude_none=True on the PATCH payload. If the JS
+    returns `undefined` for an empty service list, the field is omitted from
+    the JSON body entirely and the backend ignores it, leaving old services in
+    place. Returning [] is the explicit instruction to clear the list.
+
+    Regression for: collectServices() used to return `undefined` when entries
+    were empty; now it returns `entries` (always an array) after the early-return
+    guard for a missing widget."""
+    import pathlib
+    source = (
+        pathlib.Path(__file__).parent.parent
+        / "app" / "templates" / "owner_me.html"
+    ).read_text()
+
+    # Must NOT return undefined for the empty-list case
+    assert "return entries.length ? entries : undefined" not in source, (
+        "collectServices() still returns undefined for an empty list — "
+        "the backend will ignore it and old services will reappear on reload. "
+        "Fix: return entries (always an array), let the early-return guard "
+        "handle the no-widget case."
+    )
+    # Must return the entries array directly (which is [] when all rows removed)
+    assert "return entries;" in source, (
+        "collectServices() must return `entries` directly so that an empty array "
+        "is sent to the backend as an explicit clear instruction."
+    )
+
+
+def test_collect_hours_includes_cleared_days():
+    """When an owner clears both time inputs for a day without checking Closed,
+    that day must still be included in the payload with null hours — not omitted.
+
+    WHY: Omitting the day means the backend sees no change and leaves the old
+    hours in place. Sending {opens_at: null, closes_at: null} is the explicit
+    instruction to clear that day's hours.
+
+    Regression for: collectHours() previously omitted any day where neither
+    Closed was checked nor any time was entered. Now it includes those days
+    with null hours whenever at least one other day has been filled in."""
+    import pathlib
+    source = (
+        pathlib.Path(__file__).parent.parent
+        / "app" / "templates" / "owner_me.html"
+    ).read_text()
+
+    # The else branch that includes null-hour days must be present
+    assert "opens_at: null, closes_at: null, closed: false" in source, (
+        "collectHours() is missing the else branch that includes cleared days "
+        "with null opens_at/closes_at. Without it, clearing a day's hours is "
+        "silently ignored and old hours reappear on reload."
+    )
+    # Must use anyRowTouched guard so a completely-untouched form doesn't force
+    # a 7-day null-hours write
+    assert "anyRowTouched" in source, (
+        "collectHours() must track whether any row was actually touched "
+        "(anyRowTouched flag) so a save that only updates phone/description "
+        "does not send a spurious 7-day null-hours array."
+    )
+
+
+def test_claim_form_support_email_has_jinja_default():
+    """The error message in claim_form.html that mentions the support email
+    must use a Jinja default filter so it never renders as a literal
+    template variable when support_email is missing from the route context.
+
+    WHY: Without a default, {{ support_email }} renders as the string
+    '{{ support_email }}' (raw template syntax) in the browser error message,
+    which looks broken to the owner and exposes the template variable name."""
+    import pathlib
+    source = (
+        pathlib.Path(__file__).parent.parent
+        / "app" / "templates" / "partials" / "claim_form.html"
+    ).read_text()
+
+    assert "support_email | default(" in source, (
+        "claim_form.html uses {{ support_email }} in the JS error string without "
+        "a Jinja default filter. If support_email is not in the route context it "
+        "will render as literal template syntax in the browser. "
+        "Fix: {{ support_email | default('hello@knowsbeauty.com') }}"
+    )

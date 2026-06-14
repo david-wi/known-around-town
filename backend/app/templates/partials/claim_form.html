@@ -559,7 +559,7 @@
             } else {
               showError(
                 "Something went wrong saving your claim. Try again in a " +
-                "minute, or email {{ support_email }} if it keeps failing."
+                "minute, or email {{ support_email | default('hello@knowsbeauty.com') }} if it keeps failing."
               );
             }
             submitBtn.disabled = false;

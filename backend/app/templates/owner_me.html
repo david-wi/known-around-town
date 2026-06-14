@@ -891,6 +891,7 @@
 
   function collectHours() {
     var entries = [];
+    var anyRowTouched = false;
     document.querySelectorAll('.hours-row').forEach(function (row) {
       var day    = row.dataset.day;
       var closed = row.querySelector('[data-role="closed"]').checked;
@@ -898,18 +899,25 @@
       var closes = (row.querySelector('[data-role="closes_at"]').value || '').trim();
       if (closed) {
         entries.push({ day: day, closed: true });
+        anyRowTouched = true;
       } else if (opens || closes) {
         entries.push({ day: day, opens_at: opens || null, closes_at: closes || null, closed: false });
+        anyRowTouched = true;
+      } else {
+        /* WHY: include days where both time fields were cleared and Closed is
+           unchecked, with null hours. Without this, clearing times to remove
+           hours for a specific day is silently ignored — the day is omitted
+           from the payload and the backend treats it as "no change". Sending
+           null opens_at/closes_at is the explicit instruction to clear them. */
+        entries.push({ day: day, opens_at: null, closes_at: null, closed: false });
       }
-      /* WHY: days with neither Closed checked nor any time entered are
-         omitted — they represent "not set yet" rather than "intentionally
-         closed", so we leave them out of the JSON-LD block rather than
-         emitting an entry with null times. */
     });
-    /* WHY: undefined means "no change to hours" — backend exclude_none=True
-       leaves existing hours untouched when the owner only updated their bio.
-       An empty array would silently clear all hours. */
-    return entries.length ? entries : undefined;
+    /* WHY: return undefined only when every row is completely empty (no hours
+       set anywhere, no Closed checked). This lets a save that only changes
+       phone or description skip the hours field entirely. Once any row has
+       real input (anyRowTouched), we send the full array including null-cleared
+       days so the backend sees the complete, authoritative hours picture. */
+    return anyRowTouched ? entries : undefined;
   }
 
   /* ── Services list management ───────────────────────────────── */
@@ -955,9 +963,13 @@
       var price = (row.querySelector('[data-role="price"]').value || '').trim();
       if (name) entries.push({ name: name, price: price || null });
     });
-    /* WHY: undefined means "no change to services" — same logic as hours.
-       A save that only updates phone leaves the service list untouched. */
-    return entries.length ? entries : undefined;
+    /* WHY: return [] (empty array) rather than undefined when all rows have
+       been removed. An empty array is an explicit instruction to clear the
+       service list; undefined means "don't touch this field" and the backend
+       (exclude_none=True) would leave old services in place. The early return
+       above (when servicesRows doesn't exist) still returns undefined, which
+       correctly leaves services untouched on pages without the services widget. */
+    return entries;
   }
 
   function setSubmitting(on) {
@@ -973,7 +985,9 @@
     setSubmitting(true);
 
     /* Send all text fields (including empty strings = "clear this field").
-       Hours uses undefined to mean "don't touch" vs an array of entries. */
+       Hours uses undefined to mean "don't touch" vs an array of entries.
+       Services: always an array ([] = clear all) when the widget is present;
+       undefined only when the widget doesn't exist in the DOM. */
     var payload = {
       phone:       form.querySelector('[name=phone]').value.trim(),
       website:     form.querySelector('[name=website]').value.trim(),
