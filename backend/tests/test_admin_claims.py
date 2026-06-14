@@ -359,11 +359,79 @@ def test_verify_claim_still_works(client, seeded_db):
     assert r.json() == {"status": "verified"}
     b_after = asyncio.run(seeded_db.businesses.find_one({"_id": business["_id"]}))
     assert b_after["claim_status"] == "verified"
-    # WHY: the owners page promises "Founding Partner" status to every early
-    # claimer. Without this assertion the badge could silently stop being set
-    # and the broken promise would go undetected until an owner checked their
-    # own listing and found it missing.
+    # WHY: with the default cap of 25 and only one business being verified here,
+    # 0 < 25 so the badge is still granted. This asserts the happy path still
+    # works after the cap-enforcement fix. Cap rejection is tested below.
     assert b_after.get("is_founding_partner") is True, (
-        "Verified claimers must receive Founding Partner status — "
-        "it is explicitly promised on the owners page."
+        "First verified claimer must receive Founding Partner status — "
+        "cap is 25 and this is the only verified claim in this test."
     )
+
+
+# ---- founding partner cap enforcement in verify_claim ------------------
+
+def test_verify_claim_does_not_grant_fp_badge_when_cap_full(seeded_db, monkeypatch):
+    """When the founding-partner cap is already reached, a newly-verified
+    claim in the same network must NOT receive the badge."""
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setenv("FOUNDING_PARTNER_CAP", "1")
+    try:
+        from app.main import app
+        c = TestClient(app)
+
+        # Mark the first business as already having the badge — cap is now full.
+        first_biz = _first_business(seeded_db)
+        network_id = first_biz.get("network_id")
+        asyncio.run(
+            seeded_db.businesses.update_one(
+                {"_id": first_biz["_id"]},
+                {"$set": {"is_founding_partner": True}},
+            )
+        )
+
+        # Find a second business in the SAME network so the scoped cap filter
+        # correctly sees 1 existing badge holder (cap is per-network; a business
+        # in a different network would see 0 and incorrectly receive the badge).
+        same_net: dict = {"city_id": {"$exists": True}, "_id": {"$ne": first_biz["_id"]}}
+        if network_id:
+            same_net["network_id"] = network_id
+        peers = asyncio.run(seeded_db.businesses.find(same_net).to_list(length=2))
+        assert peers, "Need at least two businesses in the same network to run this test"
+        second_biz = peers[0]
+
+        claim = _submit_claim(c, second_biz["_id"], submitter_email="late@example.com")
+        r = c.post(f"/api/v1/claims/{claim['_id']}/verify")
+        assert r.status_code == 200, r.text
+
+        b_after = asyncio.run(seeded_db.businesses.find_one({"_id": second_biz["_id"]}))
+        assert b_after["claim_status"] == "verified"
+        # WHY: cap is 1 and the slot is taken by first_biz — the second claimer
+        # must receive is_founding_partner: False (written explicitly, not absent)
+        # so the scarcity promised on the owners and pricing pages is real.
+        assert b_after.get("is_founding_partner") is False, (
+            "Founding Partner badge must not be granted when the cap is full."
+        )
+    finally:
+        get_settings.cache_clear()
+
+
+def test_verify_claim_grants_fp_badge_when_cap_not_yet_reached(seeded_db, monkeypatch):
+    """When slots are still available, a verified claim must receive the badge."""
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setenv("FOUNDING_PARTNER_CAP", "5")
+    try:
+        from app.main import app
+        c = TestClient(app)
+        business = _first_business(seeded_db)
+        claim = _submit_claim(c, business["_id"])
+        r = c.post(f"/api/v1/claims/{claim['_id']}/verify")
+        assert r.status_code == 200, r.text
+        b_after = asyncio.run(seeded_db.businesses.find_one({"_id": business["_id"]}))
+        # WHY: cap is 5, no existing badge holders, 0 < 5 — badge must be granted.
+        assert b_after.get("is_founding_partner") is True, (
+            "Founding Partner badge must be granted when slots remain."
+        )
+    finally:
+        get_settings.cache_clear()
