@@ -1,4 +1,5 @@
-"""Tests for site_settings.update_site_settings $set/$unset behaviour.
+"""Tests for site_settings.update_site_settings $set/$unset behaviour and
+individual setting getters.
 
 The key invariant: saving None for a text field removes it from the DB so
 the env-var default applies.  Saving "" instead would silently override the
@@ -9,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
-from app.services.site_settings import update_site_settings
+from app.services.site_settings import update_site_settings, get_ratings_min_review_count
 
 
 @pytest.fixture()
@@ -69,3 +70,57 @@ async def test_update_settings_all_none_uses_only_unset(mock_db):
     update_doc = args[1]
     assert "$unset" in update_doc
     assert "$set" not in update_doc
+
+
+# ── get_ratings_min_review_count ─────────────────────────────────────────────
+
+@pytest.fixture
+def mock_db_with_no_setting():
+    """DB has no ratings_min_review_count field — should fall back to default."""
+    db = MagicMock()
+    # find_one returns a doc without the key — simulates a fresh deployment
+    db.site_settings.find_one = AsyncMock(return_value={"_id": "global"})
+    return db
+
+
+@pytest.fixture
+def mock_db_with_setting(value):
+    """DB has a ratings_min_review_count field set to the given value."""
+    db = MagicMock()
+    db.site_settings.find_one = AsyncMock(
+        return_value={"_id": "global", "ratings_min_review_count": value}
+    )
+    return db
+
+
+@pytest.mark.asyncio
+async def test_ratings_min_review_count_defaults_to_20(mock_db_with_no_setting):
+    """When the DB has no saved threshold, the default of 20 is returned."""
+    with patch("app.services.site_settings.get_db", return_value=mock_db_with_no_setting):
+        result = await get_ratings_min_review_count()
+    assert result == 20
+
+
+@pytest.mark.asyncio
+async def test_ratings_min_review_count_returns_db_value():
+    """When the DB has a saved threshold, it overrides the default."""
+    db = MagicMock()
+    db.site_settings.find_one = AsyncMock(
+        return_value={"_id": "global", "ratings_min_review_count": 50}
+    )
+    with patch("app.services.site_settings.get_db", return_value=db):
+        result = await get_ratings_min_review_count()
+    assert result == 50
+
+
+@pytest.mark.asyncio
+async def test_ratings_min_review_count_casts_to_int():
+    """DB values stored as strings (e.g. from old form posts) are cast to int."""
+    db = MagicMock()
+    db.site_settings.find_one = AsyncMock(
+        return_value={"_id": "global", "ratings_min_review_count": "30"}
+    )
+    with patch("app.services.site_settings.get_db", return_value=db):
+        result = await get_ratings_min_review_count()
+    assert result == 30
+    assert isinstance(result, int)

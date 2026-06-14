@@ -410,3 +410,142 @@ class TestSyncRatingsPost:
         assert r.status_code == 303
         assert "/admin/sync" in r.headers["location"]
         assert "updated=" in r.headers["location"]
+
+
+# ── Business model hide_ratings field ────────────────────────────────────────
+
+class TestBusinessHideRatings:
+    def test_hide_ratings_defaults_to_false(self):
+        """New business records default to showing ratings (hide_ratings=False).
+
+        WHY: False default means a freshly synced rating appears on the listing
+        automatically without the admin having to opt in for every business.
+        The admin opts OUT on a per-business basis, which is the rare case.
+        """
+        from app.models import Business
+        b = Business(
+            network_id="net1",
+            city_id="city1",
+            slug="test-salon",
+            name="Test Salon",
+        )
+        assert b.hide_ratings is False
+
+    def test_hide_ratings_can_be_set_true(self):
+        """hide_ratings can be set to True to suppress rating display."""
+        from app.models import Business
+        b = Business(
+            network_id="net1",
+            city_id="city1",
+            slug="test-salon",
+            name="Test Salon",
+            hide_ratings=True,
+        )
+        assert b.hide_ratings is True
+
+    def test_hide_ratings_survives_model_round_trip(self):
+        """hide_ratings is preserved when the model is serialised and re-parsed."""
+        from app.models import Business
+        b = Business(
+            network_id="net1",
+            city_id="city1",
+            slug="test-salon",
+            name="Test Salon",
+            hide_ratings=True,
+        )
+        data = b.model_dump(by_alias=True)
+        b2 = Business(**data)
+        assert b2.hide_ratings is True
+
+
+# ── Admin settings page — ratings_min_review_count ───────────────────────────
+
+class TestAdminSettingsRatingsThreshold:
+    def test_settings_page_shows_ratings_min_field(self, seeded_db, monkeypatch):
+        """The admin settings page renders the ratings minimum review count field."""
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.api.v1._auth as _auth_module
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+
+        client = TestClient(app)
+        r = client.get("/admin/settings")
+        assert r.status_code == 200
+        assert "ratings_min_review_count" in r.text
+        assert "Minimum reviews" in r.text
+
+    def test_settings_page_saves_ratings_min(self, seeded_db, monkeypatch):
+        """POSTing a new threshold saves it and redirects with saved=1."""
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.api.v1._auth as _auth_module
+        from unittest.mock import AsyncMock, patch
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+
+        client = TestClient(app, follow_redirects=False)
+        with patch(
+            "app.routes.admin.settings_admin.update_site_settings",
+            new_callable=AsyncMock,
+        ) as mock_save:
+            r = client.post(
+                "/admin/settings",
+                data={
+                    "ratings_min_review_count": "35",
+                    "marketing_ai_enabled": "on",
+                },
+            )
+
+        assert r.status_code == 303
+        assert "saved=1" in r.headers["location"]
+        # Confirm the parsed integer (not the raw string) was sent to the DB
+        call_kwargs = mock_save.call_args[0][0]
+        assert call_kwargs.get("ratings_min_review_count") == 35
+
+    def test_settings_page_treats_blank_threshold_as_none(self, seeded_db, monkeypatch):
+        """Clearing the field (empty string) sends None so the DB $unsets it and the default of 20 kicks in."""
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.api.v1._auth as _auth_module
+        from unittest.mock import AsyncMock, patch
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+
+        client = TestClient(app, follow_redirects=False)
+        with patch(
+            "app.routes.admin.settings_admin.update_site_settings",
+            new_callable=AsyncMock,
+        ) as mock_save:
+            r = client.post(
+                "/admin/settings",
+                data={"ratings_min_review_count": ""},
+            )
+
+        assert r.status_code == 303
+        call_kwargs = mock_save.call_args[0][0]
+        # None causes $unset in the DB so the service falls back to its default of 20
+        assert call_kwargs.get("ratings_min_review_count") is None
+
+    def test_settings_page_rejects_out_of_range_threshold(self, seeded_db, monkeypatch):
+        """A threshold outside the valid 1–10000 range is treated as None (no change)."""
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.api.v1._auth as _auth_module
+        from unittest.mock import AsyncMock, patch
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+
+        client = TestClient(app, follow_redirects=False)
+        with patch(
+            "app.routes.admin.settings_admin.update_site_settings",
+            new_callable=AsyncMock,
+        ) as mock_save:
+            r = client.post(
+                "/admin/settings",
+                data={"ratings_min_review_count": "0"},
+            )
+
+        assert r.status_code == 303
+        call_kwargs = mock_save.call_args[0][0]
+        assert call_kwargs.get("ratings_min_review_count") is None

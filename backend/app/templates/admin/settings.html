@@ -154,6 +154,35 @@
         </p>
       </div>
 
+      {# ── Ratings minimum review count ── #}
+      <div class="px-6 py-5">
+        <label for="ratings-min" class="block font-medium text-stone-900 mb-1">
+          Minimum reviews to show a rating
+        </label>
+        <p class="text-sm text-stone-500 mb-3">
+          Google star ratings are only shown to visitors when a salon has <em>at least</em> this many
+          reviews. A 5-star average from 2 friends is noise; 4.7 from 20 strangers is a real signal.
+          Salons with fewer reviews have their rating hidden — not deleted — so it appears automatically
+          once they cross the threshold. The default of 20 matches industry-standard directory sites like Yelp.
+        </p>
+        <div class="flex items-center gap-3">
+          <input
+            type="number"
+            id="ratings-min"
+            name="ratings_min_review_count"
+            value="{{ ratings_min_review_count }}"
+            min="1"
+            max="10000"
+            placeholder="20"
+            class="w-32 border border-stone-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
+          >
+          <span class="text-sm text-stone-500">reviews required (default: 20)</span>
+        </div>
+        <p class="mt-1 text-xs text-stone-400">
+          Takes effect immediately — no server restart needed. Leave blank to reset to 20.
+        </p>
+      </div>
+
     </div>
 
     <div class="mt-6 flex justify-end">

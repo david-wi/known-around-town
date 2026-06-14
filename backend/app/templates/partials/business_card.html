@@ -29,9 +29,12 @@
         <h3 class="text-xl font-serif text-stone-900 leading-tight group-hover:{{ theme.accent_text_full }} transition-colors" style='font-family: Georgia, "Times New Roman", serif;'>{{ b.name }}</h3>
         {#- WHY: rating displayed inline under the name so it's visible without
             hover — Google star ratings are the single strongest trust signal
-            for a first-time visitor scanning a directory grid. Only shown when
-            a rating exists; blank is cleaner than a placeholder zero. #}
-        {% if b.google_rating %}
+            for a first-time visitor scanning a directory grid. Three conditions
+            must all be true: a rating must exist, the review count must meet
+            the site minimum (default 20) so a 5-star average from 2 people
+            isn't shown as social proof, and hide_ratings must not be set by
+            the admin. #}
+        {% if b.google_rating and not b.hide_ratings and (b.google_review_count or 0) >= (ratings_min_review_count or 20) %}
         <div class="flex items-center gap-1 mt-1">
           <span class="text-amber-500 text-[11px] leading-none">★</span>
           <span class="text-[11px] font-semibold text-stone-700">{{ "%.1f"|format(b.google_rating) }}</span>

@@ -21,6 +21,7 @@ from app.services.site_settings import (
     get_google_site_verification,
     get_marketing_ai_enabled,
     get_preview_mode_enabled,
+    get_ratings_min_review_count,
     get_support_email,
     update_site_settings,
 )
@@ -50,6 +51,7 @@ async def settings_page(
     preview_mode_enabled = await get_preview_mode_enabled()
     google_site_verification = await get_google_site_verification()
     support_email = await get_support_email()
+    ratings_min_review_count = await get_ratings_min_review_count()
 
     return _templates.TemplateResponse(
         "admin/settings.html",
@@ -59,6 +61,7 @@ async def settings_page(
             "preview_mode_enabled": preview_mode_enabled,
             "google_site_verification": google_site_verification,
             "support_email": support_email,
+            "ratings_min_review_count": ratings_min_review_count,
             "saved": saved == "1",
         },
     )
@@ -90,24 +93,42 @@ async def update_settings(
     # WHY: same reasoning — blank input means "use the default address", not
     # "set the support email to nothing".
     support_email = str(form.get("support_email") or "").strip() or None
+    # WHY: ratings_min_review_count is stored as an int. Blank input means
+    # "use the default of 20", so we $unset the DB key and the service falls
+    # back. Invalid (non-numeric) input is silently ignored by the int() cast
+    # with a try/except, keeping the existing DB value unchanged.
+    _rc_raw = str(form.get("ratings_min_review_count") or "").strip()
+    try:
+        ratings_min_review_count: Optional[int] = int(_rc_raw) if _rc_raw else None
+        # WHY: clamp to a sensible range (1–10000) so a typo can't set the
+        # threshold to 0 (shows every 1-review business) or a billion.
+        if ratings_min_review_count is not None and not (1 <= ratings_min_review_count <= 10000):
+            ratings_min_review_count = None
+    except (ValueError, TypeError):
+        ratings_min_review_count = None
 
     await update_site_settings({
         "marketing_ai_enabled": marketing_ai_enabled,
         "preview_mode_enabled": preview_mode_enabled,
         "google_site_verification": google_site_verification,
         "support_email": support_email,
+        "ratings_min_review_count": ratings_min_review_count,
     })
 
-    # WHY: the Jinja2 global was set at startup from the env-var value.
-    # When the admin saves a new address via the settings page, we update
-    # the global in-process so templates on the NEXT request immediately
-    # reflect the new address — no container restart required.
-    # If the field was cleared, fall back to the env-var default so the
-    # site always shows a real address rather than an empty mailto: link.
+    # WHY: the Jinja2 globals were set at startup from DB/env values.
+    # When the admin saves new values, we update the globals in-process so
+    # templates on the NEXT request immediately reflect the changes — no
+    # container restart required.
     if _templates is not None:
         from app.config import get_settings as _get_settings
         _templates.env.globals["support_email"] = (
             support_email or _get_settings().support_email
+        )
+        # WHY: refresh the in-process Jinja2 global so the new threshold
+        # takes effect immediately without a restart. Fall back to 20 if
+        # the field was cleared (None = use the service default).
+        _templates.env.globals["ratings_min_review_count"] = (
+            ratings_min_review_count if ratings_min_review_count is not None else 20
         )
 
     return RedirectResponse(url="/admin/settings?saved=1", status_code=303)

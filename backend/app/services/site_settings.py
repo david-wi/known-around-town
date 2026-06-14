@@ -107,6 +107,23 @@ async def get_google_site_verification() -> str:
     return get_settings().google_site_verification
 
 
+async def get_ratings_min_review_count() -> int:
+    """Return the minimum number of Google reviews required before a rating is shown.
+
+    DB value takes precedence. Falls back to 20 — enough reviews to make a
+    rating statistically meaningful (a 5-star average from 3 friends is noise;
+    4.7 from 20+ strangers is signal). Configurable so David can raise or lower
+    the bar without a code deploy.
+    """
+    db_val = await get_site_setting("ratings_min_review_count", default=None)
+    if db_val is not None:
+        return int(db_val)
+    # WHY: 20 reviews is the threshold used by several major directory sites
+    # (Yelp, Tripadvisor) to distinguish "signal" from "noise" ratings. Below
+    # this count, a single bad review can tank a 5-star business or vice versa.
+    return 20
+
+
 async def get_support_email() -> str:
     """Return the public-facing support email address.
 
