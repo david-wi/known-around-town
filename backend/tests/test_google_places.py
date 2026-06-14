@@ -749,6 +749,151 @@ class TestSyncRatingsPost:
 
 # ── Business model hide_ratings field ────────────────────────────────────────
 
+class TestStripCitySuffix:
+    """Unit tests for _strip_city_suffix — the name-cleaning helper.
+
+    WHY this test class exists: about 40 businesses have the city name appended
+    to their stored name ("Allure Medspa Aventura") or use a pipe/dash separator
+    ("DIPLOMATIC IV | Brickell"). Google's listing omits these extras, so the
+    full stored name doesn't match. The helper strips them so the sync can try
+    a cleaner name before giving up.
+    """
+
+    def _fn(self, name, city):
+        from app.routes.admin.sync_admin import _strip_city_suffix
+        return _strip_city_suffix(name, city)
+
+    def test_strips_trailing_city_name(self):
+        assert self._fn("Allure Medspa Aventura", "Aventura") == "Allure Medspa"
+
+    def test_strips_trailing_city_name_case_insensitive(self):
+        assert self._fn("Salon Del Sol WESTON", "Weston") == "Salon Del Sol"
+
+    def test_strips_pipe_separator(self):
+        assert self._fn("DIPLOMATIC IV | Brickell", "Brickell") == "DIPLOMATIC IV"
+
+    def test_strips_em_dash_separator(self):
+        assert self._fn("LaserAway — Doral", "Doral") == "LaserAway"
+
+    def test_strips_en_dash_separator(self):
+        assert self._fn("LaserAway – Doral", "Doral") == "LaserAway"
+
+    def test_returns_empty_when_nothing_to_strip(self):
+        """Names with no city suffix or separator produce no candidate — caller skips the extra call."""
+        assert self._fn("Allure Medspa", "Aventura") == ""
+
+    def test_returns_empty_when_name_is_just_city(self):
+        """Guard against stripping to an empty string, which would be a useless search."""
+        assert self._fn("Aventura", "Aventura") == ""
+
+    def test_does_not_strip_city_name_in_the_middle(self):
+        """Only trailing city suffix is stripped, not occurrences mid-name."""
+        result = self._fn("Aventura Hair Studio", "Aventura")
+        # "Aventura" is a prefix, not a suffix here — should not be stripped
+        assert result == ""
+
+    def test_pipe_takes_priority_over_city_suffix(self):
+        """Separator stripping runs before city-suffix stripping; first match wins."""
+        # "Salon Aventura | Brickell" — strip at the pipe, not by city name
+        result = self._fn("Salon | Aventura", "Aventura")
+        assert result == "Salon"
+
+
+class TestNameStrippingFallback:
+    """Integration test for the name-stripping fallback in the ratings sync.
+
+    WHY: the city-suffix stripping fallback only fires when:
+    1. The primary city search returns nothing
+    2. The neighborhood slug fallback also returns nothing
+    3. The business has no existing place_id
+
+    This test wires all three conditions to confirm the fallback is actually tried.
+    """
+
+    @pytest.fixture
+    async def city_suffix_db(self, mock_db):
+        """Insert a city and a business whose name includes the city as a suffix."""
+        city_id = "city-aventura"
+        await mock_db.cities.insert_one({"_id": city_id, "name": "Aventura", "slug": "aventura", "status": "live"})
+        await mock_db.networks.insert_one({"_id": "net-av", "name": "Beauty", "domain_suffix": "knowsbeauty.localhost"})
+        await mock_db.businesses.insert_one({
+            "_id": "biz-allure-aventura",
+            "name": "Allure Medspa Aventura",  # city suffix in name
+            "slug": "allure-medspa-aventura",
+            "city_id": city_id,
+            "network_id": "net-av",
+            "status": "live",
+            # no google_place_id — needs discovery
+        })
+        return mock_db
+
+    def test_stripped_name_tried_when_full_name_fails(self, city_suffix_db, monkeypatch):
+        """lookup_rating is called with the city-suffix stripped name when the full name fails.
+
+        WHY: confirms the fallback path actually fires and passes the cleaned name.
+        Without this fallback, "Allure Medspa Aventura" finds nothing on Google
+        because the listing is just "Allure Medspa".
+        """
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.api.v1._auth as _auth_module
+        import app.services.google_places as gp
+        from app.services.google_places import PlaceRating
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+        monkeypatch.setattr(gp, "is_configured", lambda: True)
+
+        call_log = []
+
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            call_log.append({"name": business_name, "city": city})
+            # Full name fails; stripped name succeeds
+            if business_name == "Allure Medspa":
+                return PlaceRating(place_id="ChIJ_allure", rating=4.6, review_count=305)
+            return None
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        client = TestClient(app, follow_redirects=False)
+        r = client.post("/admin/sync/ratings")
+        assert r.status_code == 303
+
+        names_tried = [c["name"] for c in call_log]
+        assert "Allure Medspa Aventura" in names_tried, "primary name was not tried"
+        assert "Allure Medspa" in names_tried, "stripped-name fallback was not tried"
+
+    def test_stripping_fallback_not_called_when_primary_succeeds(self, city_suffix_db, monkeypatch):
+        """The stripping fallback is NOT called when the primary search finds a result.
+
+        WHY: verifies no extra API call happens for businesses that match fine as-is.
+        """
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.api.v1._auth as _auth_module
+        import app.services.google_places as gp
+        from app.services.google_places import PlaceRating
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+        monkeypatch.setattr(gp, "is_configured", lambda: True)
+
+        call_log = []
+
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            call_log.append(business_name)
+            # Always succeed (primary hit)
+            return PlaceRating(place_id="ChIJ_found", rating=4.5, review_count=100)
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        client = TestClient(app, follow_redirects=False)
+        r = client.post("/admin/sync/ratings")
+        assert r.status_code == 303
+
+        # Only one call — the primary. Stripping fallback must not add an extra call.
+        assert len(call_log) == 1
+        assert call_log[0] == "Allure Medspa Aventura"
+
+
 class TestBusinessHideRatings:
     def test_hide_ratings_defaults_to_false(self):
         """New business records default to showing ratings (hide_ratings=False).

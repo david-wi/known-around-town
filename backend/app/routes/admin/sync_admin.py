@@ -46,6 +46,39 @@ def attach_templates(t: Jinja2Templates) -> None:
     _templates = t
 
 
+def _strip_city_suffix(name: str, city_name: str) -> str:
+    """Return a cleaned business name to try when the original Places search fails.
+
+    WHY: ~40 businesses in the seed data include the city name as a suffix
+    (e.g. "Allure Medspa Aventura") or a location qualifier after a separator
+    (e.g. "DIPLOMATIC IV | Brickell"). Google's Places listing omits these extras,
+    so searching the full stored name finds nothing. Stripping the city name or
+    separator suffix produces a search-friendly name that matches the Places record.
+    Returns the stripped name if stripping produced a change, or "" if unchanged
+    (so the caller can skip the extra API call when nothing would differ).
+    """
+    stripped = name.strip()
+
+    # Strip separators first: "DIPLOMATIC IV | Brickell" → "DIPLOMATIC IV"
+    # WHY: check separators before city-name suffix because a name like
+    # "LaserAway – Doral" needs the separator stripped, not just " Doral".
+    for sep in (" | ", " — ", " – ", " - "):
+        if sep in stripped:
+            candidate = stripped.split(sep)[0].strip()
+            if candidate and candidate.lower() != stripped.lower():
+                return candidate
+
+    # Strip trailing city name: "Allure Medspa Aventura" → "Allure Medspa"
+    city_lower = city_name.strip().lower()
+    name_lower = stripped.lower()
+    if city_lower and name_lower.endswith(" " + city_lower):
+        candidate = stripped[: -(len(city_lower) + 1)].strip()
+        if candidate:
+            return candidate
+
+    return ""
+
+
 async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> None:
     """Background coroutine: sync ratings for all businesses then log results.
 
@@ -110,6 +143,25 @@ async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> 
                             biz.get("name"), nbhd_name, city_name,
                         )
                         break
+
+            # WHY: name-suffix stripping fallback. ~40 businesses include the city
+            # name at the end of their stored name ("Allure Medspa Aventura") or use
+            # a pipe/dash separator ("DIPLOMATIC IV | Brickell"). Google's listing
+            # omits these extras, so searching the full stored name fails. Try a
+            # cleaned name before giving up.
+            if rating_result is None:
+                stripped_name = _strip_city_suffix(biz.get("name", ""), city_name)
+                if stripped_name:
+                    rating_result = await google_places.lookup_rating(
+                        business_name=stripped_name,
+                        city=city_name,
+                    )
+                    await asyncio.sleep(0.1)
+                    if rating_result:
+                        log.info(
+                            "Found %r via stripped-name fallback (tried %r in %r)",
+                            biz.get("name"), stripped_name, city_name,
+                        )
 
         if rating_result is None:
             if biz.get("google_place_id"):
