@@ -60,7 +60,10 @@ async def _build_copy(tenant: TenantContext) -> CopyResolver:
     )
 
 
-def _dedup_photos(businesses: list[dict]) -> list[dict]:
+def _dedup_photos(
+    businesses: list[dict],
+    seen: Optional[set[str]] = None,
+) -> list[dict]:
     """Remove duplicate photo URLs so no image appears twice on one page.
 
     WHY: When multiple businesses share the same stock photo URL (common in
@@ -68,8 +71,13 @@ def _dedup_photos(businesses: list[dict]) -> list[dict]:
     same photo was copy-pasted. Showing a neutral gray placeholder is better
     than visual repetition — the card still renders correctly, just without
     a hero image.
+
+    Pass a shared `seen` set to deduplicate across multiple sections of the
+    same page (e.g. Editor's Picks + Trending on the home page). When omitted
+    a fresh set is created, making dedup local to the single list.
     """
-    seen: set[str] = set()
+    if seen is None:
+        seen = set()
     result = []
     for b in businesses:
         photos = b.get("photos") or []
@@ -540,11 +548,13 @@ async def home(request: Request) -> HTMLResponse:
             ][:3]
 
     # Deduplicate photos across all home-page sections so the same stock image
-    # never appears twice on the page. Sequential order matters: a URL seen in
-    # editor_picks is also suppressed in trending and spotlight.
-    editor_picks = _dedup_photos(editor_picks)
-    trending = _dedup_photos(trending)
-    spotlight_businesses = _dedup_photos(spotlight_businesses)
+    # never appears twice on the page. A single shared set is passed through
+    # every call so a URL claimed by editor_picks is suppressed in trending,
+    # spotlight, and the neighborhood mini-lists.
+    _page_seen: set[str] = set()
+    editor_picks = _dedup_photos(editor_picks, _page_seen)
+    trending = _dedup_photos(trending, _page_seen)
+    spotlight_businesses = _dedup_photos(spotlight_businesses, _page_seen)
 
     # Two-column neighborhood mini-lists (city-configured only — wellness and
     # health intentionally don't show this section on the reference).
@@ -553,7 +563,7 @@ async def home(request: Request) -> HTMLResponse:
         nb = await content_svc.get_neighborhood(city["_id"], col["slug"])
         if not nb:
             continue
-        nb_biz = _dedup_photos(_resolve_by_slug(all_live, col.get("business_slugs") or []))
+        nb_biz = _dedup_photos(_resolve_by_slug(all_live, col.get("business_slugs") or []), _page_seen)
         columns.append({"name": nb["name"], "slug": col["slug"], "businesses": nb_biz})
 
     search_chips = city.get("search_chips") or []
