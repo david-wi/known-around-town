@@ -174,7 +174,7 @@ BUSINESSES: List[Dict[str, Any]] = [
 
 async def seed_downtown_miami() -> None:
     now = datetime.now(tz=timezone.utc)
-    db = await get_db()
+    db = get_db()
 
     network = await db.networks.find_one({"slug": NETWORK_SLUG})
     if not network:
