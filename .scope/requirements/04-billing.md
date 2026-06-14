@@ -70,3 +70,13 @@ contacting David. The portal URL is returned by `POST /api/v1/billing/portal`.
 then they are redirected to Stripe's customer portal; given a non-subscriber, then
 the button is not shown.
 **Blocked on:** David must enable the portal at stripe.com/settings/billing/portal.
+
+### KAT-048 — Pricing page CTA above the fold · V1 · implemented
+**Persona:** Salon Owner (considering upgrading).
+The Featured pricing card ($29/month) shows a "Claim your listing" call-to-action
+button immediately after the price — before the 12-item feature list — so owners
+can act without scrolling. A second CTA at the bottom of the feature list is also
+retained for owners who read through all the details first.
+**Acceptance:** Given a visitor on `/pricing`, when the page first loads at 1440×900
+viewport, then the Featured card and its "Claim your listing" button are both visible
+without scrolling.
