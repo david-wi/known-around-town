@@ -94,9 +94,17 @@
           </p>
         </div>
         {% endif %}
-        <p class="text-sm text-stone-700 leading-relaxed mb-6">
+        <p class="text-sm text-stone-700 leading-relaxed mb-4">
           Control how you appear. Get the marketing AI tools that bring bookings to the door.
         </p>
+        {#- WHY: CTA appears before the feature list so salon owners can claim
+            immediately after seeing the price — without scrolling through 12
+            bullet points. The second CTA at the bottom stays for owners who
+            read through the full list first. #}
+        <a class="inline-flex items-center justify-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm mb-6"
+           href="/owners#claim-form">
+          Claim your listing <span aria-hidden="true">→</span>
+        </a>
         <ul class="space-y-3 text-sm text-stone-700 leading-relaxed mb-8">
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong>Everything in Free</strong>, plus:</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong>✦ Featured listing badge</strong> visible to every visitor browsing the directory — your listing stands out at a glance.</span></li>
