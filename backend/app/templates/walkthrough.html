@@ -19,7 +19,9 @@
 {# ----- Hero ----- #}
 <section class="bg-stone-50/60 border-b border-stone-200/60">
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-20 lg:py-24 text-center">
-    <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-5">For Owners</p>
+    {# WHY: Main domain showed "For Salon Owners" but city subdomains showed the shorter "For Owners".
+       Standardized to "For Salon Owners" everywhere to match the main domain nav. #}
+    <p class="text-[11px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-5">For Salon Owners</p>
     <h1 class="font-light text-stone-900 leading-[1.05] tracking-tight mb-6"
         style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2rem, 4vw, 3.25rem); font-weight: 300;'>
       From listed to thriving —<br>
