@@ -1318,7 +1318,9 @@ async def owners_page(
             biz = await content_svc.get_business(city_id, slug)
             if biz:
                 prefill = {
-                    "id": biz["_id"],
+                    # WHY: cast to str so the dict survives tojson in the
+                    # Jinja template — MongoDB ObjectIds are not JSON-serialisable.
+                    "id": str(biz["_id"]),
                     "name": biz.get("name", ""),
                     "slug": biz.get("slug", ""),
                 }
@@ -1327,7 +1329,9 @@ async def owners_page(
         # we'd want a real server-side search endpoint instead.
         live = await content_svc.list_businesses(city_id, limit=500)
         directory = [
-            {"id": b["_id"], "name": b.get("name", ""), "slug": b.get("slug", "")}
+            # WHY: cast _id to str — ObjectId is not JSON-serialisable and
+            # the template passes this list straight through tojson.
+            {"id": str(b["_id"]), "name": b.get("name", ""), "slug": b.get("slug", "")}
             for b in live
             if b.get("name")
         ]
