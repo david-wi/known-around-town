@@ -148,6 +148,45 @@ All public-facing pages now have og:image and twitter:image. Base template rende
 - **`www.knowsbeauty.com` DNS** currently returns 410 — needs to point at the correct server
 - **Design-partner outreach**: 10 draft DMs/emails ready; need per-message approval before sending
 
+## Email HTML — Outlook Compatibility (PR #301, 2026-06-14)
+
+Email HTML rendered by `_inquiry_owner_html()` (and all future transactional emails) must use these Outlook-safe patterns:
+
+- **No `display: flex` or `gap`** — Outlook 2007–2019 uses Word's HTML renderer which ignores these. Use `display: inline-block` with `margin-right` for side-by-side elements.
+- **No `white-space: pre-wrap`** — Outlook strips it. Convert newlines to `<br>` tags instead: `html.escape(msg).replace("\r\n","<br>").replace("\r","<br>").replace("\n","<br>")`. Apply after html.escape (not before) so the injected `<br>` tags aren't escaped.
+- **URL-encode email in mailto hrefs** — `urllib.parse.quote(email, safe="@")` then `html.escape()`. The `+` in `user+tag@example.com` must become `%2B`; without quote() it would be treated as a space by some mail clients.
+- **HTML-escape all URLs used in `href` attributes** — `html.escape(url)` so `&` in query strings renders as `&amp;` and doesn't produce invalid HTML.
+- **Pre-compute variables before the main f-string** — the mailto button is built as a string variable (`reply_button_html`) before the return statement to avoid nested f-string quoting issues.
+
+## City ID Data Quality — Three Formats Caused Invisible Businesses (2026-06-14)
+
+174 of 706 live businesses were invisible on their city pages because `city_id` was stored in three different formats across different import scripts, but the routing code only handles string UUIDs:
+
+1. **String slug as ID** (`"hollywood-fl"`) — 22 businesses. Some cities were created with their slug as the `_id` field. Businesses imported against these cities stored the slug string as `city_id`.
+2. **MongoDB ObjectId as ID** — 152 businesses across 7 cities (Doral, Pompano Beach, Hialeah, Plantation, Pembroke Pines, Weston, Miramar). Cities were created without explicit `_id`, so MongoDB auto-assigned ObjectId values. Businesses stored the raw ObjectId as `city_id`.
+3. **Correct format**: string UUID like `"eb913a29-f2d2-4f86-af0f-2deca3be3578"` — all others.
+
+**Migration pattern for ObjectId cities** (unique index prevents simultaneous old+new):
+1. Delete old ObjectId city record
+2. Insert new UUID city record (same fields, new `_id`)
+3. Update businesses: `update_many({"city_id": old_objectid}, {"$set": {"city_id": new_uuid}})`
+4. Sync `listed_count` for the new record
+
+**Hollywood slug issue**: city was stored with slug `"hollywood-fl"` but Traefik routes `hollywood.knowsbeauty.com` — slug didn't match subdomain. Renamed slug to `"hollywood"` after migrating to UUID `_id`.
+
+**To check for future problems**: `count_documents` where `city_id` doesn't match UUID regex `^[0-9a-f]{8}-`. If count > 0, run the migration.
+
+## Traefik Routing — New City Subdomains Need Explicit Host() Rules
+
+Wildcard DNS (`*.knowsbeauty.com`) sends ALL subdomains to the server, but Traefik only issues SSL certificates for hosts listed in its routing labels. Two cities (Downtown Miami, North Miami Beach) had full pages in the database but received no HTTPS traffic because they were missing from `docker-compose.prod.yml`.
+
+Pattern to add a new city subdomain:
+1. Add `|| Host(`<slug>.knowsbeauty.com`)` to the existing beauty router rule in `docker-compose.prod.yml`
+2. SCP the updated file to `/opt/known-around-town/docker-compose.prod.yml` on the server
+3. Run `docker compose -f /opt/known-around-town/docker-compose.prod.yml up -d` — Traefik picks up the new labels and requests a cert automatically
+
+Watchtower only restarts the app container when the Docker image changes — it does NOT update the compose file itself. The compose file must be manually copied to the server whenever routing rules change.
+
 ## Sitemap — Neighborhood+Category Intersection Pages (PR #91, 2026-06-10)
 
 - The sitemap listed individual neighborhood pages (`/n/wynwood`) and category pages (`/c/hair`) but was missing the intersection pages (`/n/wynwood/c/hair`). 92 pages with real businesses were invisible to Google's sitemap crawler.
