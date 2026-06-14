@@ -316,18 +316,26 @@
 {% if photos %}
 <section class="max-w-7xl mx-auto px-6 lg:px-10">
   <div class="grid grid-cols-12 gap-3 rounded-3xl overflow-hidden h-[460px] lg:h-[540px]">
-    <div class="col-span-12 lg:col-span-7 bg-cover bg-center bg-stone-100" style='background-image: url("{{ hero_photo_url }}");'></div>
+    <div class="col-span-12 lg:col-span-7 bg-cover bg-center bg-stone-100 cursor-pointer" onclick="openLightbox(0)" style='background-image: url("{{ hero_photo_url }}");'></div>
     {% if photos|length > 1 %}
     <div class="hidden lg:grid col-span-5 grid-cols-2 grid-rows-2 gap-3">
       {% for p in photos[:4] %}
       {#- WHY: same dual-format guard — resolve p to a URL whether it is a string or dict #}
       {% set p_url = p.url if (p and p is mapping) else p %}
-      <div class="bg-cover bg-center bg-stone-100 transition {% if loop.first %}opacity-100 ring-2 {{ theme.ring_accent }}{% else %}opacity-80 hover:opacity-100{% endif %}" style='background-image: url("{{ p_url }}");'></div>
+      <div class="bg-cover bg-center bg-stone-100 transition cursor-pointer {% if loop.first %}opacity-100 ring-2 {{ theme.ring_accent }}{% else %}opacity-80 hover:opacity-100{% endif %}" onclick="openLightbox({{ loop.index0 }})" style='background-image: url("{{ p_url }}");'></div>
       {% endfor %}
     </div>
     {% endif %}
   </div>
-  {% if photos|length > 1 %}<div class="text-center mt-3 text-xs text-stone-500">1 / {{ photos|length }}</div>{% endif %}
+  {% if photos|length > 1 %}<div class="text-center mt-3 text-xs text-stone-500">Click any photo to view all {{ photos|length }} photos</div>{% endif %}
+{#- Serialise all photo URLs into a data attribute so the lightbox JS can read
+    them at runtime without an extra network request. WHY: Jinja2 builds the
+    array at render time so there's no AJAX round-trip needed for navigation. #}
+{%- set _all_urls = [] %}
+{%- for p in photos %}
+  {%- set _ = _all_urls.append(p.url if (p and p is mapping) else p) %}
+{%- endfor %}
+<div id="gallery-data" class="hidden" data-photos="{{ _all_urls | tojson }}"></div>
 </section>
 {% endif %}
 
@@ -712,6 +720,85 @@
       submitBtn.disabled = false;
       submitBtn.textContent = 'Send message';
     }
+  });
+})();
+</script>
+
+{#- Photo lightbox overlay — hidden until openLightbox(idx) is called.
+    WHY: placed here (after the inquiry form script) so it renders after all
+    main content and the fixed overlay sits on top of everything via z-50. #}
+<div id="photo-lightbox"
+     class="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center hidden"
+     onclick="closeLightbox(event)"
+     role="dialog"
+     aria-modal="true"
+     aria-label="Photo viewer">
+  <button class="absolute top-4 right-4 text-white/70 hover:text-white text-3xl leading-none z-10 p-2"
+          onclick="closeLightbox()"
+          aria-label="Close photo viewer">✕</button>
+  <button id="lb-prev"
+          class="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl leading-none z-10 p-3 hidden"
+          onclick="lightboxNav(-1)"
+          aria-label="Previous photo">‹</button>
+  <button id="lb-next"
+          class="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl leading-none z-10 p-3 hidden"
+          onclick="lightboxNav(1)"
+          aria-label="Next photo">›</button>
+  <img id="lb-img"
+       src=""
+       alt="Salon photo"
+       class="max-h-[90vh] max-w-[90vw] object-contain rounded-xl shadow-2xl"
+       onclick="event.stopPropagation()">
+  <div id="lb-counter" class="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-sm"></div>
+</div>
+<script>
+(function () {
+  var photos = [];
+  try {
+    var el = document.getElementById('gallery-data');
+    if (el) photos = JSON.parse(el.dataset.photos || '[]');
+  } catch (e) { console.warn('gallery-data parse error', e); }
+
+  var overlay = document.getElementById('photo-lightbox');
+  var img     = document.getElementById('lb-img');
+  var counter = document.getElementById('lb-counter');
+  var prevBtn = document.getElementById('lb-prev');
+  var nextBtn = document.getElementById('lb-next');
+  var current = 0;
+
+  function show(idx) {
+    if (!photos.length) return;
+    current = ((idx % photos.length) + photos.length) % photos.length;
+    img.src = photos[current];
+    counter.textContent = (current + 1) + ' / ' + photos.length;
+    prevBtn.classList.toggle('hidden', photos.length < 2);
+    nextBtn.classList.toggle('hidden', photos.length < 2);
+  }
+
+  window.openLightbox = function (idx) {
+    show(idx);
+    overlay.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  };
+  window.closeLightbox = function (e) {
+    // WHY: only close when the click lands on the dark backdrop itself, not on
+    // the image or nav buttons — otherwise clicking the image dismisses the lightbox.
+    if (e && e.target !== overlay) return;
+    overlay.classList.add('hidden');
+    document.body.style.overflow = '';
+  };
+  window.lightboxNav = function (dir) {
+    show(current + dir);
+  };
+
+  // WHY: keyboard nav is essential for accessibility — sighted keyboard users
+  // and screen-reader users rely on Escape to dismiss overlays; left/right
+  // arrows are the universal convention for photo galleries.
+  document.addEventListener('keydown', function (e) {
+    if (overlay.classList.contains('hidden')) return;
+    if (e.key === 'Escape') { overlay.classList.add('hidden'); document.body.style.overflow = ''; }
+    if (e.key === 'ArrowLeft')  { lightboxNav(-1); }
+    if (e.key === 'ArrowRight') { lightboxNav(1); }
   });
 })();
 </script>
