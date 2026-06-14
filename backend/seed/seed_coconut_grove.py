@@ -665,6 +665,25 @@ BUSINESSES: List[Dict[str, Any]] = [
             {"name": "Lash Tint", "price_range": "$25–$35"},
         ],
     },
+
+    # ── WAXING — WEST COCONUT GROVE ──────────────────────────────────────────
+    {
+        "name": "European Wax Center — Coconut Grove",
+        "slug": "european-wax-center-coconut-grove",
+        "category_slugs": ["waxing"],
+        "neighborhood_slugs": ["west-coconut-grove"],
+        "address": {"street": "3250 SW 22nd St", "city": "Miami", "state": "FL", "postal_code": "33133", "country": "US"},
+        "phone": "(786) 600-3929",
+        "website": "https://waxcenter.com",
+        "short_description": (
+            "The Coconut Grove outpost of the national waxing brand, located on "
+            "SW 22nd Street on the western edge of the neighborhood. Uses their "
+            "proprietary Comfort Wax formula and offers full-body waxing services "
+            "with online booking and a membership program for regular clients."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
 ]
 
 async def seed_coconut_grove() -> None:
