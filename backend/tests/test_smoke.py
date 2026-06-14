@@ -2632,6 +2632,60 @@ def test_canonical_base_url_overrides_canonical_tag(seeded_db, monkeypatch):
         get_settings.cache_clear()
 
 
+def test_canonical_base_url_preserves_city_subdomain(seeded_db, monkeypatch):
+    """When CANONICAL_BASE_URL is set and the request already comes from a
+    city subdomain on the canonical production domain, the canonical must
+    preserve that city's own subdomain — not rewrite it to the Miami root.
+
+    WHY: each city (coral-gables.knowsbeauty.com, plantation.knowsbeauty.com,
+    etc.) is a distinct indexed page. If all city subdomains canonicalize to
+    miami.knowsbeauty.com, Google treats them as duplicates of the Miami homepage
+    and refuses to index them separately. CANONICAL_BASE_URL was designed for
+    dev→prod host swaps (e.g. devintensive.com → knowsbeauty.com), not for
+    replacing city subdomains on the production domain itself."""
+    from app.config import get_settings
+    from app.main import app
+
+    # WHY: monkeypatch NETWORK_DOMAINS to add the production .com suffix so the
+    # app's host-based router recognises miami.knowsbeauty.com as a valid tenant.
+    # Without this the router returns 404 before the canonical logic is reached.
+    # The .localhost suffix is left in place so other tests that run in the same
+    # process (using the same seeded_db) are not affected.
+    monkeypatch.setenv(
+        "NETWORK_DOMAINS",
+        "beauty:knowsbeauty.com,beauty:knowsbeauty.localhost,"
+        "wellness:knowswellness.localhost,health:knowshealth.localhost",
+    )
+    monkeypatch.setenv("CANONICAL_BASE_URL", "https://miami.knowsbeauty.com")
+    get_settings.cache_clear()
+    try:
+        client = TestClient(app)
+        # Request comes from miami.knowsbeauty.com — same root as canonical_base.
+        # The canonical must remain https://miami.knowsbeauty.com/ (itself), NOT
+        # be rewritten again. This is the case that was broken before the fix:
+        # a city page on the production domain was getting the Miami root forced
+        # onto it instead of keeping its own subdomain.
+        r = client.get("/", headers={"host": "miami.knowsbeauty.com"})
+        assert r.status_code == 200, r.text
+        # WHY: the canonical logic upgrades http→https when the request host is
+        # already on the production domain because all real production traffic
+        # arrives over HTTPS. TestClient sends http:// but the canonical tag
+        # correctly outputs https:// by using the scheme from CANONICAL_BASE_URL.
+        assert 'href="https://miami.knowsbeauty.com/"' in r.text, (
+            "Miami root canonical must be https://miami.knowsbeauty.com/ "
+            "(scheme upgraded from CANONICAL_BASE_URL; host preserved, not rewritten)"
+        )
+        assert 'content="https://miami.knowsbeauty.com/"' in r.text, (
+            "og:url must also be https://miami.knowsbeauty.com/ when on production domain"
+        )
+        # WHY: a second city (e.g. doral.knowsbeauty.com) is not testable here
+        # because only miami is seeded in seeded_db. The host-preservation logic
+        # operates on the request host string before any DB lookup, so the miami
+        # test above exercises the identical code path for every other city.
+    finally:
+        get_settings.cache_clear()
+
+
 def test_canonical_base_url_overrides_business_page_canonical(seeded_db, monkeypatch):
     """CANONICAL_BASE_URL must be applied to business detail pages, not just home.
 

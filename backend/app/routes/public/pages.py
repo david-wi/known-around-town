@@ -180,17 +180,45 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
     canonical_url: Optional[str] = page_url if page_url.startswith("http") else None
 
     canonical_base = get_settings().canonical_base_url.rstrip("/")
+    request_host = request.headers.get("host", "")
     if canonical_base and canonical_url:
-        # WHY: query params and fragments are never part of a canonical URL —
-        # the .split("?")[0] strip on page_url (above) already ensures
-        # canonical_url has no query string at this point. We use urlparse to
-        # extract the path cleanly regardless, without worrying about edge-case
-        # parse errors (urlparse never raises on any string input).
-        # Fragments are intentionally dropped: they are client-side anchor
-        # references, never sent to the server, and should not appear in
-        # canonical declarations per Google's guidance.
+        # WHY: CANONICAL_BASE_URL has two different jobs depending on who is
+        # making the request:
+        #
+        # (A) Dev/staging host (e.g. *.ai.devintensive.com or *.knowsbeauty.localhost):
+        #     Replace the entire origin — both hostname AND scheme — with the
+        #     canonical base. This makes staging pages declare the production
+        #     .com URL as their canonical, so Google doesn't index the dev
+        #     subdomain.
+        #
+        # (B) Production host (e.g. doral.knowsbeauty.com, miami.knowsbeauty.com):
+        #     Keep the request's own subdomain (so each city stays distinct) but
+        #     upgrade the scheme to HTTPS when the canonical base is HTTPS.
+        #     Without the scheme upgrade the canonical would be "http://..." but
+        #     all production traffic arrives over HTTPS — mismatched scheme causes
+        #     Google to treat http and https versions as separate URLs.
+        #     DO NOT replace the host with canonical_base's host — that would
+        #     make doral.knowsbeauty.com declare miami.knowsbeauty.com as its
+        #     canonical, causing Google to treat all 22 city pages as duplicates
+        #     of the Miami homepage.
+        canonical_base_parsed = urlparse(canonical_base)
+        canonical_base_netloc = canonical_base_parsed.netloc  # e.g. "miami.knowsbeauty.com"
+        canonical_scheme = canonical_base_parsed.scheme       # e.g. "https"
+        # Derive the apex domain by stripping the leftmost label so we match
+        # any city subdomain (doral.knowsbeauty.com, plantation.knowsbeauty.com, …).
+        canonical_apex = ".".join(canonical_base_netloc.rsplit(".", 2)[-2:])  # "knowsbeauty.com"
+        host_is_canonical_domain = (
+            request_host == canonical_apex
+            or request_host.endswith("." + canonical_apex)
+        )
         parsed = urlparse(canonical_url)
-        canonical_url = canonical_base + (parsed.path or "/")
+        if host_is_canonical_domain:
+            # Case B: already on the right domain — keep the city subdomain,
+            # just ensure the scheme matches the canonical (http→https upgrade).
+            canonical_url = f"{canonical_scheme}://{request_host}{parsed.path or '/'}"
+        else:
+            # Case A: dev/staging host — replace origin with canonical base.
+            canonical_url = canonical_base + (parsed.path or "/")
 
     return {
         "request": request,
