@@ -440,6 +440,13 @@ async def seed_hallandale_beach() -> None:
             "the main boulevard, upscale salons inside Village at Gulfstream, "
             "and boutique med-spas in the waterfront Golden Isles enclave."
         ),
+        "meta_description": (
+            "The curated beauty directory for Hallandale Beach, Florida — salons, spas, "
+            "nail bars, and lash studios discovered by locals. Covering Hallandale Beach "
+            "Boulevard, the Village at Gulfstream Park, and the Golden Isles waterfront."
+        ),
+        "tagline": "Hallandale Beach's most trusted beauty addresses.",
+        "seo_title": "Hallandale Beach Knows Beauty",
         "hero_description": (
             "Between the racetrack glamour of Gulfstream Park and the Intracoastal "
             "calm of Golden Isles, Hallandale Beach has a beauty scene as varied "
