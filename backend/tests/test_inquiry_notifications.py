@@ -5,6 +5,8 @@ Three scenarios:
   2. Unclaimed business (no session, no verified claim) → admin receives email
   3. Email failure → submission still succeeds (fire-and-forget)
   4. Unknown business → 404
+
+Plus unit tests for the HTML email template (reply-button rendering).
 """
 
 from __future__ import annotations
@@ -136,6 +138,70 @@ def test_inquiry_succeeds_even_if_notification_raises(client, seeded_db):
 def test_inquiry_404_for_unknown_business(client, seeded_db):
     r = _submit(client, "non-existent-biz-id")
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# HTML template unit tests — reply button rendering
+# ---------------------------------------------------------------------------
+
+def _make_html(visitor_email=None, visitor_phone=None, message="Hello", business_name="Test Salon", visitor_name="Jane"):
+    from app.services.owner_email import _inquiry_owner_html  # type: ignore[attr-defined]
+    return _inquiry_owner_html(
+        business_name=business_name,
+        visitor_name=visitor_name,
+        visitor_email=visitor_email,
+        visitor_phone=visitor_phone,
+        message=message,
+        dashboard_url="https://miami.knowsbeauty.com/owners/me",
+    )
+
+
+def test_reply_button_present_when_email_provided():
+    html_out = _make_html(visitor_email="jane@example.com")
+    assert "Reply to Jane" in html_out
+    assert "mailto:jane@example.com" in html_out
+    assert "Re%3A%20Your%20inquiry%20about%20Test%20Salon" in html_out or "Re:" in html_out
+
+
+def test_reply_button_absent_when_no_email():
+    html_out = _make_html(visitor_email=None)
+    assert "Reply to" not in html_out
+    assert "mailto:" not in html_out
+
+
+def test_reply_button_email_with_plus_sign():
+    """Email addresses with + (e.g. user+tag@example.com) must be URL-encoded in href."""
+    html_out = _make_html(visitor_email="user+tag@example.com")
+    # The + must be encoded as %2B in the href so it is not treated as a space
+    assert "user%2Btag@example.com" in html_out or "mailto:user%2Btag" in html_out
+
+
+def test_dashboard_url_html_escaped():
+    """dashboard_url must be HTML-escaped so & in query strings renders as &amp;."""
+    from app.services.owner_email import _inquiry_owner_html  # type: ignore[attr-defined]
+    html_out = _inquiry_owner_html(
+        business_name="Salon",
+        visitor_name="Jane",
+        visitor_email=None,
+        visitor_phone=None,
+        message="Hi",
+        dashboard_url="https://miami.knowsbeauty.com/owners/me?foo=1&bar=2",
+    )
+    assert "&amp;bar=2" in html_out
+    assert 'href="https://miami.knowsbeauty.com/owners/me?foo=1&bar=2"' not in html_out
+
+
+def test_message_newlines_rendered_as_br():
+    """Multi-line visitor messages must use <br> so they render in Outlook."""
+    html_out = _make_html(message="Line one\nLine two\r\nLine three")
+    assert "Line one<br>Line two<br>Line three" in html_out
+    assert "white-space: pre-wrap" not in html_out
+
+
+def test_xss_in_visitor_name_escaped():
+    html_out = _make_html(visitor_name="<script>alert(1)</script>", visitor_email="x@y.com")
+    assert "<script>" not in html_out
+    assert "&lt;script&gt;" in html_out
 
 
 # ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ from __future__ import annotations
 import html
 import logging
 import os
+import urllib.parse
 from typing import Optional
 
 import httpx
@@ -944,14 +945,34 @@ def _inquiry_owner_html(
     safe_name = html.escape(visitor_name)
     safe_email = html.escape(visitor_email or "")
     safe_phone = html.escape(visitor_phone or "")
-    safe_msg = html.escape(message)
+    # WHY: escape first, then replace newlines with <br> — reversing the order would
+    # escape the injected tags. Handle \r\n (Windows), \r (old Mac), and \n (Unix).
+    safe_msg = html.escape(message).replace("\r\n", "<br>").replace("\r", "<br>").replace("\n", "<br>")
+    safe_dashboard_url = html.escape(dashboard_url)
 
     contact_rows = ""
+    # WHY: pre-build the reply button outside the main f-string to avoid nested
+    # f-string quoting issues. The mailto subject is URL-encoded so business
+    # names with spaces or special chars don't break the URI.
+    reply_button_html = ""
     if visitor_email:
+        subject = urllib.parse.quote(f"Re: Your inquiry about {business_name}", safe="")
+        # WHY: URL-encode email before HTML-escaping for href — safe="@" preserves
+        # the required @ sign while encoding chars that would break the mailto URI
+        # (e.g. + in user+tag@example.com would otherwise be treated as a space).
+        safe_email_href = html.escape(urllib.parse.quote(visitor_email, safe="@"))
+        reply_button_html = (
+            f'<a href="mailto:{safe_email_href}?subject={subject}"'
+            f' style="display: inline-block; background: #be185d; color: #ffffff; font-size: 14px;'
+            f' font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;'
+            f' margin-right: 12px;">'
+            f"Reply to {safe_name} &rarr;"
+            f"</a>"
+        )
         contact_rows += (
             f"<tr><td style='padding: 6px 0; color: #78716c; width: 80px;'>Email</td>"
             f"<td style='padding: 6px 0;'>"
-            f"<a href='mailto:{safe_email}' style='color: #be185d;'>{safe_email}</a>"
+            f"<a href='mailto:{safe_email_href}' style='color: #be185d;'>{safe_email}</a>"
             f"</td></tr>"
         )
     if visitor_phone:
@@ -961,7 +982,7 @@ def _inquiry_owner_html(
         )
 
     return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
+<html lang="en"><head><meta charset="utf-8"><title>New inquiry for {safe_business}</title></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
               background: #f8f5f2; padding: 32px; color: #1c1917;">
   <div style="max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 16px;
@@ -983,11 +1004,14 @@ def _inquiry_owner_html(
       {contact_rows}
     </table>
     <div style="background: #f8f5f2; border-radius: 8px; padding: 16px; margin: 0 0 24px;
-                font-size: 15px; color: #1c1917; line-height: 1.7; white-space: pre-wrap;">{safe_msg}</div>
-    <a href="{dashboard_url}"
-       style="display: inline-block; background: #be185d; color: #ffffff; font-size: 14px;
-              font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">
-      View in dashboard →
-    </a>
+                font-size: 15px; color: #1c1917; line-height: 1.7;">{safe_msg}</div>
+    <div>
+      {reply_button_html}<a href="{safe_dashboard_url}"
+         style="display: inline-block; background: #ffffff; color: #1c1917; font-size: 14px;
+                font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;
+                border: 1.5px solid #e7e5e4;">
+        View in dashboard &rarr;
+      </a>
+    </div>
   </div>
 </body></html>"""
