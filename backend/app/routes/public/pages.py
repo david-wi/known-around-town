@@ -1094,11 +1094,16 @@ async def business_page(
     # WHY: surface guides that feature this business so visitors can discover related
     # editorial content and so Google sees bidirectional link equity between listing pages
     # and the guides they appear in. Capped at 5 to keep the section scannable.
+    # The $or checks both featured_business_ids (UUID, for older guides) and
+    # business_slugs (slug, for guides published via the editorial API).
     related_guides = await get_db().editorial_guides.find(
         {
             "city_id": city["_id"],
             "status": "live",
-            "featured_business_ids": business["_id"],
+            "$or": [
+                {"featured_business_ids": business["_id"]},
+                {"business_slugs": business["slug"]},
+            ],
         },
         {"slug": 1, "title": 1, "_id": 0},
     ).to_list(length=5)
@@ -1180,6 +1185,15 @@ async def editorial_guide_page(request: Request, slug: str) -> HTMLResponse:
     if guide.get("featured_business_ids"):
         cur = content_svc.get_db().businesses.find(
             {"_id": {"$in": guide["featured_business_ids"]}}
+        )
+        featured = await cur.to_list(length=20)
+    # WHY: fall back to slug-based lookup when featured_business_ids is absent.
+    # Guides published via the editorial API use business_slugs (human-readable)
+    # rather than internal UUIDs. Both paths produce the same result for the
+    # "Featured in this guide" section and the ItemList JSON-LD block.
+    if not featured and guide.get("business_slugs"):
+        cur = content_svc.get_db().businesses.find(
+            {"city_id": city["_id"], "slug": {"$in": guide["business_slugs"]}}
         )
         featured = await cur.to_list(length=20)
 

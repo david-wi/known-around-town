@@ -347,6 +347,12 @@ class EditorialGuide(BaseModel):
     author: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     featured_business_ids: List[str] = Field(default_factory=list)
+    # WHY: business_slugs lets guide authors reference businesses by slug
+    # (the human-readable URL key) rather than requiring the internal UUID.
+    # When the guide page renders, it resolves slugs → IDs as a fallback if
+    # featured_business_ids is empty. Older guides keep using IDs; new guides
+    # published via the editorial API use slugs.
+    business_slugs: List[str] = Field(default_factory=list)
     seo_title: Optional[str] = None
     meta_description: Optional[str] = None
     published_at: Optional[datetime] = None
