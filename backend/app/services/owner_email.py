@@ -359,7 +359,7 @@ def _claim_confirmation_text(submitter_name: str, business_name: str) -> str:
     return (
         f"Hi {first},\n\n"
         f"We received your claim for {business_name} and will review it within one business day.\n\n"
-        "Once verified you'll get a one-click link to your owner dashboard — no password to set.\n\n"
+        "Once verified, we'll email you a login link. Click it, request your 6-digit code, and you're in — no password to set.\n\n"
         f"Questions while you wait? Email {get_settings().support_email}.\n\n"
         "— The Miami Knows Beauty team\n"
     )
@@ -379,7 +379,7 @@ def _claim_verified_text(
     return (
         f"Hi {first},\n\n"
         f"Great news — your claim for {business_name} has been verified.\n\n"
-        f"Log in to your owner dashboard here:\n{login_url}\n\n"
+        f"Log in here — your email is already filled in. Click to request your 6-digit code and you're in:\n{login_url}\n\n"
         "Three things that take 5 minutes:\n"
         "1. Add a cover photo — listings with photos get far more clicks\n"
         "2. Set your hours — visitors decide whether to visit based on this\n"
@@ -431,11 +431,15 @@ def _claim_verified_html(
       Hi {first} — your claim for <strong>{business_name}</strong> has been approved.
       Your owner dashboard is ready.
     </p>
+    <p style="font-size: 13px; color: #78716c; line-height: 1.5; margin: 0 0 20px;">
+      Click the button below — your email is already filled in. Request your 6-digit code,
+      enter it, and you're in. No password to set.
+    </p>
     <a href="{login_url}"
        style="display: inline-block; background: #be185d; color: #ffffff; font-size: 15px;
               font-weight: 600; text-decoration: none; padding: 14px 28px;
               border-radius: 8px; margin: 0 0 24px;">
-      Log in to your dashboard →
+      Log in to your owner page →
     </a>
     <div style="background: #fafaf9; border: 1px solid #e7e5e4; border-radius: 12px;
                 padding: 18px 20px; margin: 0 0 24px;">
@@ -602,7 +606,7 @@ def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:
       within one business day.
     </p>
     <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 24px;">
-      Once verified, you'll receive a one-click link to your owner dashboard. No password to set.
+      Once verified, we'll email you a login link. Click it, request your 6-digit code, and you're in — no password to set.
     </p>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
       Questions while you wait?
