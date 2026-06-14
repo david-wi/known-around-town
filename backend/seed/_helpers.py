@@ -160,6 +160,17 @@ async def upsert(collection_name: str, query: Dict[str, Any], doc: Dict[str, Any
         # reappear on the live directory every time the seed ran.
         if existing.get("status") == "archived" and doc.get("status") == "live":
             doc["status"] = "archived"
+        # WHY: preserve Google sync data that the seed doesn't provide. Running
+        # a seed to update a business name or photo should NOT wipe out cached
+        # Google star ratings, review counts, place IDs, and hours — those are
+        # expensive to re-fetch (~$0.017/call) and the seed file has no way to
+        # know the correct values. Copy any google_* field and hours from the
+        # existing record if the new doc omits them.
+        _PRESERVE_KEYS = ("google_place_id", "google_rating", "google_review_count",
+                          "google_rating_synced_at", "hours")
+        for key in _PRESERVE_KEYS:
+            if key in existing and key not in doc:
+                doc[key] = existing[key]
         await db[collection_name].replace_one({"_id": existing["_id"]}, doc)
         return doc
     await db[collection_name].insert_one(doc)
