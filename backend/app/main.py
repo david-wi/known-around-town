@@ -81,6 +81,30 @@ templates.env.globals["support_email"] = settings.support_email
 # as support_email.
 templates.env.globals["ratings_min_review_count"] = 20
 
+
+def _jinja_fmt_time(t: str) -> str:
+    """Convert HH:MM to H:MM AM/PM (e.g. '09:00' -> '9:00 AM', '13:30' -> '1:30 PM').
+
+    WHY: hours are stored in 24-hour HH:MM format (matching HTML <input type="time">
+    output), but American visitors read and expect 12-hour AM/PM notation. Registering
+    this as a Jinja2 filter lets every template convert times without duplicating logic.
+    """
+    if not t:
+        return t
+    try:
+        h, m = map(int, t.split(":"))
+        period = "AM" if h < 12 else "PM"
+        h12 = h % 12 or 12
+        return f"{h12}:{m:02d} {period}"
+    except (ValueError, AttributeError):
+        return t
+
+
+# WHY: register as a Jinja2 filter so templates can write {{ h.opens_at | fmt_time }}
+# rather than calling a Python function — consistent with how other formatting
+# (tojson, replace, etc.) is expressed in the template layer.
+templates.env.filters["fmt_time"] = _jinja_fmt_time
+
 app = FastAPI(title="Known Around Town", version="0.1.0", default_response_class=MongoSafeJSONResponse)
 
 # WHY: the preview gate must be added as middleware BEFORE any routes are

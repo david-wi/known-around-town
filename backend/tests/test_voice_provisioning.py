@@ -250,7 +250,12 @@ class TestDeprovisionSalonReceptionist:
 
     def test_deprovision_clears_voice_fields_in_db(self):
         """After deprovisioning, voice fields must be unset in the DB and
-        featured tier must be downgraded to premium."""
+        featured tier must be reset to free — not premium.
+
+        WHY: the salon subscribed to Concierge specifically for the AI
+        receptionist. Removing that feature should return the listing to its
+        baseline free state, not silently grant a paid premium tier the owner
+        never purchased."""
         business = self._make_business_with_voice()
         db = self._make_mock_db(business)
         mock_client = self._mock_delete_client()
@@ -263,7 +268,9 @@ class TestDeprovisionSalonReceptionist:
         db.businesses.update_one.assert_called_once()
         call_args = db.businesses.update_one.call_args
         update_arg = call_args[0][1]
-        assert update_arg["$set"]["featured.tier"] == "premium"
+        # Must reset to "free", not "premium" — deprovisioning removes the
+        # Concierge feature; it does not grant a paid premium upgrade.
+        assert update_arg["$set"]["featured.tier"] == "free"
         assert "voice_phone_number" in update_arg["$unset"]
         assert "vapi_phone_number_id" in update_arg["$unset"]
         assert "vapi_assistant_id" in update_arg["$unset"]

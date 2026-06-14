@@ -436,7 +436,13 @@ async def deprovision_salon_receptionist(db: Any, business_id: str) -> None:
         {"_id": business_id},
         {
             "$set": {
-                "featured.tier": "premium",
+                # WHY: reset to "free" rather than "premium" — the salon was on
+                # Concierge specifically for the AI receptionist feature. Removing
+                # that feature should return the listing to its baseline free state,
+                # not silently grant a paid "premium" tier the owner never subscribed
+                # to. A premium upgrade should only happen through an explicit Stripe
+                # subscription, not as a side effect of deprovisioning.
+                "featured.tier": "free",
                 "updated_at": datetime.now(timezone.utc),
             },
             "$unset": {
