@@ -28,7 +28,7 @@
       <em class="italic text-stone-500">in about five minutes.</em>
     </h1>
     <p class="text-lg text-stone-600 leading-relaxed max-w-xl mx-auto">
-      Your {{ listing_word_singular or 'business' }} is already in Miami Knows {{ vertical_word }}. Here's how to claim it, customize it, and make it work for you.
+      Your {{ listing_word_singular or 'business' }} is already in {{ tenant_label }}. Here's how to claim it, customize it, and make it work for you.
     </p>
   </div>
 </section>
@@ -44,7 +44,7 @@
         <p class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_full }} font-semibold mb-2">Already here</p>
         <h2 class="text-2xl font-light text-stone-900 mb-3" style='font-family: Georgia, "Times New Roman", serif;'>Find your listing</h2>
         <p class="text-stone-600 leading-relaxed">
-          We've already built a page for your {{ listing_word_singular or 'business' }} on Miami Knows {{ vertical_word }}. It shows your name, neighborhood, category, price range, hours, and a short description pulled from public sources. You can find it by browsing the directory or searching your name.
+          We've already built a page for your {{ listing_word_singular or 'business' }} on {{ tenant_label }}. It shows your name, neighborhood, category, price range, hours, and a short description pulled from public sources. You can find it by browsing the directory or searching your name.
         </p>
         <a href="/" class="inline-flex items-center gap-1.5 mt-4 text-sm {{ theme.accent_text_full }} {{ theme.accent_hover_text }} font-medium">
           Browse the directory <span aria-hidden="true">→</span>

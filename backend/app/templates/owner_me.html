@@ -39,10 +39,10 @@
       <span class="text-amber-200 text-lg leading-none shrink-0">★</span>
       <div class="min-w-0">
         {% if owner_business.get('is_founding_partner') %}
-        <p class="font-semibold text-sm">You're now a Founding Partner on Miami Knows Beauty!</p>
+        <p class="font-semibold text-sm">You're now a Founding Partner on {{ tenant_label }}!</p>
         <p class="text-amber-100 text-xs mt-0.5">Your featured listing and permanent gold badge are now live. Thank you for being an early supporter.</p>
         {% else %}
-        <p class="font-semibold text-sm">You're now Featured on Miami Knows Beauty!</p>
+        <p class="font-semibold text-sm">You're now Featured on {{ tenant_label }}!</p>
         <p class="text-amber-100 text-xs mt-0.5">Your subscription is active. Your salon now appears first in search results in your neighborhood.</p>
         {% endif %}
       </div>
@@ -65,9 +65,9 @@
 <div id="subscribed-toast"
      class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-amber-600 text-white text-sm font-medium px-6 py-3 rounded-full shadow-xl pointer-events-none">
   {% if owner_business.get('is_founding_partner') %}
-  ★ You're now a Founding Partner on Miami Knows Beauty!
+  ★ You're now a Founding Partner on {{ tenant_label }}!
   {% else %}
-  ★ You're now Featured on Miami Knows Beauty!
+  ★ You're now Featured on {{ tenant_label }}!
   {% endif %}
 </div>
 
@@ -187,7 +187,7 @@
       <span class="text-sm font-semibold text-amber-900">Founding Partner</span>
     </div>
     <p class="text-sm text-amber-800">
-      You&rsquo;re one of the first salons on Miami Knows Beauty.
+      You&rsquo;re one of the first salons on {{ tenant_label }}.
       Your permanent gold badge appears on your public listing — forever.
     </p>
   </div>
