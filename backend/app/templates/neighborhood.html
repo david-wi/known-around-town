@@ -98,6 +98,11 @@
 
 <section class="max-w-7xl mx-auto px-6 lg:px-10 py-12">
   {% if businesses %}
+  {#- WHY: listing count near the grid gives visitors immediate context about
+      how many options are available before they start scrolling. The hero badge
+      is visible on load but disappears once the visitor scrolls past the photo;
+      this count stays in view as they browse. #}
+  <p class="text-sm text-stone-500 mb-6">{{ businesses|length }} {{ listing_word_singular }}{{ 's' if businesses|length != 1 else '' }} in {{ neighborhood.name }}</p>
   <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
     {% for b in businesses %}
       {% include 'partials/business_card.html' %}
