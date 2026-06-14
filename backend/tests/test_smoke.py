@@ -1332,17 +1332,16 @@ def test_search_page_shows_owner_banner_when_results(client, seeded_db):
 
 
 def test_search_page_title_includes_city_name(client):
-    """The search page <title> must include the city name so Google knows
-    the page is specific to Miami, not a generic search across all cities.
+    """The search page <title> must include the city name.
 
-    WHY: 'Search — Knows Beauty' can't rank for 'hair salon search miami'
-    because the title has no location signal. 'Search Miami — Knows Beauty'
-    targets the city and helps with local SEO. The city name is already in
-    the page context (it's used for the h1 text), so including it in the
-    title costs nothing and lifts relevance significantly."""
+    WHY: "Search — Knows Beauty" cannot rank for "hair salon search miami"
+    because the title has no location signal. "Search Miami — Knows Beauty"
+    gives Google a city keyword and boosts local relevance. The city name is
+    already in scope (used for the h1 text), so including it costs nothing
+    and lifts SEO meaningfully."""
     import re
 
-    # No-query state: title should be 'Search Miami — Knows Beauty'
+    # No-query state: title should be "Search Miami — Knows Beauty"
     r = client.get("/search", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
     m = re.search(r"<title>(.*?)</title>", r.text)
