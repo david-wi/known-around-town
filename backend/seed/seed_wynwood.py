@@ -430,6 +430,105 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$$",
         "editors_pick": False,
     },
+
+    # ── MED-SPA — MIDTOWN / EDGE DISTRICT ────────────────────────────────────
+    {
+        "name": "Skin Laser & Wellness Spa",
+        "slug": "skin-laser-wellness-spa-midtown",
+        "category_slugs": ["med-spa"],
+        "neighborhood_slugs": ["midtown-edge-district"],
+        "address": {"street": "3250 NE 1st Ave, Suite 305", "city": "Miami", "state": "FL", "postal_code": "33137", "country": "US"},
+        "phone": "(305) 539-9909",
+        "website": "https://www.skinlaserandwellness.com",
+        "instagram": "@skinlaserandwellness",
+        "short_description": (
+            "A medical spa inside the Midtown Miami tower offering laser hair removal, "
+            "CoolSculpting, PRP facials, and injectables under physician oversight — "
+            "one of the area's most reviewed clinical aesthetic practices serving "
+            "the Wynwood and Midtown creative professional crowd."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": False,
+    },
+
+    # ── HAIR — BUENA VISTA ────────────────────────────────────────────────────
+    {
+        "name": "Silvia's Hair Studio",
+        "slug": "silvias-hair-studio-buena-vista",
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": ["buena-vista"],
+        "address": {"street": "180 NE 39th St, Suite 248", "city": "Miami", "state": "FL", "postal_code": "33137", "country": "US"},
+        "phone": "(305) 576-9944",
+        "website": None,
+        "instagram": "@silviashairsalon",
+        "short_description": (
+            "A long-established boutique salon tucked inside the Miami Design District "
+            "building on NE 39th Street — Silvia specializes in precision cuts, "
+            "keratin treatments, and color for a loyal Buena Vista and Design District "
+            "clientele built over more than a decade."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+
+    # ── BARBER — NW 2ND AVE / WYNWOOD WALLS ──────────────────────────────────
+    {
+        "name": "Wynwood Barbershop",
+        "slug": "wynwood-barbershop-nw-2nd-ave",
+        "category_slugs": ["barber"],
+        "neighborhood_slugs": ["nw-2nd-ave-wynwood-walls"],
+        "address": {"street": "55 NW 25th St", "city": "Miami", "state": "FL", "postal_code": "33127", "country": "US"},
+        "phone": "(786) 401-5533",
+        "website": None,
+        "instagram": "@wynwoodbarbershop",
+        "short_description": (
+            "A street-level barbershop right in the Wynwood Walls district serving the "
+            "neighborhood's artists, gallerists, and foot-traffic crowd with sharp fades, "
+            "line-ups, and beard trims at accessible prices without sacrificing craft."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
+
+    # ── MAKEUP — NW 25TH–29TH CORRIDOR ───────────────────────────────────────
+    {
+        "name": "Beauty Room Wynwood",
+        "slug": "beauty-room-wynwood-nw-corridor",
+        "category_slugs": ["makeup", "lash-brow"],
+        "neighborhood_slugs": ["nw-25th-29th-corridor"],
+        "address": {"street": "2610 N Miami Ave, Suite 5", "city": "Miami", "state": "FL", "postal_code": "33127", "country": "US"},
+        "phone": "(786) 605-4747",
+        "website": None,
+        "instagram": "@beautyroomwynwood",
+        "short_description": (
+            "A studio-style makeup and lash atelier on N Miami Ave focused on "
+            "editorial and bridal makeup, individual and volume lash extensions, "
+            "and brow design — drawing clients from across Miami who want "
+            "a makeup artist's eye rather than a cookie-cutter lash chain."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+
+    # ── SPA — NW 25TH–29TH CORRIDOR ──────────────────────────────────────────
+    {
+        "name": "Wynwood Wellness Spa",
+        "slug": "wynwood-wellness-spa-n-miami-ave",
+        "category_slugs": ["spa"],
+        "neighborhood_slugs": ["nw-25th-29th-corridor"],
+        "address": {"street": "3140 N Miami Ave", "city": "Miami", "state": "FL", "postal_code": "33127", "country": "US"},
+        "phone": "(305) 438-9010",
+        "website": None,
+        "instagram": "@wynwoodwellnessspa",
+        "short_description": (
+            "A neighborhood day spa on N Miami Ave offering deep-tissue massage, "
+            "customized facials, body scrubs, and reflexology — a calm pocket of "
+            "wellness tucked among the galleries and studios that defines the "
+            "deep-Wynwood block between 25th and 29th Street."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
 ]
 
 
