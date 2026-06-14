@@ -46,19 +46,14 @@ async def analytics_page(request: Request) -> HTMLResponse:
 
     db = get_db()
 
-    # WHY: Resolve the beauty network's Miami city so every stat below counts
-    # only the salons on THIS site. Without this filter, count_documents({})
-    # returns 147 (beauty + wellness + health combined) — misleading because
-    # the beauty directory only has 50 listings. A David looking at "147
-    # businesses" would think the directory is three times larger than it is.
+    # WHY: Filter by network_id so every stat counts ALL beauty-network salons
+    # across all 26 cities — not just Miami. The old filter used city_id for
+    # the Miami city record, which showed only ~122 of the ~800+ beauty businesses.
+    # We have 3 networks (beauty, health, wellness) in one database; without
+    # this filter the numbers would mix all three.
     beauty_network = await db.networks.find_one({"slug": "beauty"})
-    beauty_city = (
-        await db.cities.find_one({"network_id": beauty_network["_id"], "slug": "miami"})
-        if beauty_network
-        else None
-    )
     city_filter: Dict[str, Any] = (
-        {"city_id": beauty_city["_id"]} if beauty_city else {}
+        {"network_id": beauty_network["_id"]} if beauty_network else {}
     )
 
     # ── Page view stats ──────────────────────────────────────────────────────
