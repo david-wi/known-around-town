@@ -218,6 +218,10 @@ class TestCheckout:
 
         assert captured_params.get("customer_email") == email
         assert "customer" not in captured_params
+        # Verify the statement descriptor suffix is sent so card statements
+        # show "KNOWS BEAUTY" instead of a generic account name.
+        pid = captured_params.get("payment_intent_data", {})
+        assert pid.get("statement_descriptor_suffix") == "KNOWS BEAUTY"
 
     @pytest.mark.asyncio
     async def test_checkout_reuses_existing_stripe_customer(self, client, seeded_db):

@@ -79,6 +79,14 @@ async def create_checkout_session(request: Request) -> JSONResponse:
         # WHY: promotion codes let us hand discount codes to design partners
         # and early adopters without any code change on our side.
         "allow_promotion_codes": True,
+        # WHY: statement_descriptor_suffix appends "KNOWS BEAUTY" to the
+        # account name on card statements so salon owners see a recognizable
+        # charge name instead of just the generic Stripe account name.
+        # Scoped to this checkout only — the main Expertly AI account settings
+        # are not touched.
+        "payment_intent_data": {
+            "statement_descriptor_suffix": "KNOWS BEAUTY",
+        },
     }
 
     customer_id = business.get("stripe_customer_id")
