@@ -820,7 +820,11 @@ async def category_page(request: Request, category_slug: str) -> HTMLResponse:
             # the page (shows an actual Miami salon) and fall back to the city
             # hero so the card is never blank — a blank preview kills click-through.
             "og_image": next(
-                (b["photos"][0]["url"] for b in businesses if b.get("photos")),
+                (
+                    p["url"] if isinstance(p, dict) else p
+                    for b in businesses if b.get("photos")
+                    for p in [b["photos"][0]]
+                ),
                 city.get("hero_photo_url"),
             ),
             # WHY: ItemList JSON-LD gives Google a machine-readable enumeration
@@ -885,7 +889,11 @@ async def neighborhood_page(request: Request, neighborhood_slug: str) -> HTMLRes
             # WHY: same pattern as category pages — first business photo or
             # city hero fallback so social share cards always show an image.
             "og_image": next(
-                (b["photos"][0]["url"] for b in businesses if b.get("photos")),
+                (
+                    p["url"] if isinstance(p, dict) else p
+                    for b in businesses if b.get("photos")
+                    for p in [b["photos"][0]]
+                ),
                 city.get("hero_photo_url"),
             ),
             # WHY: ItemList JSON-LD enumerates the businesses in this neighborhood
@@ -962,7 +970,11 @@ async def neighborhood_category_page(
             ),
             # WHY: same pattern as category and neighborhood pages.
             "og_image": next(
-                (b["photos"][0]["url"] for b in businesses if b.get("photos")),
+                (
+                    p["url"] if isinstance(p, dict) else p
+                    for b in businesses if b.get("photos")
+                    for p in [b["photos"][0]]
+                ),
                 city.get("hero_photo_url"),
             ),
             # WHY: most specific ItemList — businesses in both this neighborhood
@@ -1010,7 +1022,11 @@ async def search_page(request: Request, q: Optional[str] = None) -> HTMLResponse
             # Miami salon matching the query) and fall back to the city hero so the card
             # is never blank — a blank preview kills click-through on social.
             "og_image": next(
-                (b["photos"][0]["url"] for b in businesses if b.get("photos")),
+                (
+                    p["url"] if isinstance(p, dict) else p
+                    for b in businesses if b.get("photos")
+                    for p in [b["photos"][0]]
+                ),
                 city.get("hero_photo_url"),
             ),
         }
@@ -1086,8 +1102,18 @@ async def business_page(
     # WHY: Build a real Google Maps URL from the address so the template has
     # a proper href for the "Get directions" link. The CopyResolver only
     # supplies human-readable labels (e.g. "Get directions") — not URLs.
+    # WHY: include city, state, and postal_code in addition to street so Maps
+    # resolves to the correct location. Street-only queries are ambiguous —
+    # "1234 SW 8th St" matches dozens of cities; the full address pins it to
+    # the right neighborhood. filter(None, ...) drops any missing fields so
+    # businesses without a full address still get a useful (if shorter) query.
     addr = business.get("address") or {}
-    _map_query = addr.get("street") or business.get("name", "")
+    _map_query = ", ".join(filter(None, [
+        addr.get("street"),
+        addr.get("city"),
+        addr.get("state"),
+        addr.get("postal_code"),
+    ])) or business.get("name", "")
     directions_url = (
         f"https://maps.google.com/?q={quote_plus(_map_query)}"
         if _map_query
