@@ -80,6 +80,16 @@
          class="text-sm text-rose-700 hidden"
          role="alert"
          aria-live="polite"></p>
+      <p id="owner-resend-confirmation"
+         class="text-sm text-emerald-700 hidden"
+         role="status"
+         aria-live="polite">Code resent — check your inbox.</p>
+      <button type="button"
+              id="owner-resend-btn"
+              class="text-sm text-stone-500 hover:text-stone-900 underline underline-offset-4 disabled:opacity-40 disabled:cursor-not-allowed">
+        Resend code
+      </button>
+      <span class="text-stone-300 text-sm mx-1">·</span>
       <button type="button"
               id="owner-code-back"
               class="text-sm text-stone-500 hover:text-stone-900 underline underline-offset-4">
@@ -115,6 +125,8 @@
   var codeSubmit = document.getElementById('owner-code-submit');
   var codeBack = document.getElementById('owner-code-back');
   var codeEchoEmail = document.getElementById('owner-code-email-echo');
+  var resendBtn = document.getElementById('owner-resend-btn');
+  var resendConfirmation = document.getElementById('owner-resend-confirmation');
 
   function setLoading(btn, loading) {
     btn.disabled = loading;
@@ -210,6 +222,38 @@
       showError(codeError, 'Network error. Please try again.');
       setLoading(codeSubmit, false);
     }
+  });
+
+  resendBtn.addEventListener('click', async function() {
+    var email = codeForm.dataset.email || '';
+    if (!email) return;
+    // WHY: disable for 3 s to stop rapid repeated taps; 3 s is long enough
+    // to prevent accidental double-sends while still feeling snappy.
+    resendBtn.disabled = true;
+    resendConfirmation.classList.add('hidden');
+    clearError(codeError);
+    try {
+      var r = await fetch('/api/v1/owner/login/request', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: email}),
+      });
+      var data = null;
+      try { data = await r.json(); } catch (e) {}
+      if (!r.ok) {
+        showError(codeError, (data && data.detail) || 'Could not resend code. Please try again.');
+      } else {
+        resendConfirmation.classList.remove('hidden');
+        // WHY: hide the confirmation after 4 s so it doesn't linger and
+        // confuse owners who click resend again later in the same session.
+        setTimeout(function() { resendConfirmation.classList.add('hidden'); }, 4000);
+      }
+    } catch (e) {
+      showError(codeError, 'Network error. Please try again.');
+    }
+    // WHY: re-enable after 3 s regardless of outcome so the owner can
+    // retry after a failed resend without having to refresh the page.
+    setTimeout(function() { resendBtn.disabled = false; }, 3000);
   });
 
   codeBack.addEventListener('click', function() {
