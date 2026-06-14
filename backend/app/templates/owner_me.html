@@ -194,51 +194,83 @@
 </section>
 {% endif %}
 
-{# ── Getting started checklist ─────────────────────────────────── #}
-{# WHY: new owners land on the dashboard with no guidance about what
-   matters most. Photos are the single highest-leverage action —
-   they dramatically increase clicks vs text-only listings — but
-   there's no obvious signal to tell the owner that. Show this
-   checklist only when they haven't uploaded a photo yet; once
-   they have at least one, they're past the first hurdle and the
-   card disappears to keep the dashboard uncluttered. #}
-{% if not (owner_business.photos or []) %}
-<section class="bg-emerald-50 border-t border-emerald-100">
-  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-8">
-    <h2 class="text-base font-semibold text-stone-900 mb-1">Getting started</h2>
-    <p class="text-sm text-stone-500 mb-5">Three things that take five minutes and make your listing stand out to visitors.</p>
-    <ol class="space-y-3 text-sm text-stone-700 list-none">
-      <li class="flex items-start gap-3">
-        <span class="text-lg leading-none mt-0.5">📸</span>
-        <div>
-          <strong class="font-semibold">Add a cover photo</strong>
-          <span class="text-stone-500"> — listings with photos get far more clicks than text-only ones. Scroll down to the Photos section to upload.</span>
-        </div>
-      </li>
-      <li class="flex items-start gap-3">
-        <span class="text-lg leading-none mt-0.5">🕐</span>
-        <div>
-          <strong class="font-semibold">Set your hours</strong>
-          <span class="text-stone-500"> — visitors decide whether to visit based on this. Fill in the Hours section in the edit form below.</span>
-        </div>
-      </li>
-      <li class="flex items-start gap-3">
-        <span class="text-lg leading-none mt-0.5">✏️</span>
-        <div>
-          <strong class="font-semibold">Describe your salon</strong>
-          <span class="text-stone-500"> — two sentences about what makes you special. The "About your salon" field in the edit form is a great place to start.</span>
-        </div>
-      </li>
-      {% if not owner_business.instagram %}
-      <li class="flex items-start gap-3">
-        <span class="text-lg leading-none mt-0.5">📸</span>
-        <div>
-          <strong class="font-semibold">Add your Instagram</strong>
-          <span class="text-stone-500"> — visitors click through to your Instagram profile. Add it in the Social Links section of the edit form below.</span>
-        </div>
-      </li>
-      {% endif %}
-    </ol>
+{# ── Profile completeness ─────────────────────────────────────────
+   WHY: the old "getting started" card disappeared as soon as the owner
+   added one photo, even if hours, description, phone, and Instagram were
+   all still empty. This persistent card stays until ALL key profile
+   fields are filled, driving richer listings that convert better and
+   making the Featured upgrade more compelling.
+#}
+{%- set _photo_done = (owner_business.photos or [])|length > 0 %}
+{%- set _hours_done = (owner_business.hours or [])|length > 0 %}
+{%- set _desc_done  = owner_business.description and owner_business.description|trim %}
+{%- set _phone_done = owner_business.phone and owner_business.phone|trim %}
+{%- set _insta_done = owner_business.instagram and owner_business.instagram|trim %}
+{%- set _complete_count = (1 if _photo_done else 0) + (1 if _hours_done else 0) + (1 if _desc_done else 0) + (1 if _phone_done else 0) + (1 if _insta_done else 0) %}
+{%- set _total_count = 5 %}
+{% if _complete_count < _total_count %}
+<section class="bg-emerald-50/70 border-t border-emerald-100">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-7">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="text-sm font-semibold text-stone-900">Complete your profile</h2>
+      <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">{{ _complete_count }} of {{ _total_count }} complete</span>
+    </div>
+    <p class="text-sm text-stone-500 mb-3">A complete profile gets more clicks and makes your Featured listing stand out.</p>
+    <div class="w-full h-1.5 rounded-full bg-emerald-100 mb-4">
+      <div class="h-1.5 rounded-full bg-emerald-500" style="width: {{ (_complete_count / _total_count * 100)|round|int }}%"></div>
+    </div>
+    <div class="grid sm:grid-cols-2 gap-2 text-sm">
+      {# 1. Photo #}
+      <div class="flex items-center gap-2">
+        {% if _photo_done %}
+          <span class="text-emerald-500 shrink-0">✓</span>
+          <span class="text-stone-400 line-through">Add a photo</span>
+        {% else %}
+          <span class="text-stone-300 shrink-0">○</span>
+          <a href="#photos-section" class="{{ theme.accent_text_full }} hover:opacity-80 font-medium">Add a photo</a>
+        {% endif %}
+      </div>
+      {# 2. Description #}
+      <div class="flex items-center gap-2">
+        {% if _desc_done %}
+          <span class="text-emerald-500 shrink-0">✓</span>
+          <span class="text-stone-400 line-through">Write a description</span>
+        {% else %}
+          <span class="text-stone-300 shrink-0">○</span>
+          <a href="#owner-profile-form" class="{{ theme.accent_text_full }} hover:opacity-80 font-medium">Write a description</a>
+        {% endif %}
+      </div>
+      {# 3. Phone #}
+      <div class="flex items-center gap-2">
+        {% if _phone_done %}
+          <span class="text-emerald-500 shrink-0">✓</span>
+          <span class="text-stone-400 line-through">Add your phone number</span>
+        {% else %}
+          <span class="text-stone-300 shrink-0">○</span>
+          <a href="#owner-profile-form" class="{{ theme.accent_text_full }} hover:opacity-80 font-medium">Add your phone number</a>
+        {% endif %}
+      </div>
+      {# 4. Hours #}
+      <div class="flex items-center gap-2">
+        {% if _hours_done %}
+          <span class="text-emerald-500 shrink-0">✓</span>
+          <span class="text-stone-400 line-through">Set your hours</span>
+        {% else %}
+          <span class="text-stone-300 shrink-0">○</span>
+          <a href="#owner-profile-form" class="{{ theme.accent_text_full }} hover:opacity-80 font-medium">Set your hours</a>
+        {% endif %}
+      </div>
+      {# 5. Instagram #}
+      <div class="flex items-center gap-2">
+        {% if _insta_done %}
+          <span class="text-emerald-500 shrink-0">✓</span>
+          <span class="text-stone-400 line-through">Add your Instagram</span>
+        {% else %}
+          <span class="text-stone-300 shrink-0">○</span>
+          <a href="#owner-profile-form" class="{{ theme.accent_text_full }} hover:opacity-80 font-medium">Add your Instagram</a>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </section>
 {% endif %}
