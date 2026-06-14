@@ -225,6 +225,68 @@ class TestLookupRating:
         assert fri.closes_at == "20:00"
 
     @pytest.mark.asyncio
+    async def test_hours_preserves_both_periods_when_business_closes_for_lunch(self, respx_mock):
+        """When a business has two open/close periods on the same day (lunch break), both are stored.
+
+        WHY this test exists: the original code used day_map[day_int] = (opens, closes),
+        which overwrites the morning period with the afternoon one when Google returns two
+        periods for Monday (e.g. 09:00-12:00 and 13:00-18:00). The business appeared to
+        open in the afternoon instead of the morning. The fix accumulates all periods per
+        day and emits one HoursEntry per period.
+        """
+        from app.services import google_places
+
+        with patch("app.services.google_places.get_settings") as mock_settings:
+            mock_settings.return_value.google_places_api_key = "AIza-test-key"
+
+            respx_mock.get(
+                "https://places.googleapis.com/v1/places/ChIJ_lunch_break"
+            ).return_value = httpx.Response(
+                200,
+                json={
+                    "id": "ChIJ_lunch_break",
+                    "rating": 4.3,
+                    "userRatingCount": 180,
+                    "regularOpeningHours": {
+                        "periods": [
+                            # Monday: open 9am–12pm, then again 1pm–6pm (lunch break)
+                            {"open": {"day": 1, "hour": 9, "minute": 0}, "close": {"day": 1, "hour": 12, "minute": 0}},
+                            {"open": {"day": 1, "hour": 13, "minute": 0}, "close": {"day": 1, "hour": 18, "minute": 0}},
+                            # Tuesday: normal single period
+                            {"open": {"day": 2, "hour": 9, "minute": 0}, "close": {"day": 2, "hour": 18, "minute": 0}},
+                        ]
+                    },
+                },
+            )
+
+            result = await google_places.lookup_rating(
+                "Nail Salon", "Miami", existing_place_id="ChIJ_lunch_break"
+            )
+
+        assert result is not None
+        # 2 Monday periods + 1 Tuesday period + 5 closed days = 8 entries total
+        assert len(result.hours) == 8, (
+            f"Expected 8 entries (2 Monday + 1 Tuesday + 5 closed), got {len(result.hours)}"
+        )
+
+        monday_entries = [h for h in result.hours if h.day == "mon"]
+        assert len(monday_entries) == 2, (
+            f"Expected 2 Monday entries for a lunch-break business, got {len(monday_entries)}. "
+            "The morning period was likely overwritten by the afternoon period."
+        )
+
+        # Entries are ordered by period as Google returns them
+        assert monday_entries[0].opens_at == "09:00", "morning period should be first"
+        assert monday_entries[0].closes_at == "12:00", "morning period should close at noon"
+        assert monday_entries[1].opens_at == "13:00", "afternoon period should be second"
+        assert monday_entries[1].closes_at == "18:00", "afternoon period should close at 6pm"
+
+        tuesday_entries = [h for h in result.hours if h.day == "tue"]
+        assert len(tuesday_entries) == 1
+        assert tuesday_entries[0].opens_at == "09:00"
+        assert tuesday_entries[0].closes_at == "18:00"
+
+    @pytest.mark.asyncio
     async def test_hours_empty_when_opening_hours_has_empty_periods(self, respx_mock):
         """Hours list is [] when regularOpeningHours.periods is empty (Google has no data).
 

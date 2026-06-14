@@ -145,7 +145,12 @@ def _parse_hours(opening_hours: dict) -> List[HoursEntry]:
         return []
 
     periods = opening_hours.get("periods") or []
-    day_map: dict[int, tuple[str, str]] = {}
+    # WHY: list of tuples per day rather than a single tuple — some businesses
+    # close for lunch and Google returns two open/close periods on the same day
+    # (e.g. 09:00–12:00 and 13:00–18:00). A single-tuple map silently overwrites
+    # the morning period with the afternoon one, making the business appear to open
+    # in the afternoon. Storing all periods per day preserves the full schedule.
+    day_map: dict[int, list[tuple[str, str]]] = {}
     for period in periods:
         open_info = period.get("open") or {}
         close_info = period.get("close") or {}
@@ -158,7 +163,9 @@ def _parse_hours(opening_hours: dict) -> List[HoursEntry]:
             continue
         opens_fmt = f"{open_hour:02d}:{open_min:02d}"
         closes_fmt = f"{close_hour:02d}:{close_min:02d}"
-        day_map[day_int] = (opens_fmt, closes_fmt)
+        if day_int not in day_map:
+            day_map[day_int] = []
+        day_map[day_int].append((opens_fmt, closes_fmt))
 
     # WHY: no valid open periods → hours unknown, not "all closed"
     if not day_map:
@@ -168,8 +175,12 @@ def _parse_hours(opening_hours: dict) -> List[HoursEntry]:
     for day_int in range(7):
         day_str = _DAY_INT_TO_STR[day_int]
         if day_int in day_map:
-            opens_fmt, closes_fmt = day_map[day_int]
-            result.append(HoursEntry(day=day_str, opens_at=opens_fmt, closes_at=closes_fmt))
+            # WHY: emit one HoursEntry per period — the template iterates the list
+            # and renders each row, so two entries for Monday naturally display as
+            # "Monday  09:00–12:00" and "Monday  13:00–18:00" without any template
+            # changes.  The JSON-LD openingHoursSpecification block does the same.
+            for opens_fmt, closes_fmt in day_map[day_int]:
+                result.append(HoursEntry(day=day_str, opens_at=opens_fmt, closes_at=closes_fmt))
         else:
             result.append(HoursEntry(day=day_str, closed=True))
     return result
