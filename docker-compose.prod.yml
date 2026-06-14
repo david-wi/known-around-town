@@ -111,7 +111,9 @@ services:
         Host(`delray-beach.knowsbeauty.com`) ||
         Host(`hallandale-beach.knowsbeauty.com`) ||
         Host(`doral.knowsbeauty.com`) ||
-        Host(`pompano-beach.knowsbeauty.com`)
+        Host(`pompano-beach.knowsbeauty.com`) ||
+        Host(`plantation.knowsbeauty.com`) ||
+        Host(`pembroke-pines.knowsbeauty.com`)
       traefik.http.routers.kat-beauty-com.tls: "true"
       traefik.http.routers.kat-beauty-com.tls.certresolver: "letsencrypt"
       traefik.http.routers.kat-beauty-com.service: "known-around-town"
