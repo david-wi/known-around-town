@@ -220,3 +220,51 @@ class TestPublicPageCallNowButton:
             "Call Now button shown when no voice number is provisioned — "
             "clients would reach a dead number"
         )
+
+# ── fmt_time filter unit tests ───────────────────────────────────────────────
+
+
+class TestFmtTimeFilter:
+    """Unit tests for the fmt_time Jinja2 filter (_jinja_fmt_time) in app.main.
+
+    The filter converts 24-hour HH:MM strings (the format stored in the DB,
+    matching what HTML <input type="time"> produces) into American-style
+    12-hour AM/PM notation for display to visitors.
+    """
+
+    def _fmt(self, t):
+        from app.main import _jinja_fmt_time
+
+        return _jinja_fmt_time(t)
+
+    def test_morning_hour_no_leading_zero(self):
+        """09:00 should display as '9:00 AM', not '09:00 AM'."""
+        assert self._fmt("09:00") == "9:00 AM"
+
+    def test_noon_is_pm(self):
+        """12:00 is noon — must be '12:00 PM', not AM."""
+        assert self._fmt("12:00") == "12:00 PM"
+
+    def test_afternoon_converted(self):
+        """13:30 is 1:30 PM in 12-hour time."""
+        assert self._fmt("13:30") == "1:30 PM"
+
+    def test_midnight_is_12am(self):
+        """00:00 (midnight) must display as '12:00 AM'."""
+        assert self._fmt("00:00") == "12:00 AM"
+
+    def test_minute_padding_preserved(self):
+        """Minutes are always two digits — '9:05 AM' not '9:5 AM'."""
+        assert self._fmt("09:05") == "9:05 AM"
+
+    def test_empty_string_passthrough(self):
+        """An empty string should be returned unchanged (hours field is optional)."""
+        assert self._fmt("") == ""
+
+    def test_none_passthrough(self):
+        """None should be returned as-is without crashing — missing hours are valid."""
+        assert self._fmt(None) is None
+
+    def test_last_minute_of_day(self):
+        """23:59 should be '11:59 PM'."""
+        assert self._fmt("23:59") == "11:59 PM"

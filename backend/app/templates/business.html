@@ -47,24 +47,40 @@
         - BeautySalon as the catch-all for lash-brow bars, waxing studios,
                       makeup artists, and anything else without a schema.org
                       subtype. #}
-  {% set _cat = (business.category_slugs[0] if business.category_slugs else '') %}
-  {% if 'barber' in _cat %}
-    {% set _schema_type = 'BarberShop' %}
-  {% elif 'med-spa' in _cat or 'medspa' in _cat or 'medical-spa' in _cat %}
-    {% set _schema_type = 'MedicalSpa' %}
-  {% elif 'hair' in _cat or 'blowout' in _cat or 'color' in _cat %}
-    {#- WHY: "brow" deliberately excluded — "lash-brow"/"brow-lash" slugs
-        should map to BeautySalon, not HairSalon. #}
-    {% set _schema_type = 'HairSalon' %}
-  {% elif 'nail' in _cat or 'mani' in _cat or 'pedi' in _cat %}
-    {% set _schema_type = 'NailSalon' %}
-  {% elif 'spa' in _cat or 'massage' in _cat or 'wellness' in _cat %}
-    {% set _schema_type = 'DaySpa' %}
+  {#- WHY: prefer the schema_org_type stored on the business document over the
+      keyword-matching fallback below. The stored value is set by the seed helpers
+      using the same slug-to-type mapping, so it is always accurate — including for
+      businesses whose category slug doesn't contain a recognisable keyword (e.g. a
+      laser clinic filed under "facial" or "skincare" would fall through the chain
+      below and get the generic "BeautySalon" type, missing the "MedicalSpa"
+      rich-snippet that Google uses to show star ratings on that entity class).
+      The keyword chain is kept as a fallback for legacy records that pre-date the
+      schema_org_type field, or for any business where the stored value is still
+      the generic "LocalBusiness" default (meaning it hasn't been classified yet). #}
+  {% set _stored_type = business.schema_org_type if business.schema_org_type else '' %}
+  {% set _valid_specific_types = ['BarberShop', 'MedicalSpa', 'HairSalon', 'NailSalon', 'DaySpa', 'BeautySalon', 'HealthAndBeautyBusiness'] %}
+  {% if _stored_type and _stored_type != 'LocalBusiness' and _stored_type in _valid_specific_types %}
+    {% set _schema_type = _stored_type %}
   {% else %}
-    {#- WHY: BeautySalon is the schema.org catch-all for lash/brow bars,
-        waxing studios, makeup artists, and other beauty businesses that
-        don't have their own schema.org subtype. #}
-    {% set _schema_type = 'BeautySalon' %}
+    {% set _cat = (business.category_slugs[0] if business.category_slugs else '') %}
+    {% if 'barber' in _cat %}
+      {% set _schema_type = 'BarberShop' %}
+    {% elif 'med-spa' in _cat or 'medspa' in _cat or 'medical-spa' in _cat %}
+      {% set _schema_type = 'MedicalSpa' %}
+    {% elif 'hair' in _cat or 'blowout' in _cat or 'color' in _cat %}
+      {#- WHY: "brow" deliberately excluded — "lash-brow"/"brow-lash" slugs
+          should map to BeautySalon, not HairSalon. #}
+      {% set _schema_type = 'HairSalon' %}
+    {% elif 'nail' in _cat or 'mani' in _cat or 'pedi' in _cat %}
+      {% set _schema_type = 'NailSalon' %}
+    {% elif 'spa' in _cat or 'massage' in _cat or 'wellness' in _cat %}
+      {% set _schema_type = 'DaySpa' %}
+    {% else %}
+      {#- WHY: BeautySalon is the schema.org catch-all for lash/brow bars,
+          waxing studios, makeup artists, and other beauty businesses that
+          don't have their own schema.org subtype. #}
+      {% set _schema_type = 'BeautySalon' %}
+    {% endif %}
   {% endif %}
   "@type": {{ _schema_type|tojson }},
   "name": {{ business.name|tojson }},
@@ -577,7 +593,7 @@
             {% if h.closed %}
             <span class="text-stone-400">Closed</span>
             {% elif h.opens_at and h.closes_at %}
-            <span class="text-stone-900 font-medium">{{ h.opens_at }} – {{ h.closes_at }}</span>
+            <span class="text-stone-900 font-medium">{{ h.opens_at | fmt_time }} – {{ h.closes_at | fmt_time }}</span>
             {% else %}
             <span class="text-stone-400">—</span>
             {% endif %}
