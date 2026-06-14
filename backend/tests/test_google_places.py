@@ -39,45 +39,47 @@ class TestLookupRating:
         """lookup_rating without existing_place_id uses Text Search then Place Details.
 
         WHY both endpoints are mocked: _search_and_fetch finds the place_id via
-        text search, then calls _fetch_by_place_id to get opening_hours (which
-        text search results do not include). The test verifies the full two-call flow.
+        text search (POST), then calls _fetch_by_place_id (GET) to get the full
+        rating and hours. The test verifies the full two-call flow.
+
+        WHY Places API (New) format: the key is created with the new API, which
+        uses POST /v1/places:searchText (not GET textsearch/json) and returns
+        {places: [{id, displayName.text, ...}]} (not {results: [{place_id, name}]}).
         """
         from app.services import google_places
 
         with patch("app.services.google_places.get_settings") as mock_settings:
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
-            respx_mock.get(
-                "https://maps.googleapis.com/maps/api/place/textsearch/json"
+            respx_mock.post(
+                "https://places.googleapis.com/v1/places:searchText"
             ).return_value = httpx.Response(
                 200,
                 json={
-                    "results": [
+                    "places": [
                         {
-                            "place_id": "ChIJ_place_123",
-                            "name": "Test Salon",
-                            "rating": 4.7,
-                            "user_ratings_total": 312,
+                            "id": "ChIJ_place_123",
+                            "displayName": {"text": "Test Salon", "languageCode": "en"},
                         }
                     ],
-                    "status": "OK",
                 },
             )
             respx_mock.get(
-                "https://maps.googleapis.com/maps/api/place/details/json"
+                "https://places.googleapis.com/v1/places/ChIJ_place_123"
             ).return_value = httpx.Response(
                 200,
                 json={
-                    "result": {
-                        "rating": 4.7,
-                        "user_ratings_total": 312,
-                        "opening_hours": {
-                            "periods": [
-                                {"open": {"day": 1, "time": "0900"}, "close": {"day": 1, "time": "1800"}},
-                            ]
-                        },
+                    "id": "ChIJ_place_123",
+                    "rating": 4.7,
+                    "userRatingCount": 312,
+                    "regularOpeningHours": {
+                        "periods": [
+                            {
+                                "open": {"day": 1, "hour": 9, "minute": 0},
+                                "close": {"day": 1, "hour": 18, "minute": 0},
+                            },
+                        ]
                     },
-                    "status": "OK",
                 },
             )
 
@@ -101,9 +103,9 @@ class TestLookupRating:
         with patch("app.services.google_places.get_settings") as mock_settings:
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
-            respx_mock.get(
-                "https://maps.googleapis.com/maps/api/place/textsearch/json"
-            ).return_value = httpx.Response(200, json={"results": [], "status": "ZERO_RESULTS"})
+            respx_mock.post(
+                "https://places.googleapis.com/v1/places:searchText"
+            ).return_value = httpx.Response(200, json={})
 
             result = await google_places.lookup_rating("Nonexistent Salon", "Miami")
 
@@ -117,8 +119,8 @@ class TestLookupRating:
         with patch("app.services.google_places.get_settings") as mock_settings:
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
-            respx_mock.get(
-                "https://maps.googleapis.com/maps/api/place/textsearch/json"
+            respx_mock.post(
+                "https://places.googleapis.com/v1/places:searchText"
             ).side_effect = httpx.NetworkError("connection refused")
 
             result = await google_places.lookup_rating("Test Salon", "Miami")
@@ -134,16 +136,14 @@ class TestLookupRating:
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
             respx_mock.get(
-                "https://maps.googleapis.com/maps/api/place/details/json"
+                "https://places.googleapis.com/v1/places/ChIJ_existing_place"
             ).return_value = httpx.Response(
                 200,
-                json={
-                    "result": {"rating": 4.9, "user_ratings_total": 800, "opening_hours": None},
-                    "status": "OK",
-                },
+                json={"id": "ChIJ_existing_place", "rating": 4.9, "userRatingCount": 800},
             )
-            respx_mock.get(
-                "https://maps.googleapis.com/maps/api/place/textsearch/json"
+            # Text Search should NOT be called — would 400 if it were
+            respx_mock.post(
+                "https://places.googleapis.com/v1/places:searchText"
             ).return_value = httpx.Response(400, json={"error": "should not call this"})
 
             result = await google_places.lookup_rating(
@@ -163,21 +163,17 @@ class TestLookupRating:
         with patch("app.services.google_places.get_settings") as mock_settings:
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
-            respx_mock.get(
-                "https://maps.googleapis.com/maps/api/place/textsearch/json"
+            respx_mock.post(
+                "https://places.googleapis.com/v1/places:searchText"
             ).return_value = httpx.Response(
                 200,
                 json={
-                    "results": [{"place_id": "ChIJ_no_rating", "name": "New Salon"}],
-                    "status": "OK",
+                    "places": [{"id": "ChIJ_no_rating", "displayName": {"text": "New Salon"}}],
                 },
             )
             respx_mock.get(
-                "https://maps.googleapis.com/maps/api/place/details/json"
-            ).return_value = httpx.Response(
-                200,
-                json={"result": {}, "status": "OK"},
-            )
+                "https://places.googleapis.com/v1/places/ChIJ_no_rating"
+            ).return_value = httpx.Response(200, json={"id": "ChIJ_no_rating"})
 
             result = await google_places.lookup_rating("New Salon", "Miami")
 
@@ -185,30 +181,32 @@ class TestLookupRating:
 
     @pytest.mark.asyncio
     async def test_hours_populated_when_place_has_opening_hours(self, respx_mock):
-        """Hours are returned as a full 7-day list when Place Details includes opening_hours."""
+        """Hours are returned as a full 7-day list when Place Details includes regularOpeningHours.
+
+        WHY integer hour/minute: Places API (New) uses {day, hour, minute} integers
+        not the legacy "time": "0900" string.
+        """
         from app.services import google_places
 
         with patch("app.services.google_places.get_settings") as mock_settings:
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
             respx_mock.get(
-                "https://maps.googleapis.com/maps/api/place/details/json"
+                "https://places.googleapis.com/v1/places/ChIJ_known"
             ).return_value = httpx.Response(
                 200,
                 json={
-                    "result": {
-                        "rating": 4.5,
-                        "user_ratings_total": 200,
-                        "opening_hours": {
-                            "periods": [
-                                {"open": {"day": 1, "time": "0900"}, "close": {"day": 1, "time": "1800"}},
-                                {"open": {"day": 2, "time": "0900"}, "close": {"day": 2, "time": "1800"}},
-                                {"open": {"day": 5, "time": "1000"}, "close": {"day": 5, "time": "2000"}},
-                                {"open": {"day": 6, "time": "1000"}, "close": {"day": 6, "time": "1800"}},
-                            ]
-                        },
+                    "id": "ChIJ_known",
+                    "rating": 4.5,
+                    "userRatingCount": 200,
+                    "regularOpeningHours": {
+                        "periods": [
+                            {"open": {"day": 1, "hour": 9, "minute": 0}, "close": {"day": 1, "hour": 18, "minute": 0}},
+                            {"open": {"day": 2, "hour": 9, "minute": 0}, "close": {"day": 2, "hour": 18, "minute": 0}},
+                            {"open": {"day": 5, "hour": 10, "minute": 0}, "close": {"day": 5, "hour": 20, "minute": 0}},
+                            {"open": {"day": 6, "hour": 10, "minute": 0}, "close": {"day": 6, "hour": 18, "minute": 0}},
+                        ]
                     },
-                    "status": "OK",
                 },
             )
 
@@ -228,7 +226,7 @@ class TestLookupRating:
 
     @pytest.mark.asyncio
     async def test_hours_empty_when_opening_hours_has_empty_periods(self, respx_mock):
-        """Hours list is [] when opening_hours.periods is empty (Google has no data).
+        """Hours list is [] when regularOpeningHours.periods is empty (Google has no data).
 
         WHY: empty periods means Google doesn't know the hours, not that the
         business is always closed. Returning [] tells the sync to leave any
@@ -240,16 +238,14 @@ class TestLookupRating:
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
             respx_mock.get(
-                "https://maps.googleapis.com/maps/api/place/details/json"
+                "https://places.googleapis.com/v1/places/ChIJ_empty_periods"
             ).return_value = httpx.Response(
                 200,
                 json={
-                    "result": {
-                        "rating": 4.0,
-                        "user_ratings_total": 50,
-                        "opening_hours": {"periods": []},
-                    },
-                    "status": "OK",
+                    "id": "ChIJ_empty_periods",
+                    "rating": 4.0,
+                    "userRatingCount": 50,
+                    "regularOpeningHours": {"periods": []},
                 },
             )
 
@@ -262,17 +258,17 @@ class TestLookupRating:
 
     @pytest.mark.asyncio
     async def test_hours_empty_when_place_has_no_opening_hours(self, respx_mock):
-        """Hours list is [] when Place Details has no opening_hours field at all."""
+        """Hours list is [] when Place Details has no regularOpeningHours field at all."""
         from app.services import google_places
 
         with patch("app.services.google_places.get_settings") as mock_settings:
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
             respx_mock.get(
-                "https://maps.googleapis.com/maps/api/place/details/json"
+                "https://places.googleapis.com/v1/places/ChIJ_no_hours"
             ).return_value = httpx.Response(
                 200,
-                json={"result": {"rating": 4.0, "user_ratings_total": 50}, "status": "OK"},
+                json={"id": "ChIJ_no_hours", "rating": 4.0, "userRatingCount": 50},
             )
 
             result = await google_places.lookup_rating(
