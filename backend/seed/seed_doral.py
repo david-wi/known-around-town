@@ -13,7 +13,7 @@ Run (production):
 from datetime import datetime, timezone
 
 from app.database import ensure_indexes, get_db
-from seed._helpers import assert_seed_target_allowed, run, upsert
+from seed._helpers import assert_seed_target_allowed, run, upsert, pick_category_photo
 
 CITY_SLUG = "doral"
 CITY_NAME = "Doral"

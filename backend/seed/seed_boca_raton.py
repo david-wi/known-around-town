@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from app.database import ensure_indexes, get_db
-from seed._helpers import assert_seed_target_allowed, run, upsert
+from seed._helpers import assert_seed_target_allowed, run, upsert, pick_category_photo
 
 
 # ── Neighborhoods ─────────────────────────────────────────────────────────────
@@ -59,17 +59,6 @@ NEIGHBORHOOD_DESCRIPTIONS: Dict[str, str] = {
 }
 
 # Fallback photos by category slug (shared with Miami and Fort Lauderdale seeds)
-_CATEGORY_FALLBACK_PHOTOS: Dict[str, str] = {
-    "hair":      "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1600&q=80&auto=format&fit=crop",
-    "nails":     "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=1600&q=80&auto=format&fit=crop",
-    "spa":       "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1600&q=80&auto=format&fit=crop",
-    "lash-brow": "https://images.unsplash.com/photo-1583241800698-e8ab01830a07?w=1600&q=80&auto=format&fit=crop",
-    "med-spa":   "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=1600&q=80&auto=format&fit=crop",
-    "barber":    "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=1600&q=80&auto=format&fit=crop",
-    "makeup":    "https://images.unsplash.com/photo-1487070183336-b863922373d4?w=1600&q=80&auto=format&fit=crop",
-    "waxing":    "https://images.unsplash.com/photo-1556228852-80b6e5eeff06?w=1600&q=80&auto=format&fit=crop",
-}
-
 # ── Businesses ────────────────────────────────────────────────────────────────
 # category_slugs must match the beauty network's master category map:
 #   hair | nails | spa | lash-brow | med-spa | barber | makeup | waxing
@@ -670,7 +659,7 @@ async def seed_boca_raton() -> None:
     inserted = 0
     updated = 0
     for biz in BUSINESSES:
-        photo_url = _CATEGORY_FALLBACK_PHOTOS.get(biz["category_slugs"][0])
+        photo_url = pick_category_photo(biz["slug"], biz["category_slugs"][0])
         photos = [{"url": photo_url, "alt": biz["name"], "order": 0, "is_hero": True}] if photo_url else []
         address = biz.get("address", {})
         socials: Dict[str, Any] = {}
