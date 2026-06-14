@@ -420,6 +420,107 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$$$",
         "editors_pick": False,
     },
+
+    # ── HAIR — SE 1ST AVE / DOWNTOWN BRICKELL ────────────────────────────────
+    {
+        "name": "Kelia Salon",
+        "slug": "kelia-salon-brickell",
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": ["se-1st-ave-downtown-brickell"],
+        "address": {"street": "1221 Brickell Ave, Suite 900", "city": "Miami", "state": "FL", "postal_code": "33131", "country": "US"},
+        "phone": "(305) 374-7333",
+        "website": "https://www.keliasalon.com",
+        "instagram": "@keliasalon",
+        "short_description": (
+            "A long-established Brickell salon known for precision cuts, highlights, "
+            "and balayage serving the professional women who work in the Brickell Ave "
+            "office towers — a consistent favorite with a loyal client base built "
+            "over years of reliable color work and a welcoming, no-pressure environment."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": False,
+    },
+
+    # ── BLOW DRY / HAIR — BRICKELL CITY CENTRE ───────────────────────────────
+    {
+        "name": "Primp & Blow",
+        "slug": "primp-and-blow-brickell-city-centre",
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": ["brickell-city-centre"],
+        "address": {"street": "701 S Miami Ave, Suite 240", "city": "Miami", "state": "FL", "postal_code": "33130", "country": "US"},
+        "phone": "(305) 400-7250",
+        "website": "https://primpandblow.com",
+        "instagram": "@primpandblow",
+        "short_description": (
+            "A Miami-founded blow-dry bar and salon inside Brickell City Centre "
+            "offering blowouts, braids, upstyles, and makeup services for clients "
+            "heading straight from work to an event — known for stylists who actually "
+            "listen and results that hold up in South Florida humidity."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+
+    # ── SPA — BRICKELL CITY CENTRE ────────────────────────────────────────────
+    {
+        "name": "Kure Spa — Brickell City Centre",
+        "slug": "kure-spa-brickell-city-centre",
+        "category_slugs": ["spa", "nails"],
+        "neighborhood_slugs": ["brickell-city-centre"],
+        "address": {"street": "701 S Miami Ave, Suite 375", "city": "Miami", "state": "FL", "postal_code": "33130", "country": "US"},
+        "phone": "(305) 908-5873",
+        "website": "https://kurespa.com",
+        "instagram": "@kurespa",
+        "short_description": (
+            "A clean-beauty nail and body spa inside Brickell City Centre using "
+            "non-toxic, 7-free polish and organic products throughout — manicures, "
+            "pedicures, massages, and facials designed for clients who care what "
+            "goes on their skin as much as how the finished result looks."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": True,
+    },
+
+    # ── WAXING — BRICKELL AVE / MARY BRICKELL VILLAGE ────────────────────────
+    {
+        "name": "European Wax Center — Brickell",
+        "slug": "european-wax-center-brickell-mary-brickell-village",
+        "category_slugs": ["waxing"],
+        "neighborhood_slugs": ["brickell-ave-mary-brickell-village"],
+        "address": {"street": "900 S Miami Ave, Suite 150", "city": "Miami", "state": "FL", "postal_code": "33130", "country": "US"},
+        "phone": "(786) 615-9155",
+        "website": "https://www.waxcenter.com/locations/brickell",
+        "instagram": "@ewcbrickell",
+        "short_description": (
+            "The Brickell outpost of the national waxing franchise known for its "
+            "exclusive Comfort Wax formula — a proprietary wax that adheres to hair "
+            "rather than skin to minimize discomfort. Located in Mary Brickell Village "
+            "with flexible scheduling and a menu covering face, body, and Brazilian "
+            "waxing for both women and men."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+
+    # ── LASH — ALICE WAINWRIGHT / SW 15TH RD ─────────────────────────────────
+    {
+        "name": "Amazing Lash Studio — Brickell",
+        "slug": "amazing-lash-studio-brickell",
+        "category_slugs": ["lash-brow"],
+        "neighborhood_slugs": ["alice-wainwright-sw-15th-rd"],
+        "address": {"street": "1451 S Miami Ave, Suite 103", "city": "Miami", "state": "FL", "postal_code": "33130", "country": "US"},
+        "phone": "(786) 347-1818",
+        "website": "https://amazinglashstudio.com/locations/florida/brickell",
+        "instagram": "@amazinglashstudiobrickell",
+        "short_description": (
+            "A dedicated lash extension studio south of the main Brickell corridor "
+            "offering classic, hybrid, and volume sets with a membership model "
+            "designed for clients who want fresh lashes on a predictable schedule "
+            "without the unpredictability of single-appointment pricing."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
 ]
 
 

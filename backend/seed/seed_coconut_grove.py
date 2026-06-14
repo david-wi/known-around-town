@@ -556,6 +556,115 @@ BUSINESSES: List[Dict[str, Any]] = [
             {"name": "Men's Grooming / Makeup", "price_range": "$80–$150"},
         ],
     },
+
+    # ── HAIR — SOUTH BAYSHORE / FLORIDA AVENUE (additions) ───────────────────
+    {
+        "name": "Grove Salon",
+        "slug": "grove-salon-south-bayshore",
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": ["south-bayshore-florida-ave"],
+        "address": {"street": "2977 McFarlane Rd", "city": "Miami", "state": "FL", "postal_code": "33133", "country": "US"},
+        "phone": "(305) 443-5700",
+        "website": None,
+        "instagram": None,
+        "short_description": (
+            "A neighborhood hair salon serving the South Bayshore corridor of "
+            "Coconut Grove with cuts, color, and styling for men and women. "
+            "Grove Salon has built a loyal clientele through consistent, "
+            "appointment-first service in a relaxed, tree-shaded setting."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+        "services": [
+            {"name": "Women's Haircut & Style", "price_range": "$65–$100"},
+            {"name": "Men's Haircut", "price_range": "$40–$65"},
+            {"name": "Color / Highlights", "price_range": "$110–$200"},
+            {"name": "Blowout", "price_range": "$50–$80"},
+            {"name": "Keratin Treatment", "price_range": "$180–$300"},
+        ],
+    },
+
+    # ── SPA / MED-SPA — COCOWALK / GRAND AVENUE ──────────────────────────────
+    {
+        "name": "Exhale Spa at Grove Isle",
+        "slug": "exhale-spa-grove-isle-coconut-grove",
+        "category_slugs": ["spa"],
+        "neighborhood_slugs": ["south-bayshore-florida-ave"],
+        "address": {"street": "4 Grove Isle Dr", "city": "Miami", "state": "FL", "postal_code": "33133", "country": "US"},
+        "phone": "(305) 857-5007",
+        "website": "https://exhalespa.com",
+        "instagram": "@exhalespa",
+        "short_description": (
+            "The Coconut Grove outpost of Exhale, the national wellness brand, "
+            "set inside the Grove Isle Club on the water. Offers deep-tissue and "
+            "Swedish massages, customized facials, body wraps, and prenatal "
+            "treatments in a serene waterfront setting that is genuinely hard to "
+            "match anywhere in Miami."
+        ),
+        "price_cues": "$$$$",
+        "editors_pick": True,
+        "services": [
+            {"name": "Swedish Massage (60 min)", "price_range": "$130–$170"},
+            {"name": "Deep Tissue Massage (60 min)", "price_range": "$140–$180"},
+            {"name": "Customized Facial", "price_range": "$130–$180"},
+            {"name": "Body Wrap / Scrub", "price_range": "$150–$200"},
+            {"name": "Prenatal Massage", "price_range": "$130–$160"},
+        ],
+    },
+
+    # ── NAILS — SOUTH BAYSHORE / FLORIDA AVENUE ──────────────────────────────
+    {
+        "name": "Polished Nail Bar Coconut Grove",
+        "slug": "polished-nail-bar-coconut-grove",
+        "category_slugs": ["nails"],
+        "neighborhood_slugs": ["south-bayshore-florida-ave"],
+        "address": {"street": "2900 SW 28th Terrace", "city": "Miami", "state": "FL", "postal_code": "33133", "country": "US"},
+        "phone": "(305) 856-4444",
+        "website": None,
+        "instagram": None,
+        "short_description": (
+            "A clean, well-lit nail salon serving the South Bayshore area of "
+            "Coconut Grove with gel manicures, dip powder, pedicures, and nail "
+            "art. Known for attentive service and a calm environment that stands "
+            "apart from the busier nail bars closer to CocoWalk."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+        "services": [
+            {"name": "Gel Manicure", "price_range": "$40–$55"},
+            {"name": "Dip Powder", "price_range": "$50–$65"},
+            {"name": "Classic Pedicure", "price_range": "$40–$60"},
+            {"name": "Spa Pedicure", "price_range": "$55–$80"},
+            {"name": "Nail Art (per nail)", "price_range": "$5–$15"},
+        ],
+    },
+
+    # ── LASH & BROW — COMMODORE PLAZA / BIRD AVENUE ───────────────────────────
+    {
+        "name": "Brow Bar by Reema — Coconut Grove",
+        "slug": "brow-bar-by-reema-coconut-grove",
+        "category_slugs": ["lash-brow"],
+        "neighborhood_slugs": ["commodore-plaza-bird-ave"],
+        "address": {"street": "2928 SW 27th Ave", "city": "Miami", "state": "FL", "postal_code": "33133", "country": "US"},
+        "phone": "(786) 520-3374",
+        "website": "https://browbarbyreema.com",
+        "instagram": "@browbarbyreema",
+        "short_description": (
+            "The Coconut Grove location of the Miami-born threading and brow "
+            "specialist. Brow Bar by Reema built its reputation on precise "
+            "threading, tinting, and brow lamination at prices that make regular "
+            "maintenance realistic — walk-ins are welcome alongside appointments."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+        "services": [
+            {"name": "Brow Threading", "price_range": "$15–$22"},
+            {"name": "Brow Tint", "price_range": "$18–$25"},
+            {"name": "Brow Lamination", "price_range": "$65–$85"},
+            {"name": "Full-Face Threading", "price_range": "$40–$60"},
+            {"name": "Lash Tint", "price_range": "$25–$35"},
+        ],
+    },
 ]
 
 async def seed_coconut_grove() -> None:

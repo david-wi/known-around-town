@@ -464,6 +464,106 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$$$",
         "editors_pick": False,
     },
+
+    # ── HAIR — OCEAN DRIVE / COLLINS AVE ─────────────────────────────────────
+    {
+        "name": "Salon Ramses",
+        "slug": "salon-ramses-south-beach",
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": ["ocean-drive-collins"],
+        "address": {"street": "650 Collins Ave", "city": "Miami Beach", "state": "FL", "postal_code": "33139", "country": "US"},
+        "phone": "(305) 538-8300",
+        "website": None,
+        "instagram": "@salonramses",
+        "short_description": (
+            "A South Beach veteran on Collins Avenue with decades of history in the "
+            "neighborhood, offering cuts, color, highlights, and blowouts for both men "
+            "and women. Known for dependable, no-fuss service and a loyal local clientele "
+            "that has kept the salon busy through multiple waves of Miami Beach reinvention."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+
+    # ── NAILS — OCEAN DRIVE / COLLINS AVE ────────────────────────────────────
+    {
+        "name": "Nails at the Setai",
+        "slug": "nails-at-the-setai-south-beach",
+        "category_slugs": ["nails", "spa"],
+        "neighborhood_slugs": ["ocean-drive-collins"],
+        "address": {"street": "2001 Collins Ave", "city": "Miami Beach", "state": "FL", "postal_code": "33139", "country": "US"},
+        "phone": "(305) 520-6900",
+        "website": "https://thesetaihotel.com/spa-and-wellness/spa",
+        "instagram": "@thesetaihotel",
+        "short_description": (
+            "The nail and spa services at The Setai's award-winning spa offer some of "
+            "the most refined manicure and pedicure experiences on South Beach — "
+            "performed in an atmosphere of hushed Asian-inspired elegance with top-tier "
+            "products and practitioners, inside one of Collins Avenue's most prestigious hotels."
+        ),
+        "price_cues": "$$$$",
+        "editors_pick": False,
+    },
+
+    # ── WAXING — ESPAÑOLA WAY / MID-BEACH ────────────────────────────────────
+    {
+        "name": "European Wax Center — Miami Beach",
+        "slug": "european-wax-center-miami-beach-espanola",
+        "category_slugs": ["waxing"],
+        "neighborhood_slugs": ["espanola-way-mid"],
+        "address": {"street": "757 Arthur Godfrey Rd", "city": "Miami Beach", "state": "FL", "postal_code": "33140", "country": "US"},
+        "phone": "(305) 397-8770",
+        "website": "https://waxcenter.com/locations/miami-beach-fl",
+        "instagram": "@europeanwaxcenter",
+        "short_description": (
+            "The Miami Beach location of the national wax-specialist chain, situated on "
+            "Arthur Godfrey Road in the Mid-Beach residential corridor. Offers full-body "
+            "waxing for men and women using their proprietary Comfort Wax formula, with "
+            "consistent technique and online booking that appeals to busy South Beach locals."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+
+    # ── BARBER — OCEAN DRIVE / COLLINS AVE ───────────────────────────────────
+    {
+        "name": "Art Deco Barbershop",
+        "slug": "art-deco-barbershop-south-beach",
+        "category_slugs": ["barber"],
+        "neighborhood_slugs": ["ocean-drive-collins"],
+        "address": {"street": "820 Collins Ave", "city": "Miami Beach", "state": "FL", "postal_code": "33139", "country": "US"},
+        "phone": "(305) 672-4247",
+        "website": None,
+        "instagram": None,
+        "short_description": (
+            "A no-frills classic barbershop in the heart of South Beach's Art Deco "
+            "Historic District, offering straight-razor shaves, traditional cuts, and "
+            "beard trims at honest prices. A grounding counterpoint to the flashier "
+            "salons on the strip, frequented by both locals and hotel guests since the 1990s."
+        ),
+        "price_cues": "$",
+        "editors_pick": False,
+    },
+
+    # ── MED-SPA — LINCOLN ROAD / ALTON ROAD ──────────────────────────────────
+    {
+        "name": "Skin Laundry — South Beach",
+        "slug": "skin-laundry-south-beach-lincoln",
+        "category_slugs": ["med-spa"],
+        "neighborhood_slugs": ["lincoln-road-alton"],
+        "address": {"street": "1601 Collins Ave", "city": "Miami Beach", "state": "FL", "postal_code": "33139", "country": "US"},
+        "phone": "(786) 664-0920",
+        "website": "https://skinlaundry.com/locations/south-beach",
+        "instagram": "@skinlaundry",
+        "short_description": (
+            "The South Beach outpost of the cult-favorite laser facial brand, offering "
+            "their signature 15-minute Laser & Light Facial alongside microdermabrasion, "
+            "chemical peels, LED therapy, and Hydrafacials. Beloved for making clinical "
+            "skin treatments fast, accessible, and affordable without sacrificing results."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
 ]
 
 

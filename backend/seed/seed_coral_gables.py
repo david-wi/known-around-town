@@ -528,6 +528,105 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$$",
         "editors_pick": False,
     },
+
+    # ── MAKEUP — MIRACLE MILE / DOWNTOWN ─────────────────────────────────────
+    {
+        "name": "Sonia Roselli Beauty Studio",
+        "slug": "sonia-roselli-beauty-studio-miracle-mile",
+        "category_slugs": ["makeup"],
+        "neighborhood_slugs": ["miracle-mile"],
+        "address": {"street": "358 Alhambra Cir, Suite 100", "city": "Coral Gables", "state": "FL", "postal_code": "33134", "country": "US"},
+        "phone": "(305) 444-1900",
+        "website": "https://soniaroselli.com",
+        "instagram": "@soniarosellibeauty",
+        "short_description": (
+            "A prestige makeup and beauty studio near Miracle Mile built around the "
+            "professional skincare and makeup line by celebrity artist Sonia Roselli — "
+            "offering bridal, editorial, and special-event application alongside "
+            "product consultations for skin-prep obsessives."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": True,
+    },
+
+    # ── HAIR — COCONUT GROVE ADJACENT ────────────────────────────────────────
+    {
+        "name": "Studio 5C Salon",
+        "slug": "studio-5c-salon-coconut-grove-adjacent",
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": ["coconut-grove-adjacent"],
+        "address": {"street": "3390 Mary St, Suite 120", "city": "Coconut Grove", "state": "FL", "postal_code": "33133", "country": "US"},
+        "phone": "(305) 443-5080",
+        "website": "https://studio5csalon.com",
+        "instagram": "@studio5csalon",
+        "short_description": (
+            "A boutique salon serving the Coconut Grove/Coral Gables border with "
+            "precision cuts, balayage, and Olaplex color treatments — known for "
+            "a relaxed, private-suite atmosphere and stylists who prioritize "
+            "hair health alongside aesthetics."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": False,
+    },
+
+    # ── MED-SPA — SOUTH CORAL GABLES ─────────────────────────────────────────
+    {
+        "name": "Soul Aesthetics Medical Spa",
+        "slug": "soul-aesthetics-medical-spa-south-coral-gables",
+        "category_slugs": ["med-spa"],
+        "neighborhood_slugs": ["south-coral-gables"],
+        "address": {"street": "7272 SW 87th Ave, Suite 101", "city": "Miami", "state": "FL", "postal_code": "33173", "country": "US"},
+        "phone": "(305) 595-1565",
+        "website": "https://soulaestheticsspa.com",
+        "instagram": "@soulaestheticsspa",
+        "short_description": (
+            "A physician-led medical spa in the South Coral Gables/Kendall corridor "
+            "offering Botox, filler, Sculptra, laser hair removal, CoolSculpting, "
+            "and HydraFacials — appreciated for competitive pricing and a "
+            "results-focused approach with board-certified oversight."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": False,
+    },
+
+    # ── NAILS — COCONUT GROVE ADJACENT ───────────────────────────────────────
+    {
+        "name": "Le Nails & Spa",
+        "slug": "le-nails-and-spa-coconut-grove-adjacent",
+        "category_slugs": ["nails"],
+        "neighborhood_slugs": ["coconut-grove-adjacent"],
+        "address": {"street": "3015 Grand Ave", "city": "Coconut Grove", "state": "FL", "postal_code": "33133", "country": "US"},
+        "phone": "(305) 461-5080",
+        "website": None,
+        "instagram": None,
+        "short_description": (
+            "A well-regarded nail salon in CocoWalk / Coconut Grove, steps from the "
+            "Coral Gables border, offering gel manicures, acrylics, dip powder, "
+            "and spa pedicures at consistent quality for a loyal neighborhood following."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
+
+    # ── SPA — SOUTH CORAL GABLES ──────────────────────────────────────────────
+    {
+        "name": "Azul Body Therapy",
+        "slug": "azul-body-therapy-south-coral-gables",
+        "category_slugs": ["spa"],
+        "neighborhood_slugs": ["south-coral-gables"],
+        "address": {"street": "8323 SW 124th Ave, Suite 103", "city": "Miami", "state": "FL", "postal_code": "33183", "country": "US"},
+        "phone": "(305) 596-3338",
+        "website": "https://azulbodytherapy.com",
+        "instagram": "@azulbodytherapy",
+        "short_description": (
+            "A therapeutic massage and body treatment studio serving South Coral "
+            "Gables and Kendall clients with deep tissue, Swedish, hot stone, "
+            "prenatal, and lymphatic drainage sessions — consistently praised "
+            "for skilled therapists and a genuinely restorative environment."
+        ),
+        "price_cues": "$$",
+        "editors_pick": False,
+    },
 ]
 
 
