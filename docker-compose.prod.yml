@@ -68,6 +68,10 @@ services:
       # the "HTML tag" verification method in Search Console so David can
       # verify site ownership without adding a file to the repo.
       GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
+      # WHY: Google Places API key for the star-ratings sync script. Key stored
+      # in server .env (not committed). Without this line the container never
+      # sees it even when it's present on the host.
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
       # WHY: gates the entire site behind an email+code login during the
       # pre-launch period. Defaults to true (gate active). Set to false in
       # .env on the server to open the site publicly without a code deploy.
@@ -228,6 +232,8 @@ services:
       GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
       CANONICAL_BASE_URL: ${CANONICAL_BASE_URL:-}
       GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
+      # WHY: same as prod backend — key lives in server .env, not committed.
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
       # WHY: stage keeps the preview gate active by default (same as prod)
       # so reviewers also go through the login flow and can verify it works.
       PREVIEW_MODE_ENABLED: ${PREVIEW_MODE_ENABLED:-true}
