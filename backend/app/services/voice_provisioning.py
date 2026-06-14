@@ -253,6 +253,16 @@ async def provision_salon_receptionist(db: Any, business_id: str) -> Dict[str, A
     if not business:
         raise ValueError(f"Business {business_id!r} not found")
 
+    # WHY: idempotency guard — if the business already has a provisioned phone
+    # number, a second call would buy another number from Twilio via VAPI and
+    # orphan the first one, which VAPI continues to bill for indefinitely.
+    # Force the caller to deprovision before re-provisioning.
+    if business.get("vapi_phone_number_id"):
+        raise ValueError(
+            f"Business {business_id!r} already has a provisioned receptionist. "
+            "Deprovision it first before re-provisioning."
+        )
+
     api_key = _get_api_key()
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -262,51 +272,83 @@ async def provision_salon_receptionist(db: Any, business_id: str) -> Dict[str, A
     assistant_payload = _build_assistant_payload(business)
 
     async with httpx.AsyncClient(base_url=_VAPI_BASE, timeout=30.0) as client:
-        # Step 1: Create the assistant
-        log.info("Creating VAPI assistant for business %s", business_id)
-        resp = await client.post("/assistant", json=assistant_payload, headers=headers)
-        resp.raise_for_status()
-        assistant_data = resp.json()
-        assistant_id: str = assistant_data["id"]
-        log.info("Created VAPI assistant %s for business %s", assistant_id, business_id)
-
-        # Step 2: Buy a phone number — prefer area code 669, fall back to any US number
-        # WHY: two attempts — preferred area code first, then fallback — because VAPI
-        # sometimes has no inventory for a specific area code and would return 400
-        # rather than automatically choosing an alternative.
+        # Steps 1-3 are wrapped in a try/except so that any failure in the
+        # wiring step (Step 3) cleans up the already-created VAPI resources.
+        # WHY: if Step 3 raises, the assistant and phone number from Steps 1-2
+        # are orphaned — VAPI bills for them forever, and the DB record is left
+        # broken. Cleaning up here keeps VAPI and the DB consistent.
+        assistant_id: str = ""
         phone_number_id: str = ""
         raw_number: str = ""
-        for area_code in [_PREFERRED_AREA_CODE, None]:
-            phone_payload: Dict[str, Any] = {"provider": "twilio"}
-            if area_code:
-                phone_payload["areaCode"] = area_code
-            log.info("Requesting VAPI phone number (areaCode=%s)", area_code)
-            try:
-                presp = await client.post("/phone-number", json=phone_payload, headers=headers)
-                presp.raise_for_status()
-                phone_data = presp.json()
-                phone_number_id = phone_data["id"]
-                raw_number = phone_data.get("number", "")
-                log.info("Bought VAPI phone number %s (%s)", raw_number, phone_number_id)
-                break
-            except httpx.HTTPStatusError as e:
-                if area_code is not None:
-                    log.warning(
-                        "Area code %s not available (%s), retrying without preference",
-                        area_code,
-                        e.response.status_code,
-                    )
-                    continue
-                raise  # fallback also failed — re-raise
+        try:
+            # Step 1: Create the assistant
+            log.info("Creating VAPI assistant for business %s", business_id)
+            resp = await client.post("/assistant", json=assistant_payload, headers=headers)
+            resp.raise_for_status()
+            assistant_data = resp.json()
+            assistant_id = assistant_data["id"]
+            log.info("Created VAPI assistant %s for business %s", assistant_id, business_id)
 
-        # Step 3: Wire the assistant to the phone number
-        log.info("Wiring assistant %s to phone number %s", assistant_id, phone_number_id)
-        patch_resp = await client.patch(
-            f"/phone-number/{phone_number_id}",
-            json={"assistantId": assistant_id},
-            headers=headers,
-        )
-        patch_resp.raise_for_status()
+            # Step 2: Buy a phone number — prefer area code 669, fall back to any US number
+            # WHY: two attempts — preferred area code first, then fallback — because VAPI
+            # sometimes has no inventory for a specific area code and would return 400
+            # rather than automatically choosing an alternative.
+            for area_code in [_PREFERRED_AREA_CODE, None]:
+                phone_payload: Dict[str, Any] = {"provider": "twilio"}
+                if area_code:
+                    phone_payload["areaCode"] = area_code
+                log.info("Requesting VAPI phone number (areaCode=%s)", area_code)
+                try:
+                    presp = await client.post("/phone-number", json=phone_payload, headers=headers)
+                    presp.raise_for_status()
+                    phone_data = presp.json()
+                    phone_number_id = phone_data["id"]
+                    raw_number = phone_data.get("number", "")
+                    log.info("Bought VAPI phone number %s (%s)", raw_number, phone_number_id)
+                    break
+                except httpx.HTTPStatusError as e:
+                    if area_code is not None:
+                        log.warning(
+                            "Area code %s not available (%s), retrying without preference",
+                            area_code,
+                            e.response.status_code,
+                        )
+                        continue
+                    raise  # fallback also failed — re-raise
+
+            # Step 3: Wire the assistant to the phone number
+            log.info("Wiring assistant %s to phone number %s", assistant_id, phone_number_id)
+            patch_resp = await client.patch(
+                f"/phone-number/{phone_number_id}",
+                json={"assistantId": assistant_id},
+                headers=headers,
+            )
+            patch_resp.raise_for_status()
+
+        except Exception:
+            # Clean up any VAPI resources that were already created so they don't
+            # become orphaned billable resources.
+            if phone_number_id:
+                log.warning(
+                    "Provisioning failed — deleting orphaned phone number %s", phone_number_id
+                )
+                try:
+                    await client.delete(f"/phone-number/{phone_number_id}", headers=headers)
+                except Exception:
+                    log.exception(
+                        "Failed to clean up orphaned phone number %s", phone_number_id
+                    )
+            if assistant_id:
+                log.warning(
+                    "Provisioning failed — deleting orphaned assistant %s", assistant_id
+                )
+                try:
+                    await client.delete(f"/assistant/{assistant_id}", headers=headers)
+                except Exception:
+                    log.exception(
+                        "Failed to clean up orphaned assistant %s", assistant_id
+                    )
+            raise
 
     # Format the number as "(NXX) NXX-XXXX" if it looks like a 10-digit US E.164 number
     formatted_number = _format_us_phone(raw_number)
