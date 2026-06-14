@@ -10,7 +10,13 @@ from app.database import get_db
 
 async def list_neighborhoods(city_id: str) -> List[Dict[str, Any]]:
     db = get_db()
-    cur = db.neighborhoods.find({"city_id": city_id, "status": {"$ne": "archived"}})
+    # WHY: only surface neighborhoods that actually have businesses — a
+    # listed_count of 0 (or missing) means the page would be empty, which
+    # hurts SEO and confuses visitors. The field is incremented whenever a
+    # business is published to this neighborhood.
+    cur = db.neighborhoods.find(
+        {"city_id": city_id, "status": {"$ne": "archived"}, "listed_count": {"$gt": 0}}
+    )
     return await cur.sort([("order", 1), ("name", 1)]).to_list(length=200)
 
 
