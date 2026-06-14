@@ -436,3 +436,33 @@ completely off-screen at a standard 1440×900 viewport. Owners who didn't scroll
 saw a way to act. Add the primary CTA immediately after the price (before the feature
 list). Keep a second CTA at the bottom for thorough readers. Two CTAs on a pricing
 card is correct UX, not redundant.
+
+## Home page og:image: pass it through the route context, don't add it manually in the template (2026-06-14)
+
+`base.html` emits `og:image` only when the route passes `og_image` in the template
+context (`{% if og_image %}<meta property="og:image"...>`). Every page route does this.
+The home route was the only exception — it passed `hero_photo_url` but not `og_image`,
+so `base.html` silently emitted nothing. Someone then added a manual `og:image` tag
+inside `home.html`'s `head_extra` block as a workaround, producing TWO og:image tags
+(one blank from `base.html`, one correct from `home.html`).
+
+**Fix (PR #261):** Add `"og_image": city.get("hero_photo_url")` to the home route
+context and remove the manual tag from `home.html`. Now all pages follow the same
+pattern.
+
+**Pattern to enforce:** never add `og:image` manually in a page template — always pass
+`og_image` through the route context so `base.html` handles it.
+
+## Sitemap lastmod: use the record's actual date, not today (2026-06-14)
+
+Editorial guide entries in the sitemap previously used `today_str` (today's date) as
+`<lastmod>`. Google's crawler therefore treated every guide as modified daily, wasting
+crawl budget and reducing the signal value of our date fields.
+
+**Fix (PR #261):** Use `g.get("updated_at") or g.get("published_at")` and fall back
+to `today_str` only when neither field exists. Every guide now reports its real
+publish date as `lastmod`.
+
+**General rule:** never use today's date as a `lastmod` for content that doesn't
+actually change daily — it signals noise to search engines and erodes the credibility
+of your sitemap dates overall.

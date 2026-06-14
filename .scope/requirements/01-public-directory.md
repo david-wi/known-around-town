@@ -77,3 +77,22 @@ All pages use canonical `<link rel="canonical">` tags pointing to
 **Acceptance:** Given a business detail page, when the HTML source is inspected,
 then a canonical URL tag is present and the GA4 snippet is included when
 `GA_MEASUREMENT_ID` is set.
+
+### KAT-073 — Single og:image tag on home page · V1 · implemented
+**Persona:** Google, social media platforms (Facebook, Slack, iMessage link previews).
+The home page emits exactly one `og:image` meta tag — the city hero image — so that
+social sharing previews display a single, correct image instead of a blank or doubled
+card. All other page types already handled this through the base template; the home
+route was the lone exception that added a second manual tag.
+**Acceptance:** Given a GET request to the home page, when the HTML source is
+inspected, then exactly one `<meta property="og:image">` tag is present and its
+`content` attribute contains the city hero photo URL.
+
+### KAT-074 — Sitemap guide lastmod uses actual publish date · V1 · implemented
+**Persona:** Google (search indexer).
+Each editorial guide entry in `/sitemap.xml` reports its actual `published_at` (or
+`updated_at`) date as `<lastmod>`, not today's date. Reporting today's date on every
+crawl told Google that every guide was modified daily, wasting crawl budget and weakening
+the trustworthiness of our lastmod signals for guides that haven't changed.
+**Acceptance:** Given a published editorial guide, when `/sitemap.xml` is fetched, then
+the guide's `<lastmod>` value matches the guide's publish date, not the current date.
