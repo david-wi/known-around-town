@@ -349,6 +349,56 @@ def test_admin_claims_page_shows_street_address(client, seeded_db):
             )
 
 
+# ---- submit_claim guard: verified and pending businesses ---------------
+
+def test_submit_claim_blocked_when_business_already_verified(client, seeded_db):
+    """Submitting a claim for a business that already has claim_status='verified'
+    must return 409 so the verified owner's dashboard access is never revoked."""
+    business = _first_business(seeded_db)
+    # Mark the business as verified (simulates a paying subscriber owning it).
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"_id": business["_id"]},
+            {"$set": {"claim_status": "verified"}},
+        )
+    )
+    payload = {
+        "business_id": business["_id"],
+        "submitter_name": "Imposter",
+        "submitter_email": "imposter@example.com",
+        "submitter_phone": "+1 305-555-9999",
+        "notes": "Trying to steal this listing.",
+    }
+    r = client.post("/api/v1/claims", json=payload)
+    assert r.status_code == 409, r.text
+    assert "already been claimed" in r.text
+    # Confirm the business status was NOT changed.
+    b_after = asyncio.run(seeded_db.businesses.find_one({"_id": business["_id"]}))
+    assert b_after["claim_status"] == "verified"
+
+
+def test_submit_claim_blocked_when_business_claim_pending(client, seeded_db):
+    """Submitting a second claim for a business that is already pending review
+    must return 409.  A duplicate submission does not create a second record."""
+    business = _first_business(seeded_db)
+    # First submission — should succeed.
+    _submit_claim(client, business["_id"])
+    # Confirm the business is now pending.
+    b_mid = asyncio.run(seeded_db.businesses.find_one({"_id": business["_id"]}))
+    assert b_mid["claim_status"] == "pending"
+    # Second submission — must be rejected.
+    payload = {
+        "business_id": business["_id"],
+        "submitter_name": "Second Claimant",
+        "submitter_email": "second@example.com",
+        "submitter_phone": "+1 305-555-8888",
+        "notes": "Also want to claim this.",
+    }
+    r = client.post("/api/v1/claims", json=payload)
+    assert r.status_code == 409, r.text
+    assert "already under review" in r.text
+
+
 # ---- existing verify still works ---------------------------------------
 
 def test_verify_claim_still_works(client, seeded_db):

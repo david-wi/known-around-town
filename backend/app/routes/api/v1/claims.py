@@ -27,6 +27,22 @@ async def submit_claim(body: BusinessClaim, request: Request) -> Dict[str, Any]:
     business = await db.businesses.find_one({"_id": doc["business_id"]})
     if not business:
         raise HTTPException(404, "Business not found")
+    # WHY: guard against overwriting a verified (paying subscriber) or
+    # already-pending claim.  Without this check any visitor can submit a
+    # new claim and unconditionally flip claim_status to "pending", which
+    # immediately locks the verified owner out of their dashboard (the
+    # dashboard checks claim_status == "verified" to grant access).
+    current_status = business.get("claim_status")
+    if current_status == "verified":
+        raise HTTPException(
+            409,
+            "This listing has already been claimed. Contact hello@knowsbeauty.com if you believe this is an error.",
+        )
+    if current_status == "pending":
+        raise HTTPException(
+            409,
+            "A claim for this listing is already under review.",
+        )
     await db.business_claims.insert_one(doc)
     await db.businesses.update_one(
         {"_id": doc["business_id"]},
