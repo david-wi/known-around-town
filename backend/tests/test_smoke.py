@@ -1331,6 +1331,45 @@ def test_search_page_shows_owner_banner_when_results(client, seeded_db):
     assert 'href="/owners"' in r.text
 
 
+def test_search_page_title_includes_city_name(client):
+    """The search page <title> must include the city name so Google knows
+    the page is specific to Miami, not a generic search across all cities.
+
+    WHY: 'Search — Knows Beauty' can't rank for 'hair salon search miami'
+    because the title has no location signal. 'Search Miami — Knows Beauty'
+    targets the city and helps with local SEO. The city name is already in
+    the page context (it's used for the h1 text), so including it in the
+    title costs nothing and lifts relevance significantly."""
+    import re
+
+    # No-query state: title should be 'Search Miami — Knows Beauty'
+    r = client.get("/search", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    m = re.search(r"<title>(.*?)</title>", r.text)
+    assert m, "Search page has no <title> tag"
+    title = m.group(1)
+    assert "Miami" in title, (
+        f"Search page title '{title}' is missing 'Miami' — "
+        "without the city name the title cannot rank for local search queries"
+    )
+    assert "Knows Beauty" in title, (
+        f"Search page title '{title}' is missing the network name 'Knows Beauty'"
+    )
+
+    # With-query state: title should include both the city and the query term
+    r2 = client.get("/search?q=nails", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r2.status_code == 200, r2.text
+    m2 = re.search(r"<title>(.*?)</title>", r2.text)
+    assert m2, "Search results page has no <title> tag"
+    title2 = m2.group(1)
+    assert "Miami" in title2, (
+        f"Search results title '{title2}' is missing 'Miami'"
+    )
+    assert "nails" in title2.lower(), (
+        f"Search results title '{title2}' is missing the query term 'nails'"
+    )
+
+
 def test_404_page_has_search_and_owner_cta(client):
     """A 404 should not be a dead end. The page must include a search bar
     (so a user can recover by searching) and an owner claim CTA (since many
