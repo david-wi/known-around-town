@@ -2539,11 +2539,62 @@ def test_robots_txt_disallows_owner_auth_routes(client):
     assert "Disallow: /owners/login" in body, (
         "robots.txt should disallow /owners/login (always redirects to auth)"
     )
+    assert "Disallow: /owners/auth" in body, (
+        "robots.txt should disallow /owners/auth (POST endpoint that sends magic codes)"
+    )
     assert "Disallow: /owners/me" in body, (
         "robots.txt should disallow /owners/me (authenticated dashboard)"
     )
+    assert "Disallow: /owners/verify" not in body, (
+        "robots.txt must NOT list /owners/verify — that route does not exist; "
+        "its presence confuses SEO audit tools"
+    )
     assert "Sitemap:" in body, (
         "robots.txt must still include the Sitemap: directive"
+    )
+
+
+def test_business_jsonld_uses_stored_schema_org_type_over_keyword_chain(client, seeded_db):
+    """When a business has schema_org_type set in the database, the JSON-LD block
+    must use that stored value rather than guessing from the category slug keyword.
+    Without this, a laser clinic filed under 'skincare' gets 'BeautySalon' instead
+    of 'MedicalSpa', losing Google rich-snippet eligibility for that entity class."""
+    import asyncio
+    import json
+    import re
+
+    from app.database import get_db
+
+    async def _setup():
+        db = get_db()
+        # Borrow city_id from a seeded business — the route resolves business by
+        # (city_id, slug) so the city_id must match what the tenant city resolves to.
+        existing = await db.businesses.find_one({"status": "live"})
+        assert existing, "Expected at least one seeded business in mock db"
+        await db.businesses.insert_one({
+            "_id": "test-schema-type-override",
+            "slug": "test-laser-clinic",
+            "name": "Test Laser Clinic",
+            "city_id": existing["city_id"],
+            "status": "live",
+            # 'skincare' has no med-spa/medspa keyword — keyword chain would fall
+            # through to BeautySalon, which is the wrong type for a laser clinic
+            "category_slugs": ["skincare"],
+            # stored type must override the keyword chain
+            "schema_org_type": "MedicalSpa",
+            "short_description": "A test laser clinic.",
+        })
+
+    asyncio.run(_setup())
+
+    r = client.get("/b/test-laser-clinic", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, f"Business detail page returned {r.status_code}; expected 200"
+    match = re.search(r'<script type="application/ld\+json">(.*?)</script>', r.text, re.DOTALL)
+    assert match, "JSON-LD <script> block not found in business page"
+    data = json.loads(match.group(1))
+    assert data.get("@type") == "MedicalSpa", (
+        f"Expected '@type': 'MedicalSpa' (stored), got {data.get('@type')!r}. "
+        "The template must prefer schema_org_type over keyword-matching the slug."
     )
 
 
