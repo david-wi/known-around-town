@@ -3329,3 +3329,50 @@ def test_dedup_photos_empty_list():
     from app.routes.public.pages import _dedup_photos
 
     assert _dedup_photos([]) == []
+
+
+async def test_cross_city_footer_shows_sibling_cities(seeded_db):
+    """Footer renders a 'More cities' section with all sibling cities in the network.
+
+    WHY: cross-linking every city page to its siblings signals to Google that
+    the pages form a coherent network, passing authority between them and helping
+    the crawler discover all city subdomains without relying solely on the sitemap.
+    """
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    network = await seeded_db.networks.find_one({"slug": "beauty"})
+    assert network, "beauty network must be seeded"
+
+    await seeded_db.cities.insert_one({
+        "_id": "city-ft-laud-test",
+        "network_id": network["_id"],
+        "slug": "fort-lauderdale",
+        "name": "Fort Lauderdale",
+        "status": "live",
+    })
+
+    client = TestClient(app)
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+
+    # The sibling city should appear in the footer with its cross-city URL
+    assert "Fort Lauderdale" in r.text
+    assert "https://fort-lauderdale.knowsbeauty.localhost/" in r.text
+    # The section header must be present
+    assert "More cities" in r.text
+
+
+async def test_cross_city_footer_hidden_when_only_one_city(seeded_db):
+    """'More cities' section is absent when the network has only one city.
+
+    The default seeded DB has Miami as the sole beauty city; there are no
+    sibling cities to cross-link to, so the section should not render at all.
+    """
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "More cities" not in r.text

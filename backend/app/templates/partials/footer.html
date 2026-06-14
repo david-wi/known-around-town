@@ -61,6 +61,16 @@
         </ul>
       </div>
     </div>
+    {% if network_cities %}
+    <div class="mt-12 pt-8 border-t border-stone-800">
+      <p class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-500 mb-4">More cities</p>
+      <div class="flex flex-wrap gap-x-6 gap-y-2">
+        {% for nc in network_cities %}
+        <a href="{{ nc.url }}" class="text-sm text-stone-400 hover:text-white transition-colors">{{ nc.name }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
     <div class="mt-16 pt-8 border-t border-stone-800 flex flex-col md:flex-row justify-between gap-4 text-xs text-stone-500">
       <p>{{ footer_legal or ('© ' ~ now.year ~ ' ' ~ (city.name if city else '') ~ ' Knows ' ~ vertical_word ~ ' · A local-first directory.') }}</p>
       <p class="italic">{{ footer_made_in or ('Made in ' ~ (city.name if city else 'South Florida') ~ ' · Powered by Expertly') }}</p>
