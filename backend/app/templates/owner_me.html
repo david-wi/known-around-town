@@ -287,12 +287,16 @@
 <section class="bg-stone-50 border-t border-stone-100">
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-10">
     <h2 class="text-base font-semibold text-stone-900 mb-1">Listing performance</h2>
-    <p class="text-sm text-stone-500 mb-6">How many times visitors have viewed your listing page.</p>
+    <p class="text-sm text-stone-500 mb-6">Your listing activity — page views and messages received.</p>
     <div class="flex gap-8 flex-wrap">
       <div class="bg-white rounded-2xl border border-stone-200 px-8 py-6 flex flex-col items-center min-w-[10rem]">
         <span id="stat-views" class="text-4xl font-bold text-rose-600 tracking-tight">&hellip;</span>
         <span class="mt-1 text-sm text-stone-500">page views</span>
       </div>
+      <a href="#visitor-inquiries" class="bg-white rounded-2xl border border-stone-200 px-8 py-6 flex flex-col items-center min-w-[10rem] hover:border-stone-300 transition no-underline">
+        <span id="stat-inquiries" class="text-4xl font-bold text-emerald-600 tracking-tight">&hellip;</span>
+        <span class="mt-1 text-sm text-stone-500">messages received</span>
+      </a>
     </div>
     <p id="stats-error" class="hidden mt-4 text-sm text-rose-700" role="alert" aria-live="polite"></p>
   </div>
@@ -702,7 +706,7 @@
 {# WHY: Owners need to see who tried to contact them through their listing.
    Without this, a lead sitting in business_inquiries is invisible — the
    owner never knows someone reached out, and the inquiry dies unused. #}
-<section class="bg-stone-50/40 border-t border-stone-100">
+<section id="visitor-inquiries" class="bg-stone-50/40 border-t border-stone-100">
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
     <h2 class="text-base font-semibold text-stone-900 mb-1">Visitor inquiries</h2>
     <p class="text-sm text-stone-500 mb-6">
@@ -1528,11 +1532,15 @@
       loadingEl.classList.add('hidden');
       if (!data || data.length === 0) {
         emptyEl.classList.remove('hidden');
+        var statInq = document.getElementById('stat-inquiries');
+        if (statInq) statInq.textContent = '0';
         return;
       }
       data.forEach(function (inq) {
         listEl.appendChild(renderInquiry(inq));
       });
+      var statInq = document.getElementById('stat-inquiries');
+      if (statInq) statInq.textContent = data.length;
       listEl.classList.remove('hidden');
     })
     .catch(function () {
