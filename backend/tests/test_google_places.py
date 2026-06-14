@@ -278,6 +278,109 @@ class TestLookupRating:
         assert result is not None
         assert result.hours == []
 
+    @pytest.mark.asyncio
+    async def test_retries_on_429_and_succeeds(self, respx_mock):
+        """lookup_rating retries after a 429 and returns the result on the second attempt.
+
+        WHY this test exists: before the retry fix, a single 429 would permanently
+        fail the business — the sync counted it as 'failed' and never retried.
+        After the fix, the client backs off and tries again up to _MAX_RETRY_ATTEMPTS times.
+        """
+        from app.services import google_places
+        from unittest.mock import AsyncMock
+
+        with patch("app.services.google_places.get_settings") as mock_settings, \
+             patch("app.services.google_places.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            mock_settings.return_value.google_places_api_key = "AIza-test-key"
+
+            # First call returns 429; second call returns valid data
+            respx_mock.get(
+                "https://places.googleapis.com/v1/places/ChIJ_rate_limited"
+            ).side_effect = [
+                httpx.Response(429, json={"error": "RESOURCE_EXHAUSTED"}),
+                httpx.Response(200, json={"id": "ChIJ_rate_limited", "rating": 4.2, "userRatingCount": 150}),
+            ]
+
+            result = await google_places.lookup_rating(
+                "Test Salon", "Miami", existing_place_id="ChIJ_rate_limited"
+            )
+
+        assert result is not None, "should have succeeded on the second attempt"
+        assert result.rating == 4.2
+        assert result.review_count == 150
+        # Confirm sleep was called once (one retry)
+        assert mock_sleep.call_count == 1
+        # Confirm backoff delay: attempt 0 → 2.0 * 2^0 = 2.0s
+        assert mock_sleep.call_args_list[0][0][0] == pytest.approx(2.0)
+
+    @pytest.mark.asyncio
+    async def test_gives_up_after_max_retries_on_429(self, respx_mock):
+        """lookup_rating returns None after exhausting all retry attempts on 429.
+
+        WHY: verifies the retry limit is actually enforced and the function
+        doesn't loop forever. With _MAX_RETRY_ATTEMPTS = 3, we expect 4 total
+        attempts (original + 3 retries), all returning 429, then None.
+        """
+        from app.services import google_places
+        from app.services.google_places import _MAX_RETRY_ATTEMPTS
+        from unittest.mock import AsyncMock
+
+        with patch("app.services.google_places.get_settings") as mock_settings, \
+             patch("app.services.google_places.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            mock_settings.return_value.google_places_api_key = "AIza-test-key"
+
+            # All attempts return 429
+            respx_mock.get(
+                "https://places.googleapis.com/v1/places/ChIJ_always_rate_limited"
+            ).return_value = httpx.Response(429, json={"error": "RESOURCE_EXHAUSTED"})
+
+            result = await google_places.lookup_rating(
+                "Test Salon", "Miami", existing_place_id="ChIJ_always_rate_limited"
+            )
+
+        assert result is None, "should give up after max retries"
+        # sleep was called _MAX_RETRY_ATTEMPTS times (once per retry, not on the final give-up)
+        assert mock_sleep.call_count == _MAX_RETRY_ATTEMPTS
+
+    @pytest.mark.asyncio
+    async def test_text_search_retries_on_429(self, respx_mock):
+        """429 on text search (no existing place_id) also triggers retry.
+
+        WHY: the retry fix applies to BOTH API calls — text search (POST) and
+        place details (GET). Without this, businesses without a cached place_id
+        would be counted as 'no_match' on any rate-limited text search.
+        """
+        from app.services import google_places
+        from unittest.mock import AsyncMock
+
+        with patch("app.services.google_places.get_settings") as mock_settings, \
+             patch("app.services.google_places.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            mock_settings.return_value.google_places_api_key = "AIza-test-key"
+
+            # Text search: first 429, then success
+            respx_mock.post(
+                "https://places.googleapis.com/v1/places:searchText"
+            ).side_effect = [
+                httpx.Response(429, json={"error": "RESOURCE_EXHAUSTED"}),
+                httpx.Response(200, json={
+                    "places": [{"id": "ChIJ_found", "displayName": {"text": "Test Salon"}}]
+                }),
+            ]
+            # Details fetch succeeds immediately
+            respx_mock.get(
+                "https://places.googleapis.com/v1/places/ChIJ_found"
+            ).return_value = httpx.Response(
+                200,
+                json={"id": "ChIJ_found", "rating": 4.5, "userRatingCount": 200},
+            )
+
+            result = await google_places.lookup_rating("Test Salon", "Miami")
+
+        assert result is not None, "should succeed after retrying the text search"
+        assert result.place_id == "ChIJ_found"
+        assert result.rating == 4.5
+        assert mock_sleep.call_count == 1
+
 
 # ── admin sync endpoint tests ────────────────────────────────────────────────
 

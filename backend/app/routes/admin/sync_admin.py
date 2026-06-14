@@ -115,10 +115,12 @@ async def sync_ratings(
 
     log.info("Starting Google ratings sync for %d businesses", len(businesses))
 
-    # WHY: semaphore of 5 to avoid hammering the Places API with dozens of
-    # simultaneous requests, which can trigger rate-limit errors even under
-    # the per-second quota. Sequential-enough to stay under 10 QPS.
-    sem = asyncio.Semaphore(5)
+    # WHY: semaphore of 3 (down from 5) to reduce burst rate. Combined with
+    # the 0.1s inter-request sleep below, peak throughput is ~30 req/s —
+    # well under Google's 100 QPS limit but far enough from the edge to
+    # avoid triggering 429s on large syncs. The google_places module now also
+    # retries on 429 with backoff, so this is defense-in-depth.
+    sem = asyncio.Semaphore(3)
     updated = 0
     failed = 0
     no_match = 0
@@ -138,6 +140,10 @@ async def sync_ratings(
                 city=city_name,
                 existing_place_id=biz.get("google_place_id"),
             )
+            # WHY: 0.1s sleep inside the semaphore block paces each slot so
+            # concurrent slots don't all fire requests at the same millisecond.
+            # At semaphore=3 and 0.1s hold this caps burst throughput at ~30 req/s.
+            await asyncio.sleep(0.1)
         if rating_result is None:
             if biz.get("google_place_id"):
                 # Had a place_id but fetch failed — transient error; keep old data

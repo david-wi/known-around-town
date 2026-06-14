@@ -26,6 +26,7 @@ regularOpeningHours with integer hour/minute fields instead of the legacy
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
@@ -62,6 +63,16 @@ _NAME_SIMILARITY_THRESHOLD = 0.40
 # HoursEntry.day strings. This lets us translate the API's numeric format
 # into the model's named-day format without a conditional chain.
 _DAY_INT_TO_STR = {0: "sun", 1: "mon", 2: "tue", 3: "wed", 4: "thu", 5: "fri", 6: "sat"}
+
+# WHY: retry up to 3 times on 429 rate-limit responses. Google's quotas reset
+# per second, so sleeping a few seconds between attempts recovers most bursts.
+# 3 retries keeps total per-business wait under 15s (2 + 4 + 8) in the worst case.
+_MAX_RETRY_ATTEMPTS = 3
+
+# WHY: 2s base delay; doubles each attempt (2s → 4s → 8s). Exponential backoff
+# is the standard approach for rate-limited APIs — it spaces out retries so
+# quota has time to replenish rather than hammering the same second again.
+_RETRY_BACKOFF_SECONDS = 2.0
 
 
 @dataclass
@@ -188,22 +199,47 @@ async def _search_and_fetch(
     with the query in the JSON body and auth in the X-Goog-Api-Key header.
     """
     query = f"{business_name} {city} {state}"
-    try:
-        r = await client.post(
-            _PLACES_SEARCH_URL,
-            json={"textQuery": query},
-            headers={
-                "X-Goog-Api-Key": api_key,
-                # WHY: field mask requests only the fields we need (id and
-                # display name for the match check). Rating + hours come from
-                # the subsequent Details call so are not requested here.
-                "X-Goog-FieldMask": "places.id,places.displayName",
-            },
-        )
-        r.raise_for_status()
-        data = r.json()
-    except Exception as exc:
-        log.warning("Places text search failed for %r: %s", query, exc)
+    headers = {
+        "X-Goog-Api-Key": api_key,
+        # WHY: field mask requests only the fields we need (id and
+        # display name for the match check). Rating + hours come from
+        # the subsequent Details call so are not requested here.
+        "X-Goog-FieldMask": "places.id,places.displayName",
+    }
+    data: Optional[dict] = None
+    for attempt in range(_MAX_RETRY_ATTEMPTS + 1):
+        try:
+            r = await client.post(
+                _PLACES_SEARCH_URL,
+                json={"textQuery": query},
+                headers=headers,
+            )
+        except Exception as exc:
+            log.warning("Places text search failed for %r: %s", query, exc)
+            return None
+        if r.status_code == 429:
+            if attempt < _MAX_RETRY_ATTEMPTS:
+                delay = _RETRY_BACKOFF_SECONDS * (2 ** attempt)
+                log.info(
+                    "Rate-limited searching %r; retrying in %.1fs (attempt %d/%d)",
+                    query, delay, attempt + 1, _MAX_RETRY_ATTEMPTS,
+                )
+                await asyncio.sleep(delay)
+                continue
+            log.warning(
+                "Rate-limited searching %r after %d retries — giving up",
+                query, _MAX_RETRY_ATTEMPTS,
+            )
+            return None
+        try:
+            r.raise_for_status()
+            data = r.json()
+        except Exception as exc:
+            log.warning("Places text search failed for %r: %s", query, exc)
+            return None
+        break
+
+    if data is None:
         return None
 
     places = data.get("places") or []
@@ -245,20 +281,45 @@ async def _fetch_by_place_id(
     path rather than a query parameter. The field mask header controls which
     fields are returned (and billed for).
     """
-    try:
-        r = await client.get(
-            f"{_PLACES_DETAILS_BASE}/{place_id}",
-            headers={
-                "X-Goog-Api-Key": api_key,
-                # WHY: request rating, review count, and opening hours together
-                # in one call. Listing hours separately would double billing.
-                "X-Goog-FieldMask": "id,rating,userRatingCount,regularOpeningHours",
-            },
-        )
-        r.raise_for_status()
-        data = r.json()
-    except Exception as exc:
-        log.warning("Places details fetch failed for place_id=%r: %s", place_id, exc)
+    headers = {
+        "X-Goog-Api-Key": api_key,
+        # WHY: request rating, review count, and opening hours together
+        # in one call. Listing hours separately would double billing.
+        "X-Goog-FieldMask": "id,rating,userRatingCount,regularOpeningHours",
+    }
+    data: Optional[dict] = None
+    for attempt in range(_MAX_RETRY_ATTEMPTS + 1):
+        try:
+            r = await client.get(
+                f"{_PLACES_DETAILS_BASE}/{place_id}",
+                headers=headers,
+            )
+        except Exception as exc:
+            log.warning("Places details fetch failed for place_id=%r: %s", place_id, exc)
+            return None
+        if r.status_code == 429:
+            if attempt < _MAX_RETRY_ATTEMPTS:
+                delay = _RETRY_BACKOFF_SECONDS * (2 ** attempt)
+                log.info(
+                    "Rate-limited fetching place_id=%r; retrying in %.1fs (attempt %d/%d)",
+                    place_id, delay, attempt + 1, _MAX_RETRY_ATTEMPTS,
+                )
+                await asyncio.sleep(delay)
+                continue
+            log.warning(
+                "Rate-limited for place_id=%r after %d retries — giving up",
+                place_id, _MAX_RETRY_ATTEMPTS,
+            )
+            return None
+        try:
+            r.raise_for_status()
+            data = r.json()
+        except Exception as exc:
+            log.warning("Places details fetch failed for place_id=%r: %s", place_id, exc)
+            return None
+        break
+
+    if data is None:
         return None
 
     rating_val = data.get("rating")
