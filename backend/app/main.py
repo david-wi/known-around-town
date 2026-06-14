@@ -57,6 +57,8 @@ from app.routes.api.v1 import (
     owner_photos as api_owner_photos,
     owner_stats as api_owner_stats,
     stripe_billing as api_stripe_billing,
+    admin_voice as api_admin_voice,
+    owner_voice as api_owner_voice,
 )
 from app.routes.admin import claims_admin, analytics_admin, settings_admin, sync_admin, businesses_admin
 from app.routes.public import pages as public_pages, media as public_media
@@ -163,6 +165,14 @@ app.include_router(api_stripe_billing.router, prefix="/api/v1")
 # WHY: same full-prefix pattern as owner_profile — the router carries
 # /api/v1/owner/photos internally so no prefix is passed here.
 app.include_router(api_owner_photos.router)
+# Admin voice provisioning — admin-key-gated, triggers real VAPI API calls.
+# WHY: prefix not passed here because the router carries /api/v1/admin/businesses
+# internally (keeping all admin/businesses routes under one clear path).
+app.include_router(api_admin_voice.router)
+# Owner voice status — session-cookie-authenticated, read-only.
+# WHY: same full-prefix pattern as owner_profile — the router carries
+# /api/v1/owner/voice internally so no prefix is passed here.
+app.include_router(api_owner_voice.router)
 
 
 public_pages.attach_templates(templates)
