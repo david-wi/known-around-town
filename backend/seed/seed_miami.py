@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from app.database import ensure_indexes, get_db
-from seed._helpers import assert_seed_target_allowed, run, upsert
+from seed._helpers import assert_seed_target_allowed, run, upsert, pick_category_photo
 
 
 # Photo URLs scraped from the reference pages (one hero photo per network,
@@ -387,35 +387,6 @@ NETWORK_CITY_CONFIG = {
 # businesses below — those came from an LLM lookup that returns names, addresses
 # and editorial blurbs but no photo URLs. Each category gets a generic but
 # topical photo so cards don't render with empty hero space.
-_CATEGORY_FALLBACK_PHOTOS: Dict[str, str] = {
-    # beauty
-    "hair":            "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1600&q=80&auto=format&fit=crop",
-    "nails":           "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=1600&q=80&auto=format&fit=crop",
-    "spa":             "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1600&q=80&auto=format&fit=crop",
-    "lash-brow":       "https://images.unsplash.com/photo-1583241800698-e8ab01830a07?w=1600&q=80&auto=format&fit=crop",
-    "med-spa":         "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=1600&q=80&auto=format&fit=crop",
-    "barber":          "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=1600&q=80&auto=format&fit=crop",
-    "makeup":          "https://images.unsplash.com/photo-1487070183336-b863922373d4?w=1600&q=80&auto=format&fit=crop",
-    "waxing":          "https://images.unsplash.com/photo-1556228852-80b6e5eeff06?w=1600&q=80&auto=format&fit=crop",
-    # wellness
-    "recovery":        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1600&q=80&auto=format&fit=crop",
-    "iv-hydration":    "https://images.unsplash.com/photo-1582719471384-894fbb16e074?w=1600&q=80&auto=format&fit=crop",
-    "yoga-meditation": "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=1600&q=80&auto=format&fit=crop",
-    "holistic":        "https://images.unsplash.com/photo-1591343395082-e120087004b4?w=1600&q=80&auto=format&fit=crop",
-    "nutrition":       "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=1600&q=80&auto=format&fit=crop",
-    "sleep-stress":    "https://images.unsplash.com/photo-1522337660859-02fbefca4702?w=1600&q=80&auto=format&fit=crop",
-    "retreats":        "https://images.unsplash.com/photo-1540206395-68808572332f?w=1600&q=80&auto=format&fit=crop",
-    # health
-    "aesthetics":      "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=1600&q=80&auto=format&fit=crop",
-    "metabolic":       "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=1600&q=80&auto=format&fit=crop",
-    "longevity":       "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1600&q=80&auto=format&fit=crop",
-    "dental":          "https://images.unsplash.com/photo-1606811971618-4486d14f3f99?w=1600&q=80&auto=format&fit=crop",
-    "mental-health":   "https://images.unsplash.com/photo-1573497019418-b400bb3ab074?w=1600&q=80&auto=format&fit=crop",
-    "fertility":       "https://images.unsplash.com/photo-1530497610245-94d3c16cda28?w=1600&q=80&auto=format&fit=crop",
-    "pt-recovery":     "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1600&q=80&auto=format&fit=crop",
-    "primary-care":    "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=1600&q=80&auto=format&fit=crop",
-}
-
 
 def _load_real_businesses() -> Dict[str, List[Dict[str, Any]]]:
     """Load the LLM-generated 'real' businesses and reshape into the same
@@ -448,7 +419,7 @@ def _load_real_businesses() -> Dict[str, List[Dict[str, Any]]]:
                 "instagram":          it.get("instagram"),
                 "address_full":       it.get("address"),
                 # No specific photo from the LLM — fall back to a category photo
-                "photo_url":          _CATEGORY_FALLBACK_PHOTOS.get(it["category_slug"]),
+                "photo_url":          pick_category_photo(it["slug"], it["category_slug"]),
                 # WHY: seed-time services let us pre-populate curated menus for
                 # outreach-target businesses before any owner claims the listing.
                 # On re-seed the existing DB services are preserved (see upsert

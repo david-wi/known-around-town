@@ -3,11 +3,70 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from app.config import get_settings
 from app.database import ensure_indexes, get_db
+
+
+# WHY: Multiple URLs per category so that different businesses in the same
+# category get different photos on city pages. The old single-URL-per-category
+# pattern caused every hair salon (for example) to display the identical Unsplash
+# image — visually confusing to visitors. MD5 of the slug gives deterministic
+# variety: re-seeding a business always picks the same photo, but adjacent
+# businesses in the same category differ.
+_CATEGORY_PHOTOS: Dict[str, List[str]] = {
+    "hair": [
+        "1522337360788-8b13dee7a37e", "1560066984-138dadb4c035", "1562322140-8baeececf3df",
+        "1595476108010-b4d1f102b1b1", "1605497788044-5a32c7078486", "1521590832167-7bcbfaa6381f",
+    ],
+    "nails": [
+        "1604654894610-df63bc536371", "1604654894517-85b5bb6ef18d", "1604654894468-a4c600c60c6b",
+        "1559757148-5c350d0d3c56", "1571019613454-1cb2f99b2d8b",
+    ],
+    "spa": [
+        "1540555700478-4be289fbecef", "1544161515-4c0d0de6e43a", "1545205597-3d9d02c29597",
+        "1576091160550-2173dba999ef", "1606811971618-4486d14f3f99",
+    ],
+    "barber": [
+        "1599351431202-1e0f0137899a", "1585747860715-2ba37e788b70",
+        "1503951914875-452162b0f3f1", "1521119989659-3bd22a06cba8",
+    ],
+    "lash-brow": [
+        "1583241800698-e8ab01830a07", "1577527843344-8e51c4da1cce",
+        "1487070183336-b863922373d4", "1533236898036-2d4b83a3c8a9",
+    ],
+    "med-spa": [
+        "1570172619644-dfd03ed5d881", "1576091160400-aa43de2d1fce",
+        "1527613788048-8a20a56e7a07", "1588776814546-1ffedbe47ada",
+    ],
+    "waxing": [
+        "1556228852-80b6e5eeff06", "1560750588-73207b1ef5b8",
+        "1509042239860-f550ce710b93", "1571019614242-c5c5dee9f50b",
+    ],
+    "makeup": [
+        "1487070183336-b863922373d4", "1512207736890-6ffed8a84e8d",
+        "1522338242992-e1d3aedef060", "1583241475307-44a34c96a4e5",
+    ],
+}
+
+_PHOTO_BASE = "https://images.unsplash.com/photo-{}?w=1600&q=80&auto=format&fit=crop"
+
+
+def pick_category_photo(slug: str, category: str) -> Optional[str]:
+    """Return a deterministic variety photo for a business based on its slug.
+
+    WHY: Uses MD5 of the slug so the same business always gets the same photo
+    across re-seeds, but adjacent businesses in the same category get different
+    photos — eliminating the identical-image repetition on city pages.
+    """
+    photos = _CATEGORY_PHOTOS.get(category)
+    if not photos:
+        return None
+    idx = int(hashlib.md5(slug.encode()).hexdigest(), 16) % len(photos)
+    return _PHOTO_BASE.format(photos[idx])
 
 
 # WHY: the env flag a human (or the deploy script) must set on purpose to allow
