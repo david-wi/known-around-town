@@ -86,7 +86,7 @@ async def sync_ratings(
 ):
     """Trigger a Google Places sync for all published businesses.
 
-    Fetches ratings in parallel (5 at a time) and writes updates directly to
+    Fetches ratings in parallel (3 at a time) and writes updates directly to
     the business documents. Redirects back to the sync page with a summary.
     """
     if not google_places.is_configured():
@@ -105,7 +105,7 @@ async def sync_ratings(
     # it so the operator knows they need to re-run or implement pagination.
     businesses = await db.businesses.find(
         {"status": "live"},
-        {"_id": 1, "name": 1, "city_id": 1, "google_place_id": 1},
+        {"_id": 1, "name": 1, "city_id": 1, "google_place_id": 1, "neighborhood_slugs": 1},
     ).to_list(5000)
 
     if len(businesses) == 5000:
@@ -144,6 +144,40 @@ async def sync_ratings(
             # concurrent slots don't all fire requests at the same millisecond.
             # At semaphore=3 and 0.1s hold this caps burst throughput at ~30 req/s.
             await asyncio.sleep(0.1)
+
+            # WHY: neighborhood-name fallback for businesses in sub-cities.
+            # Some Google-registered cities (Wilton Manors, Flagler Village, Las Olas)
+            # are neighborhoods of Fort Lauderdale but have their own Places listings.
+            # Searching "Business Name Fort Lauderdale FL" fails to match them; trying
+            # the neighborhood name (slug converted to title-case) as the city finds
+            # the correct Places record. Only runs when no existing place_id is cached
+            # (discovery phase) and the city search returned nothing.
+            if rating_result is None and not biz.get("google_place_id"):
+                # WHY cap at 3: bounding the fallback loop prevents one business
+                # with many neighborhood slugs from holding the semaphore slot for
+                # an unbounded time. 3 covers the real-world cases (e.g., Fort
+                # Lauderdale businesses may be in Wilton Manors, Las Olas, or
+                # Flagler Village) without materializing a runaway rate spike.
+                nbhd_slugs = (biz.get("neighborhood_slugs") or [])[:3]
+                for nbhd_slug in nbhd_slugs:
+                    nbhd_name = nbhd_slug.replace("-", " ").title()
+                    if nbhd_name.lower() == city_name.lower():
+                        # Same as primary city — would repeat the same query
+                        continue
+                    # WHY no existing_place_id: the guard above already requires
+                    # biz["google_place_id"] to be absent; passing None is a no-op.
+                    rating_result = await google_places.lookup_rating(
+                        business_name=biz.get("name", ""),
+                        city=nbhd_name,
+                    )
+                    await asyncio.sleep(0.1)
+                    if rating_result:
+                        log.info(
+                            "Found %r via neighborhood fallback %r (primary city %r had no match)",
+                            biz.get("name"), nbhd_name, city_name,
+                        )
+                        break
+
         if rating_result is None:
             if biz.get("google_place_id"):
                 # Had a place_id but fetch failed — transient error; keep old data
