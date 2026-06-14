@@ -44,12 +44,8 @@
   }
 }
 </script>
-{#- WHY: og:image for the homepage uses the hero photo that already dominates
-    the above-the-fold experience. Without it, shares of the homepage produce
-    a blank grey preview card — particularly bad since owners often share the
-    directory with other business owners via WhatsApp. hero_photo_url is
-    already resolved by the route handler. #}
-{% if hero_photo_url %}<meta property="og:image" content="{{ hero_photo_url }}">{% endif %}
+{#- WHY: og:image is now passed as og_image in the route context, so base.html
+    handles it the same as every other page. No duplicate tag needed here. #}
 {#- WHY: Organization JSON-LD tells Google this is a named legal/business entity —
     the prerequisite for a Google Knowledge Panel (the info box shown in search
     results for recognized brands). The WebSite block above describes the website;

@@ -577,6 +577,10 @@ async def home(request: Request) -> HTMLResponse:
             # SEO
             "seo_title": city.get("seo_title") or f"{tenant.network.get('name')} {city.get('name')}",
             "meta_description": city.get("meta_description") or city.get("hero_description"),
+            # WHY: og_image lets base.html emit the og:image tag uniformly — without
+            # it, home.html added a second manual tag in head_extra, producing two
+            # og:image meta tags on the home page (one blank, one correct).
+            "og_image": city.get("hero_photo_url"),
             # WHY: Organization JSON-LD tells Google this is a named entity (a real
             # organization, not just a web page) and is how Google Knowledge Panels
             # are populated. Adding it alongside the existing WebSite block gives
@@ -1672,7 +1676,12 @@ async def sitemap(request: Request) -> HTMLResponse:
         for nb_slug, cat_slug in sorted(nb_cat_pairs):
             entries.append((f"{base}/n/{nb_slug}/c/{cat_slug}", today_str))
         for g in await content_svc.list_editorial_guides(city_id, limit=500):
-            entries.append((f"{base}/guides/{g['slug']}", today_str))
+            # WHY: use the guide's actual publish date as lastmod rather than
+            # today — telling Google every guide changed daily caused unnecessary
+            # re-crawling and weakened the trustworthiness of our lastmod signals.
+            _g_date = g.get("updated_at") or g.get("published_at")
+            _g_lastmod = _g_date.strftime("%Y-%m-%d") if _g_date else today_str
+            entries.append((f"{base}/guides/{g['slug']}", _g_lastmod))
 
     def _url_tag(loc: str, lastmod: str) -> str:
         return f"  <url><loc>{loc}</loc><lastmod>{lastmod}</lastmod></url>\n"
