@@ -726,6 +726,16 @@ async def seed_hialeah() -> None:
         "name": CITY_NAME,
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
+        "hero_description": (
+            "An index of the colorists, nail artists, lash stylists, and estheticians "
+            "Hialeah locals actually book — from the classic barberías of Palm Avenue "
+            "to the modern beauty studios of Hialeah Gardens."
+        ),
+        "meta_description": (
+            "The curated beauty directory for Hialeah, Florida — salons, nail bars, "
+            "lash studios, and spas discovered by locals. Covering Palm Avenue, "
+            "Hialeah Drive, Westland Mall area, and Hialeah Gardens."
+        ),
         "domain_override": DOMAIN_OVERRIDE,
         "status": "live",
         "updated_at": now,

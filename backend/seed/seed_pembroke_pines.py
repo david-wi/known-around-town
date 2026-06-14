@@ -713,6 +713,16 @@ async def seed_pembroke_pines() -> None:
         "name": CITY_NAME,
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
+        "hero_description": (
+            "An index of the colorists, estheticians, nail artists, and lash stylists "
+            "Pembroke Pines locals actually book — from the shops at Pembroke Gardens "
+            "to the studios along Pines Boulevard and Flamingo Road."
+        ),
+        "meta_description": (
+            "The curated beauty directory for Pembroke Pines, Florida — salons, spas, "
+            "nail bars, and lash studios discovered by locals. Covering Pembroke Gardens, "
+            "Pines Boulevard, Flamingo Road, and Chapel Trail."
+        ),
         "domain_override": DOMAIN_OVERRIDE,
         "status": "live",
         "updated_at": now,

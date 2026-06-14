@@ -736,6 +736,16 @@ async def seed_plantation() -> None:
         "name": CITY_NAME,
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
+        "hero_description": (
+            "An index of the colorists, estheticians, nail artists, and lash stylists "
+            "Plantation locals actually book — from the Broward Mall area to the boutique "
+            "studios along University Drive and Cleary Boulevard."
+        ),
+        "meta_description": (
+            "The curated beauty directory for Plantation, Florida — salons, spas, nail "
+            "lounges, and lash studios discovered by locals. Covering the Broward Mall "
+            "area, University Drive, Cleary Boulevard, and Sunrise Boulevard."
+        ),
         "domain_override": DOMAIN_OVERRIDE,
         "status": "live",
         "updated_at": now,
