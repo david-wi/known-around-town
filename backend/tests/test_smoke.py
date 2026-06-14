@@ -3267,3 +3267,65 @@ def test_business_page_hides_guide_section_when_no_guides(client):
         "/b/blow-dry-bar-brickell shows 'Featured in our guides' even though "
         "this business is not in any editorial guide — the conditional guard is broken"
     )
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for _dedup_photos helper
+# ---------------------------------------------------------------------------
+
+def test_dedup_photos_removes_duplicate_url():
+    """When two businesses share the same photo URL, the second one's photos
+    should be cleared so the same image does not appear twice on a listing page."""
+    from app.routes.public.pages import _dedup_photos
+
+    url = "https://cdn.example.com/photo.jpg"
+    biz_a = {"name": "Salon A", "photos": [{"url": url}]}
+    biz_b = {"name": "Salon B", "photos": [{"url": url}]}
+
+    result = _dedup_photos([biz_a, biz_b])
+
+    assert result[0]["photos"] == [{"url": url}], "First business should keep its photo"
+    assert result[1]["photos"] == [], "Second business with same URL should have photos cleared"
+
+
+def test_dedup_photos_keeps_distinct_urls():
+    """Businesses with different photo URLs should both keep their photos."""
+    from app.routes.public.pages import _dedup_photos
+
+    biz_a = {"name": "Salon A", "photos": [{"url": "https://cdn.example.com/a.jpg"}]}
+    biz_b = {"name": "Salon B", "photos": [{"url": "https://cdn.example.com/b.jpg"}]}
+
+    result = _dedup_photos([biz_a, biz_b])
+
+    assert result[0]["photos"] == biz_a["photos"]
+    assert result[1]["photos"] == biz_b["photos"]
+
+
+def test_dedup_photos_passthrough_no_photos():
+    """Businesses with no photos should pass through unchanged."""
+    from app.routes.public.pages import _dedup_photos
+
+    biz = {"name": "Salon A", "photos": []}
+    result = _dedup_photos([biz])
+    assert result[0]["photos"] == []
+
+
+def test_dedup_photos_does_not_mutate_original():
+    """The helper must return new dict objects rather than mutating the input,
+    since the same business dict may appear in multiple lists on the home page."""
+    from app.routes.public.pages import _dedup_photos
+
+    url = "https://cdn.example.com/photo.jpg"
+    biz_a = {"name": "Salon A", "photos": [{"url": url}]}
+    biz_b = {"name": "Salon B", "photos": [{"url": url}]}
+
+    _dedup_photos([biz_a, biz_b])
+
+    assert biz_b["photos"] == [{"url": url}], "Original dict must not be mutated"
+
+
+def test_dedup_photos_empty_list():
+    """Empty input should return empty output without error."""
+    from app.routes.public.pages import _dedup_photos
+
+    assert _dedup_photos([]) == []
