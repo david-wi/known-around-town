@@ -534,6 +534,22 @@
             <a href="tel:{{ business.phone }}" class="text-sm text-stone-900 hover:{{ theme.accent_text_full }}">{{ business.phone }}</a>
           </div>
           {% endif %}
+          {#- WHY: The "Call Now" button only appears when the business has an AI
+              receptionist number provisioned (Concierge tier). It uses a distinct
+              violet style so it reads as a premium action separate from the plain
+              phone link above. The tel: href strips all non-digits so mobile
+              browsers dial correctly regardless of the formatted string format.
+              Placed right after the phone row so callers see both contact paths
+              together and can choose. #}
+          {% if business.get('voice_phone_number') %}
+          <a href="tel:{{ business.get('voice_phone_number') | replace('(', '') | replace(')', '') | replace(' ', '') | replace('-', '') }}"
+             class="flex items-center justify-center gap-2 w-full px-4 py-3 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
+            </svg>
+            Call Now (24/7 AI Receptionist)
+          </a>
+          {% endif %}
           {% if business.website or business.instagram %}
           <div>
             <div class="text-xs uppercase tracking-wide text-stone-500 font-semibold mb-2">On the web</div>
