@@ -100,11 +100,28 @@
         {#- WHY: CTA appears before the feature list so salon owners can claim
             immediately after seeing the price — without scrolling through 12
             bullet points. The second CTA at the bottom stays for owners who
-            read through the full list first. #}
+            read through the full list first.
+            Three states: anonymous → claim form; logged-in free tier → upgrade
+            to /owners/me; already subscribed → confirmation badge (no action). #}
+        {% if owner_is_subscribed %}
+        <div class="inline-flex items-center justify-center gap-2 border-2 border-green-400 text-green-700 bg-green-50 font-medium px-6 py-3 rounded-full text-sm mb-6 cursor-default">
+          ✓ You're on Featured
+        </div>
+        {% elif owner_logged_in %}
         <a class="inline-flex items-center justify-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm mb-6"
+           href="/owners/me">
+          Upgrade to Featured <span aria-hidden="true">→</span>
+        </a>
+        {% else %}
+        <a class="inline-flex items-center justify-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm mb-5"
            href="/owners#claim-form">
           Claim your listing <span aria-hidden="true">→</span>
         </a>
+        <p class="text-xs text-stone-500 text-center mb-1">
+          Already have a listing?
+          <a class="{{ theme.accent_text_full }} underline underline-offset-2" href="/owners/login">Sign in to upgrade →</a>
+        </p>
+        {% endif %}
         <ul class="space-y-3 text-sm text-stone-700 leading-relaxed mb-8">
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong>Everything in Free</strong>, plus:</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong>✦ Featured listing badge</strong> visible to every visitor browsing the directory — your listing stands out at a glance.</span></li>
@@ -119,10 +136,22 @@
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Owner-curated quotes from your reviews.</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Email support (~1 business day).</span></li>
         </ul>
+        {% if owner_is_subscribed %}
+        <a class="inline-flex items-center justify-center gap-2 border-2 border-green-400 text-green-700 bg-green-50 font-medium px-6 py-3 rounded-full text-sm"
+           href="/owners/me">
+          ✓ You're on Featured — manage your listing →
+        </a>
+        {% elif owner_logged_in %}
+        <a class="inline-flex items-center justify-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
+           href="/owners/me">
+          Upgrade to Featured <span aria-hidden="true">→</span>
+        </a>
+        {% else %}
         <a class="inline-flex items-center justify-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
            href="/owners#claim-form">
           Claim your listing <span aria-hidden="true">→</span>
         </a>
+        {% endif %}
       </div>
 
       {# ----- Concierge ----- #}
@@ -237,11 +266,24 @@
     </p>
     {#- WHY: anchor must match the actual id="claim-form" div in claim_form.html —
         previously pointed to #claim (nonexistent), so pricing-page visitors
-        landed at the top of /owners instead of scrolling to the form. #}
+        landed at the top of /owners instead of scrolling to the form.
+        Three states mirror the two CTAs inside the Featured card above. #}
+    {% if owner_is_subscribed %}
+    <a class="inline-flex items-center gap-2 border-2 border-green-400 text-green-700 bg-green-50 font-medium px-6 py-3 rounded-full text-sm"
+       href="/owners/me">
+      ✓ You're on Featured — manage your listing →
+    </a>
+    {% elif owner_logged_in %}
+    <a class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
+       href="/owners/me">
+      Upgrade to Featured <span aria-hidden="true">→</span>
+    </a>
+    {% else %}
     <a class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
        href="/owners#claim-form">
       Claim your listing <span aria-hidden="true">→</span>
     </a>
+    {% endif %}
   </div>
 </section>
 

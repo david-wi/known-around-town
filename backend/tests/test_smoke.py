@@ -710,6 +710,82 @@ def test_owners_page_shows_accurate_price_and_support_email(client):
     assert "hello@knowsbeauty.com" in body
 
 
+@pytest.mark.asyncio
+async def test_pricing_cta_for_logged_in_free_tier_owner(seeded_db):
+    """A logged-in owner who has NOT subscribed should see "Upgrade to Featured"
+    on the pricing page — not "Claim your listing" (they already claimed) and
+    not the subscribed confirmation badge (they haven't paid yet).
+
+    Without this, claimed owners who visit /pricing to consider upgrading see a
+    button that takes them back to the claim form, which is confusing and breaks
+    the upgrade funnel."""
+    from app.main import app
+    from app.services.owner_auth import SESSION_COOKIE_NAME, sign_session
+    from fastapi.testclient import TestClient
+
+    email = "free-tier@example.com"
+    # Claimed but no stripe_subscription_id → free tier owner
+    await seeded_db.businesses.insert_one({
+        "_id": "biz-free-001",
+        "name": "Radiant Salon",
+        "slug": "radiant-salon",
+        "claimed_email": email,
+        # WHY: no stripe_subscription_id — this is the free-tier state
+    })
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.get(
+        "/pricing",
+        headers={"host": "miami.knowsbeauty.localhost"},
+        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+    )
+    assert r.status_code == 200, r.text
+    assert "Upgrade to Featured" in r.text, (
+        "Logged-in free-tier owner should see 'Upgrade to Featured' on the pricing page"
+    )
+    assert "/owners#claim-form" not in r.text, (
+        "Logged-in owner should not be sent to the claim form — they already claimed"
+    )
+    assert "You're on Featured" not in r.text, (
+        "Free-tier owner should not see the subscribed confirmation badge"
+    )
+
+
+@pytest.mark.asyncio
+async def test_pricing_cta_for_logged_in_subscribed_owner(seeded_db):
+    """A logged-in owner who IS subscribed should see a "You're on Featured"
+    confirmation badge — not a call to action, since there's nothing to do.
+
+    Without this, a current subscriber visiting /pricing would see a button
+    asking them to claim or upgrade, which is confusing and could lead them to
+    accidentally try to start a second subscription."""
+    from app.main import app
+    from app.services.owner_auth import SESSION_COOKIE_NAME, sign_session
+    from fastapi.testclient import TestClient
+
+    email = "subscribed-pricing@example.com"
+    # Claimed AND has a stripe_subscription_id → subscribed Featured owner
+    await seeded_db.businesses.insert_one({
+        "_id": "biz-sub-pricing-001",
+        "name": "Luxe Beauty Bar",
+        "slug": "luxe-beauty-bar",
+        "claimed_email": email,
+        "stripe_subscription_id": "sub_test_pricing_456",
+    })
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.get(
+        "/pricing",
+        headers={"host": "miami.knowsbeauty.localhost"},
+        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+    )
+    assert r.status_code == 200, r.text
+    assert "You're on Featured" in r.text, (
+        "Subscribed owner should see confirmation that they're already on Featured"
+    )
+    assert "Upgrade to Featured" not in r.text, (
+        "Subscribed owner should not be prompted to upgrade — they already are on Featured"
+    )
+
+
 def test_business_detail_has_share_button(client):
     """The sticky nav on business detail pages must include a Share button so
     clients can forward a favorite salon via WhatsApp, iMessage, or any other
