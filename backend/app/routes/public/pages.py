@@ -1568,6 +1568,37 @@ async def pricing_page(request: Request) -> HTMLResponse:
     ctx["founding_partner_cap"] = cap
     ctx["founding_partner_count"] = founding_count
     ctx["founding_partner_spots_left"] = max(0, cap - founding_count)
+
+    # WHY: if the visiting owner is already logged in, the generic "Claim your listing"
+    # CTA is confusing — they already claimed, they want to upgrade. We check the session
+    # cookie here so the template can show the right button for each case:
+    #   - not logged in → "Claim your listing" (new owner path)
+    #   - logged in, free tier → "Upgrade to Featured" → /owners/me
+    #   - logged in, already subscribed → "You're on Featured ✓" (no action needed)
+    # All failures fall back to None (not logged in) — this is a convenience UX
+    # enhancement, not a security gate, so silent failure is the right behaviour.
+    owner_logged_in: bool = False
+    owner_is_subscribed: bool = False
+    owner_business_name: Optional[str] = None
+    try:
+        raw_cookie = request.cookies.get(SESSION_COOKIE_NAME)
+        session = verify_session(raw_cookie) if raw_cookie else None
+        if session:
+            email = session["email"].lower()
+            biz = await get_db().businesses.find_one(
+                {"claimed_email": email},
+                {"name": 1, "stripe_subscription_id": 1},
+            )
+            if biz:
+                owner_logged_in = True
+                owner_is_subscribed = bool(biz.get("stripe_subscription_id"))
+                owner_business_name = biz.get("name")
+    except Exception:
+        pass  # WHY: any DB or decoding error falls back to the anonymous visitor path
+
+    ctx["owner_logged_in"] = owner_logged_in
+    ctx["owner_is_subscribed"] = owner_is_subscribed
+    ctx["owner_business_name"] = owner_business_name
     return _templates.TemplateResponse("pricing.html", ctx)
 
 
