@@ -22,7 +22,7 @@
     {#- WHY: text-xs (12px) keeps the badge legible at grid-scanning distance; solid
         amber-500 with drop shadow reads on any photo background. Previous text-[9px]
         was effectively invisible — visitors couldn't spot Featured listings at a glance. #}
-    {% if b.featured and b.featured.enabled %}<div class="absolute top-3 right-3 inline-flex items-center gap-1 bg-amber-500 text-white text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full shadow-md shadow-black/30">✦ {{ b.featured.tier or 'Featured' }}</div>{% endif %}
+    {% if b.featured and b.featured.enabled %}<div class="absolute top-3 right-3 inline-flex items-center gap-1 bg-amber-500 text-white text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full shadow-md shadow-black/30">✦ Featured</div>{% endif %}
     {% if b.is_founding_partner %}{% with variant='overlay', tenant_label=tenant_label %}{% include 'partials/founding_partner_badge.html' %}{% endwith %}{% endif %}
   </div>
   <div class="p-5">
