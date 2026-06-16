@@ -251,11 +251,40 @@ async def sync_page(
     )
 
 
+def _resolve_unrated_only(form_value: Optional[bool], query_params) -> bool:
+    """Decide whether to run an unrated-only sync, reading from form OR query string.
+
+    WHY this exists (the footgun it guards against): the two web buttons submit
+    `unrated_only` as a form field, so the browser path works fine. But a
+    programmatic caller (curl/script) that passes `?unrated_only=true` as a URL
+    query string would have it SILENTLY IGNORED by a plain `Form(...)` parameter —
+    FastAPI never reads query strings into a Form field. The param would default to
+    False and trigger an expensive FULL sync of every business in the directory,
+    exhausting the entire daily Google Places API quota (Text Search AND Place
+    Details per-day limits) in one shot. This actually happened and burned a full
+    day of quota plus money. Reading the query string as a fallback makes the safe,
+    cheap unrated-only request honored no matter how it was sent.
+
+    The form body wins when present (so the web buttons keep their exact behavior);
+    only when the form did not supply the field do we fall back to the query string.
+    """
+    if form_value is not None:
+        return form_value
+
+    raw = query_params.get("unrated_only")
+    if raw is None:
+        return False
+    # WHY: accept the common truthy spellings a script might send. Anything else
+    # (including "false"/"0") resolves to False, matching the safe-but-only-when-
+    # explicit nature of a full sync.
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
 @router.post("/sync/ratings")
 async def sync_ratings(
     request: Request,
     background_tasks: BackgroundTasks,
-    unrated_only: bool = Form(False),
+    unrated_only: Optional[bool] = Form(None),
     _admin=Depends(require_admin),
 ):
     """Trigger a Google Places sync for published businesses.
@@ -267,8 +296,15 @@ async def sync_ratings(
     unrated_only=True targets only businesses with no Google rating yet.
     WHY: conserves daily API quota — avoids re-fetching the ~880 businesses
     that already have ratings when the goal is filling in new additions.
+
+    unrated_only is read from the form body (the web buttons) OR the URL query
+    string (programmatic callers). See _resolve_unrated_only for why both paths
+    matter — a query-string caller used to be silently ignored and trigger an
+    expensive full sync that exhausted the daily Google Places quota.
     """
     global _sync_running
+
+    unrated_only_effective = _resolve_unrated_only(unrated_only, request.query_params)
 
     if not google_places.is_configured():
         # WHY: redirect-then-GET so browser back/refresh doesn't re-POST the form
@@ -289,7 +325,7 @@ async def sync_ratings(
     # explicitly null — both mean "never synced." This conserves daily API quota
     # by skipping the ~880 businesses that already have ratings.
     biz_filter: dict = {"status": "live"}
-    if unrated_only:
+    if unrated_only_effective:
         biz_filter["$or"] = [
             {"google_rating": {"$exists": False}},
             {"google_rating": None},
@@ -307,9 +343,21 @@ async def sync_ratings(
             "sync_ratings hit the 5000-business cap — some businesses were not synced"
         )
 
+    if not unrated_only_effective:
+        # WHY: a full (non-unrated) sync re-fetches every business, consuming a
+        # large slice of the daily Google Places quota (both Text Search and Place
+        # Details per-day limits) and real money. Surface it loudly so an accidental
+        # full sync — e.g. a script that forgot unrated_only — is obvious in the logs.
+        log.warning(
+            "FULL Google ratings sync triggered: will fetch ALL %d live businesses "
+            "(unrated_only is OFF). This consumes significant daily Google Places "
+            "API quota and money. If this was unintended, use unrated_only=true.",
+            len(businesses),
+        )
+
     log.info(
         "Queuing Google ratings sync for %d businesses (unrated_only=%s) (background task)",
-        len(businesses), unrated_only,
+        len(businesses), unrated_only_effective,
     )
 
     # WHY: set the flag BEFORE add_task so there is no window between the flag
@@ -320,5 +368,5 @@ async def sync_ratings(
 
     # WHY: include unrated_only in the redirect so the banner can tell the
     # operator exactly what mode was queued and how long it will take.
-    suffix = "&unrated_only=1" if unrated_only else ""
+    suffix = "&unrated_only=1" if unrated_only_effective else ""
     return RedirectResponse(url=f"/admin/sync?result=started{suffix}", status_code=303)

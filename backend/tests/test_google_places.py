@@ -866,6 +866,136 @@ class TestSyncRatingsPost:
         assert "Needs Rating Salon" in synced_names, "unrated business should be synced"
         assert "Already Rated Salon" not in synced_names, "already-rated business should be skipped"
 
+    def test_unrated_only_honored_from_query_string(self, mock_db, monkeypatch):
+        """A programmatic caller passing ?unrated_only=true (query string, no form body)
+        must get the unrated-only filter — NOT a silently-ignored full sync.
+
+        WHY this test exists: the endpoint originally read unrated_only only from the
+        form body (Form(...)). A script that passed ?unrated_only=true as a URL query
+        string had it silently ignored, defaulting to a FULL sync of every business —
+        which exhausted the entire daily Google Places API quota (Text Search AND Place
+        Details per-day limits) and cost real money. This actually happened. The fix
+        reads the query string as a fallback so the safe, cheap request is honored.
+
+        This test proves the unrated-only filter is applied (only the unrated business
+        is fetched) when the flag arrives via the query string with NO form data.
+        """
+        import asyncio
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.admin.sync_admin as sync_mod
+        import app.routes.api.v1._auth as _auth_module
+        import app.services.google_places as gp
+        from app.services.google_places import PlaceRating
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+        monkeypatch.setattr(gp, "is_configured", lambda: True)
+        monkeypatch.setattr(sync_mod, "_sync_running", False)
+
+        # Seed: one business WITH a rating, one WITHOUT
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.cities.insert_one({"_id": "city-test", "name": "Miami", "slug": "miami"})
+        )
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.networks.insert_one({"_id": "net-test", "name": "Beauty", "domain_suffix": "knowsbeauty.localhost"})
+        )
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.insert_many([
+                {"_id": "biz-rated", "name": "Already Rated Salon", "slug": "rated", "city_id": "city-test",
+                 "network_id": "net-test", "status": "live", "google_rating": 4.5, "google_place_id": "ChIJ_already"},
+                {"_id": "biz-unrated", "name": "Needs Rating Salon", "slug": "unrated", "city_id": "city-test",
+                 "network_id": "net-test", "status": "live"},
+            ])
+        )
+
+        synced_names = []
+
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            synced_names.append(business_name)
+            return PlaceRating(place_id="ChIJ_new", rating=4.2, review_count=50)
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        client = TestClient(app, follow_redirects=False)
+        # Flag sent ONLY as a query-string param — no form body, mimicking a curl/script caller.
+        r = client.post("/admin/sync/ratings?unrated_only=true")
+
+        assert r.status_code == 303
+        assert "unrated_only=1" in r.headers["location"], (
+            "redirect should reflect unrated-only mode when ?unrated_only=true is in the query string"
+        )
+
+        # The unrated-only filter must have been applied: only the unrated business is fetched.
+        assert "Needs Rating Salon" in synced_names, "unrated business should be synced"
+        assert "Already Rated Salon" not in synced_names, (
+            "already-rated business must NOT be synced — query-string unrated_only=true was ignored, "
+            "meaning a full quota-exhausting sync ran instead of the safe unrated-only sync"
+        )
+
+    def test_full_sync_logs_quota_warning(self, mock_db, monkeypatch):
+        """A FULL sync (no unrated_only) must emit a WARNING naming the business count.
+
+        WHY: an accidental full sync exhausts the daily Google Places quota and costs
+        money. The warning makes such an accident visible in the logs after the fact.
+        """
+        import asyncio
+        import logging
+        from app.main import app
+        from fastapi.testclient import TestClient
+        import app.routes.admin.sync_admin as sync_mod
+        import app.routes.api.v1._auth as _auth_module
+        import app.services.google_places as gp
+        from app.services.google_places import PlaceRating
+
+        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
+        monkeypatch.setattr(gp, "is_configured", lambda: True)
+        monkeypatch.setattr(sync_mod, "_sync_running", False)
+
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.cities.insert_one({"_id": "city-test", "name": "Miami", "slug": "miami"})
+        )
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.networks.insert_one({"_id": "net-test", "name": "Beauty", "domain_suffix": "knowsbeauty.localhost"})
+        )
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.insert_one(
+                {"_id": "biz-1", "name": "Some Salon", "slug": "some", "city_id": "city-test",
+                 "network_id": "net-test", "status": "live"}
+            )
+        )
+
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            return PlaceRating(place_id="ChIJ_x", rating=4.0, review_count=10)
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        warnings = []
+
+        class LogCapture(logging.Handler):
+            def emit(self, record):
+                if record.levelno >= logging.WARNING:
+                    warnings.append(record.getMessage())
+
+        handler = LogCapture()
+        sync_logger = logging.getLogger("app.routes.admin.sync_admin")
+        orig_level = sync_logger.level
+        sync_logger.setLevel(logging.DEBUG)
+        sync_logger.addHandler(handler)
+        try:
+            client = TestClient(app, follow_redirects=False)
+            # No unrated_only anywhere → full sync.
+            r = client.post("/admin/sync/ratings")
+        finally:
+            sync_logger.removeHandler(handler)
+            sync_logger.setLevel(orig_level)
+
+        assert r.status_code == 303
+        full_warnings = [w for w in warnings if "FULL Google ratings sync" in w]
+        assert full_warnings, f"Expected a FULL-sync quota warning; got warnings: {warnings}"
+        assert "ALL 1 live businesses" in full_warnings[0], (
+            f"Warning should name the business count that will be fetched; got: {full_warnings[0]}"
+        )
+
     def test_rate_limit_error_counted_as_failed_not_no_match(self, mock_db, monkeypatch):
         """RateLimitError from lookup_rating counts as failed (transient), not no_match (permanent).
 
