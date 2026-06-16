@@ -19,3 +19,11 @@ email-validator==2.2.0
 # WHY: respx is the httpx-specific mock library used in test_google_places.py
 # to intercept Places API HTTP calls without making real network requests.
 respx==0.22.0
+# WHY: esprima is a pure-Python JavaScript parser used by
+# test_template_js_syntax.py to syntax-check every inline <script> block in our
+# Jinja templates. We use a Python parser rather than `node --check` because the
+# "Smoke tests" CI job (.github/workflows/ci.yml) only sets up Python — it never
+# installs Node — so depending on a Node binary would make the guard rely on
+# undeclared tooling that a future runner image could remove, silently letting
+# the very bug class this test exists to catch slip through again.
+esprima==4.0.1
