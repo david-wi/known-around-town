@@ -19,7 +19,10 @@
        on <img>; inset-0 + w-full h-full fills the aspect-ratio container the same way. #}
     {% if photo_url %}<img src="{{ photo_url }}" alt="{{ b.name }}" loading="lazy" class="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105">{% endif %}
     {% if b.editors_pick %}<div class="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/95 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-semibold text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
-    {% if b.featured and b.featured.enabled %}<div class="absolute top-3 right-3 bg-gradient-to-br from-amber-400 to-yellow-500 text-stone-900 text-[9px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full">{{ b.featured.tier or 'Premium' }}</div>{% endif %}
+    {#- WHY: text-xs (12px) keeps the badge legible at grid-scanning distance; solid
+        amber-500 with drop shadow reads on any photo background. Previous text-[9px]
+        was effectively invisible — visitors couldn't spot Featured listings at a glance. #}
+    {% if b.featured and b.featured.enabled %}<div class="absolute top-3 right-3 inline-flex items-center gap-1 bg-amber-500 text-white text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full shadow-md shadow-black/30">✦ {{ b.featured.tier or 'Featured' }}</div>{% endif %}
     {% if b.is_founding_partner %}{% with variant='overlay', tenant_label=tenant_label %}{% include 'partials/founding_partner_badge.html' %}{% endwith %}{% endif %}
   </div>
   <div class="p-5">

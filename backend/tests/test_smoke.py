@@ -4062,3 +4062,73 @@ def test_claim_form_support_email_has_jinja_default():
         "will render as literal template syntax in the browser. "
         "Fix: {{ support_email | default('hello@knowsbeauty.com') }}"
     )
+
+
+def test_free_tier_owner_sees_upgrade_nudge(client, seeded_db):
+    """A logged-in owner who has claimed their listing but has NOT subscribed
+    should see the amber upgrade nudge banner when they visit their own listing
+    page. This closes the conversion gap where owners who claimed for free had
+    no in-product reminder to upgrade once they left the dashboard.
+
+    The test simulates the session cookie using the same sign_session() helper
+    that the real login flow issues — so we're exercising the exact same cookie
+    verification path the route uses."""
+    import asyncio
+    from app.services.owner_auth import sign_session, SESSION_COOKIE_NAME
+
+    # Mark a stable seed business as claimed by a test email (no subscription).
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"slug": "blow-dry-bar-brickell"},
+            {"$set": {"claimed_email": "owner@example.com", "claim_status": "verified"},
+             "$unset": {"stripe_subscription_id": ""}},
+        )
+    )
+
+    # Issue a valid signed session cookie for that owner email.
+    cookie_value = sign_session("owner@example.com")
+
+    r = client.get(
+        "/b/blow-dry-bar-brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+        cookies={SESSION_COOKIE_NAME: cookie_value},
+    )
+    assert r.status_code == 200, r.text
+    # The nudge banner headline must appear.
+    assert "You're viewing your listing" in r.text
+    # The upgrade CTA must link to the owner dashboard.
+    assert "Get Featured" in r.text
+    assert 'href="/owners/me"' in r.text
+
+
+def test_subscribed_owner_does_not_see_upgrade_nudge(client, seeded_db):
+    """An owner who is already on the Featured tier must NOT see the upgrade
+    nudge — they've already paid, so showing it would be confusing and
+    annoying. The subscribed state is indicated by stripe_subscription_id
+    being set on the business document."""
+    import asyncio
+    from app.services.owner_auth import sign_session, SESSION_COOKIE_NAME
+
+    # Mark the same business as claimed AND subscribed.
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"slug": "blow-dry-bar-brickell"},
+            {"$set": {
+                "claimed_email": "owner@example.com",
+                "claim_status": "verified",
+                "stripe_subscription_id": "sub_test_already_subscribed",
+            }},
+        )
+    )
+
+    cookie_value = sign_session("owner@example.com")
+
+    r = client.get(
+        "/b/blow-dry-bar-brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+        cookies={SESSION_COOKIE_NAME: cookie_value},
+    )
+    assert r.status_code == 200, r.text
+    # The nudge banner must NOT appear for a paying owner.
+    assert "You're viewing your listing" not in r.text
+    assert "Get Featured" not in r.text

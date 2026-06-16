@@ -1165,12 +1165,32 @@ async def business_page(
         {"slug": 1, "title": 1, "_id": 0},
     ).to_list(length=5)
 
+    # WHY: detect if the logged-in owner is viewing their OWN listing so the
+    # template can show a contextual upgrade nudge. This is the same session-check
+    # pattern used in pricing_page() — a convenience UX signal, not a security gate,
+    # so any decoding or DB error silently falls back to "not the owner" (False).
+    is_own_listing: bool = False
+    owner_is_subscribed: bool = False
+    try:
+        raw_cookie = request.cookies.get(SESSION_COOKIE_NAME)
+        _session = verify_session(raw_cookie) if raw_cookie else None
+        if _session:
+            _email = _session["email"].lower()
+            claimed_email = (business.get("claimed_email") or "").lower()
+            if claimed_email and _email == claimed_email:
+                is_own_listing = True
+                owner_is_subscribed = bool(business.get("stripe_subscription_id"))
+    except Exception:
+        pass  # WHY: any DB or decoding error falls back to the anonymous visitor path
+
     ctx.update(
         {
             "business": business,
             "nearby_businesses": nearby,
             "related_guides": related_guides,
             "directions_url": directions_url,
+            "is_own_listing": is_own_listing,
+            "owner_is_subscribed": owner_is_subscribed,
             # WHY: prefer the salon's own photo over the city hero — it's more accurate
             # for sharing. Fall back to city hero so cards are never blank.
             "og_image": _hero_url or city.get("hero_photo_url"),
