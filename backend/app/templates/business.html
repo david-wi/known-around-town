@@ -258,17 +258,46 @@
   · <span class="text-stone-700">{{ business.name }}</span>
 </div>
 
+{#- WHY: nudge banner shown only to free-tier owners viewing their own listing.
+    Subscribed owners already see the "✦ Featured listing" badge in the info card,
+    so showing them another upgrade prompt would be nagging someone who already paid.
+    The check is done server-side (is_own_listing / owner_is_subscribed from the
+    business_page route) so no client-side JavaScript or second request is needed. #}
+{% if is_own_listing and not owner_is_subscribed %}
+<div class="max-w-7xl mx-auto px-6 lg:px-10 pt-4">
+  <div class="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <p class="text-sm font-semibold text-amber-800 flex items-center gap-2">
+        <span>✦</span> You're viewing your listing
+      </p>
+      <p class="text-sm text-amber-700 mt-0.5">Upgrade to Featured for $29/mo to appear first in searches, unlock AI tools, and more.</p>
+    </div>
+    <a href="/owners/me" class="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-5 py-2 transition-colors whitespace-nowrap">
+      Get Featured <span aria-hidden="true">→</span>
+    </a>
+  </div>
+</div>
+{% endif %}
+
 <section class="max-w-7xl mx-auto px-6 lg:px-10 pt-6 pb-10">
   <div class="grid md:grid-cols-12 gap-10 items-end">
     <div class="md:col-span-8">
       <div class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text }} font-semibold mb-3">{% if neighborhood_obj %}{{ neighborhood_obj.name }}{% endif %}{% if neighborhood_obj and category_obj %} · {% endif %}{% if category_obj %}{{ category_obj.name }}{% endif %}{% if business.price_cues %} · {{ business.price_cues }}{% endif %}</div>
       <h1 class="font-serif text-5xl md:text-6xl lg:text-7xl font-light text-stone-900 leading-[0.95] mb-5" style='font-family: Georgia, "Times New Roman", serif;'>{{ business.name }}</h1>
+      {#- WHY: amber badge in the hero tells visitors this is an enhanced listing before
+          they scroll anywhere. Left-border accent on the description lede gives the content
+          a subtle visual lift. Both signals use amber-500 to match the listing-card badge. #}
+      {% if business.featured and business.featured.enabled %}
+      <div class="flex items-center gap-2 mb-4">
+        <span class="inline-flex items-center gap-1.5 bg-amber-500 text-white text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full shadow-sm">✦ Featured listing</span>
+      </div>
+      {% endif %}
       {% if business.is_founding_partner %}
       <div class="mb-5">
         {% with variant='inline', tenant_label=tenant_label %}{% include 'partials/founding_partner_badge.html' %}{% endwith %}
       </div>
       {% endif %}
-      {% if business.short_description %}<p class="text-xl text-stone-600 max-w-2xl leading-relaxed">{{ business.short_description }}</p>{% endif %}
+      {% if business.short_description %}<p class="text-xl text-stone-600 max-w-2xl leading-relaxed{% if business.featured and business.featured.enabled %} border-l-4 border-amber-300 pl-4{% endif %}">{{ business.short_description }}</p>{% endif %}
     </div>
     <div class="md:col-span-4 flex md:justify-end">
       <div class="border rounded-2xl p-5 w-full md:max-w-xs shadow-sm bg-white border-stone-200">
@@ -323,7 +352,11 @@
             "Claimed by owner" alone. It also makes the upgrade tangible
             for owners: they can see the badge on their own public page
             after subscribing, which validates the spend. #}
-        {% if business.featured and business.featured.enabled %}<div class="text-xs font-semibold text-rose-700 bg-rose-50 rounded-full px-3 py-1 inline-flex items-center gap-1"><span>✦</span> Featured listing</div>{% endif %}
+        {#- WHY: solid amber-500 bg with white text makes this immediately legible in the
+            sidebar card. The previous pale rose-50 background blended into the white card
+            and was easy to overlook. Amber matches the listing-card badge and hero badge
+            for a consistent Featured color story across the page. #}
+        {% if business.featured and business.featured.enabled %}<div class="text-sm font-bold text-white bg-amber-500 rounded-full px-4 py-1.5 inline-flex items-center gap-1.5 shadow-sm"><span>✦</span> Featured listing</div>{% endif %}
       </div>
     </div>
   </div>
