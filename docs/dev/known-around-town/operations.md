@@ -37,6 +37,19 @@ docker compose -f docker-compose.prod.yml exec backend python -m app.database
 2. Watchtower on the server polls GHCR every 5 minutes → detects new image → pulls and restarts `backend` container
 3. No manual action needed for code-only changes
 
+**Merging a PR (there IS a required CI check):** `main` has branch protection
+requiring the **"Smoke tests"** status check (from the "CI" workflow) to pass
+before merge. Merge with `gh pr merge <n> --auto --squash` and let it land
+automatically once Smoke tests go green — a PR will show `mergeStateStatus:
+BLOCKED` with `mergeable: MERGEABLE` while that check is still running, which is
+normal, not an error. (`gh pr checks` may print a 401 because the deploy webhook
+is a non-Actions check; use `gh pr view <n> --json statusCheckRollup` to watch
+the real "Smoke tests" run instead.) After merge, a second "CI" run on the merge
+commit builds and pushes the new `:latest`; the prod backend container is
+typically recreated within ~1 minute. Verify the new code is live by exec-ing
+into `known-around-town-backend-1` and grepping the changed file — the image has
+no git repo baked in, so check by content, not by SHA.
+
 **Env var changes**: Watchtower does NOT re-read `.env` or the compose file on image updates. After changing `.env`, you must run:
 ```bash
 docker compose -f docker-compose.prod.yml restart backend
