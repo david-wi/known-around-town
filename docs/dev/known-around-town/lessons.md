@@ -466,3 +466,38 @@ publish date as `lastmod`.
 **General rule:** never use today's date as a `lastmod` for content that doesn't
 actually change daily — it signals noise to search engines and erodes the credibility
 of your sitemap dates overall.
+
+## Verifying preview-gated pages: mint a short-lived token via the container (2026-06-17)
+
+To screenshot a public page while the site is still in preview mode, mint a
+preview-session token, set the cookie via the set-session link, screenshot, then
+delete the token. Two gotchas:
+
+1. **The hashing helper is `app.services.preview_auth.hash_value`** (SHA-256 hex),
+   not `app.security.tokens.hash_value`. A `preview_sessions` doc needs
+   `{_id, email, token_hash, created_at, expires_at}`; `set-session` only checks
+   `token_hash` + `expires_at > now`.
+2. **Run the mint/delete script from `/app` inside the container with
+   `PYTHONPATH=/app`** — `docker exec -w /app -e PYTHONPATH=/app
+   known-around-town-backend-1 python <script>`. A script left in `/tmp` fails with
+   `ModuleNotFoundError: No module named 'app'` because `/tmp` isn't on the path.
+
+Recipe: `python` script reads `MONGODB_URL` + `MONGODB_DATABASE` (defaults
+`who_knows_local`), inserts the session doc with a 30-minute `expires_at`, prints
+the token. Then Playwright (Python, `channel='chrome'`, 1280×800) visits
+`/api/v1/preview/set-session?token=...&next=/pricing`. Delete the token by `_id`
+when done and confirm the set-session link returns 401. Used in PR #347 to verify
+the pricing-copy reposition. The simpler admin-key header bypass
+(`X-API-Key: ADMIN_API_KEY`) also works for read-only checks — see the Playwright
+admin-key lesson above.
+
+## Never advertise an enforced limit the code doesn't enforce (2026-06-17)
+
+The pricing copy advertised "50 captions/month" and "20 ad campaigns/month" for the
+AI tools, but `ai_caption.py` / `marketing_ai.py` enforce no monthly counter — only
+a per-call output-token cap and a per-input character cap. Stating an enforced number
+that isn't enforced is the same false-claim class as the "Google Business Profile
+sync" feature that was never built (see the earlier lesson). PR #347 replaced the
+numbers with "generous monthly usage included". Sibling rule to "Never list a pricing
+feature that isn't built": before publishing any quantified plan limit, grep the code
+for the counter that enforces it; if there's no counter, don't state a number.
