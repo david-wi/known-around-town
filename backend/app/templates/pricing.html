@@ -95,7 +95,7 @@
         </div>
         {% endif %}
         <p class="text-sm text-stone-700 leading-relaxed mb-4">
-          Control how you appear. Get the marketing AI tools that bring bookings to the door.
+          AI that writes your Instagram captions and ad copy — the marketing help that goes to work for you on day one. Plus the Featured badge and stronger search placement.
         </p>
         {#- WHY: CTA appears before the feature list so salon owners can claim
             immediately after seeing the price — without scrolling through 12
@@ -124,16 +124,16 @@
         {% endif %}
         <ul class="space-y-3 text-sm text-stone-700 leading-relaxed mb-8">
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong>Everything in Free</strong>, plus:</span></li>
-          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong>✦ Featured listing badge</strong> visible to every visitor browsing the directory — your listing stands out at a glance.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong>AI writes your Instagram captions</strong> — describe the post, get a hashtag-ready caption in seconds. Generous monthly usage included.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong>AI generates your Google and Meta ad copy</strong> — describe what you're promoting, get ready-to-run ad variations. Generous monthly usage included.</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Owner dashboard — edit profile, photos, services, hours, menu so your page is always accurate.</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Up to 12 photos plus a hero image. Longer bio (up to ~800 characters).</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>3-5 house specialties pinned at the top of your page.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Owner-curated quotes from your reviews.</span></li>
+          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong>✦ Featured listing badge</strong> visible to every visitor browsing the directory — your listing stands out at a glance.</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span><strong>Editor's Pick eligibility</strong> — our curated picks appear first in category searches. Any Featured listing can earn one.</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Neighborhood spotlight rotation — Featured listings cycle through our neighborhood roundups read by locals actively searching.</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Premium search positioning across the directory.</span></li>
-          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>AI writes your Instagram captions — describe the post, get a hashtag-ready caption in seconds (50/month).</span></li>
-          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>AI generates your Google and Meta ad copy — describe what you're promoting, get 20 ready-to-run ad variations per month.</span></li>
-          <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Owner-curated quotes from your reviews.</span></li>
           <li class="flex gap-2"><span class="{{ theme.accent_text_full }}" aria-hidden="true">•</span><span>Email support (~1 business day).</span></li>
         </ul>
         {% if owner_is_subscribed %}
@@ -163,25 +163,23 @@
         </p>
         <p class="text-sm text-white/60 mb-2">Featured + AI phone receptionist</p>
         <p class="text-sm text-white/80 leading-relaxed mb-6">
-          Never miss a booking. We answer the phone for you, in any language, and book straight into your calendar.
+          Never miss a call. A dedicated AI receptionist answers the phone for you, around the clock, so a missed call doesn't become a missed booking. We set it up with you on a short onboarding call.
         </p>
         <ul class="space-y-3 text-sm text-white/85 leading-relaxed mb-8">
           <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span><strong class="text-white">Everything in Featured</strong>, plus:</span></li>
-          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>AI phone receptionist that books straight into your calendar.</span></li>
+          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>A dedicated AI phone receptionist on its own number, answering questions about your hours and services and taking messages 24/7.</span></li>
           <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>150 calls included @ 5 min each, $2 per overage call.</span></li>
-          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>Multi-language phone handling.</span></li>
-          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>Live calendar sync with Fresha, Vagaro, Mindbody, Square, Booksy.</span></li>
-          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>Call recording, transcription, translation.</span></li>
-          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>1-week free trial, setup included, walk away anytime.</span></li>
+          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>Calendar booking and additional call-handling features are set up with you as we tailor Concierge to your business.</span></li>
+          <li class="flex gap-2"><span class="text-amber-400" aria-hidden="true">•</span><span>Setup included — we handle the call forwarding and onboarding with you.</span></li>
         </ul>
-        {#- WHY: /owners is the main owner-acquisition page and the natural next
-            step for a Concierge prospect — they can claim their listing and
-            submit an inquiry there. Using /owners (not a mailto) means the
-            CTA works the same way across all devices and doesn't require the
-            visitor to have a mail client configured. #}
+        {#- WHY: Concierge has no self-serve checkout — the only billing flow in
+            the app is the $29 Featured subscription, and the webhook can only
+            ever set the Featured tier. So this CTA must read as "talk to us"
+            and route to the owners page where a prospect can claim their
+            listing and submit an inquiry, NOT imply an instant purchase. #}
         <a class="inline-flex items-center justify-center gap-2 bg-amber-300 hover:opacity-90 text-stone-900 font-medium px-6 py-3 rounded-full transition tracking-wide text-sm"
            href="/owners">
-          Get started <span aria-hidden="true">→</span>
+          Talk to us <span aria-hidden="true">→</span>
         </a>
       </div>
 
@@ -216,19 +214,10 @@
       </div>
 
       <div>
-        <h3 class="text-base font-semibold text-stone-900 mb-2">Can I switch tiers?</h3>
-        <p class="text-stone-600 leading-relaxed text-sm">
-          Anytime, from your dashboard. Upgrades take effect immediately and we charge the
-          difference pro-rated. Downgrades take effect at the end of your current billing
-          period — you keep everything you paid for until then.
-        </p>
-      </div>
-
-      <div>
         <h3 class="text-base font-semibold text-stone-900 mb-2">Is there a per-photo or per-AI-draft fee?</h3>
         <p class="text-stone-600 leading-relaxed text-sm">
-          No. Featured includes up to 12 photos plus a hero image, 50 Instagram caption
-          drafts per month, and 20 ad-copy campaigns per month. Concierge call overages
+          No. Featured includes up to 12 photos plus a hero image, and generous monthly
+          usage of the Instagram caption and ad-copy tools. Concierge call overages
           (above 150 calls/month) are billed at $2 per call.
         </p>
       </div>
@@ -237,9 +226,8 @@
         <h3 class="text-base font-semibold text-stone-900 mb-2">What happens if I cancel?</h3>
         <p class="text-stone-600 leading-relaxed text-sm">
           Your listing stays live forever as a Free listing — you don't lose your spot in
-          the directory. You lose the dashboard, marketing AI tools, and the editorial
-          enhancements when the paid period ends. We refund any full unused months
-          pro-rated.
+          the directory. You keep Featured, the dashboard, and the marketing AI tools
+          through the end of the month you've already paid for, and there's no charge after that.
         </p>
       </div>
 

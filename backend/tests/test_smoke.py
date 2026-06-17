@@ -152,6 +152,82 @@ def test_owners_page_has_claim_form_not_mailto(client):
         assert field_id in r.text
 
 
+def test_pricing_page_leads_with_ai_tools_and_omits_false_claims(client):
+    """The /pricing page repositions Featured around the AI marketing tools
+    (the day-one value) and must NOT carry copy the product can't honor.
+
+    Background: on a brand-new directory, "top placement" is unconvincing,
+    while the AI caption + ad-copy tools deliver value immediately — so the
+    AI tools lead the Featured pitch. Several earlier claims were also flatly
+    untrue for how billing/AI actually work, and are removed here:
+      * the system sells one plan and blocks a second purchase, so there is
+        no "switch tiers, pro-rated" flow;
+      * the AI tools enforce no monthly caps in code, so the specific
+        "50 captions / 20 ad campaigns per month" limits were fiction;
+      * Concierge has no self-serve checkout, so its CTA must read "talk to
+        us", not "get started".
+    If any assertion here fails, an edit reintroduced an unsupported claim."""
+    r = client.get("/pricing", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    body = r.text
+
+    # The AI marketing tools are present and are the hero benefit of Featured.
+    assert "AI writes your Instagram captions" in body
+    assert "AI generates your Google and Meta ad copy" in body
+    # The AI caption bullet must come BEFORE the Featured badge bullet in the
+    # Featured card — that ordering is what "AI tools lead" means.
+    ai_pos = body.find("AI writes your Instagram captions")
+    badge_pos = body.find("Featured listing badge</strong> visible")
+    assert ai_pos != -1 and badge_pos != -1
+    assert ai_pos < badge_pos, "AI tools must lead the Featured feature list"
+
+    # Placement perks are kept (just demoted), not deleted.
+    assert "Premium search positioning" in body
+    assert "Featured listing badge" in body
+
+    # False/over-promise claims must be gone.
+    assert "switch tiers" not in body.lower()
+    assert "pro-rated" not in body.lower() and "prorated" not in body.lower()
+    assert "50 Instagram caption" not in body
+    assert "20 ad-copy campaigns" not in body
+    assert "captions per month" not in body.lower()
+    # The original Featured bullet stated an enforced cap as "(50/month)" and
+    # "20 ready-to-run ad variations per month" — neither limit is enforced in
+    # code, so both specific-number forms must be gone.
+    assert "(50/month)" not in body
+    assert "ad variations per month" not in body
+    # Concierge CTA reads as contact-us, not instant self-serve checkout.
+    assert "Talk to us" in body
+    assert ">Get started<" not in body
+    # Unbuilt Concierge integrations must not be advertised as built features.
+    for vendor in ("Fresha", "Vagaro", "Mindbody", "Booksy"):
+        assert vendor not in body
+    # The $299 price is still shown (we reposition the pitch, not the price).
+    assert "$299" in body
+
+
+def test_owners_page_omits_false_claims(client):
+    """The /owners landing page mirrors the same truthfulness fixes as
+    /pricing: AI tools lead the Featured tier, no unsupported pro-rated
+    refund language, no specific AI monthly caps, and no unbuilt Concierge
+    calendar-sync integrations stated as built features."""
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    body = r.text
+
+    assert "AI writes your Instagram captions" in body
+    assert "AI generates your Google and Meta ad copy" in body
+    # No specific AI monthly cap numbers.
+    assert "20 ready-to-run ad variations per month" not in body
+    # No pro-rated refund promise (one-plan monthly billing doesn't do this).
+    assert "pro-rated" not in body.lower() and "prorated" not in body.lower()
+    # Unbuilt Concierge calendar-sync integrations not stated as built.
+    for vendor in ("Fresha", "Vagaro", "Mindbody", "Booksy"):
+        assert vendor not in body
+    # Concierge reads as contact-us / setup-assisted.
+    assert "set up with you" in body.lower() or "talk to us" in body.lower()
+
+
 def test_owners_page_prefills_from_slug(client, seeded_db):
     """When the visitor lands at /owners?slug=<biz>, the form shows the
     listing as a read-only confirmation and locks the business name to it.
