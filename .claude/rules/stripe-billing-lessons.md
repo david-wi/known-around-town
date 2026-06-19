@@ -178,3 +178,44 @@ async def test_count(mock_db):
     count = await mock_db.businesses.count_documents({"is_founding_partner": True})
     assert count == 1
 ```
+
+## 9. `payment_intent_data` Is NOT Allowed in Subscription-Mode Checkout
+
+Stripe Checkout Sessions created with `mode: "subscription"` MUST NOT include a
+`payment_intent_data` block. `payment_intent_data` only applies to one-time
+`mode: "payment"` sessions. Passing it in subscription mode fails the entire
+request with HTTP 400:
+
+```
+You can not pass `payment_intent_data` in `subscription` mode.
+```
+
+Our endpoint returns 502 on that 400, so the owner sees "Could not create
+checkout session" and CANNOT subscribe — a total upgrade-flow outage.
+
+**This actually shipped (PR #317 → fixed in PR #349, 2026-06-19).** PR #317 added
+`payment_intent_data.statement_descriptor_suffix = "KNOWS BEAUTY"` to put a
+recognizable label on card statements. It broke every owner's upgrade for as long
+as it was live, and the bug was invisible in tests because a test was asserting the
+broken behavior.
+
+**Where the card-statement descriptor actually belongs for subscriptions:** it is
+not a per-checkout field. Set it once on the Stripe Price/Product, or on the
+connected account's statement descriptor, in the Stripe dashboard. Do not try to
+pass it through the Checkout Session.
+
+**Regression guard:** `test_checkout_never_sends_payment_intent_data_in_subscription_mode`
+in `test_stripe_billing.py` captures the params passed to `stripe.checkout.Session.create`
+and asserts `payment_intent_data` is absent. Verified red-green.
+
+## 10. Atlas Disk-Threshold Write Block Is Cluster-Wide (operational)
+
+On 2026-06-19 the shared Atlas cluster briefly refused ALL writes with
+`User writes blocked, reason: DiskUseThresholdExceeded` (error code 371). This is
+an Atlas-level disk-capacity guard, not anything in this app — the Known Around
+Town database itself is only ~4 MB. While active it blocks photo uploads, listing
+edits, claims, preview-token issuance, and Stripe-webhook-driven subscription
+updates. Reads keep working. It can clear on its own when disk frees up elsewhere
+on the shared cluster. Before public launch, confirm the cluster has disk headroom
+— a salon hitting a silent "can't save" on day one is damaging. Diagnose with a
+trivial write probe; the app's own collections are not the cause.
