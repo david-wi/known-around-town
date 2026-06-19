@@ -10,6 +10,12 @@
     the URL directly. All downstream uses go through photo_url, never photo.url,
     so both formats render correctly without a data migration. #}
 {% set photo_url = photo.url if (photo and photo is mapping) else photo %}
+{#- WHY: a branded fallback tile shown when a salon has no photo, or when its
+    photo URL 404s. Stock photos are being replaced and some now fail to load;
+    without this the card showed an empty grey box (or the browser's broken-image
+    icon), which reads as a broken directory to a first-time shopper. The static
+    SVG is cached once by the browser and reused across every card. #}
+{% set placeholder_url = '/assets/placeholder-salon.svg' %}
 {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
 {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
 <a class="group block bg-white rounded-2xl overflow-hidden border border-stone-200/70 hover:border-stone-300 hover:shadow-xl hover:shadow-stone-900/5 transition-all duration-300" href="/b/{{ b.slug }}">
@@ -17,7 +23,15 @@
     {# WHY: <img loading="lazy"> defers off-screen images so the browser only fetches
        cards as they scroll into view. bg-cover/bg-center becomes object-cover/object-center
        on <img>; inset-0 + w-full h-full fills the aspect-ratio container the same way. #}
-    {% if photo_url %}<img src="{{ photo_url }}" alt="{{ b.name }}" loading="lazy" class="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105">{% endif %}
+    {#- WHY: always render an <img> — with the real photo when present, otherwise
+        the branded placeholder — so a photoless card never shows an empty grey
+        box. onerror swaps a broken/404 photo to the placeholder; this.onerror=null
+        first so a failing placeholder can't loop, then it switches object-fit to
+        contain so the brand mark isn't cropped.
+        WHY inline object-fit: the precompiled reference.css ships NO object-fit
+        utilities (object-cover/object-contain are absent), so the Tailwind class
+        names have no effect — set object-fit via inline style instead. #}
+    {% if photo_url %}<img src="{{ photo_url }}" alt="{{ b.name }}" loading="lazy" style="object-fit:cover;object-position:center;" onerror="this.onerror=null;this.src='{{ placeholder_url }}';this.style.objectFit='contain';" class="absolute inset-0 w-full h-full transition-transform duration-500 group-hover:scale-105">{% else %}<img src="{{ placeholder_url }}" alt="{{ b.name }}" loading="lazy" style="object-fit:contain;object-position:center;" class="absolute inset-0 w-full h-full">{% endif %}
     {% if b.editors_pick %}<div class="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/95 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-semibold text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
     {#- WHY: text-xs (12px) keeps the badge legible at grid-scanning distance; solid
         amber-500 with drop shadow reads on any photo background. Previous text-[9px]

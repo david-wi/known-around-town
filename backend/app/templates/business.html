@@ -250,6 +250,12 @@
 {#- WHY: resolve the photo URL once here rather than at every use site,
     so both string and dict formats work without touching downstream markup. #}
 {% set hero_photo_url = hero_photo.url if (hero_photo and hero_photo is mapping) else hero_photo %}
+{#- WHY: branded fallback tile for the photo backgrounds below. These use CSS
+    background-image, which can't use an <img> onerror handler, so we layer the
+    placeholder UNDERNEATH the photo: if the photo URL 404s, the placeholder
+    shows through instead of a flat grey box. The placeholder is the second
+    (lower) layer; the real photo paints on top when it loads. #}
+{% set placeholder_url = '/assets/placeholder-salon.svg' %}
 
 <div class="max-w-7xl mx-auto px-6 lg:px-10 pt-8 pb-2 text-sm text-stone-500">
   <a class="hover:text-stone-900" href="/">{{ city.name }}</a>
@@ -365,13 +371,16 @@
 {% if photos %}
 <section class="max-w-7xl mx-auto px-6 lg:px-10">
   <div class="grid grid-cols-12 gap-3 rounded-3xl overflow-hidden h-[460px] lg:h-[540px]">
-    <div class="col-span-12 lg:col-span-7 bg-cover bg-center bg-stone-100 cursor-pointer" onclick="openLightbox(0)" style='background-image: url("{{ hero_photo_url }}");'></div>
+    {#- WHY: photo on top, branded placeholder beneath — if the photo 404s the
+        placeholder shows through, not grey. per-layer size: photo covers, brand
+        mark is contained so it isn't cropped. #}
+    <div class="col-span-12 lg:col-span-7 bg-center bg-stone-100 cursor-pointer" onclick="openLightbox(0)" style='background-image: url("{{ hero_photo_url }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>
     {% if photos|length > 1 %}
     <div class="hidden lg:grid col-span-5 grid-cols-2 grid-rows-2 gap-3">
       {% for p in photos[:4] %}
       {#- WHY: same dual-format guard — resolve p to a URL whether it is a string or dict #}
       {% set p_url = p.url if (p and p is mapping) else p %}
-      <div class="bg-cover bg-center bg-stone-100 transition cursor-pointer {% if loop.first %}opacity-100 ring-2 {{ theme.ring_accent }}{% else %}opacity-80 hover:opacity-100{% endif %}" onclick="openLightbox({{ loop.index0 }})" style='background-image: url("{{ p_url }}");'></div>
+      <div class="bg-center bg-stone-100 transition cursor-pointer {% if loop.first %}opacity-100 ring-2 {{ theme.ring_accent }}{% else %}opacity-80 hover:opacity-100{% endif %}" onclick="openLightbox({{ loop.index0 }})" style='background-image: url("{{ p_url }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>
       {% endfor %}
     </div>
     {% endif %}
