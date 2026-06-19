@@ -32,7 +32,7 @@ David (the operator) sends outreach emails to Miami salon owners. Owners click a
 - **Directory size**: 64 beauty businesses (miami.knowsbeauty.com), 48 wellness (miami.knowswellness.com), 49 health — 161 total across all verticals (as of 2026-06-12)
 - **Founding Partner cap**: 25 subscribers (configurable via `FOUNDING_PARTNER_CAP` env var)
 - **Second vertical**: miami.knowswellness.com is live in the database behind the preview gate; ready to open alongside beauty
-- **Marketing AI**: Instagram caption and ad copy endpoints are built and auth-gated, but the `MARKETING_AI_ENABLED` feature flag is currently OFF on production — must be enabled before launch so subscribers can use these tools
+- **Marketing AI**: Instagram caption and ad copy generators are **live and verified working on production** (both endpoints returned real generated content on 2026-06-19). The feature is turned ON by a database site-setting (`site_settings.marketing_ai_enabled = true`), set from the admin settings page; this database value takes precedence over the `MARKETING_AI_ENABLED` env var. As a belt-and-suspenders backup, the production server's `.env` also has both `MARKETING_AI_ENABLED=true` and `MARKETING_AI_ENABLED_PROD=true`, so the feature stays on even if the database value were ever removed. LLM calls route through the centralized Expertly AI gateway (no Anthropic key on the server). See `operations.md` → Feature Flags for the full mechanism, and `stories.md` for the launch-readiness risk note.
 
 ## GitHub
 

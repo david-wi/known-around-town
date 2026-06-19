@@ -54,9 +54,19 @@
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Instagram caption generator | ✅ Live | `/api/v1/marketing-ai/instagram-caption`; gated on `MARKETING_AI_ENABLED` |
-| Ad copy generator | ✅ Live | `/api/v1/marketing-ai/ad-copy`; returns 3 variations (Google/FB/Instagram-sized) |
-| Marketing AI toggle | ✅ Live | `/admin/settings` → Feature Flags section |
+| Instagram caption generator | ✅ Live & ON in prod | `/api/v1/marketing-ai/instagram-caption`; verified returning real captions on prod 2026-06-19 |
+| Ad copy generator | ✅ Live & ON in prod | `/api/v1/marketing-ai/ad-copy`; returns 3 variations (Google/FB/Instagram-sized); verified on prod 2026-06-19 |
+| Marketing AI on/off control | ✅ Live | DB site-setting `marketing_ai_enabled` (currently `true`) takes precedence; env var `MARKETING_AI_ENABLED` is the fallback. Toggle from `/admin/settings` → Feature Flags |
+
+> **Launch-readiness note (2026-06-19):** The paid AI tools are confirmed ON and
+> working on production. The primary on/off switch is a **database** value
+> (`site_settings.marketing_ai_enabled = true`) set from the admin page, not the
+> env var. If that database document were ever wiped or the setting unset, the
+> feature would fall back to the env var — which on the production server is also
+> `true` (both `MARKETING_AI_ENABLED` and `MARKETING_AI_ENABLED_PROD` are set), so
+> the tools would stay on. The one dependency to keep an eye on: these tools call
+> the centralized Expertly AI gateway, so the gateway API key (`AI_GATEWAY_KEY`)
+> must stay configured in the production `.env`. It is confirmed present today.
 
 ## Admin Tools
 
