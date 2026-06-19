@@ -79,14 +79,15 @@ async def create_checkout_session(request: Request) -> JSONResponse:
         # WHY: promotion codes let us hand discount codes to design partners
         # and early adopters without any code change on our side.
         "allow_promotion_codes": True,
-        # WHY: statement_descriptor_suffix appends "KNOWS BEAUTY" to the
-        # account name on card statements so salon owners see a recognizable
-        # charge name instead of just the generic Stripe account name.
-        # Scoped to this checkout only — the main Expertly AI account settings
-        # are not touched.
-        "payment_intent_data": {
-            "statement_descriptor_suffix": "KNOWS BEAUTY",
-        },
+        # WHY: NO payment_intent_data here. Stripe rejects payment_intent_data
+        # in subscription mode ("You can not pass `payment_intent_data` in
+        # `subscription` mode."), which made the whole checkout request fail
+        # with a 400 — so every owner who clicked "Get Featured" got a 502 and
+        # could not subscribe at all (regression from PR #317). The card-
+        # statement descriptor for a recurring subscription is not a per-
+        # checkout field: it must be configured once on the Stripe Price/Product
+        # ("KNOWS BEAUTY") or on the connected account's statement descriptor.
+        # Set it there in the Stripe dashboard rather than per checkout session.
     }
 
     customer_id = business.get("stripe_customer_id")
