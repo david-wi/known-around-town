@@ -72,9 +72,9 @@ The platform supports multiple "networks" (e.g., beauty, wellness, health) and m
 **Business document key fields**:
 - `status`: `draft` | `live` | `archived`
 - `claim_status`: `unclaimed` | `pending` | `claimed` | `verified`
-- `stripe_customer_id`: set at checkout, **never cleared** (permanence guard for founding partner badge)
-- `stripe_subscription_id`: set at checkout, **cleared on cancellation** (do not use for badge permanence)
-- `is_founding_partner`: permanent flag once earned; controlled by `stripe_customer_id` presence
+- `stripe_customer_id`: set at checkout, **never cleared**
+- `stripe_subscription_id`: set at checkout, **cleared on cancellation**
+- `is_founding_partner`: **dead field** — the Founding Partner concept was removed entirely (PR #362). The app no longer grants, counts, or displays it. The field and the `clear-seeded-founding-partner-flags` startup migration are intentionally left in place as harmless dead data; do not build on them.
 
 ## Preview Gate
 
@@ -104,7 +104,6 @@ To disable the gate (public launch): set `PREVIEW_MODE_ENABLED=false` in `/opt/k
 | `PREVIEW_MODE_ENABLED` | For gate | `true` (private) or `false` (public) |
 | `GA_MEASUREMENT_ID` | For analytics | Google Analytics 4 measurement ID |
 | `GOOGLE_SITE_VERIFICATION` | For GSC | Meta tag for Search Console verification |
-| `FOUNDING_PARTNER_CAP` | Optional | Default: 25 |
 | `ALLOW_LOCAL_MONGODB` | Dev only | `true` to allow localhost Mongo |
 
 ## URL Structure
@@ -132,8 +131,8 @@ To disable the gate (public launch): set `PREVIEW_MODE_ENABLED=false` in `/opt/k
 1. Owner clicks "Subscribe" on their dashboard → POST `/api/v1/billing/checkout` → Stripe Checkout Session URL returned
 2. Owner completes payment on Stripe → redirected back to `/owners/me?checkout=success`
 3. Stripe fires `checkout.session.completed` webhook → `/api/v1/billing/webhook`
-4. Webhook sets `stripe_customer_id`, `stripe_subscription_id`, `is_founding_partner` (if within cap), `claim_status=verified`
-5. If owner cancels: Stripe fires `customer.subscription.deleted` → webhook clears `stripe_subscription_id` only (badge stays)
+4. Webhook sets `stripe_customer_id`, `stripe_subscription_id`, `featured.tier=premium`, `featured.enabled=true` (it no longer touches `is_founding_partner` — that concept was removed in PR #362)
+5. If owner cancels: Stripe fires `customer.subscription.deleted` → webhook downgrades `featured` to free and clears `stripe_subscription_id`
 
 **Statement descriptor**: `EXPERTLY*KNOWSBEAUTY`
 
