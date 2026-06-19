@@ -661,3 +661,40 @@ include `the-spa-at-the-setai`, `the-spa-at-st-regis-bal-harbour`,
 programmatically sets `featured: {enabled: True, tier: "premium"}` on ~36
 businesses — this flag is NOT in `_real_businesses.json`, so don't conclude
 "nothing is Featured" from that file alone.
+
+## Never promise "forever" or "locked-in" in owner copy (2026-06-19)
+
+Standing owner instruction: the site must **never promise permanence or a price
+lock**. The Founding Partner copy used to tell salons their badge and pricing
+were "permanent", "forever", and "locked-in" — promises the product doesn't
+actually back. PR #360 removed every such phrase while keeping the Founding
+Partner concept (gold badge, limited spots) and replacing the over-promises with
+honest wording ("recognized as a Founding Partner with a gold badge on their
+listing"; "visible to visitors" instead of "visible to every visitor, forever").
+
+Where the over-promises lived (all fixed): `services/copy.py` claim body,
+`templates/business.html` claim-banner fallback, `templates/pricing.html`
+callout, `templates/owner_me.html` (welcome banner, the "Lock in Founding
+Partner pricing before rates increase" bullet — removed entirely, and the badge
+banner), `services/owner_email.py` claim-verified urgency ("left at the founding
+price" → "left."), and `static/walkthrough/mkb-owner-outreach-preview.html`.
+
+Two distinctions that matter when touching this:
+- **Keep, don't remove, the accurate "free forever" lines** — `pricing.html`
+  "Your listing stays live forever as a Free listing" and `owners.html` "Free
+  forever to stay listed." are TRUE (free listings stay free), so they stay.
+- **"Permanent" as a code-behavior note ≠ a user promise.** The
+  `is_founding_partner` flag genuinely is not cleared by the cancellation webhook
+  today, so the badge section lives outside the subscription conditional. That's
+  an internal persistence fact (fine to state in a WHY comment), but the
+  user-facing copy must not advertise it as a permanence guarantee.
+- **Seed descriptions legitimately contain "permanent"** (e.g. "permanent
+  makeup", "Permanent Eyeliner" — real beauty services). So a regression guard
+  must assert the specific over-promise phrase ("permanent Founding Partner
+  status", "permanent gold badge", "locked-in pricing") is absent — never the
+  bare word "permanent" on a page that renders salon descriptions.
+
+Regression guards: `tests/test_founding_partner_copy.py` (copy default) and a
+`TestFoundingPartnerNoPriceLockPromise` class in `tests/test_owner_email.py`
+(red-green verified). Three smoke tests had codified the old wording and were
+updated to the corrected copy plus negative guards.
