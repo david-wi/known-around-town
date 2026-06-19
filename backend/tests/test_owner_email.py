@@ -7,7 +7,12 @@ to test without any mocking.
 
 import pytest
 
-from app.services.owner_email import _claim_verified_html, _claim_verified_text
+from app.services.owner_email import (
+    _claim_verified_html,
+    _claim_verified_text,
+    _subscription_confirmed_html,
+    _subscription_confirmed_text,
+)
 
 
 LOGIN_URL = "https://miami.knowsbeauty.com/owners/login?email=test%40example.com"
@@ -93,3 +98,32 @@ class TestClaimVerifiedHtml:
     def test_fallback_first_name_for_empty_name(self):
         html = _claim_verified_html("", "Salon X", LOGIN_URL, PRICING_URL)
         assert "Hi there" in html
+
+
+DASHBOARD_URL = "https://miami.knowsbeauty.com/owners/me"
+
+
+class TestSubscriptionConfirmedAdVariationCount:
+    """The welcome email must promise the same number of ad variations the
+    generator actually returns. The ad-copy tool is hard-coded to produce
+    EXACTLY 3 variations (app/services/ai_caption.py), so the email previously
+    promising "20" was an over-promise that set owners up for disappointment
+    the first time they used the tool. These tests lock the email to "3" and
+    guard against the inflated "20" creeping back in.
+    """
+
+    def test_text_promises_three_ad_variations(self):
+        text = _subscription_confirmed_text("Maria", "Curl Studio", DASHBOARD_URL)
+        assert "3 ready-to-run ad variations" in text
+
+    def test_text_does_not_overpromise_twenty(self):
+        text = _subscription_confirmed_text("Maria", "Curl Studio", DASHBOARD_URL)
+        assert "20 ready-to-run ad variations" not in text
+
+    def test_html_promises_three_variations(self):
+        html = _subscription_confirmed_html("Maria", "Curl Studio", DASHBOARD_URL)
+        assert "3 ready-to-run variations per campaign" in html
+
+    def test_html_does_not_overpromise_twenty(self):
+        html = _subscription_confirmed_html("Maria", "Curl Studio", DASHBOARD_URL)
+        assert "20 ready-to-run variations" not in html
