@@ -698,3 +698,38 @@ Regression guards: `tests/test_founding_partner_copy.py` (copy default) and a
 `TestFoundingPartnerNoPriceLockPromise` class in `tests/test_owner_email.py`
 (red-green verified). Three smoke tests had codified the old wording and were
 updated to the corrected copy plus negative guards.
+
+## Founding Partner removed entirely — only dead data + cleanup migration remain (2026-06-19, PR #362)
+
+The owner decided to drop the Founding Partner concept altogether (the badge,
+the "spots left" scarcity, the granting). PR #362 stripped ALL of it: the public
+badge (deleted `partials/founding_partner_badge.html` + every include on cards
+and the detail page), the owner-dashboard celebration banner and badge section,
+the pricing/walkthrough/owners/claim-form copy, the claim-verified email
+urgency, the outreach templates, the checkout + claim-verify grant logic, the
+`founding_partner_cap` config, and the per-page founding-count context.
+
+Three things were deliberately KEPT (so don't "finish the job" by removing them):
+- **The paid Featured tier** (`business.featured.enabled` / `featured.tier`) and
+  its champagne-gold `✦ Featured` badge, plus Editor's Pick — a separate paid
+  product, untouched.
+- **The "Get Featured — $29/month" upgrade CTA** on `owner_me.html` — the
+  revenue path. The card was only re-labelled (was "Founding Partner offer", now
+  "Get Featured"); button, bullets, and checkout flow are unchanged.
+- **The `is_founding_partner` model field and the
+  `clear-seeded-founding-partner-flags-20260611` startup migration in
+  `database.py`** — left exactly in place as harmless dead data/cleanup. The
+  invariant going forward: `grep -rniE 'founding' backend/app` should return
+  ONLY those two locations. Anything else is a regression of this removal.
+
+Note: the seed scripts (`backend/seed/*`) still write `is_founding_partner:
+False` and `seed_miami.py` still reads it from the seed JSON — but no seed JSON
+ever sets it true, so the seed never grants the badge (it's inert dead data).
+Left untouched to avoid editing the production-reset seed path for no behavior
+change. If FP ever needs to be excised from seeds too, do it as its own change.
+
+Tests: deleted `test_founding_partner_copy.py`; converted the grant/badge tests
+in `test_stripe_billing.py`, `test_admin_claims.py`, and the owner-dashboard
+smoke tests into negative guards (flag set in DB → still NO badge rendered);
+the `test_startup_migrations.py` tests that protect the kept migration still
+pass unchanged.
