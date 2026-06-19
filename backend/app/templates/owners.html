@@ -52,13 +52,9 @@
         {#- WHY: Social proof addresses the "is this real?" hesitation a first-time
             visitor has before committing to a claim. Using the live claim_directory
             count rather than a hardcoded number so the figure stays accurate as
-            the directory grows. The Founding Partner mention creates genuine
-            scarcity — the badge already appears on listing pages but is never
-            named as a benefit on the owners pitch page, so this is the first
-            place it's positioned as something worth wanting. #}
+            the directory grows. #}
         <p class="text-sm text-stone-500 mb-10">
-          Join {{ claim_directory|length }}+ {{ city.name if city else '' }} {{ listing_word_plural }} already in the directory — early claimers get
-          <strong class="text-stone-700 font-semibold">Founding Partner</strong> status on their profile while it lasts.
+          Join {{ claim_directory|length }}+ {{ city.name if city else '' }} {{ listing_word_plural }} already in the directory.
         </p>
 
         {#- WHY: Three concise trust signals in a visual grid break the reading

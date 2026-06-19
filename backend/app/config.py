@@ -70,12 +70,6 @@ class Settings(BaseSettings):
     # swap it between test mode and live mode without a code change.
     stripe_price_id_pro: str = ""
 
-    # WHY: 25 is enough early adopters to create visible social proof
-    # (badge shown on listing pages) without devaluing the "founding"
-    # status. Configurable so David can raise the cap if early demand
-    # is strong without a code deploy.
-    founding_partner_cap: int = 25
-
     # WHY: read through pydantic-settings (same as all other config) rather
     # than os.environ.get() directly, so the setting is documented in one
     # place and works with .env files in dev. Empty string means the GA4

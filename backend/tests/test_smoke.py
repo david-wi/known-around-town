@@ -86,16 +86,9 @@ def test_miami_beauty_business(client):
     # only check copy if the claim banner is present)
     if "Claim free to add photos" in r.text:
         assert "searching for salons in Miami" in r.text
-        # WHY: the claim copy names the Founding Partner offer but must NOT
-        # promise permanence or locked-in pricing (owner instruction: never
-        # promise "forever"). Assert the concept is present without the
-        # removed over-promise phrases. We match the specific phrases rather
-        # than the bare word "permanent" — seeded salon descriptions legitimately
-        # mention services like "permanent makeup", so a bare-word check would be
-        # both brittle and semantically wrong.
-        assert "Founding Partner" in r.text
-        assert "permanent Founding Partner status" not in r.text
-        assert "locked-in pricing" not in r.text
+        # WHY: the Founding Partner concept was removed entirely — the claim
+        # banner must no longer mention it.
+        assert "Founding Partner" not in r.text
 
 
 def test_miami_wellness_home(client):
@@ -134,9 +127,9 @@ def test_owners_page(client):
     # Three-tier explainer must mention all three tier names.
     for tier in ("Free", "Featured", "Concierge"):
         assert tier in r.text
-    # Social proof + Founding Partner mention in hero section
+    # Social proof in hero section; Founding Partner concept removed entirely.
     assert "already listed" in r.text
-    assert "Founding Partner" in r.text
+    assert "Founding Partner" not in r.text
 
 
 def test_owners_page_has_claim_form_not_mailto(client):
@@ -403,26 +396,18 @@ def test_pricing_page(client):
     assert "/owners#claim'" not in r.text  # ensure the broken anchor is gone
 
 
-def test_pricing_page_shows_founding_partner_callout(client):
-    """The /pricing page must include the founding partner callout while slots
-    are still available (the default state with zero subscribers)."""
+def test_pricing_page_has_no_founding_partner_callout(client):
+    """The /pricing page must NOT mention Founding Partner — the concept was
+    removed entirely — while still selling the $29/month Featured tier."""
     r = client.get("/pricing", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
-    # WHY: check for the stable key phrase rather than the exact number so
-    # the test does not break as soon as the first subscriber signs up.
-    assert "Founding Partner" in r.text, (
-        "Pricing page must show 'Founding Partner' callout while slots remain — "
-        "it is a key conversion incentive"
+    assert "Founding Partner" not in r.text, (
+        "Pricing page must not mention Founding Partner — the concept was removed"
     )
-    assert "Founding Partner gold badge" in r.text, (
-        "Pricing page must mention the Founding Partner gold badge — "
-        "the badge is the value of the offer"
-    )
-    # WHY: the copy must NOT promise permanence or "forever" (owner instruction:
-    # never promise "forever"). Guard against the over-promise creeping back into
-    # the founding-partner callout.
-    assert "permanent gold badge" not in r.text
-    assert "visible to every visitor, forever" not in r.text
+    # WHY: the paid Featured tier is a different product and stays — guard that
+    # removing Founding Partner didn't take the revenue pitch with it.
+    assert "Featured" in r.text
+    assert "$29" in r.text
 
 
 def test_pricing_link_in_header_nav(client):
@@ -552,15 +537,15 @@ def test_copy_block_override(client, seeded_db):
     assert "An editors&#39; guide for Miami" in r.text or "An editors' guide for Miami" in r.text
 
 
-def test_founding_partner_badge_on_business_detail(client, seeded_db):
-    """A business explicitly flagged as a Founding Partner shows the badge
-    on its detail page. The flag is set directly in this test — the seed
-    data no longer sets it, since the badge should only be granted by the
-    Stripe webhook or admin claim verification, never by seed data."""
+def test_founding_partner_badge_gone_from_business_detail(client, seeded_db):
+    """The Founding Partner badge was removed entirely. Even a business that
+    still carries the legacy is_founding_partner flag in the database must NOT
+    render any Founding Partner badge on its detail page — the app no longer
+    displays the concept anywhere."""
     import asyncio
-    # WHY: igk-salon-south-beach is a stable seed business confirmed present;
-    # the previous target (ayesha-beauty-studio-wynwood) was removed from the
-    # seed when the business closed.
+    # WHY: igk-salon-south-beach is a stable seed business confirmed present.
+    # We set the legacy flag to prove the display is gone even when the (now
+    # dead) data flag is present.
     asyncio.run(
         seeded_db.businesses.update_one(
             {"slug": "igk-salon-south-beach"},
@@ -572,20 +557,16 @@ def test_founding_partner_badge_on_business_detail(client, seeded_db):
         headers={"host": "miami.knowsbeauty.localhost"},
     )
     assert r.status_code == 200, r.text
-    assert "Founding Partner" in r.text
-    # Tooltip should reference the publication name.
-    assert "Founding member of Miami Knows Beauty" in r.text
+    assert "Founding Partner" not in r.text
+    assert "Founding member of Miami Knows Beauty" not in r.text
 
 
-def test_founding_partner_badge_on_trending_row(client, seeded_db):
-    """The home page's trending row also surfaces the Founding Partner badge
-    for any business that has the flag. The flag is set directly in this
-    test — the seed data no longer sets it."""
+def test_founding_partner_badge_gone_from_trending_row(client, seeded_db):
+    """The home page's trending row must not render any Founding Partner badge,
+    even for a business that still carries the legacy flag in the database."""
     import asyncio
     # WHY: igk-salon-south-beach is in the trending_business_slugs list in
-    # seed_miami.py, so it appears on the homepage trending row — needed for
-    # this badge-visibility test. The previous target (ayesha-beauty-studio-wynwood)
-    # was removed from the seed when the business closed.
+    # seed_miami.py, so it appears on the homepage trending row.
     asyncio.run(
         seeded_db.businesses.update_one(
             {"slug": "igk-salon-south-beach"},
@@ -594,24 +575,19 @@ def test_founding_partner_badge_on_trending_row(client, seeded_db):
     )
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
-    assert "Founding Partner" in r.text
+    assert "Founding Partner" not in r.text
 
 
-def test_non_founding_partner_does_not_show_badge(client):
-    """A salon NOT flagged as a Founding Partner doesn't render the
-    badge on its detail page. Drybar Miami Beach is a real, non-founding
-    business in the seed, so its page should NOT show the badge.
-
-    Note: the claim banner copy mentions 'Founding Partner' as the offer
-    text ('recognized as a Founding Partner with a gold badge') — that's
-    expected on all unclaimed listings. What must be absent is the actual badge,
-    identified by its tooltip text 'Founding member of Miami Knows Beauty'."""
+def test_business_detail_has_no_founding_partner_badge(client):
+    """A salon that does not carry the legacy flag also shows no Founding
+    Partner badge — the tooltip wording must be absent everywhere."""
     r = client.get(
         "/b/drybar-miami-beach",
         headers={"host": "miami.knowsbeauty.localhost"},
     )
     assert r.status_code == 200, r.text
     assert "Founding member of Miami Knows Beauty" not in r.text
+    assert "Founding Partner" not in r.text
 
 
 def test_home_hero_has_owner_entry_point(client):
@@ -3294,94 +3270,15 @@ def test_ga_measurement_id_from_settings(seeded_db, monkeypatch):
         get_settings.cache_clear()
 
 
-def test_owner_me_founding_partner_badge_shown_when_flag_set():
-    """The owner dashboard must show the 'Founding Partner' badge section
-    when the business has is_founding_partner set to True.
+def test_owner_me_has_no_founding_partner_badge_section():
+    """The owner dashboard must contain NO Founding Partner badge section or
+    wording — the concept was removed entirely.
 
-    WHY: owners who subscribed early earned a Founding Partner gold badge that
-    appears on their public listing.  Without a dashboard confirmation, they have
-    no way to see or celebrate that status — which undercuts the 'founding partner'
-    framing used in the upgrade card to motivate early sign-ups.  Seeing 'Your
-    Founding Partner gold badge appears on your public listing' is the payoff
-    for being an early adopter.
-
-    The copy must NOT promise permanence or "forever" — the owner instruction is
-    to never make that promise. The badge flag is not cleared by the cancellation
-    webhook today, so this section must live OUTSIDE the Stripe subscription
-    conditional and stay visible even if the owner later cancels — but that's an
-    internal behavior, not a guarantee the copy advertises.
-
-    We test the Jinja2 logic directly (without a full HTTP round-trip) because
-    /owners/me is auth-gated and the template variable that drives this section
-    is straightforward to verify in isolation."""
-    import pathlib
-    from jinja2 import Environment as JEnv
-
-    templates_dir = pathlib.Path(__file__).parent.parent / "app" / "templates"
-    source = (templates_dir / "owner_me.html").read_text()
-
-    # 1. Template source must contain the founding-partner conditional and badge copy.
-    assert "is_founding_partner" in source, (
-        "owner_me.html has no reference to is_founding_partner — "
-        "founding partner badge can never render"
-    )
-    assert "Founding Partner gold badge" in source, (
-        "owner_me.html missing 'Founding Partner gold badge' copy — "
-        "founding partners won't see confirmation of their badge"
-    )
-    assert "Founding Partner" in source, (
-        "owner_me.html missing 'Founding Partner' label text"
-    )
-    # WHY: copy must not promise permanence or "forever" (owner instruction).
-    # Guard the user-facing badge line against the over-promise returning.
-    assert "Your permanent gold badge appears on your public listing — forever." not in source
-
-    # 2. Render the conditional snippet with the flag set → badge content appears.
-    snippet = (
-        "{% if owner_business.get('is_founding_partner') %}"
-        "BADGE_SHOWN"
-        "{% else %}"
-        "BADGE_HIDDEN"
-        "{% endif %}"
-    )
-    env = JEnv()
-    tmpl = env.from_string(snippet)
-
-    out_with_flag = tmpl.render(owner_business={"is_founding_partner": True})
-    assert "BADGE_SHOWN" in out_with_flag, (
-        "Founding Partner badge section does not render when is_founding_partner=True"
-    )
-    assert "BADGE_HIDDEN" not in out_with_flag, (
-        "Founding Partner badge rendered the wrong branch with is_founding_partner=True"
-    )
-
-    # 3. When the flag is absent, the badge must NOT appear.
-    out_no_flag = tmpl.render(owner_business={})
-    assert "BADGE_HIDDEN" in out_no_flag, (
-        "Founding Partner badge section appeared when is_founding_partner is absent — "
-        "non-founding-partner owners would see a badge they didn't earn"
-    )
-    assert "BADGE_SHOWN" not in out_no_flag, (
-        "Founding Partner badge incorrectly shown when is_founding_partner is absent"
-    )
-
-
-def test_owner_me_founding_partner_badge_outside_subscription_conditional():
-    """The Founding Partner badge section must be structurally outside the
-    subscription conditional in owner_me.html.
-
-    WHY: the is_founding_partner flag persists — the webhook that grants it does
-    not clear it today, even when an owner cancels their subscription.  (This is
-    an internal behavior; the copy does not advertise it as a permanence
-    guarantee, per the owner instruction to never promise "forever".)
-    If the badge were inside the is_subscribed block, a founding partner who cancels
-    would lose their dashboard confirmation of a status that still shows on their
-    public listing.  They would have a live gold badge on their public page with no
-    matching confirmation in their dashboard — confusing and demoralising for an
-    early adopter.
-
-    We verify this structurally: the is_founding_partner check must appear in the
-    template source after the endif that closes the subscription block."""
+    WHY: the Founding Partner badge, its celebration banner, and the
+    is_founding_partner template branches all used to live in owner_me.html.
+    With the concept gone, none of that wording or the flag check may remain in
+    the template source. We assert against the template source directly because
+    /owners/me is auth-gated."""
     import pathlib
 
     source = (
@@ -3389,30 +3286,13 @@ def test_owner_me_founding_partner_badge_outside_subscription_conditional():
         / "app" / "templates" / "owner_me.html"
     ).read_text()
 
-    # The closing comment marks the boundary between the subscription block and
-    # the Founding Partner badge section.
-    sub_endif_marker = "{% endif %}{# /if is_subscribed #}"
-    sub_endif_pos = source.find(sub_endif_marker)
-    assert sub_endif_pos != -1, (
-        "owner_me.html is missing the '{% endif %}{# /if is_subscribed #}' "
-        "marker that closes the subscription block — "
-        "the founding partner badge may be inside the subscription conditional"
+    assert "Founding Partner" not in source, (
+        "owner_me.html still contains 'Founding Partner' wording — "
+        "the concept was removed and must not appear anywhere"
     )
-
-    # The Founding Partner BADGE SECTION (the amber section that says
-    # "You're one of the first salons") must appear AFTER the subscription endif.
-    # We use rfind() so we match the badge's own conditional, not any earlier
-    # occurrence of the same check inside the post-payment confirmation banner.
-    fp_check = "{% if owner_business.get('is_founding_partner') %}"
-    fp_check_pos = source.rfind(fp_check)
-    assert fp_check_pos != -1, (
-        "owner_me.html is missing the founding partner conditional — "
-        "founding partner badge section may have been removed"
-    )
-    assert fp_check_pos > sub_endif_pos, (
-        "Founding Partner badge check appears BEFORE the subscription block's "
-        "{% endif %} — the badge is inside the subscription conditional and won't "
-        "render for founding partners who cancel their subscription later"
+    assert "is_founding_partner" not in source, (
+        "owner_me.html still references the is_founding_partner flag — "
+        "the dashboard must not branch on it any more"
     )
 
 
@@ -3450,13 +3330,14 @@ async def test_owner_me_shows_subscribed_banner_on_stripe_return(seeded_db):
         "Post-payment confirmation banner (#subscribed-banner) not found in the page — "
         "owner returning from Stripe checkout gets no visible confirmation"
     )
-    # WHY: non-founding-partner subscribers see "You're now Featured!" copy;
-    # founding partners see "You're now a Founding Partner!" — either is valid
-    # confirmation.  The old "featured listing is now live" phrasing was wrong
-    # for non-founding-partner subscribers (it called them "Founding Partner").
-    assert "now Featured" in r.text or "Founding Partner" in r.text, (
+    # WHY: with Founding Partner removed, every subscriber sees the same
+    # "You're now Featured!" confirmation copy.
+    assert "now Featured" in r.text, (
         "Confirmation message text missing from subscribed-banner — "
         "banner element exists but contains no confirmation copy"
+    )
+    assert "Founding Partner" not in r.text, (
+        "subscribed banner must not mention Founding Partner — concept removed"
     )
     assert 'id="subscribed-banner-close"' in r.text, (
         "Banner close/dismiss button missing — "
@@ -3581,7 +3462,7 @@ async def test_owner_me_no_banner_when_not_yet_subscribed(seeded_db):
 
 
 async def test_owner_me_upgrade_cta_hidden_when_subscribed(seeded_db):
-    """Subscribed owners must NOT see the 'Founding Partner offer' upgrade card.
+    """Subscribed owners must NOT see the 'Get Featured' upgrade card.
 
     WHY: Showing the 'Get Featured' checkout button to an owner who has already
     paid is confusing and undermines trust — they'd wonder whether their payment
@@ -3607,10 +3488,6 @@ async def test_owner_me_upgrade_cta_hidden_when_subscribed(seeded_db):
         cookies={SESSION_COOKIE_NAME: sign_session(email)},
     )
     assert r.status_code == 200, r.text
-    assert "Founding Partner offer" not in r.text, (
-        "Upgrade card ('Founding Partner offer') is visible to a subscribed owner — "
-        "they already paid, seeing a checkout CTA undermines trust"
-    )
     assert "Featured listing active" in r.text, (
         "'Featured listing active' status badge missing for subscribed owner — "
         "owner has no confirmation their paid subscription is active"
@@ -3618,14 +3495,19 @@ async def test_owner_me_upgrade_cta_hidden_when_subscribed(seeded_db):
     assert 'id="upgrade-btn"' not in r.text, (
         "'Get Featured' checkout button still visible to subscribed owner"
     )
+    assert "Founding Partner" not in r.text, (
+        "subscribed dashboard must not mention Founding Partner — concept removed"
+    )
 
 
 async def test_owner_me_upgrade_cta_shown_when_not_subscribed(seeded_db):
-    """Free-tier owners must see the 'Founding Partner offer' upgrade card.
+    """Free-tier owners must see the 'Get Featured' upgrade card with the
+    $29/month checkout button.
 
     WHY: The upgrade card is the primary revenue driver — it's how free-tier
     owners convert to paid subscribers. If it disappears, owners have no way
-    to upgrade from their dashboard."""
+    to upgrade from their dashboard. Removing Founding Partner must NOT remove
+    this revenue path — only the founding-partner label/scarcity goes."""
     from app.main import app
     from app.services.owner_auth import SESSION_COOKIE_NAME, sign_session
     from fastapi.testclient import TestClient
@@ -3646,9 +3528,18 @@ async def test_owner_me_upgrade_cta_shown_when_not_subscribed(seeded_db):
         cookies={SESSION_COOKIE_NAME: sign_session(email)},
     )
     assert r.status_code == 200, r.text
-    assert "Founding Partner offer" in r.text, (
-        "Upgrade card ('Founding Partner offer') missing for free-tier owner — "
+    # WHY: the re-framed card is labelled "Get Featured" (the founding-partner
+    # label was removed) and the $29/month checkout button is the revenue path.
+    assert "Get Featured" in r.text, (
+        "Upgrade card ('Get Featured') missing for free-tier owner — "
         "owners on the free tier cannot upgrade from their dashboard"
+    )
+    assert "Get Featured — $29/month" in r.text, (
+        "'Get Featured — $29/month' upgrade button missing for free-tier owner — "
+        "this is the revenue path and must render"
+    )
+    assert "Founding Partner" not in r.text, (
+        "free-tier dashboard must not mention Founding Partner — concept removed"
     )
     assert 'id="upgrade-btn"' in r.text, (
         "'Get Featured' checkout button missing for free-tier owner"

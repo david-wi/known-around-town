@@ -53,7 +53,6 @@
         no-ops, so the badge had no shadow at all. Uses only classes present in
         reference.css. #}
     {% if _is_featured %}<div class="absolute top-3 right-3 inline-flex items-center gap-1 bg-gradient-to-r from-amber-400 to-amber-600 text-white text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full shadow-lg ring-1 ring-white/30">✦ Featured</div>{% endif %}
-    {% if b.is_founding_partner %}{% with variant='overlay', tenant_label=tenant_label %}{% include 'partials/founding_partner_badge.html' %}{% endwith %}{% endif %}
   </div>
   <div class="p-5">
     <div class="flex items-start justify-between gap-2 mb-2">

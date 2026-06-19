@@ -305,11 +305,6 @@
         <p class="text-xs text-amber-700 font-medium mt-2 tracking-wide">Selected for premium placement</p>
       </div>
       {% endif %}
-      {% if business.is_founding_partner %}
-      <div class="mb-5">
-        {% with variant='inline', tenant_label=tenant_label %}{% include 'partials/founding_partner_badge.html' %}{% endwith %}
-      </div>
-      {% endif %}
       {% if business.short_description %}<p class="text-xl text-stone-600 max-w-2xl leading-relaxed{% if business.featured and business.featured.enabled %} border-l-4 border-amber-300 pl-4{% endif %}">{{ business.short_description }}</p>{% endif %}
     </div>
     <div class="md:col-span-4 flex md:justify-end">
@@ -474,14 +469,12 @@
       <p class="text-base font-semibold text-amber-900">{{ claim_title or 'Is this your business?' }}</p>
       {#- WHY: The old copy ("update your hours, photos, and details") framed
           claiming as admin busywork. The new copy leads with the growth benefit —
-          getting found by people searching tonight — and surfaces the Featured
-          upgrade at the moment of highest intent (the owner is looking at their
-          own listing). The Founding Partner badge creates genuine scarcity-driven
-          urgency without making any false pricing promises. #}
+          getting found by people searching tonight — at the moment of highest
+          intent (the owner is looking at their own listing). #}
       {# WHY: The fallback text previously hardcoded "Miami", causing every other city subdomain
          (Doral, Plantation, etc.) to falsely advertise the wrong city to salon owners. Now uses
          city.name from template context so the city is always correct. #}
-      <p class="text-sm text-amber-800 mt-0.5">{{ claim_body or 'Claim free to add photos, respond to inquiries, and get found by people searching for salons in ' ~ (city.name if city else 'your city') ~ '. The first 25 owners to upgrade are recognized as a Founding Partner with a gold badge on their listing.' }}</p>
+      <p class="text-sm text-amber-800 mt-0.5">{{ claim_body or 'Claim free to add photos, respond to inquiries, and get found by people searching for salons in ' ~ (city.name if city else 'your city') ~ '.' }}</p>
     </div>
     <a href="/owners?slug={{ business.slug }}#claim-form"
        class="inline-flex items-center gap-2 bg-amber-700 hover:bg-amber-800 text-white font-semibold px-6 py-3 rounded-full text-base shadow-sm transition whitespace-nowrap shrink-0">
@@ -914,7 +907,7 @@
       <p class="text-white text-sm font-medium leading-snug">
         <span class="hidden sm:inline">Own {{ business.name }}? </span>
         <span class="sm:hidden">Is this your business? </span>
-        Claim your listing free — Founding Partner spots still open.
+        Claim your listing free.
       </p>
       <div class="flex items-center gap-3 shrink-0">
         <a href="/owners?slug={{ business.slug }}#claim-form"
