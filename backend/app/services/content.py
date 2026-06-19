@@ -90,29 +90,65 @@ async def list_businesses(
     return await cur.to_list(length=limit)
 
 
+# WHY: the fields every search term is matched against. Beyond free-text name
+# and description, we include the slug arrays so a term like "nails" or
+# "brickell" finds a salon by its category or neighborhood even though those
+# words never appear in the salon's own copy. The slugs ARE the searchable
+# words for Miami's single-word categories/neighborhoods ("nails", "hair",
+# "brickell", "wynwood"); a regex (substring) match also catches multi-word
+# slugs like "brickell-ave-mary-brickell-village" from a "brickell" term.
+_SEARCH_FIELDS = (
+    "name",
+    "short_description",
+    "tags",
+    "category_slugs",
+    "neighborhood_slugs",
+)
+
+
 async def search_businesses(
     city_id: str, query: str, *, limit: int = 40
 ) -> List[Dict[str, Any]]:
-    """Full-text-style search across business name and description.
+    """Full-text-style search across a business's name, description, tags,
+    category, and neighborhood.
 
     Uses case-insensitive regex because Atlas free-tier clusters do not
-    guarantee a $text index is available. Regex on name + short_description
-    covers the vast majority of real search intent ("lash bar", "curly hair",
-    "nail art").
+    guarantee a $text index is available. Regex on name + short_description +
+    tags + category/neighborhood slugs covers the vast majority of real search
+    intent ("lash bar", "curly hair", "nail art", "nails brickell").
+
+    Multi-word queries use AND-across-terms semantics: every whitespace-
+    separated term must match at least one searchable field. So "nails
+    brickell" returns nail salons in Brickell — it does NOT require any single
+    field to contain the literal phrase "nails brickell" (no business has it).
     """
-    # WHY: re.escape prevents a query like "a.b" from being treated as a
-    # regex wildcard and matching "a<any-char>b" — user input must be literal.
-    pattern = re.escape(query.strip())
-    if not pattern:
+    # WHY: split into terms so a multi-word query like "nails brickell" matches
+    # nail salons that are in Brickell, instead of looking for the literal
+    # contiguous phrase "nails brickell" (which no business name or slug holds).
+    terms = query.split()
+    if not terms:
         return []
+
+    # WHY: re.escape prevents a term like "a.b" from being treated as a regex
+    # wildcard and matching "a<any-char>b" — user input must be literal.
+    # Each term gets its own $or across all searchable fields; combining the
+    # per-term blocks with $and requires EVERY term to match SOMEWHERE.
+    and_clauses: List[Dict[str, Any]] = []
+    for term in terms:
+        pattern = re.escape(term)
+        and_clauses.append(
+            {
+                "$or": [
+                    {field: {"$regex": pattern, "$options": "i"}}
+                    for field in _SEARCH_FIELDS
+                ]
+            }
+        )
+
     q: Dict[str, Any] = {
         "city_id": city_id,
         "status": "live",
-        "$or": [
-            {"name": {"$regex": pattern, "$options": "i"}},
-            {"short_description": {"$regex": pattern, "$options": "i"}},
-            {"tags": {"$regex": pattern, "$options": "i"}},
-        ],
+        "$and": and_clauses,
     }
     db = get_db()
     cur = db.businesses.find(q)
