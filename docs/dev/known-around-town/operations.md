@@ -101,24 +101,55 @@ If you skip step 2, the env var is silently invisible to the container even if i
 
 All feature flags are set in `/opt/known-around-town/.env` and take effect after a container restart.
 
-| Flag | What it controls | Safe to enable when |
+| Flag | What it controls | Current prod state (verified 2026-06-19) |
 |---|---|---|
-| `PREVIEW_MODE_ENABLED` | Gates the entire site behind email+code login | Ready to open to the public |
-| `MARKETING_AI_ENABLED_PROD` | Enables the AI caption and ad copy endpoints for Featured subscribers | An Anthropic API key is confirmed configured and the AI tools are ready to serve |
+| `PREVIEW_MODE_ENABLED` | Gates the entire site behind email+code login | ON (`preview_mode_enabled = true` in the `site_settings` DB doc) — site is still private |
+| Marketing AI (caption + ad copy) | Enables the AI caption and ad copy endpoints for Featured subscribers | **ON and verified working** — primary control is the DB site-setting `marketing_ai_enabled = true` |
 
-> **Note on variable naming:** The staging container reads `MARKETING_AI_ENABLED` (defaults to `true`). The production container reads `MARKETING_AI_ENABLED_PROD` (defaults to empty/off). This split is intentional — staging always has AI on; production stays off until explicitly enabled. Don't use `MARKETING_AI_ENABLED=true` in production's `.env`; it has no effect.
+> **How the Marketing-AI on/off switch actually works (precedence matters):**
+> The code reads `get_marketing_ai_enabled()`, which checks the **database** first
+> (`site_settings.marketing_ai_enabled`, set from the `/admin/settings` page) and
+> only falls back to the env var when the DB value is unset. **The DB value wins.**
+> As of 2026-06-19 the production DB has `marketing_ai_enabled = true`, so the
+> tools are ON — independent of any env var. Belt-and-suspenders: the production
+> `.env` also has both `MARKETING_AI_ENABLED=true` and `MARKETING_AI_ENABLED_PROD=true`,
+> so even if the DB value were removed, the env-var fallback keeps the tools on.
+>
+> **Env-var naming:** Per `docker-compose.prod.yml`, the prod service maps the
+> container's `MARKETING_AI_ENABLED` from the host's `MARKETING_AI_ENABLED_PROD`
+> (`${MARKETING_AI_ENABLED_PROD:-}`); the staging service maps it from
+> `MARKETING_AI_ENABLED` (default `true`). Today the host `.env` sets both to
+> `true`, so the env-var fallback is on regardless of which mapping applies.
+>
+> **LLM provider:** These tools do NOT use an Anthropic key on the server. They
+> call the centralized Expertly AI gateway
+> (`admin-api.ai.devintensive.com/api/public/ai-config/call`, use case
+> `marketing_caption`) using the `AI_GATEWAY_KEY` env var — confirmed present in
+> the prod `.env`. There is intentionally no `ANTHROPIC_API_KEY` on the server,
+> matching the Expertly convention that production servers don't hold model keys.
 
-### Enabling marketing AI tools
+### Turning marketing AI off or on (if ever needed)
+
+Preferred path — the admin page (no restart, takes effect immediately):
+
+```
+/admin/settings → Feature Flags → Marketing AI toggle
+```
+
+This writes `marketing_ai_enabled` into the `site_settings` DB doc, which the
+code reads on every request. The env vars below are only the fallback for when
+the DB value is unset.
 
 ```bash
-# Add/update in /opt/known-around-town/.env
+# Fallback env path (only used when the DB value is unset)
+# Add/update in /opt/known-around-town/.env, then restart:
 MARKETING_AI_ENABLED_PROD=true
-
-# Apply (no image pull needed)
 docker compose -f docker-compose.prod.yml restart backend
 ```
 
-If `MARKETING_AI_ENABLED_PROD` is blank or `false`, the Instagram caption and ad copy endpoints return HTTP 404, so subscribers who try to use these tools get a silent failure. **This flag must be `true` before launch.**
+If the feature is off by every path (DB unset AND env vars false/blank), the
+Instagram caption and ad copy endpoints return HTTP 404, and subscribers who try
+to use these tools get a silent failure.
 
 ## Preview Gate
 
