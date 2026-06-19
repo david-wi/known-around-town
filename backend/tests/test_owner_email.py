@@ -36,29 +36,20 @@ class TestClaimVerifiedText:
         text = _claim_verified_text("Maria", "Salon X", LOGIN_URL, PRICING_URL)
         assert PRICING_URL in text
 
-    def test_urgency_shown_when_spots_available(self):
-        text = _claim_verified_text(
-            "Maria", "Salon X", LOGIN_URL, PRICING_URL, founding_partner_spots_left=5
-        )
-        assert "5 spots left" in text
-        assert "founding partner" in text.lower()
-
-    def test_urgency_singular_when_one_spot(self):
-        text = _claim_verified_text(
-            "Maria", "Salon X", LOGIN_URL, PRICING_URL, founding_partner_spots_left=1
-        )
-        assert "1 spot left" in text
-
-    def test_no_urgency_when_zero_spots(self):
-        text = _claim_verified_text(
-            "Maria", "Salon X", LOGIN_URL, PRICING_URL, founding_partner_spots_left=0
-        )
-        assert "spots left" not in text
-        assert "founding partner" not in text.lower()
-
-    def test_no_urgency_by_default(self):
+    def test_no_founding_partner_mention(self):
+        # WHY: the Founding Partner concept was removed entirely. The claim-
+        # verified email must no longer mention founding partner status or a
+        # spots-left scarcity hook.
         text = _claim_verified_text("Maria", "Salon X", LOGIN_URL, PRICING_URL)
-        assert "spots left" not in text
+        assert "founding partner" not in text.lower()
+        assert "spots left" not in text.lower()
+
+    def test_still_sells_featured(self):
+        # WHY: removing Founding Partner must not remove the legitimate Featured
+        # upgrade pitch — that's the revenue path and stays.
+        text = _claim_verified_text("Maria", "Salon X", LOGIN_URL, PRICING_URL)
+        assert "Featured" in text
+        assert "$29/month" in text
 
 
 class TestClaimVerifiedHtml:
@@ -76,24 +67,14 @@ class TestClaimVerifiedHtml:
         html = _claim_verified_html("Maria", "Salon X", LOGIN_URL, PRICING_URL)
         assert "$29/month" in html
 
-    def test_urgency_shown_when_spots_available(self):
-        html = _claim_verified_html(
-            "Maria", "Salon X", LOGIN_URL, PRICING_URL, founding_partner_spots_left=3
-        )
-        assert "3 founding partner spots left" in html or "3 spots" in html
-        # urgency should be styled prominently (red, uppercase, etc.)
-        assert "dc2626" in html  # red urgency color
-
-    def test_no_urgency_block_when_zero_spots(self):
-        html = _claim_verified_html(
-            "Maria", "Salon X", LOGIN_URL, PRICING_URL, founding_partner_spots_left=0
-        )
-        assert "dc2626" not in html  # no red urgency color
-        assert "spots left" not in html
-
-    def test_no_urgency_by_default(self):
+    def test_no_founding_partner_block(self):
+        # WHY: the Founding Partner concept was removed entirely — the email
+        # must no longer carry the founding-partner scarcity block (the red
+        # "spots left" urgency line) or any founding-partner wording.
         html = _claim_verified_html("Maria", "Salon X", LOGIN_URL, PRICING_URL)
-        assert "spots left" not in html
+        assert "founding partner" not in html.lower()
+        assert "spots left" not in html.lower()
+        assert "dc2626" not in html  # the red urgency color is gone with the block
 
     def test_fallback_first_name_for_empty_name(self):
         html = _claim_verified_html("", "Salon X", LOGIN_URL, PRICING_URL)
@@ -129,25 +110,18 @@ class TestSubscriptionConfirmedAdVariationCount:
         assert "20 ready-to-run variations" not in html
 
 
-class TestFoundingPartnerNoPriceLockPromise:
-    """The owner instruction is to never promise locked-in or permanent pricing.
-
-    The claim-verified urgency line previously said spots were "left at the
-    founding price", which implies an early-claimer gets a price that is locked
-    against future increases — a promise the product does not actually make.
-    The spots-left count is honest urgency and stays; the price-lock phrasing
-    is removed. These tests guard against the locked-pricing wording returning.
+class TestNoFoundingPartnerInEmails:
+    """The Founding Partner concept was removed entirely. The claim-verified
+    email must carry no founding-partner wording in either the text or HTML
+    body — no badge mention, no spots-left scarcity, no founding price.
     """
 
-    def test_urgency_keeps_honest_spot_count(self):
-        text = _claim_verified_text(
-            "Maria", "Salon X", LOGIN_URL, PRICING_URL, founding_partner_spots_left=5
-        )
-        assert "5 spots left" in text
+    def test_text_has_no_founding_partner_wording(self):
+        text = _claim_verified_text("Maria", "Salon X", LOGIN_URL, PRICING_URL)
+        for phrase in ("founding partner", "founding price", "spots left"):
+            assert phrase not in text.lower(), f"text must not mention {phrase!r}"
 
-    def test_urgency_does_not_promise_founding_price(self):
-        text = _claim_verified_text(
-            "Maria", "Salon X", LOGIN_URL, PRICING_URL, founding_partner_spots_left=5
-        )
-        assert "founding price" not in text.lower()
-        assert "locked" not in text.lower()
+    def test_html_has_no_founding_partner_wording(self):
+        html = _claim_verified_html("Maria", "Salon X", LOGIN_URL, PRICING_URL)
+        for phrase in ("founding partner", "founding price", "spots left"):
+            assert phrase not in html.lower(), f"html must not mention {phrase!r}"

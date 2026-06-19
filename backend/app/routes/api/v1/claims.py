@@ -98,28 +98,7 @@ async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
         {"$set": {"status": "verified", "verified_at": now}},
     )
 
-    # --- Founding Partner cap check ---
-    # WHY: look up the business's network_id first so we can scope the cap
-    # per vertical (beauty / wellness / health). Each vertical advertises its
-    # own "X of N remaining" counter independently — a beauty network filling
-    # up should not block wellness claimers from getting the badge.
-    biz_for_cap = await db.businesses.find_one(
-        {"_id": claim["business_id"]}, {"network_id": 1}
-    )
-    network_id_for_cap = (biz_for_cap or {}).get("network_id")
     settings = get_settings()
-    cap = settings.founding_partner_cap
-    cap_filter: dict = {"is_founding_partner": True}
-    if network_id_for_cap:
-        # WHY: scope to the business's own network so badge slots in one
-        # vertical (beauty) don't count against a different vertical (wellness).
-        cap_filter["network_id"] = network_id_for_cap
-    current_fp_count = await db.businesses.count_documents(cap_filter)
-    # WHY: write False explicitly rather than leaving the field absent so a
-    # future cap increase doesn't require a migration — the field will be
-    # present and queryable on all verified businesses regardless of badge status.
-    is_founding_partner = current_fp_count < cap
-
     await db.businesses.update_one(
         {"_id": claim["business_id"]},
         {
@@ -133,11 +112,6 @@ async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
                 # regardless of how the owner capitalises their email at
                 # sign-in.
                 "claimed_email": (claim["submitter_email"] or "").lower(),
-                # WHY: only True when a slot is still available. The owners
-                # page advertises "X of N remaining" — without this check
-                # that scarcity is fake; every verified business would get
-                # the badge regardless of how many slots have already been used.
-                "is_founding_partner": is_founding_partner,
             }
         },
     )
@@ -155,13 +129,6 @@ async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
     # code-entry screen immediately rather than having to re-type their address.
     # One fewer step between "verified" and "inside the dashboard".
     login_url = base + "/owners/login?email=" + _url_quote(owner_email, safe="")
-    # WHY: compute founding partner spots AFTER the update so the count in the
-    # email reflects the current state (the just-verified owner may have become
-    # a founding partner themselves, or an earlier owner may have just taken the
-    # last slot). This count is passed to the email so it shows real urgency
-    # without a second DB round-trip inside the email service.
-    fp_count_after = await db.businesses.count_documents(cap_filter)
-    spots_left = max(0, cap - fp_count_after)
     asyncio.create_task(
         send_claim_verified_email(
             email=owner_email,
@@ -169,7 +136,6 @@ async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
             business_name=(business or {}).get("name", "your business"),
             login_url=login_url,
             site_base_url=base,
-            founding_partner_spots_left=spots_left,
         )
     )
     return {"status": "verified"}

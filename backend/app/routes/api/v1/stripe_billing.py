@@ -226,25 +226,6 @@ async def stripe_webhook(request: Request) -> JSONResponse:
                 "updated_at": datetime.now(timezone.utc),
             }
 
-            # WHY: auto-grant Founding Partner status to the first N subscribers
-            # so the dashboard's "Founding Partner offer" copy actually delivers
-            # what it promises. The badge renders on the public listing page and
-            # persists even if the owner later cancels — giving early adopters
-            # something genuinely permanent.  We count BEFORE the current update
-            # so two simultaneous checkouts race fairly: one gets slot N and one
-            # gets slot N+1 (at worst one extra badge is granted, never one
-            # fewer).
-            cap = get_settings().founding_partner_cap
-            existing_count = await db.businesses.count_documents(
-                {"is_founding_partner": True}
-            )
-            if existing_count < cap:
-                update_fields["is_founding_partner"] = True
-                log.info(
-                    "Business %s granted Founding Partner status (%d/%d slots used)",
-                    business_id, existing_count + 1, cap,
-                )
-
             await db.businesses.update_one(
                 {"_id": business_id},
                 {"$set": update_fields},

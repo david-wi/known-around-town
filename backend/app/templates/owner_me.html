@@ -38,13 +38,8 @@
     <div class="flex items-center gap-3 min-w-0">
       <span class="text-amber-200 text-lg leading-none shrink-0">★</span>
       <div class="min-w-0">
-        {% if owner_business.get('is_founding_partner') %}
-        <p class="font-semibold text-sm">You're now a Founding Partner on {{ tenant_label }}!</p>
-        <p class="text-amber-100 text-xs mt-0.5">Your featured listing and Founding Partner gold badge are now live. Thank you for being an early supporter.</p>
-        {% else %}
         <p class="font-semibold text-sm">You're now Featured on {{ tenant_label }}!</p>
         <p class="text-amber-100 text-xs mt-0.5">Your subscription is active. Your salon now appears first in search results in your neighborhood.</p>
-        {% endif %}
       </div>
     </div>
     <button id="subscribed-banner-close" type="button"
@@ -64,11 +59,7 @@
    page refresh after success doesn't re-show either banner. #}
 <div id="subscribed-toast"
      class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-amber-600 text-white text-sm font-medium px-6 py-3 rounded-full shadow-xl pointer-events-none">
-  {% if owner_business.get('is_founding_partner') %}
-  ★ You're now a Founding Partner on {{ tenant_label }}!
-  {% else %}
   ★ You're now Featured on {{ tenant_label }}!
-  {% endif %}
 </div>
 
 {# ── REAL DASHBOARD ─────────────────────────────────────────────── #}
@@ -144,12 +135,12 @@
     <div class="rounded-2xl border border-stone-200 bg-gradient-to-br from-amber-50/60 via-rose-50/30 to-white p-6 sm:p-8">
       <div class="flex flex-wrap items-start justify-between gap-6">
         <div class="min-w-0">
-          {#- WHY: "Founding Partner" framing creates genuine urgency from the
-              limited number of spots — more compelling than generic "upgrade"
-              copy for owners who just got verified and are deciding right now.
-              WHY: no price-lock or "rates increase" promise — the owner
-              instruction is to never promise locked-in or permanent pricing. #}
-          <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-2">Founding Partner offer</p>
+          {#- WHY: the upgrade card sells the Featured tier on its concrete
+              benefits — top placement, the Featured badge, and the AI marketing
+              tools — rather than a scarcity hook. No price-lock or "rates
+              increase" promise; the owner instruction is to never promise
+              locked-in or permanent pricing. #}
+          <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-2">Get Featured</p>
           <h2 class="text-base font-semibold text-stone-900 mb-1.5">Be the first {{ listing_word_singular or 'salon' }} visitors see in {{ _uc_nb_name }}</h2>
           <ul class="text-sm text-stone-600 space-y-1 leading-relaxed max-w-xs list-none">
             {% if _uc_tags %}
@@ -174,26 +165,6 @@
   </div>
 </section>
 {% endif %}{# /if is_subscribed #}
-{# WHY: the Founding Partner flag is not cleared by the cancellation webhook
-   today, so this badge must live OUTSIDE the stripe_subscription_id conditional
-   above — a founding partner who cancels should still see (and feel good about)
-   their badge.  WHY: copy here must not promise permanence or "forever" — the
-   owner instruction is to never make that promise, even though the flag happens
-   to persist in the current implementation. #}
-{% if owner_business.get('is_founding_partner') %}
-<section class="bg-amber-50 border-b border-amber-100">
-  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-4 flex flex-wrap items-center gap-3">
-    <div class="inline-flex items-center gap-2.5 rounded-full border border-amber-300 bg-white px-5 py-2.5 shadow-sm">
-      <span class="text-amber-500 text-sm leading-none">★</span>
-      <span class="text-sm font-semibold text-amber-900">Founding Partner</span>
-    </div>
-    <p class="text-sm text-amber-800">
-      You&rsquo;re one of the first salons on {{ tenant_label }}.
-      Your Founding Partner gold badge appears on your public listing.
-    </p>
-  </div>
-</section>
-{% endif %}
 
 {# ── Profile completeness ─────────────────────────────────────────
    WHY: the old "getting started" card disappeared as soon as the owner

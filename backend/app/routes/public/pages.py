@@ -295,11 +295,10 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "theme": _network_theme(network),
         "vertical_word": _vertical_word(network),
         "canonical_url": canonical_url,
-        # WHY: A short human label like "Miami Knows Beauty" used inside
-        # the Founding Partner tooltip ("Founding member of <tenant_label>").
-        # Falls back to the network name on the network-home page where
-        # there's no city in context (e.g. the landing page before a city
-        # has been picked).
+        # WHY: A short human label like "Miami Knows Beauty" used in page
+        # copy and meta tags. Falls back to the network name on the
+        # network-home page where there's no city in context (e.g. the
+        # landing page before a city has been picked).
         "tenant_label": (
             f"{city['name']} Knows {_vertical_word(network)}"
             if city else network.get("name", "this publication")
@@ -1570,24 +1569,6 @@ async def pricing_page(request: Request) -> HTMLResponse:
     # customer or partner. The city hero is the right image for a pricing page — it
     # represents the Miami beauty market we're selling into.
     ctx["og_image"] = tenant.city.get("hero_photo_url") if tenant.city else None
-    # WHY: pass founding partner count so the pricing page can show how many
-    # spots are left. Render-time count is accurate to within a few seconds
-    # which is good enough — we don't need real-time precision for a "26 of
-    # 25 spots claimed" edge case.
-    # WHY: filter by city_id — the database holds multiple directory networks
-    # (beauty, wellness, health) and each has its own founding-partner offer.
-    # Without the city filter, the beauty pricing page would count founding
-    # partners from wellness and health toward the beauty cap, showing fewer
-    # remaining spots than actually exist for beauty subscribers.
-    cap = get_settings().founding_partner_cap
-    city_id = str(tenant.city["_id"]) if tenant.city else None
-    founding_filter: dict = {"is_founding_partner": True}
-    if city_id:
-        founding_filter["city_id"] = city_id
-    founding_count = await get_db().businesses.count_documents(founding_filter)
-    ctx["founding_partner_cap"] = cap
-    ctx["founding_partner_count"] = founding_count
-    ctx["founding_partner_spots_left"] = max(0, cap - founding_count)
 
     # WHY: if the visiting owner is already logged in, the generic "Claim your listing"
     # CTA is confusing — they already claimed, they want to upgrade. We check the session
@@ -1732,11 +1713,11 @@ async def owners_me_page(request: Request) -> HTMLResponse:
 async def walkthrough_page(request: Request) -> HTMLResponse:
     """Shareable owner-journey explainer sent to prospective salon owners.
 
-    WHY: David sends this URL in outreach emails so owners can see the six-step
-    journey from "find your listing" to "become a Founding Partner" before they
-    decide to claim. It is also linked from the /owners page and the pricing
-    page as a "see how it works" path. The page is added to the preview gate
-    bypass list so it is always publicly accessible regardless of preview mode.
+    WHY: David sends this URL in outreach emails so owners can see the
+    journey from "find your listing" to "manage your Featured profile" before
+    they decide to claim. It is also linked from the /owners page and the
+    pricing page as a "see how it works" path. The page is added to the preview
+    gate bypass list so it is always publicly accessible regardless of preview mode.
     """
     tenant = await _require_tenant(request)
     ctx = await _base_context(request, tenant)
@@ -1744,21 +1725,10 @@ async def walkthrough_page(request: Request) -> HTMLResponse:
     vertical = _vertical_word(tenant.network)
     ctx["seo_title"] = f"How it works — {city_name} Knows {vertical}".strip(" —")
     ctx["meta_description"] = (
-        f"Six steps from finding your listing to managing your Featured profile on "
+        f"From finding your listing to managing your Featured profile on "
         f"{city_name} Knows {vertical}. Claim free, upgrade anytime."
     ).strip()
     ctx["og_image"] = tenant.city.get("hero_photo_url") if tenant.city else None
-    # WHY: walkthrough page needs the Founding Partner count so it can show
-    # how many spots are left — same calculation as the pricing page.
-    cap = get_settings().founding_partner_cap
-    city_id = str(tenant.city["_id"]) if tenant.city else None
-    founding_filter: dict = {"is_founding_partner": True}
-    if city_id:
-        founding_filter["city_id"] = city_id
-    founding_count = await get_db().businesses.count_documents(founding_filter)
-    ctx["founding_partner_cap"] = cap
-    ctx["founding_partner_count"] = founding_count
-    ctx["founding_partner_spots_left"] = max(0, cap - founding_count)
     return _templates.TemplateResponse("walkthrough.html", ctx)
 
 
