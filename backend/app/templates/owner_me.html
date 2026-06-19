@@ -208,27 +208,39 @@
 {%- set _insta_done = owner_business.instagram and owner_business.instagram|trim %}
 {%- set _complete_count = (1 if _photo_done else 0) + (1 if _hours_done else 0) + (1 if _desc_done else 0) + (1 if _phone_done else 0) + (1 if _insta_done else 0) %}
 {%- set _total_count = 5 %}
+{# WHY: when the profile is already 100% complete on page load the checklist
+   is not rendered at all. But when it IS rendered, the photo item must be able
+   to flip to "done" the instant an owner uploads their first photo — without a
+   page reload — so the checklist never tells them they still need a photo they
+   just added. The id hooks (profile-checklist, checklist-count,
+   checklist-progress, checklist-item-photo) let the photo-upload JS update this
+   section live; data-checklist-total carries the denominator so the JS doesn't
+   hard-code 5. #}
 {% if _complete_count < _total_count %}
-<section class="bg-emerald-50/70 border-t border-emerald-100">
+<section id="profile-checklist" data-checklist-total="{{ _total_count }}" class="bg-emerald-50/70 border-t border-emerald-100">
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-7">
     <div class="flex items-center justify-between mb-1">
       <h2 class="text-sm font-semibold text-stone-900">Complete your profile</h2>
-      <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">{{ _complete_count }} of {{ _total_count }} complete</span>
+      <span id="checklist-count" class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">{{ _complete_count }} of {{ _total_count }} complete</span>
     </div>
     <p class="text-sm text-stone-500 mb-3">A complete profile gets more clicks and makes your Featured listing stand out.</p>
     <div class="w-full h-1.5 rounded-full bg-emerald-100 mb-4">
-      <div class="h-1.5 rounded-full bg-emerald-500" style="width: {{ (_complete_count / _total_count * 100)|round|int }}%"></div>
+      <div id="checklist-progress" class="h-1.5 rounded-full bg-emerald-500" style="width: {{ (_complete_count / _total_count * 100)|round|int }}%"></div>
     </div>
     <div class="grid sm:grid-cols-2 gap-2 text-sm">
       {# 1. Photo #}
-      <div class="flex items-center gap-2">
-        {% if _photo_done %}
+      {# WHY: render BOTH the done and not-done states and toggle the .hidden
+         class from JS, rather than rebuilding the row's innerHTML. Keeps the
+         live update to two classList flips — no markup re-templating in JS. #}
+      <div id="checklist-item-photo" data-done="{{ '1' if _photo_done else '0' }}" class="flex items-center gap-2">
+        <span data-checklist-done class="flex items-center gap-2 {% if not _photo_done %}hidden{% endif %}">
           <span class="text-emerald-500 shrink-0">✓</span>
           <span class="text-stone-400 line-through">Add a photo</span>
-        {% else %}
+        </span>
+        <span data-checklist-todo class="flex items-center gap-2 {% if _photo_done %}hidden{% endif %}">
           <span class="text-stone-300 shrink-0">○</span>
           <a href="#photos-section" class="{{ theme.accent_text_full }} hover:opacity-80 font-medium">Add a photo</a>
-        {% endif %}
+        </span>
       </div>
       {# 2. Description #}
       <div class="flex items-center gap-2">
@@ -288,14 +300,22 @@
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-10">
     <h2 class="text-base font-semibold text-stone-900 mb-1">Listing performance</h2>
     <p class="text-sm text-stone-500 mb-6">Your listing activity — page views and messages received.</p>
-    <div class="flex gap-8 flex-wrap">
-      <div class="bg-white rounded-2xl border border-stone-200 px-8 py-6 flex flex-col items-center min-w-[10rem]">
+    {# WHY: a freshly-upgraded owner sees 0 page views and 0 messages, which on
+       its own reads as "the directory isn't working". These reassurance lines —
+       revealed by the stats JS only when the fetched count is exactly 0 — reframe
+       a zero as "tracking has started" instead of "nothing is happening". They
+       carry no numbers, so they never claim activity that didn't occur; the count
+       itself stays visible above each line. #}
+    <div class="flex gap-8 flex-wrap items-stretch">
+      <div class="bg-white rounded-2xl border border-stone-200 px-8 py-6 flex flex-col items-center text-center min-w-[10rem] max-w-[16rem]">
         <span id="stat-views" class="text-4xl font-bold text-rose-600 tracking-tight">&hellip;</span>
         <span class="mt-1 text-sm text-stone-500">page views</span>
+        <span id="stat-views-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Views appear here as Miami shoppers find your listing.</span>
       </div>
-      <a href="#visitor-inquiries" class="bg-white rounded-2xl border border-stone-200 px-8 py-6 flex flex-col items-center min-w-[10rem] hover:border-stone-300 transition no-underline">
+      <a href="#visitor-inquiries" class="bg-white rounded-2xl border border-stone-200 px-8 py-6 flex flex-col items-center text-center min-w-[10rem] max-w-[16rem] hover:border-stone-300 transition no-underline">
         <span id="stat-inquiries" class="text-4xl font-bold text-emerald-600 tracking-tight">&hellip;</span>
         <span class="mt-1 text-sm text-stone-500">messages received</span>
+        <span id="stat-inquiries-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Messages from shoppers will show up here once they reach out.</span>
       </a>
     </div>
     <p id="stats-error" class="hidden mt-4 text-sm text-rose-700" role="alert" aria-live="polite"></p>
@@ -1385,6 +1405,50 @@
     /* WHY: hide the upload button when at the limit so the owner sees the
        count as the explanation rather than receiving a confusing 409 error. */
     if (uploadLabel) uploadLabel.style.display = n >= MAX_PHOTOS ? 'none' : '';
+    syncChecklistPhoto(n);
+  }
+
+  /* WHY: the "Complete your profile" checklist is rendered server-side from the
+     photo count at page load. Without this, an owner who uploads their first
+     photo still sees "Add a photo" as not done until they reload — the page
+     contradicts what they just did. This flips the photo item to done (or back
+     to not-done if every photo is later deleted) and keeps the "X of 5 complete"
+     count and progress bar in step, so the checklist always matches reality. */
+  function syncChecklistPhoto(photoCount) {
+    var item = document.getElementById('checklist-item-photo');
+    if (!item) return;   /* checklist absent when profile already 100% on load */
+    var nowDone = photoCount > 0;
+    var wasDone = item.dataset.done === '1';
+    if (nowDone === wasDone) return;   /* no transition — nothing to update */
+    item.dataset.done = nowDone ? '1' : '0';
+
+    var doneEl = item.querySelector('[data-checklist-done]');
+    var todoEl = item.querySelector('[data-checklist-todo]');
+    if (doneEl) doneEl.classList.toggle('hidden', !nowDone);
+    if (todoEl) todoEl.classList.toggle('hidden', nowDone);
+
+    var section = document.getElementById('profile-checklist');
+    var total = parseInt(section && section.dataset.checklistTotal, 10) || 5;
+    var countEl = document.getElementById('checklist-count');
+    var progressEl = document.getElementById('checklist-progress');
+    /* WHY: recompute the done-count live from each row's visible state rather
+       than trusting a running counter — robust no matter which other items were
+       already complete when the page rendered. The photo row carries both done
+       and todo branches and is judged by which one is visible; the four static
+       rows (description, phone, hours, Instagram) render only one branch, so a
+       struck-through label is the signal that row is done. */
+    var doneCount = 0;
+    var rows = item.parentNode ? item.parentNode.children : [];
+    for (var i = 0; i < rows.length; i++) {
+      var d = rows[i].querySelector('[data-checklist-done]');
+      if (d) {
+        if (!d.classList.contains('hidden')) doneCount++;
+      } else if (rows[i].querySelector('.line-through')) {
+        doneCount++;
+      }
+    }
+    if (countEl) countEl.textContent = doneCount + ' of ' + total + ' complete';
+    if (progressEl) progressEl.style.width = Math.round(doneCount / total * 100) + '%';
   }
 
   function makeThumb(photo) {
@@ -1584,6 +1648,11 @@
         emptyEl.classList.remove('hidden');
         var statInq = document.getElementById('stat-inquiries');
         if (statInq) statInq.textContent = '0';
+        /* WHY: zero messages reads as "nobody's reaching out" without context.
+           Reveal the reassurance line so it reads as "tracking is on, waiting
+           for the first message" instead. */
+        var inqZero = document.getElementById('stat-inquiries-zero-note');
+        if (inqZero) inqZero.classList.remove('hidden');
         return;
       }
       data.forEach(function (inq) {
@@ -1617,7 +1686,14 @@
       return r.json();
     })
     .then(function (data) {
-      viewsEl.textContent = (data.page_view_count || 0).toLocaleString();
+      var count = data.page_view_count || 0;
+      viewsEl.textContent = count.toLocaleString();
+      /* WHY: a brand-new listing legitimately has 0 views. Reveal the
+         reassurance line so zero reads as "tracking has started" rather than
+         "the directory isn't working". Only on a real zero — once views exist
+         the number speaks for itself. */
+      var viewsZero = document.getElementById('stat-views-zero-note');
+      if (viewsZero && count === 0) viewsZero.classList.remove('hidden');
     })
     .catch(function () {
       viewsEl.textContent = '—';
