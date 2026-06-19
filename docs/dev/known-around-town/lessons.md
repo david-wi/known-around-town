@@ -501,3 +501,61 @@ sync" feature that was never built (see the earlier lesson). PR #347 replaced th
 numbers with "generous monthly usage included". Sibling rule to "Never list a pricing
 feature that isn't built": before publishing any quantified plan limit, grep the code
 for the counter that enforces it; if there's no counter, don't state a number.
+
+## Owner-facing counts must match what the tool actually returns (2026-06-19)
+
+The post-upgrade welcome email (`owner_email.py`, both the text and HTML
+subscription-confirmed bodies) promised "20 ready-to-run ad variations", but the
+ad-copy generator is hard-coded to return **exactly 3** — `ai_caption.py`
+(`build_ad_copy_system_prompt` says "Return EXACTLY 3 variations") and
+`marketing_ai.py` both describe 3, and so do the dashboard, pricing, owners, and
+walkthrough pages. Only the welcome email was inflated, so a new owner's very first
+use of the tool would deliver far less than the email led them to expect. Fixed in
+PR #351 by aligning the email to "3". Same class as the "never advertise an enforced
+limit" lesson: before stating a number in owner-facing copy, grep for the place that
+produces it and match the copy to reality. The ad-copy count lives in the system
+prompt, not a config value, so "make the product produce 20" would be a real
+product-scope change, not a copy tweak — the correct least-invasive fix was the copy.
+
+## Live profile checklist: server-rendered state needs a client-side update hook (2026-06-19)
+
+The owner dashboard's "Complete your profile" checklist (`owner_me.html`) is
+rendered server-side from `owner_business.photos` etc. at page load. The "Add a
+photo" item stayed showing as not-done after an owner uploaded their first photo,
+until they reloaded — the page contradicted the action they just took. Fix (PR #351):
+render the photo row with BOTH a done and a not-done branch (`data-checklist-done` /
+`data-checklist-todo`, toggled by the `hidden` class) plus id hooks
+(`profile-checklist`, `checklist-count`, `checklist-progress`,
+`data-checklist-total`), and have the existing `updateCountLabel()` photo handler call
+a new `syncChecklistPhoto()` that flips the row and recomputes the "X of 5 complete"
+count + progress bar live. The 4 static rows render only one branch and signal done
+via a `.line-through` label, so the live count loop reads each row's visible state.
+When the photo is the LAST incomplete item, the section is hidden once complete (it's
+only server-rendered while something is incomplete, so leaving it up would show a
+finished checklist still nagging). PR #352. Pattern: any checklist/progress UI that's
+server-rendered from a value the page can also change client-side needs a matching
+client-side updater, or it goes stale until reload.
+
+## Encouraging empty states beat bare zeros (2026-06-19)
+
+A freshly-upgraded owner's "Listing performance" panel showed bare "0 page views /
+0 messages", which reads as "the directory is broken" rather than "tracking just
+started". Fix (PR #351): added a short reassurance line under each metric ("Views
+appear here as Miami shoppers find your listing." / "Messages from shoppers will show
+up here once they reach out."), rendered hidden and revealed by the stats JS only when
+the fetched count is exactly 0. No fabricated numbers — the zero stays visible. Sibling
+to the "no fake limits" rule: never invent activity, but DO frame a legitimate zero
+encouragingly.
+
+## Auto-merge can fire on the first commit's green build before a follow-up lands (2026-06-19)
+
+`gh pr merge --auto --squash` merges as soon as the required checks ("Smoke tests")
+pass. If you push a SECOND commit to the branch a few minutes later (e.g. applying
+code-review follow-ups), the first commit's build may already be green and auto-merge
+fires immediately — squashing only the first commit and dropping the second. This
+happened on PR #351: the second commit (two review fixes) never reached main; it had
+to be re-shipped as PR #352. Guard: after pushing a follow-up commit to a PR that
+already has `--auto` set, confirm the merge waited for the NEW head before treating it
+as done — `gh pr view <n> --json mergedAt` plus a `git show origin/main:<file> | grep`
+for a marker unique to the follow-up. If the merge already landed without it, open a
+follow-up PR rather than assuming the squash caught everything.
