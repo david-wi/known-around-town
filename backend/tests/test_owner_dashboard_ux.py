@@ -114,6 +114,15 @@ class TestChecklistPhotoHooks:
         )
         assert 'id="checklist-item-photo" data-done="1"' in html
 
+    def test_checklist_hides_when_last_item_completes(self, seeded_db):
+        """If a photo is the last unfinished item, uploading it should hide the
+        whole "Complete your profile" section instead of leaving a finished
+        checklist on screen. The page carries the JavaScript guard that does
+        this once every item is done."""
+        html = _render_dashboard(seeded_db, photos=[])
+        assert "doneCount >= total" in html
+        assert "section.classList.add('hidden')" in html
+
 
 # ─── Fix 3: encouraging empty-state copy on the performance panel ────────────
 
