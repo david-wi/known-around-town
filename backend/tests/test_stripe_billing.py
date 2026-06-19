@@ -218,10 +218,53 @@ class TestCheckout:
 
         assert captured_params.get("customer_email") == email
         assert "customer" not in captured_params
-        # Verify the statement descriptor suffix is sent so card statements
-        # show "KNOWS BEAUTY" instead of a generic account name.
-        pid = captured_params.get("payment_intent_data", {})
-        assert pid.get("statement_descriptor_suffix") == "KNOWS BEAUTY"
+        # WHY: payment_intent_data must NOT be sent in subscription mode — Stripe
+        # rejects it with a 400 ("You can not pass `payment_intent_data` in
+        # `subscription` mode."), which previously made every owner's upgrade
+        # fail with a 502. The card-statement descriptor for a subscription is
+        # configured on the Stripe Price/Product, not per checkout session.
+        assert "payment_intent_data" not in captured_params
+
+    @pytest.mark.asyncio
+    async def test_checkout_never_sends_payment_intent_data_in_subscription_mode(
+        self, client, seeded_db
+    ):
+        """Regression for the 502 upgrade bug: subscription-mode checkout must
+        never include payment_intent_data, which Stripe rejects in this mode.
+
+        Without the fix, the endpoint sent payment_intent_data and Stripe
+        returned a 400, surfaced to the owner as a 502 — the "Get Featured"
+        button was completely broken for every salon owner.
+        """
+        email = "regression@test.com"
+        await _insert_business(seeded_db, email=email)
+        cookie = _signed_cookie(email)
+
+        mock_session = MagicMock()
+        mock_session.url = "https://checkout.stripe.com/pay/cs_test"
+        captured_params: dict = {}
+
+        def fake_create(**params):
+            captured_params.update(params)
+            return mock_session
+
+        with patch.dict(os.environ, {
+            "STRIPE_SECRET_KEY": "sk_test",
+            "STRIPE_PRICE_ID_PRO": "price_pro",
+        }):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            with patch("stripe.checkout.Session.create", side_effect=fake_create):
+                r = client.post(
+                    "/api/v1/billing/checkout",
+                    cookies={"kb_owner_session": cookie},
+                )
+            get_settings.cache_clear()
+
+        assert r.status_code == 200
+        assert captured_params.get("mode") == "subscription"
+        # The exact parameter Stripe rejects in subscription mode.
+        assert "payment_intent_data" not in captured_params
 
     @pytest.mark.asyncio
     async def test_checkout_reuses_existing_stripe_customer(self, client, seeded_db):
