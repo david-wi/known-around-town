@@ -559,3 +559,49 @@ already has `--auto` set, confirm the merge waited for the NEW head before treat
 as done — `gh pr view <n> --json mergedAt` plus a `git show origin/main:<file> | grep`
 for a marker unique to the follow-up. If the merge already landed without it, open a
 follow-up PR rather than assuming the squash caught everything.
+
+## Search must be AND-across-words, not literal-phrase, and must search category + neighborhood (2026-06-19)
+
+The pre-launch #1 shopper bug: searching "nails brickell" returned **0 results**.
+`search_businesses` (`backend/app/services/content.py`) regex-matched the WHOLE typed
+query as one contiguous string against only `name`, `short_description`, and `tags`.
+No salon's name literally contains "nails brickell", so the search came up empty — and
+it never searched `category_slugs` or `neighborhood_slugs` at all.
+
+Fix (PR #355): split the query on whitespace; for each word build an `$or` across
+`name`, `short_description`, `tags`, `category_slugs`, `neighborhood_slugs`; combine the
+per-word blocks with `$and` (every word must match somewhere). So "nails brickell" now
+returns salons that are BOTH nails AND in Brickell.
+
+Key data-model fact: business documents store **only slug arrays** (`category_slugs:
+["nails"]`, `neighborhood_slugs: ["brickell"]`), NOT human-readable category/neighborhood
+names. For Miami the slug equals the typed word ("nails", "brickell", "hair", "wynwood"),
+so matching the slug arrays covers real intent. A regex (substring, unanchored) match
+also catches multi-word slugs from other city seeds (e.g. a "brickell" term matching
+`brickell-ave-mary-brickell-village`). `mongomock-motor` matches `$regex` against array
+elements exactly like real MongoDB, so the service tests are faithful. Tests:
+`backend/tests/test_search.py` (red-green verified).
+
+## Broken/missing salon photos: degrade to a branded placeholder, never a grey box (2026-06-19)
+
+Some stock salon photos now 404, so cards showed a broken grey box; photoless cards
+showed an empty grey box — looks like a broken directory. Fix (PR #356):
+`backend/app/static/placeholder-salon.svg` (soft MKB gradient + brand mark), shown when
+a photo is missing or fails to load.
+
+- **Cards** (`partials/business_card.html`) use `<img>`: render the placeholder directly
+  when no photo; add `onerror="this.onerror=null;this.src='/assets/placeholder-salon.svg';..."`
+  (the `this.onerror=null` FIRST is the infinite-loop guard) when a photo is present.
+- **Detail page** (`business.html`) uses CSS `background-image` (no `onerror` possible),
+  so layer the placeholder as a SECOND background layer beneath the photo:
+  `background-image: url("photo"), url("placeholder"); background-size: cover, contain` —
+  if the photo 404s, the placeholder shows through.
+- **Gotcha:** the precompiled `reference.css` ships **no `object-fit` utilities** —
+  `object-cover`/`object-contain` classes have NO effect (they were already dead on the
+  pre-existing card `<img>`). Set `object-fit` via inline `style=` instead. This is the
+  same family as the admin-templates Tailwind-JIT rule: runtime/uncompiled classes are
+  absent from the shipped CSS, so use inline styles or known-present classes.
+
+Tests: `backend/tests/test_image_fallback.py`. The `test_template_js_syntax.py` esprima
+guard only scans `<script>` block bodies, so an `onerror=` HTML attribute is not checked
+by it — still run `node --check` on the handler manually.
