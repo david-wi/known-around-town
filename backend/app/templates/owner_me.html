@@ -1449,6 +1449,13 @@
     }
     if (countEl) countEl.textContent = doneCount + ' of ' + total + ' complete';
     if (progressEl) progressEl.style.width = Math.round(doneCount / total * 100) + '%';
+    /* WHY: the "Complete your profile" section is only server-rendered while
+       something is still incomplete. If the photo was the LAST missing item,
+       this live update would otherwise leave the whole "Complete your profile"
+       box on screen reading "5 of 5 complete" — a finished checklist still
+       nagging the owner to finish. Hide it once everything is done so the page
+       matches what a reload would show. */
+    if (section && doneCount >= total) section.classList.add('hidden');
   }
 
   function makeThumb(photo) {
@@ -1659,7 +1666,9 @@
         listEl.appendChild(renderInquiry(inq));
       });
       var statInq = document.getElementById('stat-inquiries');
-      if (statInq) statInq.textContent = data.length;
+      /* WHY: format with toLocaleString to match the page-views number beside
+         it — both should read "1,234" not "1234" once the counts grow. */
+      if (statInq) statInq.textContent = data.length.toLocaleString();
       listEl.classList.remove('hidden');
     })
     .catch(function () {
