@@ -605,3 +605,59 @@ a photo is missing or fails to load.
 Tests: `backend/tests/test_image_fallback.py`. The `test_template_js_syntax.py` esprima
 guard only scans `<script>` block bodies, so an `onerror=` HTML attribute is not checked
 by it — still run `node --check` on the handler manually.
+
+## reference.css is a STATIC precompiled file — many Tailwind utilities are absent (2026-06-19)
+
+`backend/app/static/css/reference.css` is the *only* stylesheet the site loads
+(see `base.html`). There is **no Tailwind build step** — no `package.json`,
+no `tailwind.config`, no PostCSS. The file is a fixed, hand-placed bundle copied
+from the reference design. So a Tailwind class only takes effect if its selector
+is literally present in that file; any class that isn't there silently does
+nothing (no error, no visible style).
+
+**Known-absent classes that the existing templates use as silent no-ops:**
+`shadow-md`, `bg-amber-600`, `hover:bg-amber-700`, `shadow-black/30`,
+`shadow-amber-*`, colored ring tints beyond `ring-amber-200` (e.g. `ring-amber-300`),
+`ring-white/40`/`ring-white/50` (but `ring-white/30` IS present), `object-fit`
+utilities, `border-t-4`, `inset-x-0`, `rounded-t-2xl`, `via-amber-500`, `to-white`.
+
+**Before adding ANY class, verify it exists.** Selectors are backslash-escaped in
+the compiled CSS — `px-2.5` is stored as `.px-2\.5`, `text-[10px]` as
+`.text-\[10px\]`, `hover:shadow-xl` as `.hover\:shadow-xl`. A naive
+`grep -F ".px-2.5"` gives a FALSE "missing". Correct check:
+
+```bash
+CSS=backend/app/static/css/reference.css
+chk(){ esc=$(printf '%s' "$1" | sed -e 's/\./\\./g' -e 's/\[/\\[/g' -e 's/\]/\\]/g' -e 's/:/\\:/g' -e 's#/#\\/#g'); grep -qF ".$esc" "$CSS" && echo "FOUND $1" || echo "MISSING $1"; }
+chk 'hover:shadow-xl'; chk 'text-[10px]'; chk 'shadow-md'
+```
+
+If a needed utility is absent, use an inline `style="..."` (as the card already
+does for `object-fit`) or substitute a present class. Confirmed-present building
+blocks for gold/amber accents: `bg-gradient-to-r`, `from-amber-400`,
+`to-amber-600`, `ring-1`, `ring-amber-200`, `ring-white/30`, `shadow-lg`,
+`shadow-xl`, `border-amber-200`/`-300`/`-400`.
+
+## Verifying the gated production site (preview gate) — use the admin API key header (2026-06-19)
+
+The site is behind the preview gate (`PreviewGateMiddleware`). The
+`/tmp/mkb-walkthrough/walkthrough_auth.py` recipe sets a `preview_token` cookie,
+but those session tokens expire (30-day `preview_sessions` rows) and the saved
+`preview_token.txt` is often stale → every request 302s to `/preview-login`.
+
+The reliable bypass: send the **admin API key** as an `X-API-Key` header on every
+request. `PreviewGateMiddleware.dispatch` checks `X-API-Key == admin_api_key`
+*before* the cookie and lets it through. The key is `MKB_ADMIN_API_KEY` in
+`~/.claude/gitignore/creds`. In Playwright:
+
+```python
+ctx = browser.new_context(extra_http_headers={"X-API-Key": MKB_ADMIN_API_KEY})
+```
+
+This renders every public page (home, `/c/*`, `/n/*`, `/b/*`) for screenshots
+without minting a fresh preview session. Featured salons (paid tier) currently
+include `the-spa-at-the-setai`, `the-spa-at-st-regis-bal-harbour`,
+`skinspirit-aventura`, `rossano-ferretti-hair-spa-miami`. The seed (`seed_miami`)
+programmatically sets `featured: {enabled: True, tier: "premium"}` on ~36
+businesses — this flag is NOT in `_real_businesses.json`, so don't conclude
+"nothing is Featured" from that file alone.
