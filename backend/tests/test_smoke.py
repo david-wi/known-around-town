@@ -86,7 +86,16 @@ def test_miami_beauty_business(client):
     # only check copy if the claim banner is present)
     if "Claim free to add photos" in r.text:
         assert "searching for salons in Miami" in r.text
-        assert "Founding Partner status" in r.text
+        # WHY: the claim copy names the Founding Partner offer but must NOT
+        # promise permanence or locked-in pricing (owner instruction: never
+        # promise "forever"). Assert the concept is present without the
+        # removed over-promise phrases. We match the specific phrases rather
+        # than the bare word "permanent" — seeded salon descriptions legitimately
+        # mention services like "permanent makeup", so a bare-word check would be
+        # both brittle and semantically wrong.
+        assert "Founding Partner" in r.text
+        assert "permanent Founding Partner status" not in r.text
+        assert "locked-in pricing" not in r.text
 
 
 def test_miami_wellness_home(client):
@@ -405,10 +414,15 @@ def test_pricing_page_shows_founding_partner_callout(client):
         "Pricing page must show 'Founding Partner' callout while slots remain — "
         "it is a key conversion incentive"
     )
-    assert "permanent gold badge" in r.text, (
-        "Pricing page must mention the badge is permanent — "
-        "that permanence is the unique value of the founding partner offer"
+    assert "Founding Partner gold badge" in r.text, (
+        "Pricing page must mention the Founding Partner gold badge — "
+        "the badge is the value of the offer"
     )
+    # WHY: the copy must NOT promise permanence or "forever" (owner instruction:
+    # never promise "forever"). Guard against the over-promise creeping back into
+    # the founding-partner callout.
+    assert "permanent gold badge" not in r.text
+    assert "visible to every visitor, forever" not in r.text
 
 
 def test_pricing_link_in_header_nav(client):
@@ -589,9 +603,9 @@ def test_non_founding_partner_does_not_show_badge(client):
     business in the seed, so its page should NOT show the badge.
 
     Note: the claim banner copy mentions 'Founding Partner' as the offer
-    text ('earn permanent Founding Partner status') — that's expected on all
-    unclaimed listings. What must be absent is the actual badge, identified by
-    its tooltip text 'Founding member of Miami Knows Beauty'."""
+    text ('recognized as a Founding Partner with a gold badge') — that's
+    expected on all unclaimed listings. What must be absent is the actual badge,
+    identified by its tooltip text 'Founding member of Miami Knows Beauty'."""
     r = client.get(
         "/b/drybar-miami-beach",
         headers={"host": "miami.knowsbeauty.localhost"},
@@ -3281,19 +3295,21 @@ def test_ga_measurement_id_from_settings(seeded_db, monkeypatch):
 
 
 def test_owner_me_founding_partner_badge_shown_when_flag_set():
-    """The owner dashboard must show a permanent 'Founding Partner' badge section
+    """The owner dashboard must show the 'Founding Partner' badge section
     when the business has is_founding_partner set to True.
 
-    WHY: owners who subscribed early earned a permanent gold badge that appears
-    on their public listing forever.  Without a dashboard confirmation, they have
+    WHY: owners who subscribed early earned a Founding Partner gold badge that
+    appears on their public listing.  Without a dashboard confirmation, they have
     no way to see or celebrate that status — which undercuts the 'founding partner'
     framing used in the upgrade card to motivate early sign-ups.  Seeing 'Your
-    permanent gold badge appears on your public listing — forever' is the payoff
+    Founding Partner gold badge appears on your public listing' is the payoff
     for being an early adopter.
 
-    This section must also live OUTSIDE the Stripe subscription conditional so it
-    stays visible even if the owner later cancels.  The badge is permanent;
-    its dashboard display must be too.
+    The copy must NOT promise permanence or "forever" — the owner instruction is
+    to never make that promise. The badge flag is not cleared by the cancellation
+    webhook today, so this section must live OUTSIDE the Stripe subscription
+    conditional and stay visible even if the owner later cancels — but that's an
+    internal behavior, not a guarantee the copy advertises.
 
     We test the Jinja2 logic directly (without a full HTTP round-trip) because
     /owners/me is auth-gated and the template variable that drives this section
@@ -3309,13 +3325,16 @@ def test_owner_me_founding_partner_badge_shown_when_flag_set():
         "owner_me.html has no reference to is_founding_partner — "
         "founding partner badge can never render"
     )
-    assert "permanent gold badge" in source, (
-        "owner_me.html missing 'permanent gold badge' copy — "
-        "founding partners won't see confirmation of their permanent status"
+    assert "Founding Partner gold badge" in source, (
+        "owner_me.html missing 'Founding Partner gold badge' copy — "
+        "founding partners won't see confirmation of their badge"
     )
     assert "Founding Partner" in source, (
         "owner_me.html missing 'Founding Partner' label text"
     )
+    # WHY: copy must not promise permanence or "forever" (owner instruction).
+    # Guard the user-facing badge line against the over-promise returning.
+    assert "Your permanent gold badge appears on your public listing — forever." not in source
 
     # 2. Render the conditional snippet with the flag set → badge content appears.
     snippet = (
@@ -3351,8 +3370,10 @@ def test_owner_me_founding_partner_badge_outside_subscription_conditional():
     """The Founding Partner badge section must be structurally outside the
     subscription conditional in owner_me.html.
 
-    WHY: is_founding_partner is a permanent boolean — the webhook that grants it
-    intentionally never clears it, even when an owner cancels their subscription.
+    WHY: the is_founding_partner flag persists — the webhook that grants it does
+    not clear it today, even when an owner cancels their subscription.  (This is
+    an internal behavior; the copy does not advertise it as a permanence
+    guarantee, per the owner instruction to never promise "forever".)
     If the badge were inside the is_subscribed block, a founding partner who cancels
     would lose their dashboard confirmation of a status that still shows on their
     public listing.  They would have a live gold badge on their public page with no
@@ -3369,7 +3390,7 @@ def test_owner_me_founding_partner_badge_outside_subscription_conditional():
     ).read_text()
 
     # The closing comment marks the boundary between the subscription block and
-    # the permanent Founding Partner section.
+    # the Founding Partner badge section.
     sub_endif_marker = "{% endif %}{# /if is_subscribed #}"
     sub_endif_pos = source.find(sub_endif_marker)
     assert sub_endif_pos != -1, (
@@ -3378,7 +3399,7 @@ def test_owner_me_founding_partner_badge_outside_subscription_conditional():
         "the founding partner badge may be inside the subscription conditional"
     )
 
-    # The permanent Founding Partner BADGE SECTION (the amber section that says
+    # The Founding Partner BADGE SECTION (the amber section that says
     # "You're one of the first salons") must appear AFTER the subscription endif.
     # We use rfind() so we match the badge's own conditional, not any earlier
     # occurrence of the same check inside the post-payment confirmation banner.
