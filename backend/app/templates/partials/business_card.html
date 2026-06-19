@@ -18,7 +18,17 @@
 {% set placeholder_url = '/assets/placeholder-salon.svg' %}
 {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
 {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
-<a class="group block bg-white rounded-2xl overflow-hidden border border-stone-200/70 hover:border-stone-300 hover:shadow-xl hover:shadow-stone-900/5 transition-all duration-300" href="/b/{{ b.slug }}">
+{#- WHY: a paid "Featured" card must look visibly elevated in a browse grid so
+    premium placement is obvious at a glance — not just a small badge on an
+    otherwise-identical tile. A Featured card gets a soft gold edge (amber border
+    + a 1px amber ring) and a resting shadow so it lifts off the page even before
+    hover, while non-Featured and Editor's-Pick cards keep their exact original
+    neutral stone border and shadow-on-hover. This keys ONLY off the paid
+    b.featured.enabled flag, never editors_pick. Kept restrained (thin gold ring,
+    not a loud border) so it elevates rather than shouts. All classes used here
+    are present in the precompiled reference.css (verified). #}
+{% set _is_featured = b.featured and b.featured.enabled %}
+<a class="group block bg-white rounded-2xl overflow-hidden transition-all duration-300 {% if _is_featured %}border border-amber-200 ring-1 ring-amber-200 shadow-lg hover:border-amber-300 hover:shadow-xl{% else %}border border-stone-200/70 hover:border-stone-300 hover:shadow-xl hover:shadow-stone-900/5{% endif %}" href="/b/{{ b.slug }}">
   <div class="relative aspect-[4/3] bg-stone-100 overflow-hidden">
     {# WHY: <img loading="lazy"> defers off-screen images so the browser only fetches
        cards as they scroll into view. bg-cover/bg-center becomes object-cover/object-center
@@ -33,10 +43,16 @@
         names have no effect — set object-fit via inline style instead. #}
     {% if photo_url %}<img src="{{ photo_url }}" alt="{{ b.name }}" loading="lazy" style="object-fit:cover;object-position:center;" onerror="this.onerror=null;this.src='{{ placeholder_url }}';this.style.objectFit='contain';" class="absolute inset-0 w-full h-full transition-transform duration-500 group-hover:scale-105">{% else %}<img src="{{ placeholder_url }}" alt="{{ b.name }}" loading="lazy" style="object-fit:contain;object-position:center;" class="absolute inset-0 w-full h-full">{% endif %}
     {% if b.editors_pick %}<div class="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/95 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-semibold text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
-    {#- WHY: text-xs (12px) keeps the badge legible at grid-scanning distance; solid
-        amber-500 with drop shadow reads on any photo background. Previous text-[9px]
-        was effectively invisible — visitors couldn't spot Featured listings at a glance. #}
-    {% if b.featured and b.featured.enabled %}<div class="absolute top-3 right-3 inline-flex items-center gap-1 bg-amber-500 text-white text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full shadow-md shadow-black/30">✦ Featured</div>{% endif %}
+    {#- WHY: the paid Featured badge is rendered as a richer champagne-gold gradient
+        pill (amber-400 → amber-600) with a soft white ring, so it reads as a
+        confident premium wordmark rather than a flat label that looks like a
+        sibling of the free Editor's Pick badge. text-xs (12px) keeps it legible at
+        grid-scanning distance and the gradient + ring stay readable on any photo.
+        WHY shadow-lg (not shadow-md): the precompiled reference.css ships shadow-lg
+        but NOT shadow-md or shadow-black/30 — the previous classes were silent
+        no-ops, so the badge had no shadow at all. Uses only classes present in
+        reference.css. #}
+    {% if _is_featured %}<div class="absolute top-3 right-3 inline-flex items-center gap-1 bg-gradient-to-r from-amber-400 to-amber-600 text-white text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full shadow-lg ring-1 ring-white/30">✦ Featured</div>{% endif %}
     {% if b.is_founding_partner %}{% with variant='overlay', tenant_label=tenant_label %}{% include 'partials/founding_partner_badge.html' %}{% endwith %}{% endif %}
   </div>
   <div class="p-5">

@@ -290,12 +290,19 @@
     <div class="md:col-span-8">
       <div class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text }} font-semibold mb-3">{% if neighborhood_obj %}{{ neighborhood_obj.name }}{% endif %}{% if neighborhood_obj and category_obj %} · {% endif %}{% if category_obj %}{{ category_obj.name }}{% endif %}{% if business.price_cues %} · {{ business.price_cues }}{% endif %}</div>
       <h1 class="font-serif text-5xl md:text-6xl lg:text-7xl font-light text-stone-900 leading-[0.95] mb-5" style='font-family: Georgia, "Times New Roman", serif;'>{{ business.name }}</h1>
-      {#- WHY: amber badge in the hero tells visitors this is an enhanced listing before
-          they scroll anywhere. Left-border accent on the description lede gives the content
-          a subtle visual lift. Both signals use amber-500 to match the listing-card badge. #}
+      {#- WHY: the paid Featured treatment in the hero is rendered as a champagne-gold
+          gradient pill (amber-400 → amber-600) with a soft ring, plus a short
+          "premium placement" descriptor line beneath it. This makes the paid tier
+          read as clearly elevated — both to a shopper and to a prospective owner
+          weighing the $29/month upgrade — without shouting. The flat amber-500 pill
+          it replaces looked almost identical to the free Editor's Pick badge. The
+          left-border accent on the description lede below is kept as a subtle extra
+          lift. Keys ONLY off the paid business.featured.enabled flag. Gradient + ring
+          classes are all present in the precompiled reference.css (verified). #}
       {% if business.featured and business.featured.enabled %}
-      <div class="flex items-center gap-2 mb-4">
-        <span class="inline-flex items-center gap-1.5 bg-amber-500 text-white text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full shadow-sm">✦ Featured listing</span>
+      <div class="mb-4">
+        <span class="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-400 to-amber-600 text-white text-xs font-bold tracking-wide uppercase px-4 py-1.5 rounded-full shadow-lg ring-1 ring-amber-200">✦ Featured salon</span>
+        <p class="text-xs text-amber-700 font-medium mt-2 tracking-wide">Selected for premium placement</p>
       </div>
       {% endif %}
       {% if business.is_founding_partner %}
@@ -306,7 +313,13 @@
       {% if business.short_description %}<p class="text-xl text-stone-600 max-w-2xl leading-relaxed{% if business.featured and business.featured.enabled %} border-l-4 border-amber-300 pl-4{% endif %}">{{ business.short_description }}</p>{% endif %}
     </div>
     <div class="md:col-span-4 flex md:justify-end">
-      <div class="border rounded-2xl p-5 w-full md:max-w-xs shadow-sm bg-white border-stone-200">
+      {#- WHY: when the listing is a paid Featured salon, the info card itself gets a
+          subtle gold edge (amber border + soft amber ring + a slightly stronger
+          resting shadow) so the whole card reads as premium, reinforcing the
+          elevated Featured pill inside it. Free / non-Featured listings keep the
+          plain neutral stone card. Keys only off the paid business.featured.enabled
+          flag; all classes verified present in reference.css. #}
+      <div class="rounded-2xl p-5 w-full md:max-w-xs bg-white {% if business.featured and business.featured.enabled %}border border-amber-200 ring-1 ring-amber-200 shadow-lg{% else %}border border-stone-200 shadow-sm{% endif %}">
         <div class="flex items-center gap-2 mb-3">
           <div class="h-px w-6 bg-stone-300"></div>
           <span class="text-[10px] uppercase tracking-[0.25em] font-semibold text-stone-500">{% if business.claim_status == 'verified' %}Verified by editors{% elif business.claim_status == 'claimed' %}Claimed by owner{% else %}Editorial selection{% endif %}</span>
@@ -358,11 +371,15 @@
             "Claimed by owner" alone. It also makes the upgrade tangible
             for owners: they can see the badge on their own public page
             after subscribing, which validates the spend. #}
-        {#- WHY: solid amber-500 bg with white text makes this immediately legible in the
-            sidebar card. The previous pale rose-50 background blended into the white card
-            and was easy to overlook. Amber matches the listing-card badge and hero badge
-            for a consistent Featured color story across the page. #}
-        {% if business.featured and business.featured.enabled %}<div class="text-sm font-bold text-white bg-amber-500 rounded-full px-4 py-1.5 inline-flex items-center gap-1.5 shadow-sm"><span>✦</span> Featured listing</div>{% endif %}
+        {#- WHY: the paid Featured pill uses a champagne-gold gradient (amber-400 →
+            amber-600) with white text and a soft gold ring, so it clearly out-ranks
+            the free Editor's Pick pill sitting beside it instead of looking like its
+            twin. The richer gradient + ring is what separates the paid tier from the
+            free editorial badge at a glance — matching the elevated treatment on the
+            listing cards and the hero for one consistent premium Featured story.
+            Editor's Pick (above) is intentionally left exactly as it was. Gradient +
+            ring classes verified present in reference.css. #}
+        {% if business.featured and business.featured.enabled %}<div class="text-sm font-bold text-white bg-gradient-to-r from-amber-400 to-amber-600 rounded-full px-4 py-1.5 inline-flex items-center gap-1.5 shadow-lg ring-1 ring-amber-200"><span>✦</span> Featured salon</div>{% endif %}
       </div>
     </div>
   </div>
