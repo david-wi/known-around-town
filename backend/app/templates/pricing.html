@@ -82,15 +82,17 @@
             creates genuine scarcity (the cap is enforced in the webhook handler,
             not just copy). Only shown when spots remain — once the cap fills the
             callout disappears rather than showing "0 spots" which feels hollow.
-            The badge is permanent even after cancellation, which is the key
-            detail that makes early-adopter status feel worth having. #}
+            WHY: copy must not promise permanence or a price lock — the owner
+            instruction is to never promise "forever". The badge flag is not
+            cleared by the cancellation webhook today, but that's an internal
+            behavior, not a guarantee we advertise. #}
         {% if founding_partner_spots_left %}
         <div class="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 mb-4">
           <span class="text-amber-500 text-sm leading-none flex-shrink-0">★</span>
           <p class="text-xs text-stone-700 leading-snug">
             <strong class="font-semibold">{{ founding_partner_spots_left }} Founding Partner
             {%- if founding_partner_spots_left == 1 %} spot{%- else %} spots{%- endif %} left.</strong>
-            First {{ founding_partner_cap }} subscribers earn a permanent gold badge on their listing — visible to every visitor, forever.
+            First {{ founding_partner_cap }} subscribers get a Founding Partner gold badge on their listing, visible to visitors.
           </p>
         </div>
         {% endif %}

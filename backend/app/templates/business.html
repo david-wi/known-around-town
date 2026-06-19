@@ -481,7 +481,7 @@
       {# WHY: The fallback text previously hardcoded "Miami", causing every other city subdomain
          (Doral, Plantation, etc.) to falsely advertise the wrong city to salon owners. Now uses
          city.name from template context so the city is always correct. #}
-      <p class="text-sm text-amber-800 mt-0.5">{{ claim_body or 'Claim free to add photos, respond to inquiries, and get found by people searching for salons in ' ~ (city.name if city else 'your city') ~ '. The first 25 owners to upgrade earn permanent Founding Partner status — gold badge and locked-in pricing.' }}</p>
+      <p class="text-sm text-amber-800 mt-0.5">{{ claim_body or 'Claim free to add photos, respond to inquiries, and get found by people searching for salons in ' ~ (city.name if city else 'your city') ~ '. The first 25 owners to upgrade are recognized as a Founding Partner with a gold badge on their listing.' }}</p>
     </div>
     <a href="/owners?slug={{ business.slug }}#claim-form"
        class="inline-flex items-center gap-2 bg-amber-700 hover:bg-amber-800 text-white font-semibold px-6 py-3 rounded-full text-base shadow-sm transition whitespace-nowrap shrink-0">

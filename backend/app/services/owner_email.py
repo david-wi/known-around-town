@@ -385,7 +385,7 @@ def _claim_verified_text(
     if founding_partner_spots_left > 0:
         urgency = (
             f"\n⭐ FOUNDING PARTNER — only {founding_partner_spots_left} spot"
-            f"{'s' if founding_partner_spots_left != 1 else ''} left at the founding price.\n"
+            f"{'s' if founding_partner_spots_left != 1 else ''} left.\n"
         )
     return (
         f"Hi {first},\n\n"

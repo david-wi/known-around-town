@@ -127,3 +127,27 @@ class TestSubscriptionConfirmedAdVariationCount:
     def test_html_does_not_overpromise_twenty(self):
         html = _subscription_confirmed_html("Maria", "Curl Studio", DASHBOARD_URL)
         assert "20 ready-to-run variations" not in html
+
+
+class TestFoundingPartnerNoPriceLockPromise:
+    """The owner instruction is to never promise locked-in or permanent pricing.
+
+    The claim-verified urgency line previously said spots were "left at the
+    founding price", which implies an early-claimer gets a price that is locked
+    against future increases — a promise the product does not actually make.
+    The spots-left count is honest urgency and stays; the price-lock phrasing
+    is removed. These tests guard against the locked-pricing wording returning.
+    """
+
+    def test_urgency_keeps_honest_spot_count(self):
+        text = _claim_verified_text(
+            "Maria", "Salon X", LOGIN_URL, PRICING_URL, founding_partner_spots_left=5
+        )
+        assert "5 spots left" in text
+
+    def test_urgency_does_not_promise_founding_price(self):
+        text = _claim_verified_text(
+            "Maria", "Salon X", LOGIN_URL, PRICING_URL, founding_partner_spots_left=5
+        )
+        assert "founding price" not in text.lower()
+        assert "locked" not in text.lower()

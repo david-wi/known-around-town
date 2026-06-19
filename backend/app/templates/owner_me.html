@@ -40,7 +40,7 @@
       <div class="min-w-0">
         {% if owner_business.get('is_founding_partner') %}
         <p class="font-semibold text-sm">You're now a Founding Partner on {{ tenant_label }}!</p>
-        <p class="text-amber-100 text-xs mt-0.5">Your featured listing and permanent gold badge are now live. Thank you for being an early supporter.</p>
+        <p class="text-amber-100 text-xs mt-0.5">Your featured listing and Founding Partner gold badge are now live. Thank you for being an early supporter.</p>
         {% else %}
         <p class="font-semibold text-sm">You're now Featured on {{ tenant_label }}!</p>
         <p class="text-amber-100 text-xs mt-0.5">Your subscription is active. Your salon now appears first in search results in your neighborhood.</p>
@@ -144,10 +144,11 @@
     <div class="rounded-2xl border border-stone-200 bg-gradient-to-br from-amber-50/60 via-rose-50/30 to-white p-6 sm:p-8">
       <div class="flex flex-wrap items-start justify-between gap-6">
         <div class="min-w-0">
-          {#- WHY: "Founding Partner" framing creates genuine urgency —
-              early adopters lock in launch-day pricing before rates increase
-              as the directory grows.  More compelling than generic "upgrade"
-              copy for owners who just got verified and are deciding right now. #}
+          {#- WHY: "Founding Partner" framing creates genuine urgency from the
+              limited number of spots — more compelling than generic "upgrade"
+              copy for owners who just got verified and are deciding right now.
+              WHY: no price-lock or "rates increase" promise — the owner
+              instruction is to never promise locked-in or permanent pricing. #}
           <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-2">Founding Partner offer</p>
           <h2 class="text-base font-semibold text-stone-900 mb-1.5">Be the first {{ listing_word_singular or 'salon' }} visitors see in {{ _uc_nb_name }}</h2>
           <ul class="text-sm text-stone-600 space-y-1 leading-relaxed max-w-xs list-none">
@@ -158,7 +159,6 @@
             {% endif %}
             <li>✓ Featured badge on your public listing</li>
             <li>✓ Instagram caption generator — AI-written posts for your salon</li>
-            <li>✓ Lock in Founding Partner pricing before rates increase</li>
           </ul>
         </div>
         <div class="flex flex-col items-start gap-2 shrink-0 pt-1">
@@ -174,11 +174,12 @@
   </div>
 </section>
 {% endif %}{# /if is_subscribed #}
-{# WHY: Founding Partner status is permanent — the webhook never clears it, not
-   even when the owner cancels their subscription. So this badge must live OUTSIDE
-   the stripe_subscription_id conditional above.  A founding partner who cancels
-   should still see (and feel good about) their permanent status, which keeps the
-   gold badge visible on their public listing forever. #}
+{# WHY: the Founding Partner flag is not cleared by the cancellation webhook
+   today, so this badge must live OUTSIDE the stripe_subscription_id conditional
+   above — a founding partner who cancels should still see (and feel good about)
+   their badge.  WHY: copy here must not promise permanence or "forever" — the
+   owner instruction is to never make that promise, even though the flag happens
+   to persist in the current implementation. #}
 {% if owner_business.get('is_founding_partner') %}
 <section class="bg-amber-50 border-b border-amber-100">
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-4 flex flex-wrap items-center gap-3">
@@ -188,7 +189,7 @@
     </div>
     <p class="text-sm text-amber-800">
       You&rsquo;re one of the first salons on {{ tenant_label }}.
-      Your permanent gold badge appears on your public listing — forever.
+      Your Founding Partner gold badge appears on your public listing.
     </p>
   </div>
 </section>
