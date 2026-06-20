@@ -73,7 +73,14 @@
           <div class="flex items-start gap-3">
             <span class="{{ theme.accent_text_full }} text-base mt-0.5" aria-hidden="true">✦</span>
             <div>
-              <p class="text-sm font-medium text-stone-800">AI tools built for beauty</p>
+              {#- WHY: use the network's vertical word (Beauty / Wellness / Health)
+                  rather than a hardcoded "beauty". This template is shared across
+                  every vertical in the network, and the wellness/health sites are
+                  seeded and ready to launch — a hardcoded "beauty" would tell a
+                  wellness-studio owner the AI tools are "built for beauty", the
+                  wrong category. vertical_word is already in this page's context;
+                  lowercased to read naturally mid-sentence. #}
+              <p class="text-sm font-medium text-stone-800">AI tools built for {{ (vertical_word or 'beauty')|lower }}</p>
               <p class="text-sm text-stone-500 mt-0.5">Generate Instagram captions and ad copy from your profile in one click — no copywriter needed.</p>
             </div>
           </div>
@@ -131,6 +138,28 @@
           <li>• Premium search positioning across the directory.</li>
           <li>• Cancel anytime — your listing stays live as a Free listing.</li>
         </ul>
+        {#- WHY: the Featured card is the $29 decision, yet it previously ended
+            at the bullet list with no call-to-action — an owner who read it and
+            decided "yes" had to scroll back up to find the claim form. This
+            dead-end leaked conversions at the exact moment of intent. We add the
+            same two CTAs the dedicated /pricing page Featured card uses:
+            a primary scroll-link to the claim form already on this page
+            (#claim-form, in the hero above) and a secondary sign-in path for an
+            owner who has already claimed and only needs to upgrade. #}
+        <div class="mt-6">
+          <a href="#claim-form"
+             class="inline-flex items-center gap-2 {{ theme.button_bg or 'bg-stone-900' }} {{ theme.button_bg_hover or 'hover:bg-stone-700' }} text-white font-medium px-6 py-2.5 rounded-full text-sm transition">
+            Claim your listing <span aria-hidden="true">→</span>
+          </a>
+          <p class="text-sm text-stone-500 mt-3">
+            Already have a listing?
+            {#- WHY: underline-offset-4 (not -2) — only -4 and -[6px] are in the
+                compiled reference.css; underline-offset-2 isn't generated, so it
+                silently does nothing. Using -4 means the small gap under the link
+                actually renders. #}
+            <a class="{{ theme.accent_text_full }} underline underline-offset-4" href="/owners/login">Sign in to upgrade →</a>
+          </p>
+        </div>
       </div>
 
       <div class="rounded-2xl p-8 bg-stone-900 text-white">
