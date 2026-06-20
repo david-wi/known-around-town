@@ -283,6 +283,13 @@
         <span id="stat-views" class="text-4xl font-bold text-rose-600 tracking-tight">&hellip;</span>
         <span class="mt-1 text-sm text-stone-500">page views</span>
         <span id="stat-views-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Views appear here as Miami shoppers find your listing.</span>
+        {# WHY: "of those, N came from Miami Knows Beauty" is the line that proves
+           WE drove the traffic — the one thing a salon's free Google Business
+           Profile can't show them, and the whole reason this report is worth
+           keeping. Revealed by the stats JS only when at least one MKB-referred
+           view exists, so a listing whose visitors so far came from Google or a
+           typed URL simply doesn't show the line (no "0 from us" guilt-trip). #}
+        <span id="stat-views-mkb" class="hidden mt-2 text-xs font-medium text-rose-500 leading-relaxed"></span>
       </div>
       <a href="#visitor-inquiries" class="bg-white rounded-2xl border border-stone-200 px-8 py-6 flex flex-col items-center text-center min-w-[10rem] max-w-[16rem] hover:border-stone-300 transition no-underline">
         <span id="stat-inquiries" class="text-4xl font-bold text-emerald-600 tracking-tight">&hellip;</span>
@@ -1840,6 +1847,22 @@
       fillStat('stat-calls', 'stat-calls-zero-note', data.call_click_count);
       fillStat('stat-directions', 'stat-directions-zero-note', data.directions_click_count);
       fillStat('stat-website', 'stat-website-zero-note', data.website_click_count);
+
+      /* WHY: show the "of those, N came from Miami Knows Beauty" line ONLY when
+         we actually sent at least one visitor. Zero stays hidden — a listing
+         whose visitors so far came from Google or a typed URL shouldn't read
+         "0 from us", which would frame the report as a failure. When non-zero,
+         this is the line that proves WE drove the traffic, the one thing the
+         salon's free Google profile can't show them. */
+      var mkbEl = document.getElementById('stat-views-mkb');
+      var mkb = data.mkb_referred_view_count || 0;
+      if (mkbEl && mkb > 0) {
+        /* WHY "of these came from" reads correctly for any count (1 or many),
+           so no singular/plural branch is needed — "1 of these came from..."
+           and "12 of these came from..." both read naturally. */
+        mkbEl.textContent = mkb.toLocaleString() + ' of these came from Miami Knows Beauty';
+        mkbEl.classList.remove('hidden');
+      }
     })
     .catch(function () {
       /* WHY: blank every tile that depends on this fetch (not just views) and

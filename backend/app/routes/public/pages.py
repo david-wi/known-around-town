@@ -1136,20 +1136,75 @@ _BOT_UA_FRAGMENTS = (
 )
 
 
-async def _increment_business_view(business_id: str) -> None:
-    """Atomically increment the page view counter for one business.
+def _is_mkb_referred(referer: Optional[str], request_host: str) -> bool:
+    """Decide whether a page view came from within Miami Knows Beauty itself.
+
+    A view is "MKB-referred" when the page the shopper clicked FROM (the
+    ``Referer`` header) lives on the SAME host as the listing they landed on.
+    On this network every editorial guide, on-site search result, category
+    page, neighborhood page, and sister listing for a given city edition is
+    served from that one host (e.g. miami.knowsbeauty.com) — so a same-host
+    referer is, by construction, an internal click from one of OUR pages. That
+    is the traffic we drove and can take credit for.
+
+    WHY same-host (not a broader network match): it's the cleanest signal that
+    can't over-claim. A referer with no host (typed URL / bookmark) or an
+    external host (Google, Instagram, the salon's own website) is NOT counted —
+    we never claim credit for a visit we didn't send.
+
+    WHY the badge is deliberately NOT counted here: the "As Featured on Miami
+    Knows Beauty" badge lives on the salon's OWN external website, so a click on
+    it arrives with the salon's domain as the referer — an external host — and
+    falls into the total only, not the MKB-referred number. The badge's link
+    carries our listing URL as its destination, but the referer (where the click
+    came from) is the salon's site, not ours, so same-host matching can't see
+    it. Catching badge clicks reliably would mean tagging the badge link with a
+    marker (e.g. ``?ref=mkb-badge``); that's a separate, larger change. Counting
+    badge clicks in the total but not the MKB number is the safe under-count —
+    we'd rather understate our credit than overstate it.
+    """
+    if not referer:
+        return False
+    try:
+        ref_host = urlparse(referer).hostname or ""
+    except (ValueError, TypeError):
+        # A malformed Referer header must never raise inside view counting.
+        return False
+    if not ref_host:
+        return False
+    # WHY strip the request host's port and casefold both sides: the Host header
+    # can carry a port (":8000" in dev) while a Referer URL's hostname never
+    # does, so compare bare hostnames case-insensitively. Splitting on ":" takes
+    # the host portion before any port.
+    own_host = (request_host or "").split(":", 1)[0]
+    return ref_host.casefold() == own_host.casefold()
+
+
+async def _increment_business_view(business_id: str, mkb_referred: bool = False) -> None:
+    """Atomically increment the page view counter(s) for one business.
+
+    Always bumps the lifetime ``page_view_count``. When ``mkb_referred`` is True
+    — the visit came from within Miami Knows Beauty (see ``_is_mkb_referred``) —
+    it ALSO bumps ``mkb_referred_view_count`` in the same atomic write, so the
+    owner can be shown how many of their visitors WE sent (vs. visitors who
+    arrived from Google, social, or by typing the URL).
 
     WHY: background task so the atomic DB write happens after the response
-    is sent — no added latency for the visitor. Using $inc on a single field
-    is safe under concurrent requests without a read-modify-write race.
+    is sent — no added latency for the visitor. Using $inc is safe under
+    concurrent requests without a read-modify-write race, and incrementing both
+    fields in one $inc keeps the two counters consistent (a MKB-referred view is
+    always also a total view).
     WHY str: business _id values are UUID strings (not ObjectIds), so the
     str() call in the caller is a no-op and querying with the string is correct.
     """
     from app.database import get_db as _get_db  # local import to avoid circular
     db = _get_db()
+    inc: Dict[str, int] = {"page_view_count": 1}
+    if mkb_referred:
+        inc["mkb_referred_view_count"] = 1
     await db.businesses.update_one(
         {"_id": business_id},
-        {"$inc": {"page_view_count": 1}},
+        {"$inc": inc},
     )
 
 
@@ -1338,7 +1393,19 @@ async def business_page(
     # Googlebot and other automated traffic that visits multiple times a day.
     ua = (request.headers.get("user-agent") or "").lower()
     if not any(f in ua for f in _BOT_UA_FRAGMENTS):
-        background_tasks.add_task(_increment_business_view, str(business["_id"]))
+        # WHY decide MKB-referred HERE (in the request, not the background task):
+        # the Referer/Host headers are only available on the live request object,
+        # not inside the deferred task, so we resolve the flag now and pass it in.
+        # A same-host referer means the shopper clicked through from one of our
+        # own pages (a guide, search, category, neighborhood, or sister listing)
+        # — traffic Miami Knows Beauty drove. See _is_mkb_referred for the rule
+        # and the badge caveat.
+        mkb_referred = _is_mkb_referred(
+            request.headers.get("referer"), request.headers.get("host", "")
+        )
+        background_tasks.add_task(
+            _increment_business_view, str(business["_id"]), mkb_referred
+        )
     return _templates.TemplateResponse("business.html", ctx)
 
 

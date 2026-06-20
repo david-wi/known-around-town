@@ -314,6 +314,13 @@ class Business(BaseModel):
     # layer). Gives owners a concrete ROI signal on their dashboard so they
     # have a reason to renew their subscription.
     page_view_count: int = 0
+    # WHY: the subset of page_view_count where the visitor clicked through from
+    # within Miami Knows Beauty itself (an editorial guide, on-site search, a
+    # category/neighborhood page, or a sister listing — detected by a same-host
+    # referer at the route layer). This is the number that proves WE drove the
+    # traffic, not just that traffic happened — the one distinction a salon's
+    # free Google Business Profile can't give them. Always <= page_view_count.
+    mkb_referred_view_count: int = 0
     status: PublishStatus = PublishStatus.draft
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)

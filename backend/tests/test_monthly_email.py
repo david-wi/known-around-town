@@ -37,6 +37,7 @@ def _report(
     calls: int = 0,
     directions: int = 0,
     website_clicks: int = 0,
+    mkb_referred: int = 0,
 ) -> MonthlyReport:
     return MonthlyReport(
         business_id="biz-1",
@@ -49,6 +50,7 @@ def _report(
         calls_this_month=calls,
         directions_this_month=directions,
         website_clicks_this_month=website_clicks,
+        mkb_referred_views_this_month=mkb_referred,
         trend=trend,
         is_first_report=is_first,
         is_thin_views=is_thin,
@@ -210,3 +212,30 @@ class TestTestSendGate:
         monkeypatch.delenv("RESEND_API_KEY", raising=False)
         result = await send_test_monthly_email(to="qa@example.com", report=_report())
         assert result is True
+
+
+# ── MKB-referral credit line (KAT-039) ───────────────────────────────────────
+
+class TestMkbReferralCredit:
+    """The dormant monthly email credits Miami Knows Beauty for the visitors it
+    sent — but only when it actually sent at least one, so a quiet month never
+    reads 'we sent you 0 visitors'."""
+
+    def test_credit_line_appears_when_we_sent_visitors(self):
+        report = _report(views_this_month=40, mkb_referred=15)
+        _subject, html, text = render_monthly_email(report)
+        # The exact phrasing proving WE drove the traffic, in both bodies.
+        assert "Miami Knows Beauty sent you 15 of those visitors." in html
+        assert "Miami Knows Beauty sent you 15 of those visitors." in text
+
+    def test_credit_line_absent_when_we_sent_none(self):
+        report = _report(views_this_month=40, mkb_referred=0)
+        _subject, html, text = render_monthly_email(report)
+        # No "sent you 0" guilt-trip — the credit is simply omitted.
+        assert "Miami Knows Beauty sent you" not in html
+        assert "Miami Knows Beauty sent you" not in text
+
+    def test_credit_line_appears_on_first_report(self):
+        report = _report(views_this_month=22, mkb_referred=9, is_first=True)
+        _subject, html, _text = render_monthly_email(report)
+        assert "Miami Knows Beauty sent you 9 of those visitors." in html
