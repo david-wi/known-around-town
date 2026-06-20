@@ -13,7 +13,8 @@ Coverage map (which public templates have the CSS-background fallback):
 - `business.html` hero + thumbnails (#356), `business_card.html` (#356)
 - `home.html` (hero, neighborhood grid, Editor's Pick cards, spotlight bg + thumbs, mini-list thumbs), `editorial_guide.html` hero, `neighborhood.html` hero (#364)
 - **Keep the existing `{% if photo %}` guards** — only layer beneath a PRESENT photo; never add an empty placeholder box where the design intends a plain dark hero or a themed gradient (e.g. the `home.html` nav-neighborhood `{% else %}` gradient).
-- Still uncovered (follow-up): `network_landing.html` city hero uses an `<img>` with no onerror fallback; `business.html:581` map-preview has a bare background but degrades to a branded gradient (low priority).
+- `network_landing.html` city hero (#366): this page's no-photo case shows the brand GRADIENT (not the placeholder SVG), so a broken hero photo degrades to that same gradient — the gradient moved onto the `<img>`'s container div and the `<img>` got `onerror="this.onerror=null;this.style.display='none';"` to hide itself and reveal it. (Pick the fallback that matches each surface's existing no-photo design: SVG for the salon surfaces, gradient here.)
+- Still uncovered (follow-up): `business.html:581` map-preview has a bare background but degrades to a branded gradient (low priority).
 
 **Testing full public pages that extend `base.html`:** a bare `jinja2.Environment`
 can't even compile them — they use app-registered filters (`markdown`) and globals.
