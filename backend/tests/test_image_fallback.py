@@ -348,6 +348,92 @@ def test_neighborhood_page_adds_no_placeholder_box_when_photo_absent():
     )
 
 
+# ── Network landing page (gradient fallback beneath the hero photo) ───────────
+# The platform-root page that lists live cities renders each city as a card with
+# a hero photo. Unlike salon cards (which fall back to the placeholder SVG), this
+# page's no-photo case shows a branded color gradient. So a broken hero photo
+# here must degrade to that SAME gradient: the gradient lives on the image's
+# container div, and the <img> hides itself onerror so the gradient shows through.
+
+
+def _network_landing_ctx(live_cities: list[dict]) -> dict:
+    """Context for a direct render of network_landing.html. Only the keys the
+    template touches need real values; theme carries the gradient class the
+    fallback relies on."""
+    return _page_ctx(
+        live_cities=live_cities,
+        planned_cities=[],
+        is_network_landing=True,
+        landing_eyebrow="MIAMI KNOWS BEAUTY — A LOCAL GUIDE NETWORK",
+        landing_subhead="A curated guide.",
+        landing_cities_eyebrow="CITIES",
+        landing_cities_intro="Pick a city.",
+        # network_landing.html reads theme.category_banner_gradient and the
+        # accent text classes; supply them on top of the base theme dict.
+        theme={
+            "accent_text_strong": "text-rose-600",
+            "accent_hover_text": "hover:text-rose-700",
+            "category_banner_gradient": "from-rose-50 via-orange-50/40 to-amber-50",
+        },
+    )
+
+
+def test_network_landing_city_with_hero_hides_broken_img_revealing_gradient():
+    """A live city WITH a hero photo: the <img> must carry an onerror that hides
+    itself (revealing the gradient beneath), and the gradient must live on the
+    image's container div so it shows through when the photo 404s."""
+    html = _render_page(
+        "network_landing.html",
+        **_network_landing_ctx(
+            [
+                {
+                    "name": "Miami",
+                    "slug": "miami",
+                    "tagline": "The best beauty.",
+                    "hero_photo_url": "https://example.com/broken-hero.jpg",
+                    "url": "https://miami.knowsbeauty.test/",
+                }
+            ]
+        ),
+    )
+    imgs = _imgs(html)
+    assert len(imgs) == 1, imgs
+    img = imgs[0]
+    assert "https://example.com/broken-hero.jpg" in img
+    # onerror must null itself first (loop guard) THEN hide the image so the
+    # gradient underneath is revealed.
+    onerror = re.search(r'onerror="([^"]*)"', img).group(1)
+    assert "this.onerror=null" in onerror
+    assert "display='none'" in onerror
+    assert onerror.index("this.onerror=null") < onerror.index("display='none'")
+    # The gradient must sit on the img's CONTAINER div, beneath the photo.
+    assert re.search(
+        r'<div class="aspect-\[4/3\][^"]*bg-gradient-to-br[^"]*">\s*<img',
+        html,
+    ), html[html.find("aspect-[4/3]"): html.find("aspect-[4/3]") + 300]
+
+
+def test_network_landing_city_without_hero_shows_gradient_only():
+    """A live city with NO hero photo keeps the existing gradient-only fallback:
+    a gradient block and no <img> at all (we did not regress the else branch)."""
+    html = _render_page(
+        "network_landing.html",
+        **_network_landing_ctx(
+            [
+                {
+                    "name": "Austin",
+                    "slug": "austin",
+                    "tagline": "Coming soon vibes.",
+                    "hero_photo_url": None,
+                    "url": "https://austin.knowsbeauty.test/",
+                }
+            ]
+        ),
+    )
+    assert _imgs(html) == []
+    assert "bg-gradient-to-br" in html
+
+
 @pytest.fixture
 def client(seeded_db):
     from app.main import app
