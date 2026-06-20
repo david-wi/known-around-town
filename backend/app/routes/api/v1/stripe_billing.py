@@ -3,8 +3,8 @@
 Two surfaces:
 
 1.  POST /api/v1/billing/checkout
-    Owner-authenticated.  Creates a Stripe Checkout Session for the Pro
-    annual subscription and returns {"url": <checkout_url>} so the browser
+    Owner-authenticated.  Creates a Stripe Checkout Session for the Featured
+    monthly subscription and returns {"url": <checkout_url>} so the browser
     can redirect.
 
 2.  POST /api/v1/billing/webhook
@@ -38,7 +38,7 @@ router = APIRouter()
 
 @router.post("/billing/checkout")
 async def create_checkout_session(request: Request) -> JSONResponse:
-    """Start a Stripe Checkout Session for the Pro annual subscription.
+    """Start a Stripe Checkout Session for the Featured monthly subscription.
 
     Returns {"url": checkout_url}.  The caller should redirect the browser
     to that URL so Stripe handles card collection securely.
