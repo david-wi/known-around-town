@@ -665,6 +665,71 @@
 </section>
 {% endif %}{# /if is_subscribed (caption) #}
 
+{# ── Add the badge to your website ──────────────────────────────────── #}
+{# WHY: a Featured perk (gated behind is_subscribed). The salon drops this
+   copy-paste snippet on their own website footer. It shows the "As Featured on
+   Miami Knows Beauty" badge linked to THEIR listing — driving their site's
+   visitors to their directory page and earning us a backlink from every salon
+   that embeds it. The badge image (/badge/featured.svg) is exempt from the
+   preview gate so it renders on the salon's external site even pre-launch. #}
+{% if is_subscribed %}
+<section class="bg-white border-t border-stone-100">
+  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
+    <h2 class="text-base font-semibold text-stone-900 mb-1">Add the badge to your website</h2>
+    <p class="text-sm text-stone-500 mb-6">
+      Show your visitors you&rsquo;re featured on {{ tenant_label }}. Paste this into your
+      website&rsquo;s footer — it links back to your listing here, so your own visitors can find you on the guide.
+    </p>
+    <div class="rounded-2xl border border-stone-200 bg-white p-6 space-y-4">
+      {# Live preview of exactly what the badge looks like, linking to the listing #}
+      <div>
+        <p class="text-xs text-stone-500 mb-2 uppercase tracking-wide">Preview</p>
+        <a href="{{ listing_absolute_url }}" target="_blank" rel="noopener"
+           title="As Featured on {{ tenant_label }}">
+          <img src="{{ badge_image_url }}" alt="As Featured on {{ tenant_label }}"
+               style="width:300px;max-width:100%;height:auto;border:0" />
+        </a>
+      </div>
+      {# The copy-paste embed code #}
+      <div>
+        <p class="text-xs text-stone-500 mb-2 uppercase tracking-wide">Embed code</p>
+        <pre id="badge-embed-code"
+             class="text-xs text-stone-800 bg-stone-50 border border-stone-200 rounded-xl p-4 overflow-x-auto whitespace-pre-wrap leading-relaxed font-mono"
+             style="word-break:break-word">{{ badge_embed_code }}</pre>
+        <div class="flex items-center gap-3 mt-3">
+          <button id="badge-copy" type="button"
+                  class="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600 hover:text-stone-900 border border-stone-200 hover:border-stone-400 rounded-full px-3 py-1.5 transition">
+            ⎘ Copy embed code
+          </button>
+          <span id="badge-copied" class="hidden text-xs text-emerald-700 font-medium">Copied!</span>
+        </div>
+        <p id="badge-copy-error" class="hidden text-sm text-rose-700 mt-2" role="alert" aria-live="polite"></p>
+      </div>
+    </div>
+
+    {# ── Share your feature (ready-to-post Instagram caption) ─────────── #}
+    {# WHY: a simple templated caption + listing link the owner can copy and
+       post to Instagram in seconds. No AI call — a good fixed caption is
+       enough, and it keeps the page fast and dependency-free. #}
+    <h3 class="text-sm font-semibold text-stone-900 mb-1 mt-10">Share your feature on Instagram</h3>
+    <p class="text-sm text-stone-500 mb-4">
+      Post this to your followers — it links them straight to your listing on the guide.
+    </p>
+    <div class="rounded-2xl border border-stone-200 bg-white p-6 space-y-4">
+      <p id="share-caption" class="text-sm text-stone-800 whitespace-pre-wrap leading-relaxed bg-stone-50 border border-stone-200 rounded-xl p-4">{{ share_caption }}</p>
+      <div class="flex items-center gap-3">
+        <button id="share-copy" type="button"
+                class="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600 hover:text-stone-900 border border-stone-200 hover:border-stone-400 rounded-full px-3 py-1.5 transition">
+          ⎘ Copy caption
+        </button>
+        <span id="share-copied" class="hidden text-xs text-emerald-700 font-medium">Copied!</span>
+      </div>
+      <p id="share-copy-error" class="hidden text-sm text-rose-700" role="alert" aria-live="polite"></p>
+    </div>
+  </div>
+</section>
+{% endif %}{# /if is_subscribed (website badge) #}
+
 {# ── Ad copy generator ─────────────────────────────────────────────── #}
 {# WHY: Same subscription gate as the caption section — both tools are
    Featured-tier benefits. The same locked-state/upgrade-CTA pattern applies. #}
@@ -1225,6 +1290,55 @@
       generateAdCopy();
     }
   });
+})();
+
+/* ── Website badge + share caption copy buttons ────────────── */
+/* WHY: a small reusable copier wires a "copy to clipboard" button to the text
+   content of a source element, flashing a "Copied!" tag. Reuses the same
+   clipboard-with-execCommand-fallback shape as the AI caption panel so it works
+   on http dev as well as https production. Each (button, source, flash, error)
+   group is independent, so the badge section renders fine even if one element
+   is absent (the early return guards). */
+(function () {
+  function wireCopier(btnId, sourceId, flashId, errId) {
+    var btn = document.getElementById(btnId);
+    var source = document.getElementById(sourceId);
+    var flash = document.getElementById(flashId);
+    var errEl = errId ? document.getElementById(errId) : null;
+    if (!btn || !source) return;
+
+    btn.addEventListener('click', async function () {
+      if (errEl) errEl.classList.add('hidden');
+      var text = source.textContent || '';
+      if (!text) return;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'absolute';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        if (flash) {
+          flash.classList.remove('hidden');
+          setTimeout(function () { flash.classList.add('hidden'); }, 2500);
+        }
+      } catch (err) {
+        if (errEl) {
+          errEl.textContent = "Couldn’t copy — select the text and copy manually.";
+          errEl.classList.remove('hidden');
+        }
+      }
+    });
+  }
+
+  wireCopier('badge-copy', 'badge-embed-code', 'badge-copied', 'badge-copy-error');
+  wireCopier('share-copy', 'share-caption', 'share-copied', 'share-copy-error');
 })();
 
 /* ── Post-payment banner dismiss button ──────────────────── */

@@ -1755,6 +1755,62 @@ async def owners_me_page(request: Request) -> HTMLResponse:
         # the template doesn't need to know the Stripe-specific field name, and
         # so route-level tests can assert on ctx directly without parsing HTML.
         ctx["is_subscribed"] = bool(business.get("stripe_subscription_id"))
+
+        # WHY: the website-badge embed code (a Featured perk) needs the salon's
+        # ABSOLUTE public listing URL — the badge is dropped on the salon's OWN
+        # external site, so a relative "/b/slug" would resolve against the salon's
+        # domain, not ours. Build it from the authoritative public host so the
+        # link drives the salon's visitors to its real Miami Knows Beauty page
+        # and earns us a backlink. Prefer CANONICAL_BASE_URL's origin (the
+        # production .com domain) so the embed never hard-codes a dev/staging
+        # subdomain; fall back to the request's own origin when no canonical base
+        # is configured (single-domain dev). The badge image itself is served
+        # from the same origin so it loads past the preview gate on the salon's
+        # site.
+        slug = business.get("slug") or ""
+        canonical_base = get_settings().canonical_base_url.rstrip("/")
+        if canonical_base:
+            origin = canonical_base
+        else:
+            origin = f"{request.url.scheme}://{request.headers.get('host', '')}"
+        ctx["listing_absolute_url"] = f"{origin}/b/{slug}" if slug else ""
+        ctx["badge_image_url"] = f"{origin}/badge/featured.svg"
+        # WHY: pre-write the exact embed snippet server-side so the template
+        # renders identical text to what the owner copies (no client-side string
+        # building that could drift). target="_blank" rel="noopener" opens our
+        # listing in a new tab (a footer badge shouldn't navigate the salon's
+        # visitor away from the salon's own site), the image is sized with inline
+        # style so it works in any site footer, and the alt text doubles as the
+        # link's accessible name.
+        ctx["badge_embed_code"] = (
+            f'<a href="{ctx["listing_absolute_url"]}" '
+            f'title="As Featured on Miami Knows Beauty" '
+            f'target="_blank" rel="noopener">'
+            f'<img src="{ctx["badge_image_url"]}" '
+            f'alt="As Featured on Miami Knows Beauty" '
+            f'style="width:300px;max-width:100%;height:auto;border:0" />'
+            f'</a>'
+        )
+        # WHY: a ready-to-post Instagram caption so the owner can share their
+        # feature in seconds (the "share your feature" affordance). Kept as a
+        # simple template — no AI call needed for a good caption — with their
+        # listing link appended so followers can tap straight through to the
+        # salon's directory page.
+        biz_name = business.get("name", "our salon")
+        nb_slugs = business.get("neighborhood_slugs") or []
+        nb_name = ""
+        if nb_slugs:
+            nb_match = next(
+                (n for n in ctx.get("nav_neighborhoods", []) if n.get("slug") == nb_slugs[0]),
+                None,
+            )
+            nb_name = nb_match.get("name", "") if nb_match else ""
+        where = f" in {nb_name}" if nb_name else ""
+        ctx["share_caption"] = (
+            f"We're featured on {ctx['tenant_label']}! ✨ "
+            f"{biz_name} is one of the salons{where} they'd send a friend to. "
+            f"Come see us — find us on the guide: {ctx['listing_absolute_url']}"
+        )
     else:
         ctx["seo_title"] = "Your account"
         ctx["meta_description"] = "Your Knows Beauty owner account."

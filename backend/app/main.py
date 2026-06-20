@@ -61,7 +61,7 @@ from app.routes.api.v1 import (
     owner_voice as api_owner_voice,
 )
 from app.routes.admin import claims_admin, analytics_admin, settings_admin, sync_admin, businesses_admin
-from app.routes.public import pages as public_pages, media as public_media
+from app.routes.public import pages as public_pages, media as public_media, badge as public_badge
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
@@ -233,6 +233,13 @@ app.include_router(businesses_admin.router)
 # WHY: media route is registered before the public SSR catch-all so /media/{id}
 # is served by the GridFS streaming route and not handed to the 404 template.
 app.include_router(public_media.router)
+
+# WHY: the Featured-salon website badge (/badge/featured.svg) is registered
+# before the public SSR catch-all so the explicit badge route handles it rather
+# than the tenant-aware not-found handler. The preview-gate middleware exempts
+# the /badge/ prefix so it loads on external salon sites even while preview mode
+# is on.
+app.include_router(public_badge.router)
 
 # Public SSR routes (last, since they catch broad URL patterns).
 app.include_router(public_pages.router)

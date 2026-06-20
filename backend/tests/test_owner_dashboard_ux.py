@@ -235,3 +235,64 @@ class TestLockedAiUpsellOverlay:
                 f"{cls} is back on the locked overlay; it has no compiled CSS "
                 f"rule so the overlay would render transparent again"
             )
+
+
+# ─── Website badge embed section (KAT-037) ───────────────────────────────────
+
+
+class TestWebsiteBadgeEmbed:
+    """The Featured-tier 'Add the badge to your website' section. Featured owners
+    get a copy-paste embed snippet whose link points to THEIR listing; free-tier
+    owners don't see it at all."""
+
+    def test_featured_owner_sees_badge_section(self, seeded_db):
+        html = _render_dashboard(seeded_db, photos=[], subscribed=True)
+        assert "Add the badge to your website" in html
+        # The copy control and its source <pre> both render so the JS can wire up.
+        assert 'id="badge-embed-code"' in html
+        assert 'id="badge-copy"' in html
+
+    def test_embed_code_links_to_this_salons_listing(self, seeded_db):
+        """The embed snippet's link must point at the owner's own listing slug —
+        that's what drives the salon's visitors to its directory page (and earns
+        the backlink). The fixture salon slug is 'ux-test-salon'."""
+        html = _render_dashboard(seeded_db, photos=[], subscribed=True)
+        # Jinja autoescapes the snippet inside the <pre>, so the angle brackets
+        # arrive as &lt;a … but the listing path and badge image src survive as
+        # plain substrings.
+        assert "/b/ux-test-salon" in html
+        assert "/badge/featured.svg" in html
+
+    def test_share_caption_present_for_featured_owner(self, seeded_db):
+        """The secondary 'share your feature' affordance ships a ready-to-post
+        caption and its own copy button."""
+        html = _render_dashboard(seeded_db, photos=[], subscribed=True)
+        assert "Share your feature on Instagram" in html
+        assert 'id="share-caption"' in html
+        assert 'id="share-copy"' in html
+        # The caption names the publication and links to the listing.
+        assert "Miami Knows Beauty" in html
+
+    def test_free_owner_does_not_see_badge_section(self, seeded_db):
+        """The badge is a Featured perk — a free-tier owner must NOT see the
+        embed section or the share caption."""
+        html = _render_dashboard(seeded_db, photos=[], subscribed=False)
+        assert "Add the badge to your website" not in html
+        assert 'id="badge-embed-code"' not in html
+        assert 'id="share-caption"' not in html
+
+    def test_badge_section_classes_are_css_backed(self, seeded_db):
+        """Every utility class on the badge section must exist in the compiled
+        stylesheet, or the section renders unstyled/broken (the reference.css is
+        static — a class typed but not compiled does nothing)."""
+        html = _render_dashboard(seeded_db, photos=[], subscribed=True)
+        css = _reference_css()
+        # A representative set of the classes the new section relies on.
+        for cls in (
+            "rounded-2xl", "border-stone-200", "overflow-x-auto",
+            "whitespace-pre-wrap", "font-mono", "text-emerald-700",
+        ):
+            assert _css_has_class(css, cls), (
+                f"{cls} is used in the badge section but has no rule in "
+                f"reference.css — it would render as nothing"
+            )
