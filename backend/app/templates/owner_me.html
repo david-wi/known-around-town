@@ -632,7 +632,17 @@
        but knowing it requires an upgrade is more motivating than never
        knowing it exists. Same pattern used in SaaS upsell flows. #}
     <div class="rounded-2xl border border-stone-200 bg-white p-6 relative overflow-hidden">
-      <div class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl">
+      {# WHY: bg-white/95 (near-opaque) + backdrop-blur-sm fully obscures the
+         disabled preview textarea behind it. The earlier bg-white/70 +
+         backdrop-blur-[1px] are NOT in the compiled reference.css (the only
+         bg-white opacities shipped are /5 /10 /40 /60 /85 /90 /95, and the
+         arbitrary blur-[1px] was never generated) — so that overlay rendered
+         fully TRANSPARENT in production: the "Featured listing required" upsell
+         text sat directly on top of the textarea placeholder and read as a
+         broken jumble, at the exact moment we ask the owner to pay. /95 +
+         blur-sm are both present in reference.css and match the readable-overlay
+         recipe the public sticky bars use (category/business/neighborhood). #}
+      <div class="absolute inset-0 bg-white/95 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
         <div class="text-center px-6">
           <p class="text-sm font-semibold text-stone-900 mb-1">Featured listing required</p>
           <p class="text-xs text-stone-500 mb-4 max-w-[20rem]">Upgrade to Featured to unlock AI-written Instagram captions for your salon.</p>
@@ -707,7 +717,11 @@
       Describe what you want to promote and we&rsquo;ll write 3 short ad variations — ready to use on Google, Facebook, or Instagram promotions.
     </p>
     <div class="rounded-2xl border border-stone-200 bg-white p-6 relative overflow-hidden">
-      <div class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl">
+      {# WHY: bg-white/95 + backdrop-blur-sm — see the matching note on the
+         caption locked overlay above. The earlier /70 + blur-[1px] weren't in
+         the compiled reference.css, so this overlay rendered transparent and
+         the upsell copy collided with the textarea placeholder behind it. #}
+      <div class="absolute inset-0 bg-white/95 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
         <div class="text-center px-6">
           <p class="text-sm font-semibold text-stone-900 mb-1">Featured listing required</p>
           <p class="text-xs text-stone-500 mb-4 max-w-[20rem]">Upgrade to Featured to unlock AI-written ad copy for your salon.</p>
