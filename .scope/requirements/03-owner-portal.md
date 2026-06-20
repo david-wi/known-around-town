@@ -58,3 +58,24 @@ link to `/owners/claim` always land the owner on the correct page instead of
 returning a 404.
 **Acceptance:** Given a GET request to `/owners/claim`, when the response is
 received, then the client is redirected to `/owners#claim-form` with status 301.
+
+### KAT-037 — "As Featured on Miami Knows Beauty" website badge · V1 · implemented
+**Persona:** Salon Owner (Featured tier).
+Featured salon owners can add an embeddable "As Featured on Miami Knows Beauty"
+badge to their own website. The badge image is served at `/badge/featured.svg`
+and is exempt from the preview gate so it renders on the salon's external site
+even while the directory is private. The owner dashboard (gated to Featured
+owners) shows a "Add the badge to your website" section with a live preview and
+a copy-paste `<a><img></a>` embed snippet whose link points to the salon's own
+listing (`{origin}/b/{slug}`) — driving the salon's site visitors to its
+directory page and earning a backlink. A secondary "Share your feature"
+affordance offers a ready-to-post Instagram caption plus the listing link. Both
+the embed code and the caption have a one-click copy button. This is the
+highest-leverage shopper-acquisition artifact: one build, every Featured salon,
+referral traffic + SEO backlink.
+**Acceptance:** Given a request to `/badge/featured.svg`, when the response is
+received (with NO preview token, while preview mode is on), then an
+`image/svg+xml` badge is returned with status 200; given a logged-in Featured
+owner, when `/owners/me` is requested, then the page shows the embed code
+containing the salon's absolute listing URL and a copy button; given a logged-in
+free-tier owner, then the badge embed section is NOT shown.

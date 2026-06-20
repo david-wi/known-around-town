@@ -108,6 +108,16 @@ _BYPASS_PREFIXES = (
     # The file contains only marketing copy; no private data is exposed.
     # Static files are mounted under /assets/ (not /static/) in main.py.
     "/assets/walkthrough/",
+    # WHY: the "As Featured on Miami Knows Beauty" website badge
+    # (/badge/featured.svg) is embedded on Featured salons' OWN external
+    # websites. The image must load for the whole public internet even while
+    # our site is still private behind the preview gate — otherwise it would
+    # render as a broken image on the salon's site. This exemption is
+    # deliberately scoped to the /badge/ prefix only: that path serves nothing
+    # but the static brand-mark SVG (no private directory content), so exposing
+    # it leaks nothing. Without this bypass, every embedded badge would 302 to
+    # /preview-login (which a salon's visitor can't follow) and show broken.
+    "/badge/",
 )
 
 # WHY: exact-path bypass for paths where sub-paths must stay gated. The claim
