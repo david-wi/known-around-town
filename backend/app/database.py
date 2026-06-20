@@ -84,6 +84,17 @@ async def ensure_indexes() -> None:
     await db.business_claims.create_index([("business_id", 1), ("status", 1)])
     await db.business_inquiries.create_index([("business_id", 1), ("submitted_at", -1)])
 
+    # WHY: the monthly listing-report email derives "views THIS month" by diffing
+    # the lifetime view counter against a per-month snapshot. The unique index on
+    # (business_id, period_key) guarantees exactly one snapshot row per business
+    # per calendar month — so a second report run in the same month can't create a
+    # duplicate baseline and skew next month's delta. The descending period sort
+    # in the read path ("latest snapshot before this month") is served by the same
+    # compound index.
+    await db.monthly_view_snapshots.create_index(
+        [("business_id", 1), ("period_key", -1)], unique=True
+    )
+
     # Owner login (passwordless verification-code flow).
     # WHY: lookup pattern is "give me the most recent unused code for this
     # email", so we sort by (email, created_at desc). The same index also

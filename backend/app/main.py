@@ -60,7 +60,7 @@ from app.routes.api.v1 import (
     admin_voice as api_admin_voice,
     owner_voice as api_owner_voice,
 )
-from app.routes.admin import claims_admin, analytics_admin, settings_admin, sync_admin, businesses_admin
+from app.routes.admin import claims_admin, analytics_admin, settings_admin, sync_admin, businesses_admin, monthly_report_admin
 from app.routes.public import pages as public_pages, media as public_media, badge as public_badge
 
 settings = get_settings()
@@ -229,6 +229,13 @@ app.include_router(analytics_admin.router)
 app.include_router(settings_admin.router)
 app.include_router(sync_admin.router)
 app.include_router(businesses_admin.router)
+# WHY: monthly-report admin routes (preview + test-send) are admin-key-gated and
+# registered before the public SSR catch-all so /admin/monthly-report/* resolves
+# here, not the public not-found handler. This feature is DORMANT: the routes
+# only PREVIEW the retention email or send a single test copy to an explicit test
+# address (behind a flag that is off by default). Nothing emails the real owner
+# list until the founder approves the live monthly send.
+app.include_router(monthly_report_admin.router)
 
 # WHY: media route is registered before the public SSR catch-all so /media/{id}
 # is served by the GridFS streaming route and not handed to the 404 template.
