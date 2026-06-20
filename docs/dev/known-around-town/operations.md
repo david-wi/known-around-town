@@ -68,12 +68,27 @@ If you skip step 2, the env var is silently invisible to the container even if i
 
 ## Stripe Setup
 
-**Current state**: Fully live as of 2026-06-11. Checkout, webhook, and Founding Partner badge all operational.
+**Current state**: Fully live as of 2026-06-11. Checkout and webhook both
+operational. Verified end-to-end 2026-06-20 (PR for billing doc accuracy):
+prod webhook returns 400 on a bad signature (route wired + signature-checking,
+secret present — not 503/404); checkout returns 401 unauthenticated (billing
+configured — not 503); the running container reports the live secret key
+(`rk_live_` prefix → LIVE mode), webhook secret, and price id all present; and
+the `checkout.session.completed` → Featured upgrade + `customer.subscription.deleted`
+→ free revert logic is covered by red-green-verified tests in `test_stripe_billing.py`.
 
 - Checkout creates a session via `POST /api/v1/billing/checkout`
-- Webhook at `POST /api/v1/billing/webhook` receives `checkout.session.completed` and `customer.subscription.deleted`
+- Webhook at `POST /api/v1/billing/webhook` receives `checkout.session.completed`
+  (sets `featured.enabled=True`, `featured.tier=premium`, stores
+  `stripe_subscription_id`/`stripe_customer_id`) and `customer.subscription.deleted`
+  (reverts to free, unsets the subscription id)
 - `STRIPE_WEBHOOK_SECRET` is set in production `.env`
-- Founding Partner badge (first 25 subscribers, permanent) is working
+- The salon listing's Featured status (top-of-results ranking + featured-only
+  sections) is driven by `featured.enabled`, so a paid upgrade is immediately
+  visible to site visitors — see `services/content.py`
+- NOTE: the Founding Partner badge concept was removed entirely in PR #362.
+  Checkout no longer grants any "founding partner" flag; cancellation reverts
+  the tier to free. Guarded by `TestNoFoundingPartnerGrant` in `test_stripe_billing.py`.
 
 **Stripe product**: `prod_UgggS2CyiLgD52`
 **Stripe price**: `price_1ThJJFAIj5oq6xI8oejLDzvu` ($29/month)
