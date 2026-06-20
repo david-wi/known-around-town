@@ -711,10 +711,14 @@
       website&rsquo;s footer — it links back to your listing here, so your own visitors can find you on the guide.
     </p>
     <div class="rounded-2xl border border-stone-200 bg-white p-6 space-y-4">
-      {# Live preview of exactly what the badge looks like, linking to the listing #}
+      {# Live preview of exactly what the badge looks like, linking to the listing.
+         WHY badge_link_url (not listing_absolute_url): the preview is a faithful
+         copy of the real badge, so it carries the same ?ref=mkb-badge marker the
+         embed code does — what the owner sees clicking here is exactly what their
+         site's visitors get. #}
       <div>
         <p class="text-xs text-stone-500 mb-2 uppercase tracking-wide">Preview</p>
-        <a href="{{ listing_absolute_url }}" target="_blank" rel="noopener"
+        <a href="{{ badge_link_url }}" target="_blank" rel="noopener"
            title="As Featured on {{ tenant_label }}">
           <img src="{{ badge_image_url }}" alt="As Featured on {{ tenant_label }}"
                style="width:300px;max-width:100%;height:auto;border:0" />

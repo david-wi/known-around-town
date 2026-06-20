@@ -1136,33 +1136,53 @@ _BOT_UA_FRAGMENTS = (
 )
 
 
-def _is_mkb_referred(referer: Optional[str], request_host: str) -> bool:
+# WHY: the marker we hang on the "As Featured on Miami Knows Beauty" website
+# badge's link (``?ref=mkb-badge``). The badge sits on the salon's OWN site, so
+# a click on it arrives with the salon's domain as the referer (external) and
+# can't be recognised by same-host matching — see _is_mkb_referred. Stamping the
+# link with this stable marker lets us credit the badge click as MKB-driven the
+# moment the shopper lands, which can never be reconstructed later. Defined once
+# so the link builder and the view detector can't drift apart.
+MKB_BADGE_REF_MARKER = "mkb-badge"
+
+
+def _is_mkb_referred(
+    referer: Optional[str], request_host: str, ref_marker: Optional[str] = None
+) -> bool:
     """Decide whether a page view came from within Miami Knows Beauty itself.
 
-    A view is "MKB-referred" when the page the shopper clicked FROM (the
-    ``Referer`` header) lives on the SAME host as the listing they landed on.
-    On this network every editorial guide, on-site search result, category
-    page, neighborhood page, and sister listing for a given city edition is
-    served from that one host (e.g. miami.knowsbeauty.com) — so a same-host
-    referer is, by construction, an internal click from one of OUR pages. That
-    is the traffic we drove and can take credit for.
+    Two independent signals make a view "MKB-driven", either is sufficient:
+
+    1. **Same-host referer.** The page the shopper clicked FROM (the ``Referer``
+       header) lives on the SAME host as the listing they landed on. On this
+       network every editorial guide, on-site search result, category page,
+       neighborhood page, and sister listing for a given city edition is served
+       from that one host (e.g. miami.knowsbeauty.com) — so a same-host referer
+       is, by construction, an internal click from one of OUR pages.
+
+    2. **Badge marker.** The request URL carries ``?ref=mkb-badge`` (the
+       ``ref_marker`` argument equals ``MKB_BADGE_REF_MARKER``). This is how we
+       credit the website badge — see the badge note below.
 
     WHY same-host (not a broader network match): it's the cleanest signal that
     can't over-claim. A referer with no host (typed URL / bookmark) or an
-    external host (Google, Instagram, the salon's own website) is NOT counted —
-    we never claim credit for a visit we didn't send.
+    external host (Google, Instagram, the salon's own website) is NOT counted on
+    that signal alone — we never claim credit for a visit we didn't send.
 
-    WHY the badge is deliberately NOT counted here: the "As Featured on Miami
-    Knows Beauty" badge lives on the salon's OWN external website, so a click on
-    it arrives with the salon's domain as the referer — an external host — and
-    falls into the total only, not the MKB-referred number. The badge's link
-    carries our listing URL as its destination, but the referer (where the click
-    came from) is the salon's site, not ours, so same-host matching can't see
-    it. Catching badge clicks reliably would mean tagging the badge link with a
-    marker (e.g. ``?ref=mkb-badge``); that's a separate, larger change. Counting
-    badge clicks in the total but not the MKB number is the safe under-count —
-    we'd rather understate our credit than overstate it.
+    WHY the badge needs a marker: the "As Featured on Miami Knows Beauty" badge
+    lives on the salon's OWN external website, so a click on it arrives with the
+    salon's domain as the referer — an external host — which same-host matching
+    can't see. The badge IS our traffic (the salon shows it because we featured
+    them, and it's our #1 shopper-acquisition lever), so we tag the badge's link
+    with ``?ref=mkb-badge`` and count that marked click as MKB-driven even though
+    the referer is external. Every other external referer is still NOT counted,
+    so this stays a tight, intentional carve-out rather than a loophole.
     """
+    # WHY: a marked badge click counts even when the referer is the salon's own
+    # (external) site — that's the whole reason the marker exists. Checked first
+    # so the same-host path below stays purely about internal clicks.
+    if ref_marker == MKB_BADGE_REF_MARKER:
+        return True
     if not referer:
         return False
     try:
@@ -1394,14 +1414,17 @@ async def business_page(
     ua = (request.headers.get("user-agent") or "").lower()
     if not any(f in ua for f in _BOT_UA_FRAGMENTS):
         # WHY decide MKB-referred HERE (in the request, not the background task):
-        # the Referer/Host headers are only available on the live request object,
-        # not inside the deferred task, so we resolve the flag now and pass it in.
-        # A same-host referer means the shopper clicked through from one of our
-        # own pages (a guide, search, category, neighborhood, or sister listing)
-        # — traffic Miami Knows Beauty drove. See _is_mkb_referred for the rule
-        # and the badge caveat.
+        # the Referer/Host headers and the URL query params are only available on
+        # the live request object, not inside the deferred task, so we resolve the
+        # flag now and pass it in. A same-host referer means the shopper clicked
+        # through from one of our own pages (a guide, search, category,
+        # neighborhood, or sister listing); a ``?ref=mkb-badge`` marker means they
+        # clicked our website badge on the salon's own site. Either way it's
+        # traffic Miami Knows Beauty drove. See _is_mkb_referred for the rule.
         mkb_referred = _is_mkb_referred(
-            request.headers.get("referer"), request.headers.get("host", "")
+            request.headers.get("referer"),
+            request.headers.get("host", ""),
+            request.query_params.get("ref"),
         )
         background_tasks.add_task(
             _increment_business_view, str(business["_id"]), mkb_referred
@@ -1968,15 +1991,29 @@ async def owners_me_page(request: Request) -> HTMLResponse:
             origin = f"{request.url.scheme}://{request.headers.get('host', '')}"
         ctx["listing_absolute_url"] = f"{origin}/b/{slug}" if slug else ""
         ctx["badge_image_url"] = f"{origin}/badge/featured.svg"
+        # WHY: the badge link gets its own URL with the ``?ref=mkb-badge`` marker,
+        # SEPARATE from listing_absolute_url. The badge is on the salon's own site,
+        # so a click on it refers from an external host that same-host matching
+        # can't credit; the marker is what lets us count badge clicks as
+        # MKB-driven (see _is_mkb_referred). We do NOT stamp the marker on
+        # listing_absolute_url itself because that same URL feeds the Instagram
+        # share caption and the on-dashboard preview link — only an actual badge
+        # click on the salon's external site should carry the badge marker.
+        ctx["badge_link_url"] = (
+            f"{ctx['listing_absolute_url']}?ref={MKB_BADGE_REF_MARKER}"
+            if ctx["listing_absolute_url"]
+            else ""
+        )
         # WHY: pre-write the exact embed snippet server-side so the template
         # renders identical text to what the owner copies (no client-side string
-        # building that could drift). target="_blank" rel="noopener" opens our
-        # listing in a new tab (a footer badge shouldn't navigate the salon's
-        # visitor away from the salon's own site), the image is sized with inline
-        # style so it works in any site footer, and the alt text doubles as the
-        # link's accessible name.
+        # building that could drift). The href carries the badge marker so every
+        # shopper who clicks the embedded badge is credited to Miami Knows Beauty.
+        # target="_blank" rel="noopener" opens our listing in a new tab (a footer
+        # badge shouldn't navigate the salon's visitor away from the salon's own
+        # site), the image is sized with inline style so it works in any site
+        # footer, and the alt text doubles as the link's accessible name.
         ctx["badge_embed_code"] = (
-            f'<a href="{ctx["listing_absolute_url"]}" '
+            f'<a href="{ctx["badge_link_url"]}" '
             f'title="As Featured on Miami Knows Beauty" '
             f'target="_blank" rel="noopener">'
             f'<img src="{ctx["badge_image_url"]}" '
