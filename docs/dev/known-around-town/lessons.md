@@ -932,3 +932,36 @@ Two more SEO touches landed in the same change:
   only by crawling the landing-page HTML. City URLs are built from the request
   host's network suffix (not `CANONICAL_BASE_URL`, which is a single city's
   domain).
+
+## Monthly "your listing is working" retention email — dormant build (PR #384, 2026-06-20)
+
+The #1 churn risk from the strategy review: a Featured owner pays $29/mo, the
+dashboard shows real stats, but nothing PUSHES them. Built a monthly email that
+does — and kept it OFF by default.
+
+- **"Views this month" from a lifetime-only counter:** the business doc only
+  carries `page_view_count` (lifetime). To get a per-month number we snapshot
+  that counter once per month into `monthly_view_snapshots` ((business_id,
+  period_key) unique) and diff: views_this_month = lifetime_now − the most recent
+  snapshot from a period BEFORE this one. The honest caveat (documented in the
+  module): if a report runs mid-month, "this month" really means "since the last
+  report," not a strict calendar slice. The first-ever report has no prior
+  snapshot, so it reports lifetime as "since you joined" rather than inventing a
+  monthly figure. Messages need NO snapshot — `business_inquiries` rows carry
+  `submitted_at`, so it's a direct half-open date-range count.
+- **Idempotent same-month reruns:** the current period's snapshot is the baseline
+  for NEXT month, so a second report in the same month must NOT overwrite it (or
+  the delta collapses to ~0). `_latest_snapshot_before` uses `period_key < current`
+  strictly, so it always skips the current month's own row. Tested explicitly.
+- **Small numbers can accelerate churn** (per the strategy review): so under 10
+  views/month the email drops the big stat strip and leans on a ready-to-post
+  caption (reusing `ai_caption.generate_caption`) instead of dwelling on the
+  number. Trend-up months lead with "up from N last month."
+- **Dormant-feature pattern, three send-safety layers:** (1) admin-key gate on the
+  route, (2) `MONTHLY_REPORT_TEST_SEND_ENABLED` off by default gates the actual
+  Resend call, (3) the test-send route refuses any `to` that matches a real
+  `claimed_email` (409). There is NO cron / bulk sender — the live monthly send is
+  the founder's call, marked by the reserved `MONTHLY_REPORT_LIVE_SEND_ENABLED`
+  flag that nothing reads yet. The preview route renders HTML and sends nothing.
+- **Founder-owned copy** (subject + headlines) lives in clearly-labelled constants
+  at the top of `monthly_email.py` so David can tweak the pitch without hunting.

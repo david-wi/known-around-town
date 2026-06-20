@@ -166,6 +166,38 @@ If the feature is off by every path (DB unset AND env vars false/blank), the
 Instagram caption and ad copy endpoints return HTTP 404, and subscribers who try
 to use these tools get a silent failure.
 
+### Monthly listing-report email (retention email for Featured owners)
+
+The monthly "your listing is working" email is **built but dormant**. It tells a
+Featured owner how many people viewed their listing and how many reached out this
+month — a recurring reason to keep their subscription. As of PR #384 there is
+**no live monthly send to owners** — that is the founder's decision and is not
+wired. Two flags govern it:
+
+| Flag | Default | What it does |
+|---|---|---|
+| `MONTHLY_REPORT_TEST_SEND_ENABLED` | OFF | When ON, allows the admin test-send route to send ONE copy to an explicit TEST address. Off → preview still works, test-send returns 403. |
+| `MONTHLY_REPORT_LIVE_SEND_ENABLED` | OFF (reserved) | Reserved name for the future founder-approved monthly send. **Nothing reads this yet** — no cron or bulk sender exists. It marks where the live send will be gated when built. |
+
+**Preview the email (sends nothing):** open, with the admin cookie/key,
+`/admin/monthly-report/preview?business_id=<business _id>`. It renders the email
+HTML in the browser. (As a side effect it writes/keeps this month's view
+snapshot — internal bookkeeping for the "views this month" math, not an email.)
+
+**Send yourself a test copy:** set `MONTHLY_REPORT_TEST_SEND_ENABLED=true` in
+`/opt/known-around-town/.env`, restart the backend, then
+`POST /admin/monthly-report/test-send` with `{"business_id": "<id>", "to": "<your-test-inbox>"}`.
+The route refuses any `to` address that belongs to a real claimed owner (409), so
+a test send can never reach an actual salon owner. Turn the flag back OFF when done.
+
+**How to turn the live monthly send ON later (when the founder approves):** build
+a small scheduled job that, for each Featured owner (`featured.enabled = true`),
+calls `monthly_report.compute_report` + `monthly_email.render_monthly_email` and
+sends via the existing Resend pattern, gated behind `MONTHLY_REPORT_LIVE_SEND_ENABLED`.
+That job is intentionally not in PR #384. The headline/subject copy the founder
+tweaks lives in clearly-marked constants at the top of
+`backend/app/services/monthly_email.py`.
+
 ## Preview Gate
 
 Toggle via env var — no code deploy needed:
