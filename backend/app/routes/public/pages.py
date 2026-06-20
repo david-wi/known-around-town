@@ -1871,21 +1871,67 @@ async def walkthrough_page(request: Request) -> HTMLResponse:
     return _templates.TemplateResponse("walkthrough.html", ctx)
 
 
+def _lastmod_str(raw: Any, fallback: str) -> str:
+    """Format a sitemap <lastmod> from a record timestamp, tolerating strings.
+
+    WHY: records in this database store their timestamps inconsistently — most
+    are real datetimes, but a chunk of imported editorial guides and salons
+    carry an ISO STRING ("2026-06-12T06:00:00Z") instead. Calling .strftime()
+    on a string raises AttributeError and would 500 the entire sitemap. This
+    helper accepts a datetime (formatted as YYYY-MM-DD), an ISO string (first
+    10 chars are already YYYY-MM-DD), or anything else (use the fallback date),
+    so one bad record can never take the whole sitemap down.
+    """
+    if isinstance(raw, datetime):
+        return raw.strftime("%Y-%m-%d")
+    if isinstance(raw, str) and len(raw) >= 10:
+        return raw[:10]
+    return fallback
+
+
+async def _seo_show_live(request: Request) -> bool:
+    """Return True when robots.txt / sitemap.xml should render their LIVE form.
+
+    The live form means "allow crawling, list every public URL". It is shown
+    whenever the launch gate is OFF (the normal post-launch state).
+
+    WHY a verification override exists: before launch we need to prove that the
+    live robots+sitemap are correct WITHOUT actually opening the site to the
+    public (flipping the launch gate is David's decision, not an automated one).
+    A request carrying the admin API key plus ``?preview_state=live`` renders
+    the live form even while the gate is still on, so the deployed site can be
+    verified ahead of launch. The override is gated on the admin key so an
+    anonymous visitor can never use it to enumerate business slugs before launch
+    — exactly the leak the empty-while-gated behaviour was designed to prevent.
+    The opposite override (``?preview_state=gated`` with the admin key) forces
+    the gated form, which lets us confirm the pre-launch response is unchanged.
+    """
+    override = request.query_params.get("preview_state", "")
+    if override in ("live", "gated"):
+        api_key = request.headers.get("X-API-Key", "")
+        if api_key and api_key == get_settings().admin_api_key:
+            return override == "live"
+    # No (valid) override: the live form shows exactly when the launch gate is
+    # off. Use the DB-backed helper so the admin toggle is reflected instantly.
+    return not await get_preview_mode_enabled()
+
+
 @router.get("/robots.txt")
 async def robots_txt(request: Request) -> HTMLResponse:
     tenant = await resolve_tenant(request.headers.get("host", ""))
     if not tenant:
         return HTMLResponse("User-agent: *\nDisallow: /\n", media_type="text/plain")
-    # WHY: while the site is in preview mode, all public content pages redirect
-    # to a login wall. Telling Google "Allow: /" while the site is gated would
-    # waste crawl budget — every page Google tries to visit gets a 302 redirect.
-    # Instead, return "Disallow: /" so Google waits until the site is public.
-    # The preview gate bypass means this response is now reachable by crawlers
-    # (they no longer get redirected before reaching this handler).
-    # WHY: use the DB-backed helper so the admin settings toggle is reflected
-    # immediately — without this, the env var value would persist even after
-    # David flips preview mode off via the admin UI.
-    if await get_preview_mode_enabled():
+    # WHY: while the launch gate is on, every public page redirects to a login
+    # wall, so telling Google "Allow: /" would just burn crawl budget on 302s.
+    # Return "Disallow: /" until the site is public. The preview-gate bypass for
+    # /robots.txt means crawlers actually reach this handler (they aren't
+    # redirected first). _seo_show_live() is the single decision that flips this:
+    # it returns False while the gate is on and True once it's off, and ALSO
+    # honours the admin-key ?preview_state= override so the live response can be
+    # verified before launch without flipping the real gate. robots.txt and
+    # sitemap.xml both read this one decision, so they flip together on one gate
+    # change.
+    if not await _seo_show_live(request):
         return HTMLResponse("User-agent: *\nDisallow: /\n", media_type="text/plain")
     host = request.headers.get("host", "")
     scheme = request.url.scheme
@@ -1930,8 +1976,11 @@ async def sitemap(request: Request) -> HTMLResponse:
     # crawlers won't request the sitemap — but this guard closes the gap for
     # direct requests. Once preview mode is off, execution falls through to the
     # full sitemap that lists every business, category, and neighborhood URL.
-    # WHY: use DB-backed helper so the admin settings toggle is reflected immediately.
-    if await get_preview_mode_enabled():
+    # WHY: _seo_show_live() is the SAME single decision robots.txt uses, so the
+    # two files flip together on one gate-flip. It also honours the admin-key
+    # verification override so the populated sitemap can be checked before launch
+    # without opening the site to the public.
+    if not await _seo_show_live(request):
         return HTMLResponse(
             '<?xml version="1.0" encoding="UTF-8"?>'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>',
@@ -1986,14 +2035,9 @@ async def sitemap(request: Request) -> HTMLResponse:
             # WHY: prefer the business's own updated_at timestamp so Google
             # knows when the listing content last changed — a hair salon that
             # updated its hours last week should be re-crawled sooner than one
-            # that hasn't changed since the site launched.
-            raw_ts = b.get("updated_at")
-            if isinstance(raw_ts, datetime):
-                lastmod = raw_ts.strftime("%Y-%m-%d")
-            elif isinstance(raw_ts, str) and len(raw_ts) >= 10:
-                lastmod = raw_ts[:10]  # accept ISO strings like "2025-03-01T..."
-            else:
-                lastmod = today_str
+            # that hasn't changed since the site launched. _lastmod_str tolerates
+            # the string-vs-datetime storage inconsistency (see its docstring).
+            lastmod = _lastmod_str(b.get("updated_at"), today_str)
             entries.append((f"{base}/b/{b['slug']}", lastmod))
             for nb_slug in b.get("neighborhood_slugs") or []:
                 for cat_slug in b.get("category_slugs") or []:
@@ -2009,9 +2053,31 @@ async def sitemap(request: Request) -> HTMLResponse:
             # WHY: use the guide's actual publish date as lastmod rather than
             # today — telling Google every guide changed daily caused unnecessary
             # re-crawling and weakened the trustworthiness of our lastmod signals.
+            # WHY string-tolerant: ~25 of Miami's live guides store published_at /
+            # updated_at as an ISO STRING ("2026-06-12T06:00:00Z") rather than a
+            # datetime (same import quirk fixed for the guide page in PR #377).
+            # Calling .strftime() on a string raises AttributeError, which would
+            # 500 the WHOLE sitemap the moment the launch gate flips off — turning
+            # a launch into an invisible-to-Google outage. _lastmod_str() handles
+            # datetime, ISO string, and missing values uniformly.
             _g_date = g.get("updated_at") or g.get("published_at")
-            _g_lastmod = _g_date.strftime("%Y-%m-%d") if _g_date else today_str
-            entries.append((f"{base}/guides/{g['slug']}", _g_lastmod))
+            entries.append((f"{base}/guides/{g['slug']}", _lastmod_str(_g_date, today_str)))
+    else:
+        # WHY: the bare-apex host (e.g. knowsbeauty.com, no city subdomain)
+        # renders the network landing page, which links out to every city — but
+        # each city lives on its OWN subdomain (miami.knowsbeauty.com, …), a
+        # different host with its own sitemap. Without listing those city home
+        # pages here, the only way Google discovers a brand-new city is by
+        # crawling the apex landing HTML; a sitemap entry makes the discovery
+        # explicit and immediate. We build each city URL from the request host's
+        # network suffix rather than CANONICAL_BASE_URL, because the canonical
+        # base is a single city's domain and would point every city at the wrong
+        # host. Each city's own per-city sitemap still enumerates its businesses.
+        suffix = tenant.network_domain_suffix or host
+        for city in await content_svc.list_cities(tenant.network["_id"]):
+            city_slug = city.get("slug")
+            if city_slug:
+                entries.append((f"{scheme}://{city_slug}.{suffix}/", today_str))
 
     def _url_tag(loc: str, lastmod: str) -> str:
         return f"  <url><loc>{loc}</loc><lastmod>{lastmod}</lastmod></url>\n"
