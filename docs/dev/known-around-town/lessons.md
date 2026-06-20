@@ -1,5 +1,56 @@
 # known-around-town — Lessons Learned
 
+## sitemap.xml and robots.txt must use the REQUEST host, not CANONICAL_BASE_URL (2026-06-20, PR #392)
+
+This is a multi-tenant site: each city is its own website on its own subdomain
+(`miami.knowsbeauty.com`, `hialeah.knowsbeauty.com`, `doral.knowsbeauty.com`, …),
+and every page self-canonicalizes to its own host (the page-canonical logic in
+`_base_context`, ~lines 340–383 of `routes/public/pages.py`, is correct: it keeps
+the request's own subdomain for production hosts and only consolidates dev hosts
+to the `.com`).
+
+The bug: the `robots.txt` and `sitemap.xml` handlers built their base as
+`canonical_base if canonical_base else f"{scheme}://{host}"`. Because
+`CANONICAL_BASE_URL` is ALWAYS set to `https://miami.knowsbeauty.com` in
+production, EVERY city's sitemap listed miami URLs and every city's robots.txt
+`Sitemap:` line pointed at miami. Google discards sitemap entries on a different
+host than the sitemap itself, so 25 of 26 city sites effectively had no sitemap of
+their own pages — directly contradicting the (correct) self-canonical page tags.
+
+Fix: `_seo_base_url(request)` (next to the other SEO helpers, just above
+`_seo_show_live`) returns the right origin for the requesting host, mirroring the
+page-canonical rule EXACTLY so the two never drift:
+- no `CANONICAL_BASE_URL` → `{scheme}://{request_host}` (self-host);
+- production host (request host == the canonical apex `knowsbeauty.com`, or ends
+  with `.knowsbeauty.com`) → keep the request's own host, https from the canonical
+  base (production always arrives over https);
+- dev/staging host (`*.ai.devintensive.com`, `*.knowsbeauty.localhost`) →
+  consolidate to the production `.com` base.
+
+Both handlers now call it. **Do NOT** change the sitemap's apex/network `else:`
+branch — it correctly builds each city's home URL from the request host's network
+suffix (`tenant.network_domain_suffix`), because the apex landing page links out to
+many different city subdomains. The apex branch uses `scheme`/`host` directly, not
+`base`.
+
+Live-verified via the admin-key `?preview_state=live` override (site still gated):
+`hialeah.knowsbeauty.com/sitemap.xml` → 72 hialeah URLs (was 72 miami URLs);
+`doral` → 74 doral; `south-beach` → 78 south-beach; `miami` → 318 miami (unchanged).
+Each city's `robots.txt` `Sitemap:` now points at its own host. The page canonical
+on a city home (`<link rel="canonical" href="https://hialeah.knowsbeauty.com/">`)
+is unchanged — the fix touched only the two SEO files, not the per-page canonical.
+
+Tests: `tests/test_seo_robots_sitemap.py` → `TestSeoBaseUrl` (helper cases + a
+red-green guard proven by reverting to the old one-liner) and
+`TestSitemapRobotsUseRequestHost` (end-to-end: a city's rendered sitemap/robots use
+its own host while `CANONICAL_BASE_URL` points at a sibling city).
+
+**General rule for this codebase:** any URL a city's own page emits about ITSELF
+(canonical tags, sitemap `<loc>` entries, the robots `Sitemap:` line, og:url) must
+use the request host on production subdomains — never `CANONICAL_BASE_URL`, which is
+a single city's address. `CANONICAL_BASE_URL` is only for consolidating dev/staging
+hosts onto the production `.com`.
+
 ## MKB-referred view tracking (2026-06-20, PR #389, KAT-039)
 
 We now track which page views Miami Knows Beauty itself drove, not just that
