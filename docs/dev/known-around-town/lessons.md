@@ -1,5 +1,72 @@
 # known-around-town — Lessons Learned
 
+## Editorial-guide quality audit (2026-06-20) — city_id type corruption + cross-network filing
+
+A full quality read of all **156 live editorial guides** (not ~106) surfaced
+three distinct data problems. Two were clear breakage and were fixed; the rest
+are content-strategy calls left for review.
+
+### Fixed: 14 satellite-city guides were invisible (city_id stored as ObjectId, not string UUID)
+
+The Doral / Pompano Beach / Hialeah / Plantation / Pembroke Pines / Weston /
+Miramar guides (2 each) had a Mongo **ObjectId** in their `city_id` field
+instead of the string city UUID the rest of the system uses. The public guide
+page resolves the tenant to a string city UUID and queries
+`editorial_guides` by it, so these 14 guides matched nothing and returned 404 —
+completely unreachable despite having real content and 6 live salons each.
+Repointed each `city_id` (and `network_id`) to the correct existing beauty city
+record; verified all 6 featured salons resolve live in each target city.
+Rollback map: `do-server:/root/mkbwork/repoint_applied.json`.
+
+**Symptom to watch for:** a guide that exists in the DB but 404s on its
+subdomain. Check `type(guide["city_id"])` — if it's `ObjectId`, it can never
+match a string-UUID city. Guard guide-insert paths to coerce/validate `city_id`
+as a string that exists in `cities`.
+
+### Fixed: archived a test-pollution guide
+
+`test-api-ping-aventura` (title "Test", body "Test content.") was `status:
+live`. Archived (reversible) — trivial leftover from API testing, not content.
+
+### Flagged (NOT fixed — content-strategy call): cross-network + thin guides
+
+- **~33 guides reference salons that live in a different network's city.** Spa,
+  wellness, and health guides are filed under `beauty/miami` but their featured
+  businesses were seeded into `wellness/miami` (and don't exist in beauty/miami).
+  The page resolves featured slugs *scoped to the guide's own city*, so all the
+  salon cards silently drop and the "Featured in this guide" section renders
+  empty (the template hides it entirely when zero resolve). The prose still
+  shows, naming salons it can't link to. **43 guides total render with an empty
+  featured section.**
+- **7 off-brand health guides** (dentists, primary care, physical therapy,
+  healthcare-by-neighborhood) live under the Beauty network — they belong to a
+  Health vertical, and their businesses were never seeded into beauty/miami.
+- **~11 guides have empty bodies** (0 chars) and a few have <800 chars.
+- **2 orphan Miami spa/wellness guides** (`city_id` `9755fe6a-…`, an unknown
+  non-city UUID) — one has a 0-length body.
+
+### Positives (the prose is genuinely good)
+
+- **No templated/near-duplicate bodies** — 0 pairs above 60% similarity on the
+  first 1,200 chars. The writing is original guide-to-guide (specific salon
+  names, neighborhood-aware, distinct voice), not boilerplate with the
+  neighborhood swapped.
+- **No duplicate SEO meta descriptions** — every populated one is unique (16
+  guides have none).
+- **Core beauty guides resolve cleanly** — e.g. `best-balayage-miami` lists 6
+  hair salons, all live in beauty/miami.
+
+### The database trap (important)
+
+Production reads/writes the **`who_knows_local`** database on the shared
+Expertly Atlas cluster (`expertly.xuf7uv`). `deploy.md` says `known_around_town`
+but that DB is empty — `architecture.md` (`who_knows_local`) is correct. The
+running container's `MONGODB_DATABASE` env is what matters; verify against the
+live API before querying. Read-only access for audits: do-server (Atlas
+allowlisted) with a fresh pymongo venv at `/tmp/mkbvenv` and a clean cwd
+(`/root/mkbwork`) — `/tmp` has a stray `inspect.py`/`pymongo` that shadows
+imports if you run scripts from there.
+
 ## `to_doc()` must use `exclude_none=True` — sparse-unique indexes and null slots
 
 `_crud.py`'s `to_doc()` helper converts a Pydantic model to a MongoDB document.
