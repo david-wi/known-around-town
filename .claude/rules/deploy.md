@@ -55,9 +55,14 @@ succeed when they actually did nothing.
 
 ## Admin key for production
 
-The admin key (for `/admin/login`) is in `/opt/known-around-town/.env` on the
-production server under `ADMIN_COOKIE_KEY`. Fetch it with:
-  `ssh -p 2222 root@152.42.152.243 "grep ADMIN_COOKIE_KEY /opt/known-around-town/.env"`
+The admin key (for `/admin/login` and the `X-API-Key` header on admin API
+routes) is in `/opt/known-around-town/.env` on the production server under
+**`ADMIN_API_KEY`** (this is the env var the app's config actually reads —
+`config.Settings.admin_api_key`). Fetch it with:
+  `ssh -p 2222 root@152.42.152.243 "grep '^ADMIN_API_KEY=' /opt/known-around-town/.env"`
+
+  (An earlier version of this doc referenced `ADMIN_COOKIE_KEY`; that name is
+  not what the app reads — use `ADMIN_API_KEY`.)
 
 ## Visual verification with Playwright
 
