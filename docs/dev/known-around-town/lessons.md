@@ -965,3 +965,63 @@ does — and kept it OFF by default.
   flag that nothing reads yet. The preview route renders HTML and sends nothing.
 - **Founder-owned copy** (subject + headlines) lives in clearly-labelled constants
   at the top of `monthly_email.py` so David can tweak the pitch without hunting.
+
+## Shopper-action click tracking via server-side redirect routes (PR #387, 2026-06-20)
+
+KAT-038 added per-listing counters for the three highest-intent shopper taps —
+tap-to-call, tap-for-directions, website click — alongside the existing
+`page_view_count`. They're lifetime counters on the business doc, `$inc`-ed in a
+background task with the same `_BOT_UA_FRAGMENTS` filter page views use.
+
+- **Tracking is server-side, not JavaScript.** The listing's phone/directions/
+  website links point at lightweight redirect routes `GET /b/{slug}/go/{call|
+  directions|website}` (in `routes/public/pages.py`). Each route resolves the
+  business by tenant+slug, bot-filters, `$inc`s the matching counter in a
+  background task (no added latency on the tap), then **302**s to the real
+  `tel:` / Google Maps / website target. Works with JS off and can't be missed.
+  Returns **404** when the salon has no target for that action (no phone/website/
+  address) — never count a tap that reaches nowhere. An `_ACTION_COUNTER_FIELDS`
+  dict maps the URL action segment to the DB field so an unknown action can't
+  `$inc` an arbitrary field (it 404s before any DB hit).
+- **Use 302, NOT 301.** A 301 is cached by the browser, so the next tap would
+  skip the server and never be counted. 302 keeps every tap flowing through.
+- **`directions_url` in `business.html` is now only a render guard.** The link
+  `href` is `/b/{slug}/go/directions`; the raw Maps URL is still computed
+  (`_directions_url_for_business`, shared by the page and the redirect route) and
+  passed to the template so the link only renders when a real destination exists,
+  and for structured-data/no-JS fallback. JSON-LD keeps the RAW phone/url.
+- **Website redirects force `https://`.** A stored website without a scheme
+  (`example.com`) would make the 302 Location browser-relative and dead-end
+  against our own domain; a non-http scheme (`javascript:`) must never become the
+  target. `_action_target_url` passes http(s) through, else prepends `https://`
+  and strips any other scheme prefix.
+
+### Testing a `tel:` redirect: httpx (TestClient) can't parse the Location
+
+`fastapi.testclient.TestClient` wraps **httpx**, which eagerly URL-parses every
+`Location` header to build the Response — and **rejects a `tel:` value as an
+invalid URL, raising `httpx.InvalidURL` before you can read it**, even with
+`follow_redirects=False`. `http(s)` redirects (website, directions) test fine
+with `TestClient(app, follow_redirects=False)` and `r.headers["location"]`.
+
+For the `tel:` route, don't fight httpx and don't drive the raw ASGI app by hand
+(the background task runs in Starlette's anyio task group, which conflicts with a
+manually-spun `asyncio.run` loop and the mongomock client's loop — you get a
+TaskGroup exception). Instead:
+1. Assert the **exact `tel:` target string** directly on the resolver
+   (`_action_target_url("call", {"phone": "(305) 555-0142"}) == "tel:3055550142"`)
+   — pure function, no HTTP.
+2. Assert the **route increments the counter** by calling `client.get(...)` inside
+   a `try/except httpx.InvalidURL` (the request fully reached the server and ran
+   the background `$inc` BEFORE httpx choked on the response), then read the count.
+`TestClient` runs background tasks synchronously, so the `$inc` is visible
+immediately after the request. See `tests/test_shopper_actions.py`.
+
+### Monthly email taps mention reuses the snapshot-diff mechanism
+
+`monthly_report.py` already snapshots the lifetime view counter per month and
+diffs to get "views this month". The three tap counters are stored in the SAME
+snapshot row and diffed identically (`_action_delta`), so the dormant monthly
+email can mention non-zero taps ("Of those, N tapped to call ...") with the same
+honest "since you joined" fallback on the first report. The email stays fully
+dormant — no `MONTHLY_REPORT_*_ENABLED` flag was touched.
