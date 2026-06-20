@@ -314,3 +314,187 @@ class TestPreviewStateOverride:
         assert sitemap.text.count("<loc>") == 0
         robots = client.get("/robots.txt?preview_state=gated", headers=hk)
         assert "Disallow: /" in robots.text
+
+
+# ─── _seo_base_url: per-host sitemap/robots base (multi-tenant correctness) ───
+
+
+def _make_request(host: str, scheme: str = "https"):
+    """Build a minimal Starlette Request carrying just a Host header and scheme.
+
+    _seo_base_url only reads request.headers["host"] and request.url.scheme, so a
+    bare ASGI scope is enough to exercise it as a pure function — no TestClient,
+    no DB, no seed needed.
+    """
+    from starlette.requests import Request
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "scheme": scheme,
+        "path": "/sitemap.xml",
+        "query_string": b"",
+        "headers": [(b"host", host.encode("latin-1"))],
+        "server": (host.split(":")[0], 443 if scheme == "https" else 80),
+    }
+    return Request(scope)
+
+
+@pytest.fixture
+def canonical_miami(monkeypatch):
+    """Set CANONICAL_BASE_URL to production miami, like the real deployment.
+
+    get_settings() is @lru_cache, so the cache must be cleared around the env
+    change (same pattern as the admin_key fixture above).
+    """
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("CANONICAL_BASE_URL", "https://miami.knowsbeauty.com")
+    get_settings.cache_clear()
+    yield "https://miami.knowsbeauty.com"
+    get_settings.cache_clear()
+
+
+@pytest.fixture
+def canonical_unset(monkeypatch):
+    """Ensure CANONICAL_BASE_URL is unset (developer shells may export it)."""
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.delenv("CANONICAL_BASE_URL", raising=False)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+class TestSeoBaseUrl:
+    """The multi-tenant SEO base: each city subdomain is its own canonical site,
+    so its sitemap/robots must reference ITS OWN host. The previous code used
+    CANONICAL_BASE_URL (always miami) for every city, so every city's sitemap
+    listed miami URLs — which Google ignores as cross-host, leaving 25 of 26 city
+    sites with no usable sitemap of their own pages.
+
+    These assert the actual return value of the helper (behaviour, not comments),
+    and mirror the four cases in the page-canonical logic so the two stay in sync.
+    """
+
+    def test_production_city_subdomain_self_hosts(self, canonical_miami):
+        """hialeah.knowsbeauty.com (a production city subdomain, NOT miami) with
+        CANONICAL_BASE_URL=https://miami.knowsbeauty.com must return its OWN host
+        — not miami. THIS is the bug: the old `base = canonical_base ...` returned
+        miami here, so hialeah's sitemap listed miami URLs."""
+        from app.routes.public.pages import _seo_base_url
+
+        req = _make_request("hialeah.knowsbeauty.com")
+        assert _seo_base_url(req) == "https://hialeah.knowsbeauty.com"
+
+    def test_production_flagship_self_hosts(self, canonical_miami):
+        """The miami flagship returns miami — unchanged from the old behaviour, so
+        we know the fix did not move the one host that was already correct."""
+        from app.routes.public.pages import _seo_base_url
+
+        req = _make_request("miami.knowsbeauty.com")
+        assert _seo_base_url(req) == "https://miami.knowsbeauty.com"
+
+    def test_production_apex_self_hosts(self, canonical_miami):
+        """The bare apex (knowsbeauty.com, the network landing host) is also a
+        production host and returns itself, https."""
+        from app.routes.public.pages import _seo_base_url
+
+        req = _make_request("knowsbeauty.com")
+        assert _seo_base_url(req) == "https://knowsbeauty.com"
+
+    def test_dev_host_consolidates_to_production_com(self, canonical_miami):
+        """A dev/staging host (e.g. *.ai.devintensive.com) is NOT on the
+        knowsbeauty.com apex, so it consolidates to the production .com base — the
+        dev subdomain must never get its own sitemap host indexed."""
+        from app.routes.public.pages import _seo_base_url
+
+        req = _make_request("knowsbeauty.ai.devintensive.com")
+        assert _seo_base_url(req) == "https://miami.knowsbeauty.com"
+
+    def test_no_canonical_base_falls_back_to_request_host(self, canonical_unset):
+        """With no CANONICAL_BASE_URL set, the base is the request's own
+        scheme://host — every host self-hosts (the test/dev default)."""
+        from app.routes.public.pages import _seo_base_url
+
+        req = _make_request("doral.knowsbeauty.com", scheme="http")
+        assert _seo_base_url(req) == "http://doral.knowsbeauty.com"
+
+    def test_production_upgrades_scheme_to_https(self, canonical_miami):
+        """A production city request that arrives over http still gets an https
+        base (the scheme comes from the canonical base), matching the per-page
+        canonical's http->https upgrade so http/https aren't indexed separately."""
+        from app.routes.public.pages import _seo_base_url
+
+        req = _make_request("doral.knowsbeauty.com", scheme="http")
+        assert _seo_base_url(req) == "https://doral.knowsbeauty.com"
+
+    def test_red_green_old_logic_would_return_miami_for_hialeah(
+        self, canonical_miami
+    ):
+        """Red-green guard: prove the OLD logic (`base = canonical_base if
+        canonical_base else ...`) returned miami for hialeah — the exact bug — and
+        that the new helper does NOT. If someone reverts _seo_base_url to the old
+        one-liner, the first assertion below mirrors that old result and the
+        second (the real fix) fails."""
+        from app.config import get_settings
+        from app.routes.public.pages import _seo_base_url
+
+        old_logic = get_settings().canonical_base_url.rstrip("/")  # the old `base`
+        assert old_logic == "https://miami.knowsbeauty.com"  # what the bug did
+        # The fix must NOT equal that for a non-miami city.
+        req = _make_request("hialeah.knowsbeauty.com")
+        assert _seo_base_url(req) != old_logic
+        assert _seo_base_url(req) == "https://hialeah.knowsbeauty.com"
+
+
+@pytest.fixture
+def canonical_other_city(monkeypatch):
+    """Set CANONICAL_BASE_URL to a DIFFERENT city on the same production apex
+    than the one we request from.
+
+    The test network suffix is knowsbeauty.localhost, and the seeded city is
+    miami. By pointing the canonical base at a sibling city (orlando) on the same
+    apex, a request to miami.knowsbeauty.localhost is a production host that does
+    NOT match the canonical host — reproducing the cross-host bug in the test
+    environment: the OLD code would put orlando URLs in miami's sitemap; the fix
+    must use miami's own host.
+    """
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("CANONICAL_BASE_URL", "https://orlando.knowsbeauty.localhost")
+    get_settings.cache_clear()
+    yield "https://orlando.knowsbeauty.localhost"
+    get_settings.cache_clear()
+
+
+class TestSitemapRobotsUseRequestHost:
+    """End-to-end guard: with a production CANONICAL_BASE_URL pointing at a
+    DIFFERENT city, a sitemap/robots fetched from this city's subdomain must
+    reference THIS subdomain's own host, not the canonical city. This is the
+    user-visible bug, asserted through the real rendered response."""
+
+    def test_sitemap_from_city_host_lists_its_own_host_not_canonical(
+        self, seeded_db, gate_off, canonical_other_city
+    ):
+        # Request the seeded miami city's sitemap while the canonical base points
+        # at a sibling city (orlando). Every <loc> must carry miami's own host.
+        body = _make_client().get("/sitemap.xml", headers=HOST).text
+        assert "<loc>https://miami.knowsbeauty.localhost/" in body
+        # The bug: with the old logic these would all be orlando URLs.
+        assert "orlando.knowsbeauty.localhost" not in body
+
+    def test_robots_from_city_host_points_sitemap_at_its_own_host(
+        self, seeded_db, gate_off, canonical_other_city
+    ):
+        robots = _make_client().get("/robots.txt", headers=HOST).text
+        sitemap_line = next(
+            line for line in robots.splitlines() if line.startswith("Sitemap:")
+        )
+        assert sitemap_line.strip() == (
+            "Sitemap: https://miami.knowsbeauty.localhost/sitemap.xml"
+        )
+        assert "orlando" not in robots
