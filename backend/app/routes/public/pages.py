@@ -2119,6 +2119,51 @@ def _lastmod_str(raw: Any, fallback: str) -> str:
     return fallback
 
 
+def _seo_base_url(request: Request) -> str:
+    """Absolute origin (scheme://host) to use for THIS request's robots.txt and
+    sitemap.xml URLs.
+
+    WHY this exists: every city edition is its own subdomain
+    (miami.knowsbeauty.com, hialeah.knowsbeauty.com, doral.knowsbeauty.com, …)
+    and each is its OWN canonical site — the per-page <link rel="canonical">
+    keeps the request's own subdomain (see _base_context). robots.txt and
+    sitemap.xml MUST agree with that: a city's sitemap has to list ITS OWN host's
+    URLs and its robots.txt has to point at its own sitemap. The previous code
+    used ``CANONICAL_BASE_URL`` (always set to miami in production) as the base
+    for every city, so e.g. hialeah.knowsbeauty.com/sitemap.xml listed
+    miami.knowsbeauty.com URLs. Google ignores cross-host sitemap entries, so 25
+    of 26 city sites effectively had no sitemap of their own pages.
+
+    This mirrors the page-canonical logic in _base_context EXACTLY so the two
+    never drift:
+      * No CANONICAL_BASE_URL set -> self-host at the request's own scheme.
+      * Production host (the request host IS the canonical apex, e.g.
+        knowsbeauty.com, OR ends with "." + apex, e.g. hialeah.knowsbeauty.com)
+        -> keep the request's own host, but use the canonical base's scheme so
+        the URL is https (production always arrives over https).
+      * Dev/staging host (e.g. *.ai.devintensive.com, *.knowsbeauty.localhost)
+        -> consolidate to the production .com base so dev pages don't get their
+        own (wrong) sitemap/robots host.
+    """
+    request_host = request.headers.get("host", "")
+    canonical_base = get_settings().canonical_base_url.rstrip("/")
+    if not canonical_base:
+        scheme = request.url.scheme or "https"
+        return f"{scheme}://{request_host}"
+    parsed = urlparse(canonical_base)
+    # Apex = the last two dot-labels of the canonical netloc, e.g.
+    # "miami.knowsbeauty.com" -> "knowsbeauty.com". This lets every city
+    # subdomain be recognised as a production host.
+    apex = ".".join(parsed.netloc.rsplit(".", 2)[-2:])
+    host_is_production = request_host == apex or request_host.endswith("." + apex)
+    if host_is_production:
+        # Self-host (each city is its own canonical site), https from the
+        # canonical base.
+        return f"{parsed.scheme}://{request_host}"
+    # Dev/staging: consolidate to the production .com base.
+    return canonical_base
+
+
 async def _seo_show_live(request: Request) -> bool:
     """Return True when robots.txt / sitemap.xml should render their LIVE form.
 
@@ -2163,8 +2208,6 @@ async def robots_txt(request: Request) -> HTMLResponse:
     # change.
     if not await _seo_show_live(request):
         return HTMLResponse("User-agent: *\nDisallow: /\n", media_type="text/plain")
-    host = request.headers.get("host", "")
-    scheme = request.url.scheme
     # WHY: disallow the auth and owner-dashboard routes so Google doesn't spend crawl
     # budget on pages that always redirect to login or require authentication. The
     # public-facing content pages (/, /b/*, /c/*, /n/*, /owners, /pricing) remain
@@ -2182,12 +2225,13 @@ async def robots_txt(request: Request) -> HTMLResponse:
             "Disallow: /owners/me",
         ]
     )
-    canonical_base = get_settings().canonical_base_url.rstrip("/")
-    # WHY: use CANONICAL_BASE_URL for the Sitemap: directive so that when both
-    # the custom domain and the dev subdomain serve the site, the sitemap URL in
-    # robots.txt points at the authoritative domain — consistent with the
-    # <link rel="canonical"> tags on every page.
-    sitemap_base = canonical_base if canonical_base else f"{scheme}://{host}"
+    # WHY: the Sitemap: directive must point at THIS host's own sitemap. Each
+    # city subdomain is its own canonical site (its pages self-canonical), so
+    # hialeah.knowsbeauty.com/robots.txt must reference
+    # hialeah.knowsbeauty.com/sitemap.xml — not miami's. _seo_base_url() returns
+    # the right origin (self-host in production, the production .com on dev), and
+    # mirrors the per-page canonical logic so the two never disagree.
+    sitemap_base = _seo_base_url(request)
     return HTMLResponse(
         f"User-agent: *\nAllow: /\n{disallowed}\nSitemap: {sitemap_base}/sitemap.xml\n",
         media_type="text/plain",
@@ -2219,12 +2263,19 @@ async def sitemap(request: Request) -> HTMLResponse:
     tenant = await _require_tenant(request)
     host = request.headers.get("host", "")
     scheme = request.url.scheme
-    canonical_base = get_settings().canonical_base_url.rstrip("/")
-    # WHY: use CANONICAL_BASE_URL when set so all sitemap <loc> entries point at
-    # the authoritative domain. Without this, a sitemap fetched from the dev
-    # subdomain would list dev-subdomain URLs, causing Google to index the wrong
-    # set of addresses even after the .com domain is the canonical one.
-    base = canonical_base if canonical_base else f"{scheme}://{host}"
+    # WHY: every <loc> for a city's sitemap must point at THAT city's own host.
+    # Each city subdomain is its own canonical site (its pages self-canonical), so
+    # hialeah.knowsbeauty.com/sitemap.xml must list hialeah URLs — not miami's.
+    # Using CANONICAL_BASE_URL (always miami in production) here was the bug: it
+    # made every city's sitemap list miami URLs, which Google ignores as
+    # cross-host, leaving 25 of 26 city sites with no usable sitemap. _seo_base_url
+    # self-hosts in production and consolidates dev hosts to the production .com,
+    # mirroring the per-page canonical logic so they never drift.
+    # NOTE: the apex/network branch below intentionally does NOT use `base` — it
+    # builds each city's home URL from the request host's network suffix, because
+    # the apex landing page links out to many city subdomains, each a different
+    # host. That branch keeps using `scheme`/`host` directly.
+    base = _seo_base_url(request)
 
     # WHY: today's date is used for pages that don't carry per-record
     # timestamps (static pages, category pages, neighborhood pages). Google
