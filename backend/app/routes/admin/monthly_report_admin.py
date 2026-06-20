@@ -98,10 +98,17 @@ async def _maybe_caption(business: Dict[str, Any], report: MonthlyReport) -> Opt
         if nb:
             neighborhood_name = nb.get("name")
 
+    # WHY: include the state + regional market so the monthly-email caption
+    # is geographically correct for ambiguously-named cities (e.g. Hollywood,
+    # FL reads as South Florida, not Hollywood/Los Angeles).
+    state, market_label = ai_caption.resolve_location(business, city)
+
     ctx = ai_caption.CaptionContext(
         business_name=business.get("name", ""),
         neighborhood_name=neighborhood_name,
         city_name=(city or {}).get("name"),
+        state=state,
+        market_label=market_label,
         primary_category=primary_category,
         vertical_word=(city or {}).get("listing_word_singular"),
         known_for=business.get("known_for"),

@@ -220,10 +220,17 @@ async def generate_instagram_caption(
     # which case the prompt builder uses "local business".
     vertical_word = (city or {}).get("listing_word_singular")
 
+    # WHY: pass the state + regional market so an ambiguously-named city
+    # (e.g. "Hollywood", which the model otherwise reads as Hollywood, CA)
+    # is pinned to South Florida and the caption/hashtags come out right.
+    state, market_label = ai_caption.resolve_location(business, city)
+
     ctx = ai_caption.CaptionContext(
         business_name=business.get("name", ""),
         neighborhood_name=neighborhood_name,
         city_name=(city or {}).get("name"),
+        state=state,
+        market_label=market_label,
         primary_category=primary_category_slug,
         vertical_word=vertical_word,
         known_for=business.get("known_for"),
@@ -321,10 +328,16 @@ async def generate_ad_copy(
     )
     vertical_word = (city or {}).get("listing_word_singular")
 
+    # WHY: same geographic disambiguation as the caption endpoint — ad copy
+    # shares the location context so it never drifts to the wrong metro.
+    state, market_label = ai_caption.resolve_location(business, city)
+
     ctx = ai_caption.CaptionContext(
         business_name=business.get("name", ""),
         neighborhood_name=neighborhood_name,
         city_name=(city or {}).get("name"),
+        state=state,
+        market_label=market_label,
         primary_category=primary_category_slug,
         vertical_word=vertical_word,
         known_for=business.get("known_for"),
