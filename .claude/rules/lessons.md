@@ -228,3 +228,15 @@ The support email `hello@knowsbeauty.com` was hardcoded in ~15 places across tem
 4. Admin settings page field saves to DB and updates the Jinja2 global in-process immediately
 
 For any future site-wide text that might need to change: use this same DB-over-env-var-over-default pattern from `site_settings.py`.
+
+## Dead Tailwind class: `underline-offset-2` is NOT in compiled reference.css (2026-06-20)
+
+The compiled `backend/app/static/css/reference.css` only ships
+`underline-offset-4` and `underline-offset-[6px]` — **`underline-offset-2` is
+not generated**, so any element using it gets no underline-offset at all (the
+link still underlines, just without the small gap). Pre-existing references to
+the dead class remain in `pricing.html`, `walkthrough.html`, and `owner_me.html`
+(cosmetic only — links still render as underlined links). When touching any of
+those, switch to `underline-offset-4`. This is the same "class must be in the
+compiled CSS or it silently no-ops" gotcha already recorded for the locked
+AI-tool overlay opacities (PR #373). New code added in PR #382 uses `-4`.
