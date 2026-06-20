@@ -162,6 +162,192 @@ def test_business_detail_layers_placeholder_behind_photo(client):
     assert PLACEHOLDER_URL in r.text
 
 
+# ── Home page (CSS background fallback across many photo surfaces) ────────────
+
+def _dual_layer_divs(html: str) -> list[str]:
+    """Return the opening tags of every div whose background-image stacks a real
+    photo over the branded placeholder — i.e. uses the two-layer fallback."""
+    return [
+        tag
+        for tag in re.findall(r"<div[^>]*background-image[^>]*>", html)
+        if PLACEHOLDER_URL in tag
+    ]
+
+
+def test_home_page_layers_placeholder_behind_photos(client):
+    """The home page paints salon/neighborhood photos as CSS backgrounds, which
+    can't use an <img> onerror handler. Each must layer the branded placeholder
+    beneath the photo so a 404 photo degrades to the brand tile, not a grey/dark
+    box. The hero is the first thing a shopper sees, so this matters most here."""
+    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.status_code
+    # The placeholder must appear at least once (the hero always renders when the
+    # city has a hero photo; the Miami seed provides one).
+    assert PLACEHOLDER_URL in r.text
+    # And wherever it appears it must be the SECOND background layer (the real
+    # photo paints on top, the placeholder shows through only on a 404). Verify
+    # the dual-layer shape on at least one div: a real photo URL, then the
+    # placeholder, with per-layer cover/contain sizing.
+    dual = _dual_layer_divs(r.text)
+    assert dual, "expected at least one photo div layering the placeholder beneath it"
+    sample = dual[0]
+    assert "background-size: cover, contain" in sample, sample
+    # The placeholder is the lower (second) layer — it appears AFTER the first
+    # url() in the background-image stack, never as the sole/first layer.
+    bg = re.search(r"background-image:\s*url\([^)]*\),\s*url\([^)]*placeholder-salon", sample)
+    assert bg, f"placeholder must be the second background layer, got: {sample}"
+
+
+def _render_page(template_name: str, **ctx) -> str:
+    """Render a public template through the APP's real Jinja environment. Used
+    for pages (guide, neighborhood) the default seed doesn't populate, so we can
+    still assert the fallback markup without depending on seeded content.
+
+    WHY the app env (not a bare jinja2.Environment): these templates extend
+    base.html and use app-registered filters/globals (e.g. the `markdown`
+    filter), so a bare environment fails to even compile them. Importing
+    app.main runs attach_templates(), which registers every filter and global —
+    giving a faithful render of what the live route would produce."""
+    from app.main import templates as app_templates
+
+    tpl = app_templates.env.get_template(template_name)
+    return tpl.render(**ctx)
+
+
+# Minimal context shared by guide/neighborhood direct renders. base.html is the
+# parent layout; these keys are the ones the hero blocks touch. Anything the
+# template references but we don't care about is left falsy/empty so the
+# {% if %} guards simply skip it.
+def _page_ctx(**overrides) -> dict:
+    from datetime import datetime, timezone
+
+    ctx = {
+        # base.html/footer reference `now` for the copyright year; the live
+        # route supplies it via _base_context. A fixed value is fine here.
+        "now": datetime(2026, 6, 19, tzinfo=timezone.utc),
+        "footer_legal": None,
+        "city": {"name": "Miami"},
+        "network": {"name": "Miami Knows Beauty"},
+        "theme": {
+            "ring_accent": "ring-rose-400",
+            "accent_text": "text-rose-600",
+            "accent_text_light": "text-rose-200",
+            "accent_text_lighter": "text-rose-100",
+            "accent_text_lighter_full": "text-rose-100",
+            "accent_text_full": "text-rose-600",
+            "accent_border_subtle": "border-rose-300/40",
+        },
+        "vertical_word": "Beauty",
+        "header_variant": "sticky",
+        "canonical_url": None,
+        "og_image": None,
+        "item_list_jsonld": None,
+        "request": None,
+        "seo_title": "Miami Knows Beauty",
+        "meta_description": "",
+        "businesses": [],
+        "featured_businesses_in_guide": [],
+    }
+    ctx.update(overrides)
+    return ctx
+
+
+def test_guide_page_layers_placeholder_behind_hero_when_present():
+    """The editorial guide hero is a CSS background photo. When a hero image is
+    present it must layer the branded placeholder beneath it, so a broken hero
+    degrades to the brand tile instead of a flat dark gap."""
+    guide = {
+        "title": "Best Balayage in Wynwood",
+        "subtitle": "A guide",
+        "seo_title": "Best Balayage in Wynwood",
+        "meta_description": "",
+        "author": "Editors",
+        "published_at": None,
+        "hero_image_url": "https://example.com/guide-hero.jpg",
+        "body_html": "<p>Body</p>",
+        "featured_business_ids": [],
+        "business_slugs": [],
+    }
+    html = _render_page("editorial_guide.html", **_page_ctx(guide=guide))
+    assert PLACEHOLDER_URL in html
+    # Placeholder is the second layer, beneath the real hero photo.
+    assert re.search(
+        r"background-image:\s*url\([^)]*guide-hero[^)]*\),\s*url\([^)]*placeholder-salon",
+        html,
+    ), html[html.find("background-image"): html.find("background-image") + 300]
+
+
+def test_guide_page_adds_no_placeholder_box_when_hero_absent():
+    """When a guide has NO hero image the design intends a plain dark hero — we
+    must NOT inject an empty placeholder box. The placeholder URL is only set as
+    a variable; it must not appear in any rendered background-image."""
+    guide = {
+        "title": "No Hero Guide",
+        "subtitle": "A guide",
+        "seo_title": "No Hero Guide",
+        "meta_description": "",
+        "author": "Editors",
+        "published_at": None,
+        "hero_image_url": None,
+        "body_html": "<p>Body</p>",
+        "featured_business_ids": [],
+        "business_slugs": [],
+    }
+    html = _render_page("editorial_guide.html", **_page_ctx(guide=guide))
+    # The placeholder is only ever painted as the lower layer BENEATH a present
+    # photo. With no hero photo, the {% if guide.hero_image_url %} guard skips
+    # the whole div, so the placeholder URL must not appear anywhere in the
+    # rendered page — proving we did NOT inject an empty placeholder box.
+    # (placeholder_url is set as a variable but never emitted on its own.)
+    assert PLACEHOLDER_URL not in html, (
+        "no-hero guide must not render an empty placeholder box; found the "
+        "placeholder URL in: "
+        + (html[html.find(PLACEHOLDER_URL) - 80 : html.find(PLACEHOLDER_URL) + 80])
+    )
+
+
+def test_neighborhood_page_layers_placeholder_behind_hero_when_present():
+    """The neighborhood hero is a CSS background photo; when present it must
+    layer the placeholder beneath it for graceful 404 degradation."""
+    neighborhood = {
+        "name": "Wynwood",
+        "slug": "wynwood",
+        "photo_url": "https://example.com/wynwood.jpg",
+        "description": "",
+        "vibe": "",
+        "listed_count": 0,
+    }
+    html = _render_page(
+        "neighborhood.html", **_page_ctx(neighborhood=neighborhood)
+    )
+    assert PLACEHOLDER_URL in html
+    assert re.search(
+        r"background-image:\s*url\([^)]*wynwood[^)]*\),\s*url\([^)]*placeholder-salon",
+        html,
+    ), html[html.find("background-image"): html.find("background-image") + 300]
+
+
+def test_neighborhood_page_adds_no_placeholder_box_when_photo_absent():
+    """A neighborhood with no photo keeps its intended plain dark hero — we must
+    NOT inject an empty placeholder box, same contract as the guide page."""
+    neighborhood = {
+        "name": "Edgewater",
+        "slug": "edgewater",
+        "photo_url": None,
+        "description": "",
+        "vibe": "",
+        "listed_count": 0,
+    }
+    html = _render_page(
+        "neighborhood.html", **_page_ctx(neighborhood=neighborhood)
+    )
+    assert PLACEHOLDER_URL not in html, (
+        "no-photo neighborhood must not render an empty placeholder box; found "
+        "the placeholder URL in: "
+        + (html[html.find(PLACEHOLDER_URL) - 80 : html.find(PLACEHOLDER_URL) + 80])
+    )
+
+
 @pytest.fixture
 def client(seeded_db):
     from app.main import app
