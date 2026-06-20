@@ -49,6 +49,66 @@ async def _require_tenant(request: Request) -> TenantContext:
     return tenant
 
 
+# WHY: ~367 imported salon records (256 of them live) store their address as a
+# single line of text — e.g. "2001 N Federal Hwy, Suite 208, Pompano Beach, FL
+# 33062" — instead of the structured {street, city, state, postal_code} object
+# the Business.address model defines. The business detail route and JSON-LD both
+# expect a dict, so a plain string crashed the page with
+# `AttributeError: 'str' object has no attribute 'get'` (HTTP 500). Normalising
+# here makes the page tolerant: a dict is returned as-is, and a single-line
+# string is wrapped into the dict shape so the address still renders, the
+# directions link still works, and the page never crashes. This is a
+# display-time fix only — it does NOT rewrite the stored data.
+def _normalize_address(raw: Any) -> Dict[str, Any]:
+    """Return an address dict regardless of how the record stored it.
+
+    Accepts the structured dict (returned unchanged), a single-line string
+    (parsed best-effort into street/city/state/postal_code), or anything else
+    (returned as an empty dict). Never raises.
+    """
+    if isinstance(raw, dict):
+        return raw
+    if not isinstance(raw, str) or not raw.strip():
+        return {}
+
+    text = raw.strip()
+    # WHY: the whole original line is kept as `street` so the Address card —
+    # which renders only `address.street` — shows the complete human-readable
+    # address, matching the existing "full address in one string" assumption
+    # noted in business.html. City/state/postal are additionally pulled out so
+    # the Google Maps query and JSON-LD get the more precise fields when the
+    # line follows the common US "..., City, ST 33444" / "..., City, ST" shape.
+    result: Dict[str, Any] = {"street": text}
+    parts = [p.strip() for p in text.split(",") if p.strip()]
+    if len(parts) >= 2:
+        # Last comma-separated chunk is usually "ST 33444", "ST", or "FL 33062-1234".
+        tail = parts[-1].split()
+        state: Optional[str] = None
+        postal: Optional[str] = None
+        if tail:
+            # A 2-letter US state code, optionally followed by a ZIP / ZIP+4.
+            if len(tail[0]) == 2 and tail[0].isalpha():
+                state = tail[0].upper()
+                if len(tail) >= 2 and tail[1][:5].isdigit():
+                    postal = tail[1]
+            elif tail[0][:5].isdigit():
+                # Bare ZIP with no state token.
+                postal = tail[0]
+        if state:
+            result["state"] = state
+        if postal:
+            result["postal_code"] = postal
+        # WHY: when the final chunk was a recognised state/zip, the city is the
+        # chunk before it ("..., Pompano Beach, FL 33062" -> "Pompano Beach").
+        # When the final chunk was NOT a state/zip (e.g. "..., Miami Beach"), that
+        # final chunk is itself the city — so don't grab the wrong chunk.
+        if state or postal:
+            result["city"] = parts[-2]
+        else:
+            result["city"] = parts[-1]
+    return result
+
+
 async def _build_copy(tenant: TenantContext) -> CopyResolver:
     network = tenant.network
     city = tenant.city
@@ -1106,13 +1166,26 @@ async def business_page(
     # "1234 SW 8th St" matches dozens of cities; the full address pins it to
     # the right neighborhood. filter(None, ...) drops any missing fields so
     # businesses without a full address still get a useful (if shorter) query.
-    addr = business.get("address") or {}
-    _map_query = ", ".join(filter(None, [
-        addr.get("street"),
-        addr.get("city"),
-        addr.get("state"),
-        addr.get("postal_code"),
-    ])) or business.get("name", "")
+    # WHY: normalise the address into a dict in place so BOTH this Maps-query
+    # code and the template (Address card + JSON-LD, which read address.street /
+    # .city / .state / .postal_code) tolerate records whose address was stored
+    # as a single line of text rather than a structured object. See
+    # _normalize_address. Reassigning on `business` (the same dict passed to the
+    # template below) means the template renders the address instead of a blank.
+    addr = _normalize_address(business.get("address"))
+    business["address"] = addr
+    # WHY: build the Maps query from street + city/state/zip, but skip any field
+    # whose text is already inside `street`. For a normalised single-line
+    # address the whole line lives in `street` and the parsed city/state/postal
+    # are substrings of it — appending them again would just duplicate text in
+    # the query. For a structured dict the fields are distinct, so all are kept.
+    _street = addr.get("street") or ""
+    _map_parts = [_street]
+    for _field in ("city", "state", "postal_code"):
+        _val = addr.get(_field)
+        if _val and _val not in _street:
+            _map_parts.append(_val)
+    _map_query = ", ".join(filter(None, _map_parts)) or business.get("name", "")
     directions_url = (
         f"https://maps.google.com/?q={quote_plus(_map_query)}"
         if _map_query
