@@ -1,5 +1,48 @@
 # known-around-town — Lessons Learned
 
+## MKB-referred view tracking (2026-06-20, PR #389, KAT-039)
+
+We now track which page views Miami Knows Beauty itself drove, not just that
+views happened. The strategic point: a salon's free Google Business Profile
+already shows "how people found you", so our "who found you" numbers are
+churn-inducing redundancy UNLESS they prove a distinction Google can't — that
+the visitor came from one of OUR pages (a guide, on-site search, a category /
+neighborhood page, or a sister listing). Like the tap counters, this can't be
+backfilled: capture the referrer at landing time or lose it forever.
+
+**How "from within MKB" is decided:** `_is_mkb_referred(referer, host)` in
+`pages.py` — a view is MKB-driven when the `Referer` header's host equals the
+request's own host. On this network every internal page for a city edition is
+served from that one host, so same-host == internal click. No referer (typed
+URL / bookmark) or an external host (Google, social, the salon's own site)
+counts toward the total only. The new `mkb_referred_view_count` is bumped in
+the SAME `$inc` as `page_view_count`, in the same bot-filtered background task —
+the flag is computed in-request (headers aren't available in the deferred task)
+and passed into `_increment_business_view(business_id, mkb_referred)`.
+
+**Badge caveat (deliberate under-count):** the "As Featured on Miami Knows
+Beauty" website badge lives on the salon's OWN external site, so its clicks
+refer from the salon's domain — an external host — and land in the total, not
+the MKB number. The badge link carries our listing URL as its destination but
+the *referer* is the salon's site. Catching badge clicks would need a marker on
+the link (e.g. `?ref=mkb-badge`); deferred as a separate change. Under-counting
+our own credit is the safe direction.
+
+**It rides the existing snapshot machinery:** adding `mkb_referred_view_count`
+to the `lifetime_actions` dict in `compute_report` means the monthly-report
+snapshot/diff treats it exactly like the tap counters — one place, no new
+plumbing. The dormant monthly email gains a "Miami Knows Beauty sent you N of
+those visitors" line, shown only when N>0. Email stays dormant: no flag touched.
+
+**Live-verifying a counter behind the preview gate:** the public business page
+`/b/{slug}` is behind the preview gate, but the gate lets a valid `X-API-Key`
+header through (admin-templates rule). So a real production view can be fired
+with `curl -H "X-API-Key: $MKB_ADMIN_API_KEY" -H "Referer: ..." https://miami.knowsbeauty.com/b/{slug}`,
+then the counter read back read-only from `who_knows_local` on do-server
+(pymongo venv in `$HOME`, NOT `/tmp` — a stray `/tmp/inspect.py` shadows
+stdlib; pass `MONGODB_ATLAS_URL` via stdin). Verified internal referer moves
+both counters and an external (google.com) referer moves only the total.
+
 ## Editorial-guide quality audit (2026-06-20) — city_id type corruption + cross-network filing
 
 A full quality read of all **156 live editorial guides** (not ~106) surfaced
