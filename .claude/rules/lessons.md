@@ -1,4 +1,27 @@
 
+## Branded photo-fallback coverage + testing full public pages (2026-06-19, PR #364)
+
+When a salon/neighborhood photo fails to load (many are Unsplash stock URLs that
+404), the page must show the branded placeholder tile, not a grey/dark gap. Two
+techniques, depending on how the photo is painted:
+
+- **`<img>` tags** → add `onerror="this.onerror=null;this.src='/assets/placeholder-salon.svg';this.style.objectFit='contain';"`. Used in `partials/business_card.html`.
+- **CSS `background-image` divs** (can't use onerror) → layer the placeholder as a
+  SECOND background beneath the photo: `style='background-image: url("PHOTO"), url("/assets/placeholder-salon.svg"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'`. The first layer (photo) paints on top; the placeholder shows through only on a 404. **Remove the `bg-cover` utility class** when you do this — it forces BOTH layers to cover and crops the brand mark; sizing is set per-layer in the inline style instead.
+
+Coverage map (which public templates have the CSS-background fallback):
+- `business.html` hero + thumbnails (#356), `business_card.html` (#356)
+- `home.html` (hero, neighborhood grid, Editor's Pick cards, spotlight bg + thumbs, mini-list thumbs), `editorial_guide.html` hero, `neighborhood.html` hero (#364)
+- **Keep the existing `{% if photo %}` guards** — only layer beneath a PRESENT photo; never add an empty placeholder box where the design intends a plain dark hero or a themed gradient (e.g. the `home.html` nav-neighborhood `{% else %}` gradient).
+- Still uncovered (follow-up): `network_landing.html` city hero uses an `<img>` with no onerror fallback; `business.html:581` map-preview has a bare background but degrades to a branded gradient (low priority).
+
+**Testing full public pages that extend `base.html`:** a bare `jinja2.Environment`
+can't even compile them — they use app-registered filters (`markdown`) and globals.
+Render through the app's real env instead: `from app.main import templates; templates.env.get_template(name).render(**ctx)`. The footer also needs a `now`
+datetime in the context. See `_render_page`/`_page_ctx` in `tests/test_image_fallback.py`.
+This lets you assert fallback markup on pages the default seed doesn't populate
+(guides, neighborhoods) without seeding them.
+
 ## Post-payment confirmation banner (2026-06-13)
 
 The confirmation banner (`id="subscribed-banner"`), URL-param stripping, click-to-dismiss, and JS toast are all already implemented in `owner_me.html`. The two gaps were: (1) the banner used generic green (`bg-emerald-700`) instead of the amber theme used everywhere else for "Featured" branding, and (2) there was no auto-dismiss timer — the banner stayed until manually clicked.
