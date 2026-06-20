@@ -39,6 +39,16 @@ def attach_templates(t: Jinja2Templates) -> None:
     t.env.filters["humantime"] = lambda when: (
         when.strftime("%b %-d, %Y") if isinstance(when, datetime) else str(when or "")
     )
+    # WHY: schema.org datePublished needs an ISO-8601 string. Some editorial
+    # guides were imported with published_at stored as a string ("2026-06-12T06:00:00Z")
+    # rather than a datetime, so calling .isoformat() on it in the template raised
+    # AttributeError and 500'd the whole guide page (23 Miami guides were down).
+    # This filter mirrors humantime: a real datetime is normalised via isoformat(),
+    # a string is passed through as-is (it is already ISO from the import), and
+    # anything empty becomes "" so the {% if %} guard above still controls output.
+    t.env.filters["iso_datetime"] = lambda when: (
+        when.isoformat() if isinstance(when, datetime) else str(when or "")
+    )
 
 
 async def _require_tenant(request: Request) -> TenantContext:
