@@ -62,11 +62,15 @@ async def _insert_business(
     return biz_id
 
 
-def _render_dashboard(seeded_db, *, photos: list | None = None) -> str:
+def _render_dashboard(
+    seeded_db, *, photos: list | None = None, subscribed: bool = False
+) -> str:
     email = "owner-ux@example.com"
     import asyncio
 
-    asyncio.run(_insert_business(seeded_db, email=email, photos=photos))
+    asyncio.run(
+        _insert_business(seeded_db, email=email, photos=photos, subscribed=subscribed)
+    )
     client = _make_client()
     # WHY: the test tenant resolves from the seeded local hostname, the same
     # one the smoke tests use for Miami Beauty.
@@ -149,3 +153,85 @@ class TestPerformanceEmptyState:
             tag_end = html.index(">", idx)
             tag = html[idx:tag_end]
             assert "hidden" in tag, f"{note_id} should start hidden"
+
+
+# ─── Locked AI-tool upsell overlay must be opaque (free-tier owners) ─────────
+
+
+def _reference_css() -> str:
+    """Read the compiled stylesheet the dashboard actually links to.
+
+    WHY: the site ships a single pre-compiled `reference.css` rather than a
+    live Tailwind build, so a utility class is only honoured if it was baked
+    into that file. A class typed in the template but missing from the CSS
+    renders as NOTHING — which is exactly the bug this test guards against.
+    """
+    import os
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    css_path = os.path.join(
+        here, "..", "app", "static", "css", "reference.css"
+    )
+    with open(css_path, "r", encoding="utf-8") as fh:
+        return fh.read()
+
+
+def _css_has_class(css: str, class_name: str) -> bool:
+    """True if `class_name` has a real rule in the compiled stylesheet.
+
+    Tailwind escapes the `/` in opacity classes (`bg-white/95` -> `bg-white\\/95`)
+    and the `[` `]` in arbitrary values, so we check for the escaped selector.
+    """
+    escaped = class_name.replace("/", r"\/").replace("[", r"\[").replace("]", r"\]")
+    return f".{escaped}" in css
+
+
+class TestLockedAiUpsellOverlay:
+    """The free-tier dashboard shows the caption + ad-copy tools behind a
+    'Featured listing required' overlay. The overlay MUST fully cover the
+    disabled preview textarea behind it, or the upsell message collides with
+    the textarea placeholder and reads as broken — at the worst possible moment,
+    when we're asking the owner to pay $29/month.
+
+    The original overlay used `bg-white/70` and `backdrop-blur-[1px]`, neither
+    of which exists in the compiled reference.css, so it rendered transparent.
+    """
+
+    def test_free_tier_shows_locked_overlays(self, seeded_db):
+        html = _render_dashboard(seeded_db, photos=[], subscribed=False)
+        # Both AI tools render their locked upgrade prompt, not the live tool.
+        assert 'id="caption-upgrade-btn"' in html
+        assert 'id="adcopy-upgrade-btn"' in html
+        # The live generate controls must NOT be present for a free owner.
+        assert 'id="caption-generate"' not in html
+        assert 'id="adcopy-generate"' not in html
+
+    def test_overlay_background_classes_are_css_backed(self, seeded_db):
+        """Every utility class on the locked overlay must exist in the compiled
+        stylesheet — otherwise the overlay is invisible and the bug returns."""
+        html = _render_dashboard(seeded_db, photos=[], subscribed=False)
+        css = _reference_css()
+        # The opaque-background + blur recipe the fix uses.
+        for cls in ("bg-white/95", "backdrop-blur-sm"):
+            assert cls in html, f"locked overlay should use {cls}"
+            assert _css_has_class(css, cls), (
+                f"{cls} is used on the locked overlay but has no rule in "
+                f"reference.css — it would render as nothing"
+            )
+
+    def test_overlay_does_not_use_uncompiled_classes(self, seeded_db):
+        """Guard against re-introducing the transparent-overlay classes.
+
+        `bg-white/70` and `backdrop-blur-[1px]` are not in reference.css, so
+        using them makes the overlay see-through. Fail if they come back."""
+        html = _render_dashboard(seeded_db, photos=[], subscribed=False)
+        css = _reference_css()
+        for cls in ("bg-white/70", "backdrop-blur-[1px]"):
+            assert not _css_has_class(css, cls), (
+                f"{cls} unexpectedly appeared in reference.css — update this "
+                f"test if it was deliberately added"
+            )
+            assert cls not in html, (
+                f"{cls} is back on the locked overlay; it has no compiled CSS "
+                f"rule so the overlay would render transparent again"
+            )
