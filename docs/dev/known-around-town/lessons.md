@@ -602,9 +602,21 @@ a photo is missing or fails to load.
   same family as the admin-templates Tailwind-JIT rule: runtime/uncompiled classes are
   absent from the shipped CSS, so use inline styles or known-present classes.
 
-Tests: `backend/tests/test_image_fallback.py`. The `test_template_js_syntax.py` esprima
-guard only scans `<script>` block bodies, so an `onerror=` HTML attribute is not checked
-by it — still run `node --check` on the handler manually.
+- **Network landing page** (`network_landing.html`, the platform-root page listing live
+  cities — rendered at the bare network host like `knowsbeauty.ai.devintensive.com`, no
+  city subdomain) is the one surface that does NOT use the placeholder SVG. Its no-photo
+  case already shows the brand color GRADIENT (`bg-gradient-to-br {{ theme.category_banner_gradient }}`),
+  so a broken city hero photo must degrade to that SAME gradient, not the SVG. The fix
+  (PR #366): put the gradient on the `<img>`'s container div so it sits beneath the photo,
+  and add `onerror="this.onerror=null;this.style.display='none';"` so a failed photo hides
+  itself and reveals the gradient. (`this.onerror=null` FIRST is the loop guard, same as the
+  card pattern.) Pick the fallback that matches the surface's existing no-photo design:
+  cards/detail/home/guide/neighborhood → placeholder SVG; this page → gradient.
+
+Tests: `backend/tests/test_image_fallback.py` (now also covers the network-landing
+gradient fallback). The `test_template_js_syntax.py` esprima guard only scans `<script>`
+block bodies, so an `onerror=` HTML attribute is not checked by it — still run
+`node --check` on the handler manually.
 
 ## reference.css is a STATIC precompiled file — many Tailwind utilities are absent (2026-06-19)
 
