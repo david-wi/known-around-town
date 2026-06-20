@@ -33,6 +33,45 @@ def test_style_note_known_category():
     assert "hair" in note.lower() or "beauty" in note.lower()
 
 
+def test_style_note_covers_real_production_slugs():
+    """Every category slug used by live businesses must get a tailored voice.
+
+    WHY: the per-category style note is keyed on Business.category_slugs.
+    An earlier version of the table used a different naming scheme
+    ("skin", "lashes-brows") and had no entry for "spa"/"waxing", so ~32%
+    of the live catalog silently fell through to DEFAULT_STYLE_NOTE and
+    lost its category-specific voice. This test pins the real production
+    slugs so a future rename can't quietly regress coverage again.
+
+    The list is the set of distinct primary-category slugs observed on
+    live businesses in production as of 2026-06-20. If a NEW vertical is
+    added to the seed data, add its slug both here and in
+    CATEGORY_STYLE_NOTES.
+    """
+    from app.services.ai_caption import (
+        DEFAULT_STYLE_NOTE,
+        style_note_for_category,
+    )
+
+    production_primary_slugs = [
+        "hair", "nails", "spa", "lash-brow", "barber", "waxing", "med-spa",
+        "makeup", "skincare", "primary-care", "massage", "pt-recovery",
+        "dental", "yoga-meditation", "recovery", "aesthetics", "holistic",
+        "iv-hydration", "sleep-stress", "longevity", "retreats", "fertility",
+        "nutrition",
+    ]
+    missing = [
+        slug
+        for slug in production_primary_slugs
+        if style_note_for_category(slug) == DEFAULT_STYLE_NOTE
+    ]
+    assert not missing, (
+        f"These live category slugs fall back to the generic voice "
+        f"instead of a tailored one: {missing}. Add them to "
+        f"CATEGORY_STYLE_NOTES in ai_caption.py."
+    )
+
+
 def test_style_note_unknown_category_falls_back():
     from app.services.ai_caption import (
         DEFAULT_STYLE_NOTE,
