@@ -131,6 +131,121 @@ def test_build_user_prompt_drops_optional_fields_cleanly():
     assert "About:" not in out
 
 
+# --- Geographic disambiguation: the Hollywood, FL / "#LosAngelesHair" bug ---
+
+
+def test_build_user_prompt_disambiguates_hollywood_with_state_and_market():
+    """Regression for the Hollywood-FL → #LosAngelesHair mis-geolocation.
+
+    A salon in Hollywood, FL must reach the model anchored to Florida and
+    the South Florida market — otherwise the model defaults the famous
+    "Hollywood" to Los Angeles, CA and writes LA hashtags. We assert the
+    built prompt carries BOTH anchors and the LA-readable bare "Hollywood"
+    on its own is replaced by "Hollywood, FL".
+    """
+    from app.services.ai_caption import CaptionContext, build_user_prompt
+
+    ctx = CaptionContext(
+        business_name="Studio 1847 Hair",
+        neighborhood_name="Downtown Hollywood",
+        city_name="Hollywood",
+        primary_category="hair",
+        vertical_word="salon",
+        known_for=None,
+        short_description=None,
+        prompt="fall color promo",
+        state="FL",
+        market_label="South Florida (Miami metro area)",
+    )
+    out = build_user_prompt(ctx)
+    # The city must appear state-anchored, not as a bare "Hollywood".
+    assert "Hollywood, FL" in out
+    # The neighborhood is preserved alongside the state-anchored city.
+    assert "Downtown Hollywood, Hollywood, FL" in out
+    # The coarse regional anchor must be present too.
+    assert "Market: South Florida (Miami metro area)" in out
+    # And there must be no Los-Angeles / California leakage in the context.
+    lowered = out.lower()
+    assert "los angeles" not in lowered
+    assert "california" not in lowered
+
+
+def test_build_user_prompt_omits_market_line_when_absent():
+    """Without a market label, no empty 'Market:' line should appear, and a
+    bare city stays bare (graceful degradation for legacy contexts)."""
+    from app.services.ai_caption import CaptionContext, build_user_prompt
+
+    ctx = CaptionContext(
+        business_name="Cafe X",
+        neighborhood_name=None,
+        city_name="Hollywood",
+        primary_category=None,
+        vertical_word=None,
+        known_for=None,
+        short_description=None,
+        prompt="grand opening",
+        state=None,
+        market_label=None,
+    )
+    out = build_user_prompt(ctx)
+    assert "Market:" not in out
+    # No state → city stays as-is (we can't fabricate a state we don't have).
+    assert "Location: Hollywood" in out
+    assert "Hollywood," not in out  # no trailing-comma state fragment
+
+
+def test_resolve_location_prefers_business_address_state():
+    """The salon's own structured address state is the most precise source."""
+    from app.services.ai_caption import resolve_location
+
+    business = {"address": {"state": "FL"}}
+    city = {"state": "NY", "name": "Hollywood"}  # city stub disagrees
+    state, market = resolve_location(business, city)
+    assert state == "FL"
+    assert market == "South Florida (Miami metro area)"
+
+
+def test_resolve_location_accepts_legacy_region_key():
+    """Early seed data used 'region' for the same value as 'state'."""
+    from app.services.ai_caption import resolve_location
+
+    business = {"address": {"region": "FL"}}
+    state, _market = resolve_location(business, city=None)
+    assert state == "FL"
+
+
+def test_resolve_location_falls_back_to_city_state():
+    """When the business has no address state, the city record supplies it."""
+    from app.services.ai_caption import resolve_location
+
+    business = {"address": {}}
+    city = {"state": "FL", "name": "Hollywood"}
+    state, market = resolve_location(business, city)
+    assert state == "FL"
+    assert market == "South Florida (Miami metro area)"
+
+
+def test_resolve_location_defaults_market_when_no_state():
+    """No state anywhere → still return the regional market so there's an
+    anchor, and state is None (we never invent a state)."""
+    from app.services.ai_caption import resolve_location, DEFAULT_MARKET_LABEL
+
+    state, market = resolve_location(business=None, city=None)
+    assert state is None
+    assert market == DEFAULT_MARKET_LABEL
+
+
+def test_resolve_location_uses_city_market_label_when_present():
+    """A real per-city market label wins over the South Florida default."""
+    from app.services.ai_caption import resolve_location
+
+    business = {"address": {"state": "CA"}}
+    city = {"state": "CA", "market_label": "Greater Los Angeles"}
+    state, market = resolve_location(business, city)
+    assert state == "CA"
+    assert market == "Greater Los Angeles"
+
+
 def test_feature_enabled_truthy_values(monkeypatch):
     from app.services.ai_caption import feature_enabled
 
@@ -235,6 +350,8 @@ def test_generate_caption_happy_path_sends_expected_body(monkeypatch):
         known_for="airbrush gradients",
         short_description="Tiny studio doing big nails.",
         prompt="fall hair color promo",
+        state="FL",
+        market_label="South Florida (Miami metro area)",
     )
 
     async def run():
@@ -251,7 +368,9 @@ def test_generate_caption_happy_path_sends_expected_body(monkeypatch):
     assert body["max_tokens_override"] == 300
     assert body["cost_tags"]["product"] == "known-around-town"
     assert "Isla Nail Society" in body["user_content"]
-    assert "Brickell, Miami" in body["user_content"]
+    assert "Brickell, Miami, FL" in body["user_content"]
+    # The regional market anchor must reach the gateway body too.
+    assert "South Florida (Miami metro area)" in body["user_content"]
     assert "fall hair color promo" in body["user_content"]
     # System prompt should reflect the nails category style note
     assert "salon" in body["system_prompt"]
@@ -396,6 +515,46 @@ def test_endpoint_returns_caption_on_success(client, seeded_db, monkeypatch):
     data = resp.json()
     assert data["caption"] == "Hello from the mock 💅\n#mock #test"
     assert data["business_id"] == biz["_id"]
+
+
+def test_endpoint_builds_context_with_state_and_market(client, seeded_db, monkeypatch):
+    """End-to-end wiring: the route must hand the generator a context carrying
+    the state and regional market, so the model can't mis-geolocate the city.
+
+    This is the route-layer half of the Hollywood-FL → #LosAngelesHair fix:
+    the pure-function tests prove the prompt builder uses the anchors; this
+    proves the endpoint actually populates them from the business + city data
+    (a Florida business in the Miami seed). We capture the context the route
+    builds instead of asserting on the returned text, so the test validates
+    behavior (what the route passes to the model), not narration.
+    """
+    from app.services import ai_caption
+
+    biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
+
+    captured = {}
+
+    async def fake_generate(ctx, http_client=None):
+        captured["ctx"] = ctx
+        return "ok 🌴\n#test"
+
+    monkeypatch.setattr(ai_caption, "generate_caption", fake_generate)
+
+    resp = client.post(
+        "/api/v1/marketing-ai/instagram-caption",
+        json={"business_id": biz["_id"], "prompt": "grand opening"},
+        cookies={"kb_owner_session": cookie},
+    )
+    assert resp.status_code == 200, resp.text
+    ctx = captured["ctx"]
+    # The seeded Miami business is in Florida → the route must anchor it.
+    assert ctx.state == "FL"
+    assert ctx.market_label == "South Florida (Miami metro area)"
+    # And the built prompt the model would see is state-anchored, not bare.
+    built = ai_caption.build_user_prompt(ctx)
+    assert ", FL" in built
+    assert "South Florida (Miami metro area)" in built
 
 
 def test_endpoint_401_when_no_session_cookie(client, seeded_db, monkeypatch):
@@ -631,6 +790,8 @@ def test_generate_ad_copy_happy_path_sends_expected_body(monkeypatch):
         known_for="lived-in color",
         short_description="Balayage specialists in Brickell.",
         prompt="fall balayage promo",
+        state="FL",
+        market_label="South Florida (Miami metro area)",
     )
 
     async def run():
@@ -645,6 +806,9 @@ def test_generate_ad_copy_happy_path_sends_expected_body(monkeypatch):
     # Must use the ad-copy-specific cost tag, not the caption one.
     assert body["cost_tags"]["feature"] == "owners.ad_copy"
     assert "Brickell Balayage" in body["user_content"]
+    # The geographic disambiguation must flow into ad copy too (shared builder).
+    assert "Brickell, Miami, FL" in body["user_content"]
+    assert "South Florida (Miami metro area)" in body["user_content"]
     assert "fall balayage promo" in body["user_content"]
     # Token budget must be the ad copy budget (450), not the caption budget (300).
     assert body["max_tokens_override"] == 450

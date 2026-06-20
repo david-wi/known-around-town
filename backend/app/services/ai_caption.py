@@ -101,6 +101,72 @@ class CaptionContext:
     known_for: Optional[str]
     short_description: Optional[str]
     prompt: str
+    # WHY: state and market_label exist purely to DISAMBIGUATE the city name
+    # for the model. Many US city names are shared across states ("Hollywood"
+    # is in both FL and CA; the famous one is CA, so the model defaults an
+    # un-anchored "Hollywood" to Los Angeles and writes "#LosAngelesHair" for
+    # a salon that is actually in Hollywood, FL). Passing the state ("FL") and
+    # a regional market label ("South Florida (Miami metro area)") pins the
+    # location so the caption — and any #City hashtag — comes out right.
+    #
+    # WHY they default to None (and sit last): older call sites and tests build
+    # this context positionally/by-keyword without these fields; defaulting
+    # them keeps those working and degrades gracefully (no location anchor)
+    # rather than crashing. The three production call sites always pass real
+    # values via resolve_location().
+    state: Optional[str] = None
+    market_label: Optional[str] = None
+
+
+# WHY: This network is the South Florida / Miami-metro directory (every seeded
+# city — Hollywood, Aventura, Doral, Boca Raton, etc. — is in that market). We
+# use this as the default regional anchor when a city record has no usable
+# market label of its own, so an ambiguous city name like "Hollywood" reads as
+# the Florida one. It is deliberately a default, NOT hardcoded into the prompt:
+# if a city or business ever carries a real state/market, that real value wins
+# (see resolve_location), and only the *region* defaults here — never a state
+# that contradicts the data.
+DEFAULT_MARKET_LABEL = "South Florida (Miami metro area)"
+
+
+def resolve_location(
+    business: Optional[Dict[str, Any]],
+    city: Optional[Dict[str, Any]],
+) -> tuple[Optional[str], str]:
+    """Resolve the (state, market_label) anchor for a business.
+
+    Returns the two-letter state and a coarse market label to feed the
+    caption/ad-copy prompt so an ambiguously-named city is unambiguous.
+
+    State source order (most specific first):
+      1. The business's own structured address ``state`` (the most precise —
+         it's the salon's literal address). ``region`` is checked too because
+         early seed scripts used that legacy key name for the same value.
+      2. The city record's ``state`` (every seeded city carries this).
+
+    Market label: the city record's own ``market_label`` if it ever has one,
+    otherwise the network-wide South Florida default. We always return a
+    market label (never None) so there's a regional anchor even when no state
+    is present at all.
+    """
+    business = business or {}
+    city = city or {}
+
+    address = business.get("address") or {}
+    # WHY: dual key-name check mirrors the rest of the codebase — the Address
+    # model uses ``state`` but legacy seed data sometimes used ``region``.
+    state = (
+        address.get("state")
+        or address.get("region")
+        or city.get("state")
+    )
+    state = state.strip() if isinstance(state, str) and state.strip() else None
+
+    market_label = city.get("market_label")
+    if not (isinstance(market_label, str) and market_label.strip()):
+        market_label = DEFAULT_MARKET_LABEL
+
+    return state, market_label
 
 
 # WHY: A short style note per category keeps the model on-brand for the
@@ -198,18 +264,37 @@ def build_system_prompt(ctx: CaptionContext) -> str:
 
 
 def build_user_prompt(ctx: CaptionContext) -> str:
-    """Build the user-content body sent to the gateway."""
+    """Build the user-content body sent to the gateway.
+
+    Shared by BOTH the caption and the ad-copy generators, so the
+    geographic disambiguation added here (state + market label) flows
+    into both surfaces from one place.
+    """
     location_bits = []
     if ctx.neighborhood_name:
         location_bits.append(ctx.neighborhood_name)
+    # WHY: attach the state directly to the city ("Hollywood, FL") rather than
+    # as a separate field, because that is the form humans — and the model —
+    # use to disambiguate a shared city name. Without the state the model reads
+    # "Hollywood" as Hollywood, CA (Los Angeles) and writes LA hashtags for a
+    # South Florida salon.
     if ctx.city_name:
-        location_bits.append(ctx.city_name)
+        if ctx.state:
+            location_bits.append(f"{ctx.city_name}, {ctx.state}")
+        else:
+            location_bits.append(ctx.city_name)
     location = ", ".join(location_bits) or "their city"
 
     lines = [
         f"Business: {ctx.business_name}",
         f"Location: {location}",
     ]
+    # WHY: the market label is a second, coarser anchor (the metro/region) that
+    # reinforces the state. Even if a city name is unfamiliar to the model,
+    # "South Florida (Miami metro area)" keeps the caption from drifting to a
+    # similarly-named place in another part of the country.
+    if ctx.market_label:
+        lines.append(f"Market: {ctx.market_label}")
     if ctx.primary_category:
         lines.append(f"Category: {ctx.primary_category}")
     if ctx.known_for:
