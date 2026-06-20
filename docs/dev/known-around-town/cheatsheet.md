@@ -116,3 +116,13 @@ python -m pytest tests/ -k "preview"   # preview gate tests only
 ```
 
 372 tests total. CI runs all on push to main.
+
+## Featured website badge (KAT-037)
+
+- Badge image: `GET /badge/featured.svg` (public — exempt from the preview gate; served by `routes/public/badge.py`).
+- Owner embed UI: the "Add the badge to your website" section on `/owners/me`, gated to Featured owners (`is_subscribed`). Shows a live preview, a copy-paste `<a><img></a>` snippet linking to `{origin}/b/{slug}`, plus a ready-to-post Instagram caption.
+- Verify the badge is public (no token):
+  ```bash
+  curl -sS -o /dev/null -w "%{http_code} %{content_type}\n" https://miami.knowsbeauty.com/badge/featured.svg   # -> 200 image/svg+xml
+  ```
+- Tests: `tests/test_badge.py` (endpoint + surgical gate exemption), `tests/test_owner_dashboard_ux.py::TestWebsiteBadgeEmbed`.

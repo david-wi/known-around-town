@@ -849,3 +849,53 @@ salons (hair, nails, med-spa, barber, brow bar, spa) showed the output is
 genuinely good — specific to each salon, cliché-light, smart local+niche+
 branded hashtags. No prompt rewrite was warranted; the only real gap was
 this category-coverage one.
+
+## "As Featured on Miami Knows Beauty" website badge — embeds must clear the preview gate (2026-06-20, PR #379)
+
+KAT-037 added an embeddable website badge: a Featured salon drops a copy-paste
+`<a><img></a>` snippet on its own site footer; the link points to the salon's
+listing (`{origin}/b/{slug}`) so the salon's visitors reach its directory page,
+and every embed is a backlink to us. The badge image is served at
+`GET /badge/featured.svg` (a dynamic route in `routes/public/badge.py`, NOT a
+static `/assets/` file).
+
+Key gotchas / decisions:
+
+- **The badge image MUST be reachable past the preview gate**, because it is
+  embedded on EXTERNAL salon sites. Without an exemption every embedded badge
+  302s to `/preview-login` (which a salon's visitor can't follow) and renders as
+  a broken image. The fix: add ONLY the `/badge/` prefix to
+  `_BYPASS_PREFIXES` in `middleware/preview_gate.py`. It serves nothing but the
+  static brand-mark SVG, so the exemption leaks no gated directory content.
+  Red-green verified in `test_badge.py` (remove the entry → the bypass test
+  fails; normal pages `/`, `/c/hair` still 302).
+
+- **Dedicated `/badge/` route, not `/assets/`**: `/assets/` already carries the
+  login page's own CSS/JS, so a prefix exemption there is broader than wanted.
+  A dedicated `/badge/` prefix keeps the gate exemption tight and unambiguous.
+  Register the badge router BEFORE the public SSR catch-all in `main.py` (same
+  ordering reason as `media.py`).
+
+- **Absolute listing URL for the embed**: a relative `/b/slug` would resolve
+  against the SALON's domain, not ours. Build the embed link from
+  `CANONICAL_BASE_URL`'s origin (the production `.com`) when set, falling back to
+  the request origin. Computed in the `/owners/me` handler in `pages.py`
+  (`listing_absolute_url`, `badge_image_url`, `badge_embed_code`,
+  `share_caption`), all gated to Featured owners (`is_subscribed`).
+
+- **Badge SVG sizing**: the serif "Miami Knows Beauty" wordmark needs a
+  340-wide viewBox at font-size 20 to clear the rounded right corner. The first
+  cut at 300-wide clipped the final letter — always render the badge (headless
+  Playwright → PNG → Read) and eyeball it; the viewBox math is easy to get
+  wrong. Slugs are `[a-z0-9-]`-only (`_validate_real._slugify`), so the embed
+  code and `<a href>` have no injection surface; Jinja autoescaping in the
+  `<pre>` is belt-and-suspenders.
+
+- **Copy buttons**: reused the dashboard's existing clipboard pattern
+  (navigator.clipboard with an execCommand fallback for http dev) via a small
+  reusable `wireCopier(btnId, sourceId, flashId, errId)` IIFE. `textContent` of
+  the `<pre>`/`<p>` yields the DECODED embed HTML / caption — exactly what the
+  owner pastes.
+
+- **The badge does NOT depend on `MARKETING_AI_ENABLED`** — it's a static asset
+  plus a templated caption, so it works regardless of the AI feature flag.
