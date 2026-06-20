@@ -57,10 +57,19 @@
 {% endblock %}
 
 {% block content %}
+{#- WHY: branded fallback tile for the photo backgrounds throughout this page.
+    CSS background-image can't use an <img> onerror handler, so wherever a real
+    photo is painted we layer this placeholder UNDERNEATH it: if the photo URL
+    404s, the placeholder shows through instead of a flat grey/dark box. Same
+    technique as business.html. Set once here, reused at every photo below.
+    The existing {% if photo %} guards stay — where there is genuinely no photo
+    the design already does something intentional (a themed gradient, or just
+    the dark hero), so we never add an empty placeholder box. #}
+{% set placeholder_url = '/assets/placeholder-salon.svg' %}
 {# ============= HERO ============= #}
 <section class="relative min-h-[92vh] flex items-end overflow-hidden bg-stone-950">
   {% if hero_photo_url %}
-  <div class="absolute inset-0 bg-cover bg-center scale-105" style='background-image: url("{{ hero_photo_url }}");'></div>
+  <div class="absolute inset-0 bg-center scale-105" style='background-image: url("{{ hero_photo_url }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>
   {% endif %}
   <div class="absolute inset-0 bg-gradient-to-b from-stone-950/55 via-stone-950/35 to-stone-950/90"></div>
   <div class="absolute inset-0 bg-gradient-to-r from-stone-950/70 via-stone-950/20 to-transparent"></div>
@@ -177,7 +186,7 @@
           {% for n in nav_neighborhoods %}
           <a class="group relative aspect-[4/5] overflow-hidden bg-stone-900" href="/n/{{ n.slug }}">
             {% if n.photo_url %}
-            <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" style='background-image: url("{{ n.photo_url }}");'></div>
+            <div class="absolute inset-0 bg-center transition-transform duration-700 group-hover:scale-110" style='background-image: url("{{ n.photo_url }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>
             {% else %}
             {# WHY: without a photo the card background defaults to flat stone-900 (near-black),
                which looks like a loading failure. An inline diagonal gradient using the network's
@@ -224,7 +233,7 @@
         {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
         {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
         <a class="group block relative overflow-hidden rounded-3xl bg-stone-100 h-[480px] md:h-[560px]" href="/b/{{ b.slug }}">
-          {% if photo %}<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" style='background-image: url("{{ photo.url }}");'></div>{% endif %}
+          {% if photo %}<div class="absolute inset-0 bg-center transition-transform duration-700 group-hover:scale-105" style='background-image: url("{{ photo.url }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>{% endif %}
           <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-900/40 to-transparent"></div>
           {% if b.editors_pick %}<div class="absolute top-6 left-6 inline-flex items-center gap-2 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
           {% if b.featured and b.featured.enabled %}<div class="absolute top-6 right-6 bg-gradient-to-br from-amber-400 to-yellow-500 text-stone-900 text-[10px] font-bold tracking-[0.15em] uppercase px-3 py-1.5 rounded-full">{{ b.featured.tier or 'Premium' }}</div>{% endif %}
@@ -245,7 +254,7 @@
         {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
         {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
         <a class="group block relative overflow-hidden rounded-3xl bg-stone-100 h-[228px] md:h-[268px]" href="/b/{{ b.slug }}">
-          {% if photo %}<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" style='background-image: url("{{ photo.url }}");'></div>{% endif %}
+          {% if photo %}<div class="absolute inset-0 bg-center transition-transform duration-700 group-hover:scale-105" style='background-image: url("{{ photo.url }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>{% endif %}
           <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-900/40 to-transparent"></div>
           {% if b.editors_pick %}<div class="absolute top-6 left-6 inline-flex items-center gap-2 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
           {% if b.featured and b.featured.enabled %}<div class="absolute top-6 right-6 bg-gradient-to-br from-amber-400 to-yellow-500 text-stone-900 text-[10px] font-bold tracking-[0.15em] uppercase px-3 py-1.5 rounded-full">{{ b.featured.tier or 'Premium' }}</div>{% endif %}
@@ -337,7 +346,7 @@
 {% set spotlight_photo = spotlight_neighborhood.photo_url %}
 <section class="py-20 lg:py-28 bg-gradient-to-br from-stone-900 via-stone-900 to-stone-950 text-white relative overflow-hidden">
   {% if spotlight_photo %}
-  <div class="absolute top-0 right-0 w-1/2 h-full opacity-30 bg-cover bg-center" style='background-image: url("{{ spotlight_photo }}");'></div>
+  <div class="absolute top-0 right-0 w-1/2 h-full opacity-30 bg-center" style='background-image: url("{{ spotlight_photo }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>
   {% endif %}
   <div class="absolute inset-0 bg-gradient-to-r from-stone-950 via-stone-950/95 to-transparent"></div>
   <div class="relative max-w-7xl mx-auto px-6 lg:px-10">
@@ -353,7 +362,7 @@
         {% set photo = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
         <div class="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl overflow-hidden">
           <a class="flex gap-5 p-5 group" href="/b/{{ b.slug }}">
-            {% if photo %}<div class="w-24 h-24 rounded-xl bg-cover bg-center shrink-0 ring-1 ring-white/10" style='background-image: url("{{ photo.url }}");'></div>{% endif %}
+            {% if photo %}<div class="w-24 h-24 rounded-xl bg-center shrink-0 ring-1 ring-white/10" style='background-image: url("{{ photo.url }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>{% endif %}
             <div class="flex-1 min-w-0">
               <div class="flex items-center justify-between mb-1">
                 <h3 class="font-serif text-xl text-white group-hover:{{ theme.accent_text_lighter_full }} transition" style="font-family: Georgia, serif;">{{ b.name }}</h3>
@@ -382,7 +391,7 @@
         {% set photo = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
         {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
         <a class="group flex items-center gap-4 p-3 rounded-2xl hover:bg-stone-50 transition" href="/b/{{ b.slug }}">
-          {% if photo %}<div class="w-20 h-20 rounded-xl bg-cover bg-center shrink-0" style='background-image: url("{{ photo.url }}");'></div>{% endif %}
+          {% if photo %}<div class="w-20 h-20 rounded-xl bg-center shrink-0" style='background-image: url("{{ photo.url }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>{% endif %}
           <div class="flex-1 min-w-0">
             <h4 class="font-serif text-lg text-stone-900 truncate group-hover:{{ theme.accent_text_full }} transition-colors" style='font-family: Georgia, "Times New Roman", serif;'>{{ b.name }}</h4>
             <p class="text-xs text-stone-500 truncate">{{ col.name }}</p>

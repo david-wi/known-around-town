@@ -33,10 +33,17 @@
 {% endif %}
 {% endblock %}
 {% block content %}
+{#- WHY: branded fallback tile for the hero photo background below. CSS
+    background-image can't use an <img> onerror handler, so we layer the
+    placeholder UNDERNEATH the photo: if the photo URL 404s, the placeholder
+    shows through instead of a flat dark gap. Same technique as business.html.
+    The {% if %} guard stays, so a guide with no hero image keeps its intended
+    dark-stone hero rather than gaining an empty placeholder box. #}
+{% set placeholder_url = '/assets/placeholder-salon.svg' %}
 <article>
   <section class="relative bg-stone-950 overflow-hidden">
     {% if guide.hero_image_url %}
-    <div class="absolute inset-0 bg-cover bg-center opacity-50" style='background-image: url("{{ guide.hero_image_url }}");'></div>
+    <div class="absolute inset-0 bg-center opacity-50" style='background-image: url("{{ guide.hero_image_url }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>
     {% endif %}
     <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/70 to-stone-950/30"></div>
     <div class="relative max-w-7xl mx-auto px-6 lg:px-10 pt-20 pb-16">
