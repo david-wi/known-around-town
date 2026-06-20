@@ -79,3 +79,27 @@ received (with NO preview token, while preview mode is on), then an
 owner, when `/owners/me` is requested, then the page shows the embed code
 containing the salon's absolute listing URL and a copy button; given a logged-in
 free-tier owner, then the badge embed section is NOT shown.
+
+### KAT-038 — Shopper-action tracking (taps to call / directions / website) · V1 · implemented
+**Persona:** Salon Owner.
+Beyond page views, the directory tracks the three highest-intent shopper actions
+on each listing — tap-to-call, tap-for-directions, and website click — so owners
+have concrete proof their listing is driving real interest. Each action is counted
+on the business document (`call_click_count`, `directions_click_count`,
+`website_click_count`) the same way page views are: incremented in a background
+task, with crawler/bot traffic filtered out so counts reflect real people. Tracking
+is done server-side via lightweight redirect routes (`GET /b/{slug}/go/call`,
+`/go/directions`, `/go/website`) that the listing's phone, directions, and website
+buttons point at; each route increments the matching counter then 302-redirects to
+the real `tel:` / Google Maps / website target, so tracking works even without
+JavaScript and a redirect can't be missed. The three counts are returned by
+`GET /api/v1/owner/stats` and shown on the owner dashboard alongside page views and
+messages, with the same encouraging zero-state framing.
+**Acceptance:** Given a real visitor (non-bot User-Agent) requesting
+`/b/{slug}/go/call` for a salon with a phone, when the request is handled, then the
+response is a 302 redirect to that salon's `tel:` number and `call_click_count` is
+incremented by 1; given a bot User-Agent, then the redirect still happens but the
+counter is NOT incremented; given `/go/website` for a salon with no website, then a
+404 is returned; given a logged-in owner viewing `/owners/me`, then taps-to-call,
+taps-for-directions, and website-clicks are displayed alongside page views and
+messages.

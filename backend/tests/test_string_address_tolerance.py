@@ -109,6 +109,14 @@ async def test_detail_page_renders_string_address_without_500(
     assert "String Address Salon" in body
     # The full address text is visible to the shopper in the Address card.
     assert STRING_ADDRESS in body
-    # The "Get directions" Maps link is built from the address and points at it.
-    assert "maps.google.com" in body
-    assert "Pompano+Beach" in body
+    # The "Get directions" link now routes through the /go/directions tracking
+    # redirect (which 302s to Google Maps) so the tap is counted. So the page
+    # body carries the tracking link, not the raw Maps URL.
+    assert f"/b/{string_address_slug}/go/directions" in body
+    # The Maps URL itself is still built correctly from the string address — we
+    # assert that at the resolver, which is what the redirect route 302s to.
+    from app.routes.public.pages import _directions_url_for_business
+
+    maps_url = _directions_url_for_business({"address": STRING_ADDRESS, "name": "String Address Salon"})
+    assert "maps.google.com" in maps_url
+    assert "Pompano+Beach" in maps_url

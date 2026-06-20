@@ -44,13 +44,25 @@ async def get_owner_stats(request: Request) -> dict:
 
     business = await db.businesses.find_one(
         {"claimed_email": email},
-        # WHY: projection limits the fields fetched from Atlas — we only need
-        # page_view_count, not the full document (photos, hours, socials, etc.)
-        projection={"page_view_count": 1},
+        # WHY: projection limits the fields fetched from Atlas — we only need the
+        # activity counters, not the full document (photos, hours, socials, etc.)
+        projection={
+            "page_view_count": 1,
+            "call_click_count": 1,
+            "directions_click_count": 1,
+            "website_click_count": 1,
+        },
     )
     if not business:
         raise HTTPException(status_code=404, detail="No business found for this account.")
 
+    # WHY: the three shopper-action counts (taps to call / directions / website)
+    # are the highest-intent "your listing is working" signals — a tap to call is
+    # a far stronger renewal argument than a passive page view. Each defaults to 0
+    # for listings that predate the counters or haven't been tapped yet.
     return {
         "page_view_count": business.get("page_view_count") or 0,
+        "call_click_count": business.get("call_click_count") or 0,
+        "directions_click_count": business.get("directions_click_count") or 0,
+        "website_click_count": business.get("website_click_count") or 0,
     }

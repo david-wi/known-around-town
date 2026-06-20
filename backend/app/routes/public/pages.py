@@ -119,6 +119,32 @@ def _normalize_address(raw: Any) -> Dict[str, Any]:
     return result
 
 
+def _directions_url_for_business(business: Dict[str, Any]) -> str:
+    """Build a Google Maps directions URL for a business, or "" if we can't.
+
+    WHY: shared by the listing page (which renders the "Get directions" link)
+    and the /b/{slug}/go/directions tracking redirect, so the URL a shopper is
+    sent to is computed identically in both places. Returns "" when there's no
+    usable address and no name to fall back on.
+
+    WHY include city/state/postal alongside street: a street-only query is
+    ambiguous — "1234 SW 8th St" matches dozens of cities — so the full address
+    pins Maps to the right neighborhood. Fields whose text already appears in
+    `street` (the single-line-address case) are skipped to avoid duplicating it.
+    """
+    addr = _normalize_address(business.get("address"))
+    street = addr.get("street") or ""
+    map_parts = [street]
+    for field in ("city", "state", "postal_code"):
+        val = addr.get(field)
+        if val and val not in street:
+            map_parts.append(val)
+    map_query = ", ".join(filter(None, map_parts)) or business.get("name", "")
+    if not map_query:
+        return ""
+    return f"https://maps.google.com/?q={quote_plus(map_query)}"
+
+
 async def _build_copy(tenant: TenantContext) -> CopyResolver:
     network = tenant.network
     city = tenant.city
@@ -1127,6 +1153,34 @@ async def _increment_business_view(business_id: str) -> None:
     )
 
 
+# WHY: the three shopper-action redirect routes below each bump one of these
+# counters. Mapping the URL action segment to the DB field in one place keeps
+# the route handler a thin lookup and makes the allowed actions explicit — an
+# unknown action can never increment an arbitrary field.
+_ACTION_COUNTER_FIELDS = {
+    "call": "call_click_count",
+    "directions": "directions_click_count",
+    "website": "website_click_count",
+}
+
+
+async def _increment_business_action(business_id: str, counter_field: str) -> None:
+    """Atomically increment one shopper-action counter for a business.
+
+    WHY: mirrors _increment_business_view — a background task so the $inc
+    happens after the redirect is sent (no added latency on the tap), and a
+    single-field $inc is race-safe under concurrent taps. counter_field is
+    always one of the values in _ACTION_COUNTER_FIELDS (the route validates the
+    action segment before calling), so this never writes an attacker-named field.
+    """
+    from app.database import get_db as _get_db  # local import to avoid circular
+    db = _get_db()
+    await db.businesses.update_one(
+        {"_id": business_id},
+        {"$inc": {counter_field: 1}},
+    )
+
+
 @router.get("/b/{business_slug}", response_class=HTMLResponse)
 async def business_page(
     request: Request, business_slug: str, background_tasks: BackgroundTasks
@@ -1168,39 +1222,18 @@ async def business_page(
         nearby_cur = content_svc.get_db().businesses.find(auto_q).limit(3)
         nearby = await nearby_cur.to_list(length=3)
 
-    # WHY: Build a real Google Maps URL from the address so the template has
-    # a proper href for the "Get directions" link. The CopyResolver only
-    # supplies human-readable labels (e.g. "Get directions") — not URLs.
-    # WHY: include city, state, and postal_code in addition to street so Maps
-    # resolves to the correct location. Street-only queries are ambiguous —
-    # "1234 SW 8th St" matches dozens of cities; the full address pins it to
-    # the right neighborhood. filter(None, ...) drops any missing fields so
-    # businesses without a full address still get a useful (if shorter) query.
-    # WHY: normalise the address into a dict in place so BOTH this Maps-query
-    # code and the template (Address card + JSON-LD, which read address.street /
-    # .city / .state / .postal_code) tolerate records whose address was stored
-    # as a single line of text rather than a structured object. See
+    # WHY: normalise the address into a dict in place so BOTH the directions-URL
+    # helper and the template (Address card + JSON-LD, which read address.street /
+    # .city / .state / .postal_code) tolerate records whose address was stored as
+    # a single line of text rather than a structured object. See
     # _normalize_address. Reassigning on `business` (the same dict passed to the
     # template below) means the template renders the address instead of a blank.
-    addr = _normalize_address(business.get("address"))
-    business["address"] = addr
-    # WHY: build the Maps query from street + city/state/zip, but skip any field
-    # whose text is already inside `street`. For a normalised single-line
-    # address the whole line lives in `street` and the parsed city/state/postal
-    # are substrings of it — appending them again would just duplicate text in
-    # the query. For a structured dict the fields are distinct, so all are kept.
-    _street = addr.get("street") or ""
-    _map_parts = [_street]
-    for _field in ("city", "state", "postal_code"):
-        _val = addr.get(_field)
-        if _val and _val not in _street:
-            _map_parts.append(_val)
-    _map_query = ", ".join(filter(None, _map_parts)) or business.get("name", "")
-    directions_url = (
-        f"https://maps.google.com/?q={quote_plus(_map_query)}"
-        if _map_query
-        else ""
-    )
+    business["address"] = _normalize_address(business.get("address"))
+    # WHY: the on-page "Get directions" link points at the /go/directions tracking
+    # redirect (below), so this raw Maps URL is no longer used as the link href.
+    # It's still computed and passed to the template as a no-JS / structured-data
+    # fallback and so the link only renders when a real directions target exists.
+    directions_url = _directions_url_for_business(business)
 
     # WHY: og_image is computed here rather than in the template so base.html
     # can emit both og:image AND twitter:image from a single source. Previously
@@ -1307,6 +1340,99 @@ async def business_page(
     if not any(f in ua for f in _BOT_UA_FRAGMENTS):
         background_tasks.add_task(_increment_business_view, str(business["_id"]))
     return _templates.TemplateResponse("business.html", ctx)
+
+
+def _action_target_url(action: str, business: Dict[str, Any]) -> str:
+    """Resolve the real destination for a shopper-action redirect.
+
+    Returns the URL the /go/{action} route should 302 to, or "" when the
+    business has no target for that action (no phone / no address / no website),
+    in which case the route returns 404 rather than redirect nowhere.
+
+    WHY tel: with non-digits stripped: mobile browsers dial most reliably from a
+    bare-digit tel: URI. This mirrors the AI-receptionist link in business.html.
+    """
+    if action == "call":
+        phone = (business.get("phone") or "").strip()
+        if not phone:
+            return ""
+        digits = "".join(ch for ch in phone if ch.isdigit() or ch == "+")
+        return f"tel:{digits}" if digits else ""
+    if action == "directions":
+        return _directions_url_for_business(business)
+    if action == "website":
+        website = (business.get("website") or "").strip()
+        if not website:
+            return ""
+        # WHY: a stored website without a scheme (e.g. "example.com") would make
+        # the 302 Location browser-relative — it'd resolve against OUR domain and
+        # dead-end. Seed data carries full https:// URLs, but admin-entered or
+        # imported records might not. So: pass http(s) through unchanged, and for
+        # anything else default to https://, stripping any non-http(s) scheme
+        # prefix (ftp:, javascript:, etc.) so a dangerous scheme can never become
+        # the redirect target — the shopper is always sent to an https web page.
+        lowered = website.lower()
+        if lowered.startswith(("http://", "https://")):
+            return website
+        if "://" in website:
+            website = website.split("://", 1)[1]
+        elif ":" in website.split("/", 1)[0]:
+            # A scheme-like prefix with no "//" (e.g. "javascript:alert(1)") —
+            # drop everything up to and including the first colon in the host part.
+            website = website.split(":", 1)[1]
+        return f"https://{website.lstrip('/')}"
+    return ""
+
+
+@router.get("/b/{business_slug}/go/{action}")
+async def business_action_redirect(
+    request: Request,
+    business_slug: str,
+    action: str,
+    background_tasks: BackgroundTasks,
+) -> RedirectResponse:
+    """Track a high-intent shopper tap, then redirect to the real target.
+
+    WHY a server-side redirect instead of a JavaScript click handler: it works
+    even with JavaScript disabled, can't be silently dropped, and lets us count
+    the tap once on the server before sending the shopper on. The listing's
+    phone / directions / website buttons point here (e.g. /b/<slug>/go/call);
+    this route bumps the matching counter (bot-filtered, in a background task so
+    the tap has no added latency) and 302s to the salon's tel:/Maps/website
+    target. Counts taps-to-call, taps-for-directions, and website clicks — the
+    strongest "your listing is working" signals an owner can be shown.
+    """
+    counter_field = _ACTION_COUNTER_FIELDS.get(action)
+    if counter_field is None:
+        raise HTTPException(404, "Unknown action")
+
+    tenant = await _require_tenant(request)
+    if not tenant.city:
+        raise HTTPException(404, "City required")
+    business = await content_svc.get_business(tenant.city["_id"], business_slug)
+    if not business:
+        raise HTTPException(404, "Business not found")
+
+    target = _action_target_url(action, business)
+    if not target:
+        # WHY 404 (not a redirect to the listing): the button only renders when a
+        # target exists, so reaching here means the link was hand-built or the
+        # data changed. Don't fabricate a redirect — and never count a tap that
+        # can't reach a real destination.
+        raise HTTPException(404, "No destination for this action")
+
+    # WHY: same bot filter the page-view counter uses, so crawlers that follow
+    # the /go/ links don't inflate the owner's shopper-action numbers.
+    ua = (request.headers.get("user-agent") or "").lower()
+    if not any(f in ua for f in _BOT_UA_FRAGMENTS):
+        background_tasks.add_task(
+            _increment_business_action, str(business["_id"]), counter_field
+        )
+
+    # WHY 302 (temporary), not 301: a 301 is cached by the browser, so the next
+    # tap would skip the server entirely and never be counted. 302 keeps every
+    # tap flowing through the counter.
+    return RedirectResponse(url=target, status_code=302)
 
 
 @router.get("/guides", response_class=HTMLResponse)

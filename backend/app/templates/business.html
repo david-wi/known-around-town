@@ -417,7 +417,11 @@
       {% if business.team %}<a class="px-4 py-2 rounded-full font-medium transition whitespace-nowrap text-stone-600 hover:bg-stone-100" href="#team">Team</a>{% endif %}
     </nav>
     <div class="flex items-center gap-3 shrink-0">
-      {% if business.phone %}<a href="tel:{{ business.phone }}" class="hidden sm:flex items-center gap-2 text-sm font-medium text-stone-700 hover:text-stone-900">
+      {#- WHY: the phone link points at /go/call, not a direct tel:, so the
+          tap is counted server-side (the route 302s on to the salon's tel:
+          number). Tracking this way works without JavaScript and can't be
+          missed. The visible number stays the salon's real number. #}
+      {% if business.phone %}<a href="/b/{{ business.slug }}/go/call" class="hidden sm:flex items-center gap-2 text-sm font-medium text-stone-700 hover:text-stone-900">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.37 1.9.71 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.58 2.81.71A2 2 0 0122 16.92z"></path></svg>{{ business.phone }}</a>{% endif %}
       {#- WHY: a Share button in the sticky nav surfaces the action exactly when
           a client thinks "I should send this to a friend" — without it there's
@@ -445,7 +449,10 @@
           Labeling a dial-action "Book now" confuses mobile visitors who expect
           to see a calendar. Show "Call" when there is no booking URL so the label
           matches what actually happens when the button is tapped. #}
-      {% if business.booking_url %}<a href="{{ business.booking_url }}" class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-semibold px-5 py-2.5 rounded-full text-sm transition">{{ cta_book or 'Book now' }}</a>{% elif business.phone %}<a href="tel:{{ business.phone }}" class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-semibold px-5 py-2.5 rounded-full text-sm transition">{{ cta_call or 'Call' }}</a>{% endif %}
+      {#- WHY: the booking button stays a direct link (booking, not a call, so
+          there's no call to track). The "Call" fallback points at /go/call so a
+          tap-to-call is counted server-side before dialing. #}
+      {% if business.booking_url %}<a href="{{ business.booking_url }}" class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-semibold px-5 py-2.5 rounded-full text-sm transition">{{ cta_book or 'Book now' }}</a>{% elif business.phone %}<a href="/b/{{ business.slug }}/go/call" class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-semibold px-5 py-2.5 rounded-full text-sm transition">{{ cta_call or 'Call' }}</a>{% endif %}
     </div>
   </div>
 </section>
@@ -570,13 +577,14 @@
       {% if business.address or business.phone or business.website or business.instagram %}
       <div class="bg-white border border-stone-200 rounded-2xl overflow-hidden">
         {% if hero_photo %}
-        {#- WHY: wrapping the photo in an <a> pointing to the Google Maps URL
-            turns the decorative placeholder into a useful tap target. The
-            directions_url is already calculated from the business address by
-            the route handler and used in the text link below. Making the
-            entire photo tappable is a much larger hit area (important on
-            mobile) and removes the "Map preview" dead-end label. #}
-        {% if directions_url %}<a href="{{ directions_url }}" target="_blank" rel="noreferrer" aria-label="Open in Google Maps">{% endif %}
+        {#- WHY: wrapping the photo in an <a> turns the decorative placeholder
+            into a useful tap target. directions_url is computed by the route
+            handler and used here only as the render guard — the actual href is
+            the /go/directions tracking redirect, so a tap-for-directions is
+            counted server-side before opening Google Maps. Making the entire
+            photo tappable is a much larger hit area (important on mobile) and
+            removes the "Map preview" dead-end label. #}
+        {% if directions_url %}<a href="/b/{{ business.slug }}/go/directions" target="_blank" rel="noreferrer" aria-label="Open in Google Maps">{% endif %}
         <div class="aspect-[16/10] bg-gradient-to-br from-rose-100 via-amber-50 to-orange-100 relative {% if directions_url %}hover:opacity-90 transition-opacity cursor-pointer{% endif %}">
           <div class="absolute inset-0 opacity-30 bg-cover bg-center" style='background-image: url("{{ hero_photo_url }}");'></div>
           <div class="absolute inset-0 flex items-end p-5">
@@ -593,13 +601,18 @@
                 full human-readable address (street, city, state, zip) in one
                 string. Appending address.city separately would duplicate it. #}
             <div class="text-sm text-stone-900">{{ business.address.street }}</div>
-            {% if directions_url %}<a href="{{ directions_url }}" target="_blank" rel="noreferrer" class="text-xs {{ theme.accent_text_strong }} hover:opacity-80 font-medium">{{ cta_directions or 'Get directions' }} →</a>{% endif %}
+            {#- WHY: href is the /go/directions tracking redirect (counts the tap,
+                then 302s to Maps); directions_url is the render guard so the link
+                only appears when a real destination exists. #}
+            {% if directions_url %}<a href="/b/{{ business.slug }}/go/directions" target="_blank" rel="noreferrer" class="text-xs {{ theme.accent_text_strong }} hover:opacity-80 font-medium">{{ cta_directions or 'Get directions' }} →</a>{% endif %}
           </div>
           {% endif %}
           {% if business.phone %}
           <div>
             <div class="text-xs uppercase tracking-wide text-stone-500 font-semibold mb-1">Phone</div>
-            <a href="tel:{{ business.phone }}" class="text-sm text-stone-900 hover:{{ theme.accent_text_full }}">{{ business.phone }}</a>
+            {#- WHY: points at /go/call so a tap-to-call is counted server-side
+                before dialing. The visible text stays the salon's real number. #}
+            <a href="/b/{{ business.slug }}/go/call" class="text-sm text-stone-900 hover:{{ theme.accent_text_full }}">{{ business.phone }}</a>
           </div>
           {% endif %}
           {#- WHY: The "Call Now" button only appears when the business has an AI
@@ -623,7 +636,10 @@
             <div class="text-xs uppercase tracking-wide text-stone-500 font-semibold mb-2">On the web</div>
             <div class="space-y-1 text-sm">
               {% if business.instagram %}<a href="https://instagram.com/{{ business.instagram|replace('@','') }}" class="block text-stone-900 hover:{{ theme.accent_text_full }}" target="_blank" rel="noreferrer">@{{ business.instagram|replace('@','') }}</a>{% endif %}
-              {% if business.website %}<a href="{{ business.website }}" class="block text-stone-900 hover:{{ theme.accent_text_full }}" target="_blank" rel="noreferrer">{{ business.website|replace('https://','')|replace('http://','') }}</a>{% endif %}
+              {#- WHY: the website link points at /go/website so a website click
+                  is counted server-side (the route 302s to the salon's real
+                  site). The displayed text stays the salon's own domain. #}
+              {% if business.website %}<a href="/b/{{ business.slug }}/go/website" class="block text-stone-900 hover:{{ theme.accent_text_full }}" target="_blank" rel="noreferrer">{{ business.website|replace('https://','')|replace('http://','') }}</a>{% endif %}
             </div>
           </div>
           {% endif %}

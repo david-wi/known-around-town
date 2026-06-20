@@ -131,14 +131,36 @@ class MonthlyReport:
     views_this_month: int
     views_last_month: Optional[int]
     messages_this_month: int
-    trend: str  # "up" | "down" | "flat" | "first"
-    is_first_report: bool
-    is_thin_views: bool
+    # WHY: the three high-intent shopper taps this month — call, directions,
+    # website. They're snapshot-diffed exactly like views (all are lifetime
+    # counters on the business doc). The email mentions them only when non-zero,
+    # so a quiet month never leads with three zeros. On the first-ever report
+    # (no prior snapshot) these hold the lifetime totals, framed "since you
+    # joined" by the email — the same honest fallback used for views.
+    calls_this_month: int = 0
+    directions_this_month: int = 0
+    website_clicks_this_month: int = 0
+    trend: str = "flat"  # "up" | "down" | "flat" | "first"
+    is_first_report: bool = False
+    is_thin_views: bool = False
 
     @property
     def views_up_from_last_month(self) -> bool:
         """True when this month beat last month — the email leads with this."""
         return self.trend == "up"
+
+    @property
+    def has_action_taps(self) -> bool:
+        """True when any high-intent tap happened this period.
+
+        WHY: the email only mentions taps when at least one occurred, so a
+        listing with views but no taps yet never reads "0 calls, 0 directions".
+        """
+        return (
+            self.calls_this_month
+            + self.directions_this_month
+            + self.website_clicks_this_month
+        ) > 0
 
 
 async def _latest_snapshot_before(
@@ -163,28 +185,39 @@ async def _latest_snapshot_before(
 
 
 async def _ensure_current_snapshot(
-    db: Any, business_id: str, current_period: str, lifetime_count: int, now: datetime
+    db: Any,
+    business_id: str,
+    current_period: str,
+    lifetime_count: int,
+    now: datetime,
+    action_counts: Optional[Dict[str, int]] = None,
 ) -> None:
     """Write this period's snapshot if it does not already exist.
 
     Idempotent: a second report run in the same month must not overwrite the
-    count captured the first time (which is what anchors next month's delta).
-    We only insert when absent. The stored count is the lifetime total at the
-    moment this period's report was first produced.
+    counts captured the first time (which is what anchors next month's deltas).
+    We only insert when absent. The stored counts are the lifetime totals at the
+    moment this period's report was first produced — for page views AND the three
+    shopper-action taps, so each gets a clean month-over-month delta.
     """
     existing = await db[SNAPSHOT_COLLECTION].find_one(
         {"business_id": business_id, "period_key": current_period}
     )
     if existing is not None:
         return
-    await db[SNAPSHOT_COLLECTION].insert_one(
-        {
-            "business_id": business_id,
-            "period_key": current_period,
-            "page_view_count": int(lifetime_count),
-            "created_at": now,
-        }
-    )
+    doc: Dict[str, Any] = {
+        "business_id": business_id,
+        "period_key": current_period,
+        "page_view_count": int(lifetime_count),
+        "created_at": now,
+    }
+    # WHY: persist the tap counters in the SAME snapshot row so they diff exactly
+    # like views. Older snapshot rows (written before taps were tracked) simply
+    # lack these keys; _delta_from_snapshot treats a missing key as 0, which is
+    # the correct baseline for a salon's first tracked month.
+    if action_counts:
+        doc.update({k: int(v) for k, v in action_counts.items()})
+    await db[SNAPSHOT_COLLECTION].insert_one(doc)
 
 
 async def _count_messages_in_period(db: Any, business_id: str, current_period: str) -> int:
@@ -242,14 +275,27 @@ async def compute_report(
     lifetime_views = int(business.get("page_view_count") or 0)
     current_period = period_key(now)
 
+    # WHY: the three shopper-action taps are lifetime counters on the business
+    # doc, just like page views, so we read them here and diff them against the
+    # prior snapshot the same way. A listing that predates tracking simply has
+    # these absent (treated as 0).
+    lifetime_actions = {
+        "call_click_count": int(business.get("call_click_count") or 0),
+        "directions_click_count": int(business.get("directions_click_count") or 0),
+        "website_click_count": int(business.get("website_click_count") or 0),
+    }
+
     # The prior snapshot anchors "views at the start of this month". We read it
     # BEFORE writing the current period's snapshot so the current write can't be
     # mistaken for the "last month" baseline.
     prior = await _latest_snapshot_before(db, business_id, current_period)
 
     # Persist the current period's snapshot (idempotent). Capturing the lifetime
-    # count now is what lets NEXT month compute its own gain.
-    await _ensure_current_snapshot(db, business_id, current_period, lifetime_views, now)
+    # counts now is what lets NEXT month compute its own gains — for views AND taps.
+    await _ensure_current_snapshot(
+        db, business_id, current_period, lifetime_views, now,
+        action_counts=lifetime_actions,
+    )
 
     if prior is None:
         # No history yet — we cannot honestly claim a one-month number, so we
@@ -279,6 +325,25 @@ async def compute_report(
             views_last_month = None
         is_first = False
 
+    # WHY: each tap counter diffs the same way as views — this month's gain is
+    # the lifetime total now minus the prior snapshot's stored total, floored at
+    # 0. On the first report (no prior snapshot) we report the lifetime total, so
+    # the email's "since you joined" framing covers taps too. A missing key on an
+    # older snapshot reads as 0, which is the right baseline for a salon's first
+    # tracked month.
+    def _action_delta(field: str, lifetime_now: int) -> int:
+        if prior is None:
+            return lifetime_now
+        return max(0, lifetime_now - int(prior.get(field) or 0))
+
+    calls_this_month = _action_delta("call_click_count", lifetime_actions["call_click_count"])
+    directions_this_month = _action_delta(
+        "directions_click_count", lifetime_actions["directions_click_count"]
+    )
+    website_clicks_this_month = _action_delta(
+        "website_click_count", lifetime_actions["website_click_count"]
+    )
+
     messages_this_month = await _count_messages_in_period(db, business_id, current_period)
     trend = _trend(views_this_month, views_last_month, is_first)
 
@@ -295,6 +360,9 @@ async def compute_report(
         views_this_month=views_this_month,
         views_last_month=views_last_month,
         messages_this_month=messages_this_month,
+        calls_this_month=calls_this_month,
+        directions_this_month=directions_this_month,
+        website_clicks_this_month=website_clicks_this_month,
         trend=trend,
         is_first_report=is_first,
         is_thin_views=is_thin,

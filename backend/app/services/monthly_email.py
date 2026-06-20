@@ -118,6 +118,31 @@ HEADLINE_FIRST = "Your listing on Miami Knows Beauty"
 
 # Lead sentence builders. These are the one or two human sentences under the
 # headline. Keep them short; David owns the voice here.
+def _action_phrase(report: MonthlyReport) -> str:
+    """Human phrase for the high-intent taps, or "" when there were none.
+
+    WHY: taps-to-call and taps-for-directions are stronger "your listing is
+    working" proof than a passive view, so when any occurred the email calls
+    them out. Returns "" when all three are zero so a quiet month never reads
+    "0 tapped to call". Each clause is included only for the non-zero counts, in
+    intent order (call, directions, website), and joined into plain English.
+    """
+    parts: list[str] = []
+    if report.calls_this_month:
+        parts.append(f"{report.calls_this_month} tapped to call")
+    if report.directions_this_month:
+        parts.append(f"{report.directions_this_month} tapped for directions")
+    if report.website_clicks_this_month:
+        parts.append(f"{report.website_clicks_this_month} clicked through to your website")
+    if not parts:
+        return ""
+    if len(parts) == 1:
+        return parts[0]
+    if len(parts) == 2:
+        return f"{parts[0]} and {parts[1]}"
+    return f"{parts[0]}, {parts[1]}, and {parts[2]}"
+
+
 def _lead_sentence(report: MonthlyReport) -> str:
     """The friendly one-liner under the headline, chosen by trend.
 
@@ -137,22 +162,28 @@ def _lead_sentence(report: MonthlyReport) -> str:
     # plural branch is needed for the verb itself.
     reached = "reached out"
 
+    # WHY: when shoppers took high-intent actions this period, append a sentence
+    # naming them — a tap to call is far stronger proof the listing works than a
+    # view. Empty string when there were none, so it adds nothing on a quiet month.
+    action = _action_phrase(report)
+    action_tail = f" Of those, {action}." if action else ""
+
     if report.is_first_report:
         # Lifetime framing — we don't have a month delta yet.
         return (
             f"So far, {views} {person} {viewed} your <strong>{html.escape(report.business_name)}</strong> "
-            f"listing, and {msgs} {reached}."
+            f"listing, and {msgs} {reached}.{action_tail}"
         )
     if report.trend == "up" and report.views_last_month is not None:
         return (
             f"In {month}, {views} {person} {viewed} your "
             f"<strong>{html.escape(report.business_name)}</strong> listing — "
-            f"up from {report.views_last_month} last month. {msgs} {reached}."
+            f"up from {report.views_last_month} last month. {msgs} {reached}.{action_tail}"
         )
     return (
         f"In {month}, {views} {person} {viewed} your "
         f"<strong>{html.escape(report.business_name)}</strong> listing, "
-        f"and {msgs} {reached}."
+        f"and {msgs} {reached}.{action_tail}"
     )
 
 
@@ -176,25 +207,29 @@ def build_subject(report: MonthlyReport) -> str:
 def _text_body(report: MonthlyReport, caption: Optional[str]) -> str:
     """Plain-text fallback body — every HTML email needs one for deliverability."""
     month = report.period_label.split()[0]
+    # WHY: same non-zero taps mention as the HTML body, plain-text form. Empty
+    # when no taps occurred, so a quiet month's text body is unchanged.
+    action = _action_phrase(report)
+    action_tail = f" Of those, {action}." if action else ""
     lines = [f"Hi,", ""]
     if report.is_first_report:
         person = "person" if report.views_this_month == 1 else "people"
         lines.append(
             f"So far, {report.views_this_month} {person} have viewed your "
-            f"{report.business_name} listing, and {report.messages_this_month} reached out."
+            f"{report.business_name} listing, and {report.messages_this_month} reached out.{action_tail}"
         )
     elif report.trend == "up" and report.views_last_month is not None:
         person = "person" if report.views_this_month == 1 else "people"
         lines.append(
             f"In {month}, {report.views_this_month} {person} viewed your "
             f"{report.business_name} listing — up from {report.views_last_month} last month. "
-            f"{report.messages_this_month} reached out."
+            f"{report.messages_this_month} reached out.{action_tail}"
         )
     else:
         person = "person" if report.views_this_month == 1 else "people"
         lines.append(
             f"In {month}, {report.views_this_month} {person} viewed your "
-            f"{report.business_name} listing, and {report.messages_this_month} reached out."
+            f"{report.business_name} listing, and {report.messages_this_month} reached out.{action_tail}"
         )
     lines.append("")
     if caption:
