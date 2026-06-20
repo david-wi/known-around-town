@@ -155,6 +155,52 @@ class TestPerformanceEmptyState:
             assert "hidden" in tag, f"{note_id} should start hidden"
 
 
+# ─── Shopper-action tap tiles (call / directions / website) ─────────────────
+
+
+class TestActionTapTiles:
+    """The dashboard performance panel shows the three high-intent tap counts
+    next to page views and messages, each with the same encouraging zero-state."""
+
+    def test_three_tap_tiles_render(self, seeded_db):
+        html = _render_dashboard(seeded_db, photos=[])
+        for tile_id in ("stat-calls", "stat-directions", "stat-website"):
+            assert f'id="{tile_id}"' in html, f"{tile_id} tile missing"
+        assert "taps to call" in html
+        assert "taps for directions" in html
+        assert "website clicks" in html
+
+    def test_tap_tiles_have_zero_state_notes(self, seeded_db):
+        html = _render_dashboard(seeded_db, photos=[])
+        for note_id in (
+            "stat-calls-zero-note",
+            "stat-directions-zero-note",
+            "stat-website-zero-note",
+        ):
+            assert f'id="{note_id}"' in html, f"{note_id} missing"
+            idx = html.index(f'id="{note_id}"')
+            tag = html[idx:html.index(">", idx)]
+            assert "hidden" in tag, f"{note_id} should start hidden"
+
+    def test_stats_js_fills_all_four_metrics(self, seeded_db):
+        """The stats JavaScript must populate views AND the three tap tiles from
+        the keys the owner-stats endpoint returns — otherwise a tile stays at the
+        '…' placeholder forever."""
+        html = _render_dashboard(seeded_db, photos=[])
+        assert "data.call_click_count" in html
+        assert "data.directions_click_count" in html
+        assert "data.website_click_count" in html
+        assert "stat-calls" in html and "stat-directions" in html and "stat-website" in html
+
+    def test_tap_tile_color_classes_exist_in_compiled_css(self, seeded_db):
+        """The tap-tile number colors must be real classes in the pre-compiled
+        stylesheet — a class typed but absent renders as nothing (the site has no
+        live Tailwind build)."""
+        css = _reference_css()
+        for cls in ("text-amber-600", "text-blue-600", "text-orange-600", "text-3xl"):
+            assert _css_has_class(css, cls), f"{cls} missing from compiled reference.css"
+
+
 # ─── Locked AI-tool upsell overlay must be opaque (free-tier owners) ─────────
 
 

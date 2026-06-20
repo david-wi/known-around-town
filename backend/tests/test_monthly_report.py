@@ -23,8 +23,22 @@ from app.services.monthly_report import (
 )
 
 
-def _biz(business_id: str = "biz-1", name: str = "Glow Salon", views: int = 0) -> dict:
-    return {"_id": business_id, "name": name, "page_view_count": views}
+def _biz(
+    business_id: str = "biz-1",
+    name: str = "Glow Salon",
+    views: int = 0,
+    calls: int = 0,
+    directions: int = 0,
+    website_clicks: int = 0,
+) -> dict:
+    return {
+        "_id": business_id,
+        "name": name,
+        "page_view_count": views,
+        "call_click_count": calls,
+        "directions_click_count": directions,
+        "website_click_count": website_clicks,
+    }
 
 
 # ── Pure helpers ─────────────────────────────────────────────────────────────
@@ -218,3 +232,87 @@ class TestMessageCount:
             mock_db, _biz(views=5), now=datetime(2026, 7, 15, tzinfo=timezone.utc)
         )
         assert report.messages_this_month == 0
+
+
+# ── Shopper-action tap deltas (call / directions / website) ───────────────────
+
+class TestActionTapDeltas:
+    """The three tap counters are lifetime counters on the business doc, so each
+    is snapshot-diffed exactly like page views: this month = lifetime now minus
+    the prior month's snapshot, floored at 0; lifetime on the first report."""
+
+    async def test_first_report_uses_lifetime_taps(self, mock_db):
+        report = await compute_report(
+            mock_db,
+            _biz(views=10, calls=4, directions=6, website_clicks=2),
+            now=datetime(2026, 6, 20, tzinfo=timezone.utc),
+        )
+        assert report.is_first_report is True
+        assert report.calls_this_month == 4
+        assert report.directions_this_month == 6
+        assert report.website_clicks_this_month == 2
+        assert report.has_action_taps is True
+
+    async def test_second_month_tap_delta_is_lifetime_minus_prior(self, mock_db):
+        # Month 1 snapshot captures the tap totals; month 2 reports only the gain.
+        await compute_report(
+            mock_db,
+            _biz(views=10, calls=4, directions=6, website_clicks=2),
+            now=datetime(2026, 6, 20, tzinfo=timezone.utc),
+        )
+        report = await compute_report(
+            mock_db,
+            _biz(views=30, calls=9, directions=10, website_clicks=2),
+            now=datetime(2026, 7, 5, tzinfo=timezone.utc),
+        )
+        assert report.calls_this_month == 5        # 9 − 4
+        assert report.directions_this_month == 4    # 10 − 6
+        assert report.website_clicks_this_month == 0  # 2 − 2 (no new clicks)
+
+    async def test_idempotent_same_month_keeps_tap_baseline(self, mock_db):
+        # The first July run anchors next month's baseline; a second July run must
+        # keep the same baseline so the delta does not collapse.
+        await compute_report(
+            mock_db, _biz(views=10, calls=4), now=datetime(2026, 6, 1, tzinfo=timezone.utc)
+        )
+        first = await compute_report(
+            mock_db, _biz(views=20, calls=10), now=datetime(2026, 7, 5, tzinfo=timezone.utc)
+        )
+        second = await compute_report(
+            mock_db, _biz(views=25, calls=14), now=datetime(2026, 7, 25, tzinfo=timezone.utc)
+        )
+        assert first.calls_this_month == 6   # 10 − 4
+        assert second.calls_this_month == 10  # 14 − 4 (baseline unchanged)
+
+    async def test_no_taps_reports_zero_and_has_action_taps_false(self, mock_db):
+        report = await compute_report(
+            mock_db, _biz(views=5), now=datetime(2026, 6, 20, tzinfo=timezone.utc)
+        )
+        assert report.calls_this_month == 0
+        assert report.directions_this_month == 0
+        assert report.website_clicks_this_month == 0
+        assert report.has_action_taps is False
+
+    async def test_negative_tap_delta_guarded_to_zero(self, mock_db):
+        # If the lifetime counter were ever reset below the snapshot, the delta
+        # must floor at 0 rather than show a negative tap count in an email.
+        await compute_report(
+            mock_db, _biz(views=10, calls=20), now=datetime(2026, 6, 10, tzinfo=timezone.utc)
+        )
+        report = await compute_report(
+            mock_db, _biz(views=12, calls=5), now=datetime(2026, 7, 10, tzinfo=timezone.utc)
+        )
+        assert report.calls_this_month == 0
+
+    async def test_snapshot_stores_tap_counts(self, mock_db):
+        await compute_report(
+            mock_db,
+            _biz(views=10, calls=4, directions=6, website_clicks=2),
+            now=datetime(2026, 6, 20, tzinfo=timezone.utc),
+        )
+        snap = await mock_db[monthly_report.SNAPSHOT_COLLECTION].find_one(
+            {"business_id": "biz-1", "period_key": "2026-06"}
+        )
+        assert snap["call_click_count"] == 4
+        assert snap["directions_click_count"] == 6
+        assert snap["website_click_count"] == 2

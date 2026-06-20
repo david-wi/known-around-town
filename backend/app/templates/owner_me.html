@@ -271,7 +271,7 @@
 <section class="bg-stone-50 border-t border-stone-100">
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-10">
     <h2 class="text-base font-semibold text-stone-900 mb-1">Listing performance</h2>
-    <p class="text-sm text-stone-500 mb-6">Your listing activity — page views and messages received.</p>
+    <p class="text-sm text-stone-500 mb-6">Your listing activity — page views, messages, and the high-intent taps shoppers make to reach you.</p>
     {# WHY: a freshly-upgraded owner sees 0 page views and 0 messages, which on
        its own reads as "the directory isn't working". These reassurance lines —
        revealed by the stats JS only when the fetched count is exactly 0 — reframe
@@ -289,6 +289,29 @@
         <span class="mt-1 text-sm text-stone-500">messages received</span>
         <span id="stat-inquiries-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Messages from shoppers will show up here once they reach out.</span>
       </a>
+    </div>
+    {# WHY: the three taps below — call, directions, website — are higher-intent
+       than a page view: a shopper who taps your number is trying to book, not
+       just browsing. They're shown in their own row, in a slightly smaller size,
+       so they read as a complement to (not a competitor with) the headline views
+       and messages numbers above. Same zero-state framing: a real zero gets a
+       reassurance line revealed by JS, never a fabricated number. #}
+    <div class="mt-5 flex gap-6 flex-wrap items-stretch">
+      <div class="bg-white rounded-2xl border border-stone-200 px-6 py-5 flex flex-col items-center text-center min-w-[9rem] max-w-[14rem]">
+        <span id="stat-calls" class="text-3xl font-bold text-amber-600 tracking-tight">&hellip;</span>
+        <span class="mt-1 text-sm text-stone-500">taps to call</span>
+        <span id="stat-calls-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Counts each time a shopper taps to call you from your listing.</span>
+      </div>
+      <div class="bg-white rounded-2xl border border-stone-200 px-6 py-5 flex flex-col items-center text-center min-w-[9rem] max-w-[14rem]">
+        <span id="stat-directions" class="text-3xl font-bold text-blue-600 tracking-tight">&hellip;</span>
+        <span class="mt-1 text-sm text-stone-500">taps for directions</span>
+        <span id="stat-directions-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Counts each time a shopper taps to map directions to you.</span>
+      </div>
+      <div class="bg-white rounded-2xl border border-stone-200 px-6 py-5 flex flex-col items-center text-center min-w-[9rem] max-w-[14rem]">
+        <span id="stat-website" class="text-3xl font-bold text-orange-600 tracking-tight">&hellip;</span>
+        <span class="mt-1 text-sm text-stone-500">website clicks</span>
+        <span id="stat-website-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Counts each time a shopper clicks through to your website.</span>
+      </div>
     </div>
     <p id="stats-error" class="hidden mt-4 text-sm text-rose-700" role="alert" aria-live="polite"></p>
   </div>
@@ -1789,23 +1812,43 @@
   var errEl   = document.getElementById('stats-error');
   if (!viewsEl) return;   /* not rendered when owner has no listing */
 
+  /* WHY: a small helper so each metric tile fills the same way — set the number,
+     and on a real zero reveal that tile's reassurance line. Keeps the four-tile
+     wiring (views + the three taps) consistent and avoids repeated code. The
+     count is formatted with toLocaleString so large numbers get thousands
+     separators, matching the page-views and messages numbers. */
+  function fillStat(numId, zeroNoteId, value) {
+    var el = document.getElementById(numId);
+    if (!el) return;
+    var n = value || 0;
+    el.textContent = n.toLocaleString();
+    var zero = document.getElementById(zeroNoteId);
+    if (zero && n === 0) zero.classList.remove('hidden');
+  }
+
   fetch('/api/v1/owner/stats')
     .then(function (r) {
       if (!r.ok) throw new Error('Error ' + r.status);
       return r.json();
     })
     .then(function (data) {
-      var count = data.page_view_count || 0;
-      viewsEl.textContent = count.toLocaleString();
-      /* WHY: a brand-new listing legitimately has 0 views. Reveal the
-         reassurance line so zero reads as "tracking has started" rather than
-         "the directory isn't working". Only on a real zero — once views exist
-         the number speaks for itself. */
-      var viewsZero = document.getElementById('stat-views-zero-note');
-      if (viewsZero && count === 0) viewsZero.classList.remove('hidden');
+      /* WHY: a brand-new listing legitimately has 0 of everything. fillStat
+         reveals each tile's reassurance line only on a real zero, so the panel
+         reads as "tracking has started" rather than "the directory isn't
+         working" — and never shows a fabricated number. */
+      fillStat('stat-views', 'stat-views-zero-note', data.page_view_count);
+      fillStat('stat-calls', 'stat-calls-zero-note', data.call_click_count);
+      fillStat('stat-directions', 'stat-directions-zero-note', data.directions_click_count);
+      fillStat('stat-website', 'stat-website-zero-note', data.website_click_count);
     })
     .catch(function () {
-      viewsEl.textContent = '—';
+      /* WHY: blank every tile that depends on this fetch (not just views) and
+         surface one error line, so a failed load never leaves a "…" hanging in
+         a tap tile. Messages load from a separate fetch and are unaffected. */
+      ['stat-views', 'stat-calls', 'stat-directions', 'stat-website'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = '—';
+      });
       errEl.textContent = 'Could not load stats. Please refresh the page.';
       errEl.classList.remove('hidden');
     });

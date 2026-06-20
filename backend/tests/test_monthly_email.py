@@ -34,6 +34,9 @@ def _report(
     is_first: bool = False,
     is_thin: bool = False,
     name: str = "Glow Salon",
+    calls: int = 0,
+    directions: int = 0,
+    website_clicks: int = 0,
 ) -> MonthlyReport:
     return MonthlyReport(
         business_id="biz-1",
@@ -43,6 +46,9 @@ def _report(
         views_this_month=views_this_month,
         views_last_month=views_last_month,
         messages_this_month=messages,
+        calls_this_month=calls,
+        directions_this_month=directions,
+        website_clicks_this_month=website_clicks,
         trend=trend,
         is_first_report=is_first,
         is_thin_views=is_thin,
@@ -130,6 +136,44 @@ class TestThinViewsCaption:
         _subject, html, _text = render_monthly_email(report, caption="<script>x</script>")
         assert "<script>x</script>" not in html
         assert "&lt;script&gt;" in html
+
+
+# ── High-intent tap mention (optional enrichment) ────────────────────────────
+
+class TestActionTapsMention:
+    def test_no_taps_means_no_tap_sentence(self):
+        # A month with views but zero taps must not read "0 tapped to call".
+        report = _report(views_this_month=30, calls=0, directions=0, website_clicks=0)
+        _subject, html, text = render_monthly_email(report)
+        assert "tapped to call" not in html
+        assert "tapped for directions" not in html
+        assert "tapped to call" not in text
+
+    def test_calls_only_mentioned_when_present(self):
+        report = _report(views_this_month=30, calls=4)
+        _subject, html, text = render_monthly_email(report)
+        assert "4 tapped to call" in html
+        assert "4 tapped to call" in text
+        # Directions/website not mentioned when zero.
+        assert "tapped for directions" not in html
+        assert "clicked through" not in html
+
+    def test_all_three_taps_joined_in_intent_order(self):
+        report = _report(views_this_month=30, calls=4, directions=6, website_clicks=2)
+        _subject, html, _text = render_monthly_email(report)
+        # Intent order: call, directions, website — joined with commas + "and".
+        assert "4 tapped to call, 6 tapped for directions, and 2 clicked through to your website" in html
+
+    def test_two_taps_joined_with_and(self):
+        report = _report(views_this_month=30, calls=4, directions=6)
+        _subject, html, _text = render_monthly_email(report)
+        assert "4 tapped to call and 6 tapped for directions" in html
+
+    def test_tap_sentence_present_in_first_report(self):
+        report = _report(views_this_month=12, is_first=True, calls=3)
+        _subject, html, text = render_monthly_email(report)
+        assert "3 tapped to call" in html
+        assert "3 tapped to call" in text
 
 
 # ── Test-send safety gate ────────────────────────────────────────────────────
