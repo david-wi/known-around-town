@@ -108,26 +108,57 @@ class CaptionContext:
 # city-scoped slugs in `categories.slug`). Unknown categories fall back
 # to a generic warm-and-professional default so the feature still works
 # for newly-added verticals.
+#
+# WHY both production slugs AND legacy aliases are present: the live
+# `categories.slug` values use slugs like "spa", "lash-brow", "waxing",
+# and "skincare". An earlier version of this table was written against a
+# different naming scheme ("skin", "lashes-brows") and had no entry for
+# "spa"/"waxing" at all, so roughly a third of the real catalog silently
+# fell through to DEFAULT_STYLE_NOTE and lost its category-specific voice.
+# We now key on the real production slugs and KEEP the legacy aliases as
+# synonyms so any city still on the old scheme (or any historical data)
+# keeps working. Coverage is verified against live data by the unit test
+# `test_style_note_covers_real_production_slugs`.
 CATEGORY_STYLE_NOTES: Dict[str, str] = {
     # Beauty
     "hair": "warm, professional, beauty-focused; speak to clients seeking expert color and cut",
     "nails": "playful but polished; emphasize craftsmanship and self-care",
-    "skin": "calm, expert, results-focused; speak to clients investing in their skin",
-    "lashes-brows": "intimate and editorial; emphasize precision and natural enhancement",
     "barber": "confident and grounded; speak to men who care about how they look",
     "makeup": "celebratory and confident; lean into transformation",
     "med-spa": "trustworthy and clinical; emphasize licensed providers and visible results",
+    # Brows & lashes — production slug is "lash-brow"; "lashes-brows" is a legacy alias.
+    "lash-brow": "intimate and editorial; emphasize precision and natural enhancement",
+    "lashes-brows": "intimate and editorial; emphasize precision and natural enhancement",
+    # Spa & body — high-volume production slugs that previously had no entry.
+    "spa": "serene and restorative; emphasize escape, glow, and a true reset",
+    "waxing": "friendly and reassuring; emphasize smooth results, comfort, and a quick, easy visit",
+    # Skin — production slug is "skincare"; "skin" is a legacy alias.
+    "skincare": "calm, expert, results-focused; speak to clients investing in their skin",
+    "skin": "calm, expert, results-focused; speak to clients investing in their skin",
+    "aesthetics": "polished and results-focused; emphasize subtle, natural-looking enhancement",
     # Wellness
     "yoga": "grounded and intentional; emphasize practice and community",
+    # Production combines these as "yoga-meditation".
+    "yoga-meditation": "grounded and contemplative; emphasize practice, stillness, and community",
     "pilates": "strong, focused, intentional; emphasize control and form",
     "massage": "restorative and quiet; emphasize relief and recovery",
     "meditation": "calm and contemplative; emphasize stillness and reset",
     "fitness": "energetic and motivating; emphasize progress and community",
+    "holistic": "warm and whole-person; emphasize balance, natural care, and feeling your best",
+    "iv-hydration": "refreshing and revitalizing; emphasize energy, recovery, and feeling restored",
+    "recovery": "restorative and motivating; emphasize bouncing back and feeling renewed",
+    "sleep-stress": "calm and reassuring; emphasize rest, relief, and a clearer mind",
+    "longevity": "forward-looking and expert; emphasize investing in your long-term vitality",
+    "nutrition": "supportive and practical; emphasize real, sustainable habits and feeling your best",
+    "retreats": "immersive and restorative; emphasize unplugging, renewal, and time away to reset",
     # Health
     "primary-care": "trustworthy and clear; speak to patients seeking a reliable provider",
     "dental": "approachable and reassuring; emphasize care and comfort",
     "physical-therapy": "expert and recovery-focused; emphasize getting patients back to life",
+    # Production slug is "pt-recovery".
+    "pt-recovery": "expert and recovery-focused; emphasize getting patients back to doing what they love",
     "mental-health": "compassionate and confidential; emphasize support and progress",
+    "fertility": "compassionate and hopeful; emphasize expert, personalized support on the journey",
 }
 
 # WHY: Generic default used when the business's primary category isn't
