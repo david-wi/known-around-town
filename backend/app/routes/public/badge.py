@@ -38,7 +38,8 @@ _CACHE_CONTROL = "public, max-age=86400"
 #   #1c1917  near-black "stone-900" card background (matches site chrome)
 #   #fb7185  rose-400 accent star (the beauty network's accent color)
 #   #fff7ed  warm off-white ("orange-50") used for primary text
-#   #fdba74 / #fed7aa  warm amber used for the smaller "AS FEATURED ON" eyebrow
+#   #fdba74  warm amber ("orange-300") for the small "AS FEATURED ON" eyebrow
+#   #a8a29e  muted "stone-400" for the de-emphasized domain line
 _BG = "#1c1917"
 _ACCENT = "#fb7185"
 _TEXT = "#fff7ed"
@@ -52,17 +53,20 @@ _SUBTLE = "#a8a29e"  # stone-400, for the trailing ".com" de-emphasis
 # rose star, and warm-white wordmark mirror the site's editorial look so the
 # badge reads as "official" on a salon's site rather than a generic widget.
 #
-# viewBox 0 0 300 96 → a ~3.1:1 landscape pill that sits naturally in a website
-# footer. width/height are omitted from the root <svg> so the embed code can
-# size it with CSS (the dashboard snippet sets width:300 / height:auto).
-_BADGE_SVG = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 96" role="img" aria-label="As Featured on Miami Knows Beauty">
+# viewBox 0 0 340 96 → a ~3.5:1 landscape pill that sits naturally in a website
+# footer. The width is 340 (not 300) so the serif "Miami Knows Beauty" wordmark
+# at font-size 20 clears the rounded right corner with comfortable padding — an
+# earlier 300-wide box clipped the final letter. width/height are omitted from
+# the root <svg> so the embed code can size it with CSS (the dashboard snippet
+# sets width:300 / height:auto, and the SVG scales to fit that box).
+_BADGE_SVG = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 96" role="img" aria-label="As Featured on Miami Knows Beauty">
   <title>As Featured on Miami Knows Beauty</title>
-  <rect x="1" y="1" width="298" height="94" rx="18" fill="{_BG}"/>
-  <rect x="1" y="1" width="298" height="94" rx="18" fill="none" stroke="{_ACCENT}" stroke-opacity="0.35" stroke-width="1.5"/>
+  <rect x="1" y="1" width="338" height="94" rx="18" fill="{_BG}"/>
+  <rect x="1" y="1" width="338" height="94" rx="18" fill="none" stroke="{_ACCENT}" stroke-opacity="0.35" stroke-width="1.5"/>
   <!-- four-point sparkle star, the site's ✦ motif -->
   <path d="M34 30 c2.2 8.4 5.4 11.6 13.8 13.8 c-8.4 2.2 -11.6 5.4 -13.8 13.8 c-2.2 -8.4 -5.4 -11.6 -13.8 -13.8 c8.4 -2.2 11.6 -5.4 13.8 -13.8 z" fill="{_ACCENT}"/>
-  <text x="64" y="36" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="2.2" fill="{_EYEBROW}">AS FEATURED ON</text>
-  <text x="64" y="62" font-family="Georgia, Cambria, Times New Roman, serif" font-size="22" font-weight="700" fill="{_TEXT}">Miami Knows Beauty</text>
+  <text x="64" y="37" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="2.2" fill="{_EYEBROW}">AS FEATURED ON</text>
+  <text x="64" y="63" font-family="Georgia, Cambria, Times New Roman, serif" font-size="20" font-weight="700" fill="{_TEXT}">Miami Knows Beauty</text>
   <text x="64" y="80" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10" letter-spacing="0.5" fill="{_SUBTLE}">miami.knowsbeauty.com</text>
 </svg>"""
 
