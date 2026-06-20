@@ -1,0 +1,301 @@
+"""Monthly "your listing is working" report aggregation.
+
+This module computes the per-business numbers that go into the monthly
+retention email for Featured salon owners: how many people viewed the
+listing this month, how many reached out, and whether that's up or down
+from last month.
+
+WHY this exists as its own module (separate from the email rendering and
+the admin route): the aggregation is pure data logic with one genuinely
+tricky part — "views THIS month" — and that part deserves to be unit-tested
+in isolation, without an HTTP layer or an email provider in the way.
+
+----------------------------------------------------------------------
+The "views this month" problem and how we solve it
+----------------------------------------------------------------------
+The business document only carries a LIFETIME view counter
+(``page_view_count``), incremented on every real human visit. There is no
+per-month history, so on its own the counter cannot answer "how many views
+did I get in June?".
+
+The smallest honest fix: take a SNAPSHOT of the lifetime counter at each
+month boundary and store it in the ``monthly_view_snapshots`` collection.
+Then:
+
+    views in month M  =  lifetime_now  −  snapshot taken at the start of M
+
+The snapshot for month M is written the first time a report is generated
+for that business in month M. We store one snapshot row per (business,
+period), each holding the lifetime count at the moment that period's report
+was first produced. "Views in month M" is then:
+
+    lifetime_now  −  (the most recent snapshot from a period BEFORE M)
+
+The "most recent earlier snapshot" is our practical stand-in for "lifetime
+count at the start of M": if a report ran last month, that snapshot was taken
+near last month's end, which is close to this month's start. This is honest
+about its one limitation — if reports run mid-month rather than exactly at the
+boundary, "this month" really means "since the last report," not a strict
+calendar slice. That trade keeps the implementation simple and never
+over-claims a number we didn't measure.
+
+When there is NO earlier snapshot (the very first report we ever generate for
+a business), we cannot honestly claim a one-month number, so we report the
+lifetime total and label the period as "since you joined" via
+``is_first_report``. We never fabricate a month delta we don't have.
+
+Messages need no snapshot: ``business_inquiries`` rows each carry a
+``submitted_at`` timestamp, so "messages this month" is a direct date-range
+count.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+# WHY: below this many monthly views the email should NOT dwell on the small
+# number (small numbers accelerate churn — a salon owner who reads "3 people
+# viewed your listing" may conclude the listing isn't working and cancel).
+# Instead the email leans on a ready-to-post caption for next month. 10 is a
+# deliberately conservative line: a listing pulling double-digit monthly views
+# has a number worth celebrating; single digits do not. Tunable in one place.
+THIN_VIEWS_THRESHOLD = 10
+
+# WHY: the collection that stores one lifetime-counter snapshot per
+# (business, month). Named here so the service, the indexes, and the tests
+# all reference the same string.
+SNAPSHOT_COLLECTION = "monthly_view_snapshots"
+
+
+def period_key(when: datetime) -> str:
+    """Return the calendar-month key ("YYYY-MM") for a timestamp.
+
+    Pure function — kept separate so the snapshot read/write logic and the
+    tests agree on exactly how a month is identified. Naive datetimes are
+    treated as UTC so a stray naive value never shifts the month boundary.
+    """
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    when = when.astimezone(timezone.utc)
+    return f"{when.year:04d}-{when.month:02d}"
+
+
+def month_label(key: str) -> str:
+    """Turn a "YYYY-MM" key into a friendly label like "June 2026".
+
+    Used for the email headline ("In June, N people viewed..."). Falls back
+    to the raw key if it is malformed, so a bad value never raises inside
+    email rendering.
+    """
+    try:
+        year_s, month_s = key.split("-")
+        dt = datetime(int(year_s), int(month_s), 1, tzinfo=timezone.utc)
+    except (ValueError, AttributeError):
+        return key
+    # %B is the full month name ("June"); strip any locale padding.
+    return f"{dt.strftime('%B')} {dt.year}"
+
+
+def month_range(key: str) -> tuple[datetime, datetime]:
+    """Return [start, end) tz-aware UTC bounds for a "YYYY-MM" period.
+
+    ``start`` is the first instant of the month; ``end`` is the first instant
+    of the NEXT month. Used for the messages date-range count. Half-open so a
+    message timestamped exactly at a boundary is counted in exactly one month.
+    """
+    year_s, month_s = key.split("-")
+    year, month = int(year_s), int(month_s)
+    start = datetime(year, month, 1, tzinfo=timezone.utc)
+    if month == 12:
+        end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+    return start, end
+
+
+@dataclass(frozen=True)
+class MonthlyReport:
+    """The computed numbers for one business's monthly email.
+
+    Everything the email template needs is here so the rendering layer never
+    touches the database. ``trend`` is one of "up" / "down" / "flat" /
+    "first" so the copy can lead with the trend when views are up.
+    """
+
+    business_id: str
+    business_name: str
+    period_key: str
+    period_label: str
+    views_this_month: int
+    views_last_month: Optional[int]
+    messages_this_month: int
+    trend: str  # "up" | "down" | "flat" | "first"
+    is_first_report: bool
+    is_thin_views: bool
+
+    @property
+    def views_up_from_last_month(self) -> bool:
+        """True when this month beat last month — the email leads with this."""
+        return self.trend == "up"
+
+
+async def _latest_snapshot_before(
+    db: Any, business_id: str, current_period: str
+) -> Optional[Dict[str, Any]]:
+    """Most recent snapshot row strictly BEFORE the current period.
+
+    WHY strictly before: the current period's own snapshot (if it was already
+    written this run) records the lifetime count "as of the start of this
+    month", so the month's gain is lifetime_now minus THAT row. But for the
+    "last month" comparison we want the prior period's row. We sort by
+    period_key descending and take the first row whose key is < current.
+    """
+    cursor = (
+        db[SNAPSHOT_COLLECTION]
+        .find({"business_id": business_id, "period_key": {"$lt": current_period}})
+        .sort("period_key", -1)
+        .limit(1)
+    )
+    rows = await cursor.to_list(length=1)
+    return rows[0] if rows else None
+
+
+async def _ensure_current_snapshot(
+    db: Any, business_id: str, current_period: str, lifetime_count: int, now: datetime
+) -> None:
+    """Write this period's snapshot if it does not already exist.
+
+    Idempotent: a second report run in the same month must not overwrite the
+    count captured the first time (which is what anchors next month's delta).
+    We only insert when absent. The stored count is the lifetime total at the
+    moment this period's report was first produced.
+    """
+    existing = await db[SNAPSHOT_COLLECTION].find_one(
+        {"business_id": business_id, "period_key": current_period}
+    )
+    if existing is not None:
+        return
+    await db[SNAPSHOT_COLLECTION].insert_one(
+        {
+            "business_id": business_id,
+            "period_key": current_period,
+            "page_view_count": int(lifetime_count),
+            "created_at": now,
+        }
+    )
+
+
+async def _count_messages_in_period(db: Any, business_id: str, current_period: str) -> int:
+    """Count visitor inquiries submitted within the given month.
+
+    WHY a date-range count instead of a snapshot: each inquiry row carries
+    its own ``submitted_at``, so the exact monthly count is a direct query —
+    no running counter to snapshot.
+    """
+    start, end = month_range(current_period)
+    return await db.business_inquiries.count_documents(
+        {
+            "business_id": business_id,
+            "submitted_at": {"$gte": start, "$lt": end},
+        }
+    )
+
+
+def _trend(views_this_month: int, views_last_month: Optional[int], is_first: bool) -> str:
+    """Classify the month-over-month trend for the email copy."""
+    if is_first or views_last_month is None:
+        return "first"
+    if views_this_month > views_last_month:
+        return "up"
+    if views_this_month < views_last_month:
+        return "down"
+    return "flat"
+
+
+async def compute_report(
+    db: Any,
+    business: Dict[str, Any],
+    *,
+    now: Optional[datetime] = None,
+) -> MonthlyReport:
+    """Compute the monthly report numbers for one business.
+
+    This is the single entry point used by both the preview route and the
+    test-send route. It (a) takes/keeps a snapshot of the lifetime view
+    counter for the current month, (b) derives this month's view gain from
+    the prior snapshot, (c) counts this month's messages by date range, and
+    (d) classifies the trend.
+
+    Args:
+      db: the Motor database handle.
+      business: the business document (must include ``_id``, ``name``,
+        ``page_view_count``).
+      now: injectable clock for deterministic tests; defaults to UTC now.
+
+    Returns a fully-populated :class:`MonthlyReport`.
+    """
+    now = now or datetime.now(timezone.utc)
+    business_id = str(business["_id"])
+    business_name = business.get("name", "your listing")
+    lifetime_views = int(business.get("page_view_count") or 0)
+    current_period = period_key(now)
+
+    # The prior snapshot anchors "views at the start of this month". We read it
+    # BEFORE writing the current period's snapshot so the current write can't be
+    # mistaken for the "last month" baseline.
+    prior = await _latest_snapshot_before(db, business_id, current_period)
+
+    # Persist the current period's snapshot (idempotent). Capturing the lifetime
+    # count now is what lets NEXT month compute its own gain.
+    await _ensure_current_snapshot(db, business_id, current_period, lifetime_views, now)
+
+    if prior is None:
+        # No history yet — we cannot honestly claim a one-month number, so we
+        # report the lifetime total and let the email label it "since you
+        # joined". We never invent a month delta we don't have.
+        views_this_month = lifetime_views
+        views_last_month: Optional[int] = None
+        is_first = True
+    else:
+        prior_lifetime = int(prior.get("page_view_count") or 0)
+        # WHY max(0, ...): the lifetime counter only ever grows, so the delta
+        # should never be negative — but guard against a manual count reset or
+        # a corrupt snapshot producing a nonsensical negative "views" number in
+        # an owner-facing email.
+        views_this_month = max(0, lifetime_views - prior_lifetime)
+        # We don't have a separate "two months ago" snapshot in the smallest
+        # version, so "last month" is approximated by the prior snapshot's own
+        # delta only when a second-prior snapshot exists. To keep the first
+        # version simple and honest, last-month views is the gain the prior
+        # period represented if we can compute it, else None.
+        second_prior = await _latest_snapshot_before(db, business_id, prior["period_key"])
+        if second_prior is not None:
+            views_last_month = max(
+                0, prior_lifetime - int(second_prior.get("page_view_count") or 0)
+            )
+        else:
+            views_last_month = None
+        is_first = False
+
+    messages_this_month = await _count_messages_in_period(db, business_id, current_period)
+    trend = _trend(views_this_month, views_last_month, is_first)
+
+    # WHY thin-views uses THIS month's number (not lifetime): the email's job is
+    # to reflect the reporting period. A listing with thousands of lifetime
+    # views but a quiet month still benefits from the caption nudge.
+    is_thin = views_this_month < THIN_VIEWS_THRESHOLD
+
+    return MonthlyReport(
+        business_id=business_id,
+        business_name=business_name,
+        period_key=current_period,
+        period_label=month_label(current_period),
+        views_this_month=views_this_month,
+        views_last_month=views_last_month,
+        messages_this_month=messages_this_month,
+        trend=trend,
+        is_first_report=is_first,
+        is_thin_views=is_thin,
+    )
