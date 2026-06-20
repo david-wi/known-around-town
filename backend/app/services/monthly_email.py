@@ -143,6 +143,26 @@ def _action_phrase(report: MonthlyReport) -> str:
     return f"{parts[0]}, {parts[1]}, and {parts[2]}"
 
 
+def _mkb_referral_phrase(report: MonthlyReport) -> str:
+    """Human sentence crediting MKB for the visitors WE sent, or "" if none.
+
+    WHY: this is the whole point of the report — proving we DROVE the traffic,
+    not just that traffic happened (the one thing a salon's free Google Business
+    Profile can't show). When we sent at least one visitor from within Miami
+    Knows Beauty this period, we say so plainly: "Miami Knows Beauty sent you N
+    of those visitors." Returns "" when the count is zero so a month whose
+    visitors all came from Google or a typed URL never reads "we sent you 0".
+    The phrase reads correctly for any count (1 or many), so no plural branch is
+    needed.
+    """
+    n = report.mkb_referred_views_this_month
+    if n <= 0:
+        return ""
+    # WHY "of those" ties the number back to the visitor count in the lead
+    # sentence — it's a subset, not a separate metric.
+    return f"Miami Knows Beauty sent you {n} of those visitors."
+
+
 def _lead_sentence(report: MonthlyReport) -> str:
     """The friendly one-liner under the headline, chosen by trend.
 
@@ -168,22 +188,30 @@ def _lead_sentence(report: MonthlyReport) -> str:
     action = _action_phrase(report)
     action_tail = f" Of those, {action}." if action else ""
 
+    # WHY: the MKB-referral credit comes LAST in the sentence — after the view
+    # count and any taps — because it's the line that answers "did the directory
+    # actually do anything for me?". Empty when we sent no one, so it never
+    # reads "we sent you 0". This is what makes the report worth keeping vs. the
+    # salon's free Google Business Profile.
+    mkb = _mkb_referral_phrase(report)
+    mkb_tail = f" {mkb}" if mkb else ""
+
     if report.is_first_report:
         # Lifetime framing — we don't have a month delta yet.
         return (
             f"So far, {views} {person} {viewed} your <strong>{html.escape(report.business_name)}</strong> "
-            f"listing, and {msgs} {reached}.{action_tail}"
+            f"listing, and {msgs} {reached}.{action_tail}{mkb_tail}"
         )
     if report.trend == "up" and report.views_last_month is not None:
         return (
             f"In {month}, {views} {person} {viewed} your "
             f"<strong>{html.escape(report.business_name)}</strong> listing — "
-            f"up from {report.views_last_month} last month. {msgs} {reached}.{action_tail}"
+            f"up from {report.views_last_month} last month. {msgs} {reached}.{action_tail}{mkb_tail}"
         )
     return (
         f"In {month}, {views} {person} {viewed} your "
         f"<strong>{html.escape(report.business_name)}</strong> listing, "
-        f"and {msgs} {reached}.{action_tail}"
+        f"and {msgs} {reached}.{action_tail}{mkb_tail}"
     )
 
 
@@ -211,25 +239,29 @@ def _text_body(report: MonthlyReport, caption: Optional[str]) -> str:
     # when no taps occurred, so a quiet month's text body is unchanged.
     action = _action_phrase(report)
     action_tail = f" Of those, {action}." if action else ""
+    # WHY: same MKB-referral credit as the HTML body, plain-text form — empty
+    # when we sent no one, so a quiet month's text body is unchanged.
+    mkb = _mkb_referral_phrase(report)
+    mkb_tail = f" {mkb}" if mkb else ""
     lines = [f"Hi,", ""]
     if report.is_first_report:
         person = "person" if report.views_this_month == 1 else "people"
         lines.append(
             f"So far, {report.views_this_month} {person} have viewed your "
-            f"{report.business_name} listing, and {report.messages_this_month} reached out.{action_tail}"
+            f"{report.business_name} listing, and {report.messages_this_month} reached out.{action_tail}{mkb_tail}"
         )
     elif report.trend == "up" and report.views_last_month is not None:
         person = "person" if report.views_this_month == 1 else "people"
         lines.append(
             f"In {month}, {report.views_this_month} {person} viewed your "
             f"{report.business_name} listing — up from {report.views_last_month} last month. "
-            f"{report.messages_this_month} reached out.{action_tail}"
+            f"{report.messages_this_month} reached out.{action_tail}{mkb_tail}"
         )
     else:
         person = "person" if report.views_this_month == 1 else "people"
         lines.append(
             f"In {month}, {report.views_this_month} {person} viewed your "
-            f"{report.business_name} listing, and {report.messages_this_month} reached out.{action_tail}"
+            f"{report.business_name} listing, and {report.messages_this_month} reached out.{action_tail}{mkb_tail}"
         )
     lines.append("")
     if caption:

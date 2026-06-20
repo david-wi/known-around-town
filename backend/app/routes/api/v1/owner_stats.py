@@ -48,6 +48,7 @@ async def get_owner_stats(request: Request) -> dict:
         # activity counters, not the full document (photos, hours, socials, etc.)
         projection={
             "page_view_count": 1,
+            "mkb_referred_view_count": 1,
             "call_click_count": 1,
             "directions_click_count": 1,
             "website_click_count": 1,
@@ -62,6 +63,13 @@ async def get_owner_stats(request: Request) -> dict:
     # for listings that predate the counters or haven't been tapped yet.
     return {
         "page_view_count": business.get("page_view_count") or 0,
+        # WHY: of the total page views, how many came from within Miami Knows
+        # Beauty itself (a guide, on-site search, a category/neighborhood page,
+        # or a sister listing). This is the number that proves WE drove the
+        # traffic — the distinction a salon's free Google profile can't show.
+        # Defaults to 0 for listings that predate the counter or have only had
+        # external/typed visits.
+        "mkb_referred_view_count": business.get("mkb_referred_view_count") or 0,
         "call_click_count": business.get("call_click_count") or 0,
         "directions_click_count": business.get("directions_click_count") or 0,
         "website_click_count": business.get("website_click_count") or 0,

@@ -103,3 +103,35 @@ counter is NOT incremented; given `/go/website` for a salon with no website, the
 404 is returned; given a logged-in owner viewing `/owners/me`, then taps-to-call,
 taps-for-directions, and website-clicks are displayed alongside page views and
 messages.
+
+### KAT-039 — Miami-Knows-Beauty-referred view tracking · V1 · implemented
+**Persona:** Salon Owner.
+A salon's free Google Business Profile already tells them how people found them,
+so our "who found you" numbers are only worth keeping if they prove a distinction
+Google can't: that *Miami Knows Beauty itself* sent the visitor — from one of our
+editorial guides, our on-site search, a category or neighborhood page, or a sister
+listing — not just that traffic happened. The directory captures this at the moment
+a shopper lands on a listing (it can never be reconstructed later): when the page
+they clicked through from is on our own site (a same-host `Referer`), the visit is
+counted in a separate `mkb_referred_view_count` on the business document, in the same
+bot-filtered background task as the total page-view counter, with no added latency. A
+visit with no referrer (typed URL / bookmark) or an external referrer (Google, social,
+the salon's own website) increments only the total, never the referred counter — so
+the referred number can never over-claim credit. The "As Featured on Miami Knows
+Beauty" badge on a salon's own site refers from the salon's domain, so its clicks land
+in the total, not the referred number (a deliberate, documented under-count). The count
+is returned by `GET /api/v1/owner/stats`, shown on the owner dashboard as an "N of these
+came from Miami Knows Beauty" line under page views (hidden at zero so it never reads as
+a failure), and carried into the dormant monthly report so the eventual email can say
+"Miami Knows Beauty sent you N of your M visitors this month." The monthly email stays
+dormant — no live send is enabled by this requirement.
+**Acceptance:** Given a real visitor (non-bot User-Agent) requesting a listing with a
+`Referer` whose host matches the site's own host, when the request is handled, then both
+`page_view_count` and `mkb_referred_view_count` are incremented by 1; given the same
+request with an external `Referer` (e.g. google.com) or no `Referer`, then only
+`page_view_count` is incremented and `mkb_referred_view_count` is unchanged; given a bot
+User-Agent, then neither counter moves; given a logged-in owner viewing `/owners/me`
+whose listing has at least one referred view, then a line stating how many of their
+views came from Miami Knows Beauty is shown under page views; given the monthly report is
+computed for a business, then it carries this month's referred-view count without
+enabling any email send.

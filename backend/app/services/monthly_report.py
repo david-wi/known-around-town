@@ -140,6 +140,13 @@ class MonthlyReport:
     calls_this_month: int = 0
     directions_this_month: int = 0
     website_clicks_this_month: int = 0
+    # WHY: of this month's views, how many came from within Miami Knows Beauty
+    # itself (a guide, on-site search, a category/neighborhood page, or a sister
+    # listing). Snapshot-diffed exactly like views and taps — it's a lifetime
+    # counter on the business doc. This is the number that proves WE drove the
+    # traffic, so the eventual monthly email can say "Miami Knows Beauty sent you
+    # N of your M visitors this month." Always <= views_this_month.
+    mkb_referred_views_this_month: int = 0
     trend: str = "flat"  # "up" | "down" | "flat" | "first"
     is_first_report: bool = False
     is_thin_views: bool = False
@@ -161,6 +168,17 @@ class MonthlyReport:
             + self.directions_this_month
             + self.website_clicks_this_month
         ) > 0
+
+    @property
+    def has_mkb_referral(self) -> bool:
+        """True when we sent at least one visitor from within MKB this period.
+
+        WHY: the email mentions the "we sent you N visitors" line only when N is
+        non-zero, so a month whose visitors all came from Google or typed URLs
+        never reads "Miami Knows Beauty sent you 0 visitors" — which would frame
+        the report as a failure rather than leaving the proof out gracefully.
+        """
+        return self.mkb_referred_views_this_month > 0
 
 
 async def _latest_snapshot_before(
@@ -275,14 +293,17 @@ async def compute_report(
     lifetime_views = int(business.get("page_view_count") or 0)
     current_period = period_key(now)
 
-    # WHY: the three shopper-action taps are lifetime counters on the business
-    # doc, just like page views, so we read them here and diff them against the
-    # prior snapshot the same way. A listing that predates tracking simply has
-    # these absent (treated as 0).
+    # WHY: the three shopper-action taps AND the MKB-referred view count are all
+    # lifetime counters on the business doc, just like page views, so we read
+    # them here and diff them against the prior snapshot the same way. A listing
+    # that predates tracking simply has these absent (treated as 0). Putting
+    # mkb_referred_view_count in this same dict means it gets snapshotted and
+    # month-over-month diffed by the exact same proven machinery as the taps.
     lifetime_actions = {
         "call_click_count": int(business.get("call_click_count") or 0),
         "directions_click_count": int(business.get("directions_click_count") or 0),
         "website_click_count": int(business.get("website_click_count") or 0),
+        "mkb_referred_view_count": int(business.get("mkb_referred_view_count") or 0),
     }
 
     # The prior snapshot anchors "views at the start of this month". We read it
@@ -343,6 +364,13 @@ async def compute_report(
     website_clicks_this_month = _action_delta(
         "website_click_count", lifetime_actions["website_click_count"]
     )
+    # WHY: same snapshot-diff as the taps — this month's MKB-referred views is
+    # the lifetime count now minus the prior snapshot's stored total. On the
+    # first report (no prior snapshot) it reports the lifetime total, framed
+    # "since you joined" by the email, like every other counter here.
+    mkb_referred_views_this_month = _action_delta(
+        "mkb_referred_view_count", lifetime_actions["mkb_referred_view_count"]
+    )
 
     messages_this_month = await _count_messages_in_period(db, business_id, current_period)
     trend = _trend(views_this_month, views_last_month, is_first)
@@ -363,6 +391,7 @@ async def compute_report(
         calls_this_month=calls_this_month,
         directions_this_month=directions_this_month,
         website_clicks_this_month=website_clicks_this_month,
+        mkb_referred_views_this_month=mkb_referred_views_this_month,
         trend=trend,
         is_first_report=is_first,
         is_thin_views=is_thin,
