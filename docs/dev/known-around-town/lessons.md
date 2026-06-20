@@ -899,3 +899,36 @@ Key gotchas / decisions:
 
 - **The badge does NOT depend on `MARKETING_AI_ENABLED`** — it's a static asset
   plus a templated caption, so it works regardless of the AI feature flag.
+
+## Sitemap 500 on string-dated guides — would have broken launch day (2026-06-20)
+
+The launch plan is a single flip of the preview/launch gate: while it's ON,
+`robots.txt` returns `Disallow: /` and `sitemap.xml` is an empty `<urlset>`
+(both short-circuit on `get_preview_mode_enabled()`); when it's OFF, both render
+their live form. That part already worked. The trap: the live `sitemap.xml`
+formats each editorial guide's `<lastmod>` from `updated_at`/`published_at` by
+calling `.strftime()` — but ~25 of Miami's 107 live guides store that field as
+an ISO STRING (same import quirk that 500'd the guide PAGE in PR #377, fixed
+there with the `iso_datetime` filter). `.strftime()` on a `str` raises
+`AttributeError`, which 500s the WHOLE sitemap. Because the gate is on today the
+sitemap is empty, so the crash was invisible — it would have fired the instant
+David flipped the gate, turning launch into an invisible-to-Google outage.
+
+Fix: a shared `_lastmod_str(raw, fallback)` helper in `pages.py` that accepts a
+datetime, an ISO string (first 10 chars are `YYYY-MM-DD`), or anything else
+(fallback) — used for BOTH the business loop and the guide loop. Lesson: any new
+code that calls `.strftime()` on a stored timestamp in this DB must assume the
+value might be a string; prefer `_lastmod_str` / the `iso_datetime` filter.
+
+Two more SEO touches landed in the same change:
+- `_seo_show_live(request)` is now the single decision both `robots.txt` and
+  `sitemap.xml` read, so they flip together on one gate change. It also honours
+  an admin-key-gated `?preview_state=live|gated` override so the live response
+  can be verified on the deployed site BEFORE launch without flipping the real
+  gate (anonymous requests with the param still get the gated form — no early
+  slug leak).
+- The bare-apex sitemap (no city subdomain) now lists each city's home page on
+  its own subdomain, so a brand-new city is discoverable via the sitemap, not
+  only by crawling the landing-page HTML. City URLs are built from the request
+  host's network suffix (not `CANONICAL_BASE_URL`, which is a single city's
+  domain).
