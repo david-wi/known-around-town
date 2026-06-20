@@ -745,3 +745,40 @@ in `test_stripe_billing.py`, `test_admin_claims.py`, and the owner-dashboard
 smoke tests into negative guards (flag set in DB → still NO badge rendered);
 the `test_startup_migrations.py` tests that protect the kept migration still
 pass unchanged.
+
+## The AI caption "voice per category" table must track the LIVE category slugs (2026-06-20)
+
+The Featured-tier AI tool writes captions + ad copy "in the salon's voice."
+Part of that voice is a per-category style note in
+`backend/app/services/ai_caption.py` (`CATEGORY_STYLE_NOTES`), keyed on
+`Business.category_slugs`. Unknown slugs fall back to `DEFAULT_STYLE_NOTE`
+(generic "warm and professional").
+
+The table had drifted from reality: it was keyed on an older naming scheme
+(`skin`, `lashes-brows`) and had NO entry for high-volume live categories
+like `spa`, `lash-brow`, and `waxing`. Result: ~32% of live businesses
+(330 of ~1,000 — including 271 across just spa/lash-brow/waxing) silently
+got the generic voice instead of a tailored one. The captions were still
+good — the salon's real neighborhood, services, and `known_for` carry most
+of the quality — but those salons lost the on-brand voice the feature sells.
+
+Fix (PR #371): extended the table to cover every live primary-category slug
+(`spa`, `lash-brow`, `waxing`, `skincare`, `aesthetics`, `holistic`,
+`iv-hydration`, `recovery`, `sleep-stress`, `longevity`, `fertility`,
+`nutrition`, `retreats`, `yoga-meditation`, `pt-recovery`), keeping the old
+names as synonyms. The caption/ad-copy prompt wording and output format were
+NOT changed. Added `test_style_note_covers_real_production_slugs` to pin the
+live slugs so a future rename can't quietly regress coverage again.
+
+How to re-check coverage against live data (read-only, from an Atlas-
+allowlisted host like `do-server`): aggregate distinct primary
+`category_slugs` on `{status:"live"}` in the `who_knows_local` database and
+compare against `CATEGORY_STYLE_NOTES.keys()`. If a NEW vertical appears in
+the catalog, add its slug both to the table and to the test's
+`production_primary_slugs` list.
+
+Quality note: exercising the real generator against the live gateway on real
+salons (hair, nails, med-spa, barber, brow bar, spa) showed the output is
+genuinely good — specific to each salon, cliché-light, smart local+niche+
+branded hashtags. No prompt rewrite was warranted; the only real gap was
+this category-coverage one.
