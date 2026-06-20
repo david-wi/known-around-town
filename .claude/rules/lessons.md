@@ -1,4 +1,45 @@
 
+## Tailwind classes only work if they're in the pre-compiled reference.css (2026-06-20, PR #373)
+
+The site ships a SINGLE pre-built stylesheet (`backend/app/static/css/reference.css`,
+one minified line) — there is NO live Tailwind/JIT build. So a utility class typed
+in a template renders as **nothing** unless that exact class already has a rule baked
+into reference.css. A class that's missing fails silently — no error, no fallback.
+
+This bit the free-tier owner dashboard's locked AI-tool upsell overlay: it used
+`bg-white/70` and `backdrop-blur-[1px]`, neither of which is in reference.css (the
+only `bg-white` opacities shipped are /5 /10 /40 /60 /85 /90 /95; arbitrary-value
+blurs like `[1px]` were never generated). The overlay rendered fully transparent, so
+the "Featured listing required" upsell text sat on top of the textarea placeholder
+behind it and read as a broken jumble — on the exact screen that asks the owner to pay.
+Fix: switch to `bg-white/95` + `backdrop-blur-sm` (both present in reference.css, and
+the same readable-overlay recipe the public sticky bars already use).
+
+**Rule for any new template styling:** before using an opacity modifier (`/NN`) or an
+arbitrary value (`[...]`), grep reference.css for the escaped selector
+(`grep 'bg-white\/95' reference.css`, note the `\/` escaping). If it's absent, pick a
+value that IS present rather than assuming Tailwind will generate it. Regression guard:
+`tests/test_owner_dashboard_ux.py::TestLockedAiUpsellOverlay` renders the free-tier
+dashboard and asserts every overlay class has a real rule in reference.css.
+
+## Driving the owner dashboard with TEST data (no real records touched)
+
+The owner dashboard resolves the logged-in owner's salon by
+`businesses.find_one({"claimed_email": <session email lowercased>})`, and the session
+cookie is just `sign_session(email)` from `app.services.owner_auth` signed with the
+server's `OWNER_SESSION_SECRET`. So to drive `/owners/me` as an owner WITHOUT going
+through the email magic-code flow: run `sign_session("<test-email>")` inside the prod
+backend container, set it as the `kb_owner_session` cookie in Playwright, and point a
+clearly-labelled TEST business's `claimed_email` at that same email. Always use a fake
+salon (e.g. slug `zzz-...-DELETEME`), never a real one, and delete it afterward.
+
+Caution: a prior demo session left the REAL "Rossano Ferretti Hair Spa" record with a
+fake `stripe_subscription_id` (`sub_demo_screenshot_posey`) + `featured.tier=premium`
+and `claimed_email: posey-demo@example.com` while `claim_status` stayed `unclaimed`.
+That makes a real salon show as a paid Featured listing (top placement) for free. If
+two businesses share one `claimed_email`, whichever sorts first wins the dashboard —
+a latent way to show an owner the wrong salon. Clean demo flags off real records.
+
 ## Salon detail page must tolerate single-line string addresses (2026-06-20, PR #369)
 
 Imported salon records (about 367 in the beauty network, 256 of them live) store
