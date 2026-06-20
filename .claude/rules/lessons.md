@@ -1,4 +1,45 @@
 
+## Salon detail page must tolerate single-line string addresses (2026-06-20, PR #369)
+
+Imported salon records (about 367 in the beauty network, 256 of them live) store
+their address as ONE line of text — e.g. `"2001 N Federal Hwy, Suite 208, Pompano
+Beach, FL 33062"` — instead of the structured `{street, city, state, postal_code}`
+object the `Business.address` model defines. The detail route built its Google
+Maps query with `address.get("street")`, which raised
+`AttributeError: 'str' object has no attribute 'get'` on a plain string, so every
+one of those live salon pages returned HTTP 500. About 1 in 4 live salon pages.
+
+What did NOT break (verified, so don't chase these): the JSON list API
+`GET /api/v1/businesses` (returns raw dicts, no `response_model` — a string
+serializes fine; the original audit's "500 on the list API" claim did not
+reproduce); the search/category/neighborhood/home pages (no Python-level address
+access — they render through `business_card.html`, which never touches address);
+the Jinja templates (attribute access on a string yields `Undefined`, not an
+error); `voice_provisioning.py` (already `isinstance(addr, dict)`-guarded).
+
+Fix: `_normalize_address()` in `app/routes/public/pages.py` normalizes the
+address into a dict at render time (dict passthrough; string → full line kept as
+`street` so the Address card still shows it, plus best-effort city/state/zip for
+the Maps query and JSON-LD). Display-time only — does NOT rewrite stored data
+(that migration needs owner sign-off and is separate). Regression test:
+`tests/test_string_address_tolerance.py` (red-green verified).
+
+Tenant-model gotcha discovered while verifying: the beauty network has ~27
+separate `city_id`s — they are AREAS, not just Miami (`aventura`, `doral`,
+`weston`, `pompano-beach`, `delray-beach`, `boca-raton`, …, plus `miami`). Each
+resolves from its own subdomain, and `get_business` filters by the host's
+`city_id`. So a Pompano-Beach salon 404s on `miami.knowsbeauty.com` — it's served
+under its own area. The string-address salons are spread across MANY of these
+areas (the `miami` city alone has 50 live ones). When verifying a specific salon
+page, match the salon's `city_id` to the host you request.
+
+Verifying gated pages without flipping the preview gate: send the admin key as
+the `X-API-Key` header — the preview-gate middleware bypasses on a matching key.
+The key in `~/.claude/gitignore/creds` was 1 char SHORT of the deployed value
+(a trailing char got lost); read the exact value from the running container with
+`docker exec known-around-town-backend-1 printenv ADMIN_API_KEY`. Playwright:
+pass it via `extra_http_headers={"X-API-Key": KEY}`.
+
 ## Branded photo-fallback coverage + testing full public pages (2026-06-19, PR #364)
 
 When a salon/neighborhood photo fails to load (many are Unsplash stock URLs that
