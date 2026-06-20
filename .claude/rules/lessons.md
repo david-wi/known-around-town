@@ -1,4 +1,65 @@
 
+## Guide pages 500 when published_at is stored as a string, not a datetime (2026-06-20, PR #377)
+
+A pre-launch sweep of every page TYPE across all 26 city editions (1,800+ live
+pages) found that **23 editorial guide pages on Miami returned HTTP 500** while
+every other page type (business, category, neighborhood, cross, home, static,
+404) was solid. Root cause: `editorial_guide.html` emitted the schema.org
+`datePublished` with `guide.published_at.isoformat()` — called directly, no type
+guard. A batch of imported guides stored `published_at` as a plain ISO string
+("2026-06-12T06:00:00Z") instead of a datetime, and a `str` has no `.isoformat()`,
+so the whole page crashed (`AttributeError`). The page's *other* date spot
+(the human-readable byline) already used the `humantime` filter, which guards
+with `isinstance(when, datetime)` — so it survived; only the unguarded JSON-LD
+line crashed.
+
+Fix: added an `iso_datetime` Jinja filter (mirrors `humantime`: datetime ->
+`.isoformat()`, string -> passthrough, empty -> "") and routed the template
+through it. There are now ZERO unguarded date-method calls in any public
+template (`grep -rE '\.(isoformat|strftime|year|month|day)\(' templates/*.html`).
+
+Two related data observations (NOT fixed in this PR — they're data/strategy calls):
+- The 23 crashing guides all belong to the **wellness/health networks**
+  (`network_id` a6486f6d / 9bf1b71d) yet are attached to the **beauty** Miami
+  city, so they surface on the beauty site. After the crash fix they render 200
+  but show wellness/health content (yoga, IV therapy, dentists) on a beauty site.
+- 3 beauty guides (`how-much-does-balayage-cost-miami`,
+  `microblading-vs-powder-brows-miami`, `lash-lift-vs-extensions-miami`) contain
+  a literal `{{BUSINESSES}}` placeholder in their `body_markdown` that was never
+  substituted — visitors see the raw text "{{BUSINESSES}}".
+- On the imported (string-date) guides the byline date renders as the raw ISO
+  string rather than "Jun 12, 2026" — cosmetic, because `humantime` str()-falls-back.
+
+The real cure for all three is to normalize the imported guide data (store
+`published_at` as a datetime, fix the network/city wiring, substitute or remove
+the placeholder). Those are data writes + content decisions, deliberately left
+for a human.
+
+### Other pre-launch sweep findings (data/config, flagged not fixed)
+
+- **`hollywood-fl` city has no live subdomain.** It is a beauty-network city
+  (status live, ~17 businesses, with a non-UUID `_id` literally "hollywood-fl")
+  but there is no `hollywood-fl.knowsbeauty.com` in the Traefik host list, so all
+  its businesses are unreachable. Looks like a duplicate of the real `hollywood`
+  city — merge or give it a subdomain (a decision + data write).
+- **Every other page type is solid.** 651/651 business pages (including all 131
+  single-line-address records — the #369 fix holds, no regression), 151 category,
+  162 cross, 91 neighborhood, all 26 home pages, and all static/owner pages
+  return 200; all deliberately-bad URLs return a clean 404 (never a 500).
+
+### Test-isolation gotcha: don't call attach_templates() in a test
+
+`attach_templates(t)` sets a **module-global `_templates`** in `pages.py` as a
+side effect. A unit test that did `attach_templates(Jinja2Templates(...))` with a
+throwaway templates object replaced the app's fully-configured templates for the
+rest of the session, which made a LATER sync-`TestClient` page-render test
+(`test_smoke.py::test_business_jsonld_emits_opening_hours...`) blow up with a
+Starlette `BaseHTTPMiddleware` TaskGroup error — a confusing failure miles from
+the cause, only visible in the full suite (passed in isolation). Fix: assert
+against the app's already-built `app.main.templates` object instead of calling
+`attach_templates` with a fresh one. Lesson: never call `attach_templates` (or
+anything that mutates a module global) from a test without restoring state.
+
 ## Tailwind classes only work if they're in the pre-compiled reference.css (2026-06-20, PR #373)
 
 The site ships a SINGLE pre-built stylesheet (`backend/app/static/css/reference.css`,
