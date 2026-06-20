@@ -132,6 +132,63 @@ def test_owners_page(client):
     assert "Founding Partner" not in r.text
 
 
+def test_owners_featured_pricing_card_has_cta(client):
+    """The Featured ($29) tier card in the /owners pricing section must give
+    the owner a way to act — a claim CTA plus a sign-in-to-upgrade link.
+
+    Background: the card previously ended at its bullet list with no button,
+    so an owner who read it and decided to buy had to scroll back up to find
+    the claim form. That dead-end at the moment of highest intent leaked
+    conversions. The fix mirrors the dedicated /pricing page Featured card,
+    which already carries both CTAs. If this fails, the card lost its CTA.
+    """
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    body = r.text
+
+    # The Featured card's primary CTA scroll-links to the claim form that is
+    # already on this same page (the hero form, anchor id #claim-form).
+    assert 'href="#claim-form"' in body
+    # The secondary path for an owner who already claimed: sign in to upgrade.
+    assert "Sign in to upgrade" in body
+    assert 'href="/owners/login"' in body
+
+    # The CTA must sit AFTER the Featured tier heading and price (i.e. it
+    # belongs to the Featured card, not somewhere unrelated). The Featured
+    # tier label and its $29 price both precede the #claim-form scroll button.
+    featured_pos = body.find(">Featured</p>")
+    price_pos = body.find("$29<span")
+    cta_pos = body.find('href="#claim-form"')
+    assert featured_pos != -1 and price_pos != -1 and cta_pos != -1
+    assert featured_pos < cta_pos and price_pos < cta_pos
+
+
+def test_owners_ai_tools_trust_line_uses_vertical_word(client):
+    """The hero "AI tools built for <vertical>" trust signal must reflect the
+    site's actual vertical, not a hardcoded "beauty".
+
+    Background: the /owners template is shared by every site in the network
+    (Beauty, Wellness, Health). The line used to read "AI tools built for
+    beauty" on every one of them — so a wellness-studio owner on the
+    Knows Wellness site, which is seeded and ready to launch, would be told
+    the tools are "built for beauty", the wrong category. The line now uses
+    the network's vertical word. On the beauty site it still reads "beauty"
+    (unchanged); on the wellness site it reads "wellness".
+    """
+    # Beauty site — unchanged wording.
+    r = client.get("/owners", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert "AI tools built for beauty" in r.text
+
+    # Wellness site — same template, correct vertical word. This is the
+    # assertion that proves the fix is real: with the old hardcoded line,
+    # this page would have said "beauty" and this would fail.
+    rw = client.get("/owners", headers={"host": "miami.knowswellness.localhost"})
+    assert rw.status_code == 200, rw.text
+    assert "AI tools built for wellness" in rw.text
+    assert "AI tools built for beauty" not in rw.text
+
+
 def test_owners_page_has_claim_form_not_mailto(client):
     """The owners page used to be two `mailto:hello@expertly.ai` links.
     Both have been replaced by a real claim form that posts to the
