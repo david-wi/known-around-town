@@ -47,6 +47,12 @@ _INTERNAL_REFERER = f"http://{_HOST}/guides/best-balayage-miami"
 # A referer from outside the network — Google search, social, the salon's own
 # site. Must NOT count as MKB-driven.
 _EXTERNAL_REFERER = "https://www.google.com/search?q=miami+hair+salon"
+# What a click on the "As Featured on Miami Knows Beauty" website badge looks
+# like: the referer is the SALON'S OWN external site, but the URL carries the
+# ?ref=mkb-badge marker we stamped on the badge link. This MUST count as
+# MKB-driven — the badge is traffic we drove.
+_BADGE_REFERER = "https://thissalon.example.com/"
+_BADGE_MARKER = "mkb-badge"
 
 
 @pytest.fixture
@@ -83,11 +89,15 @@ def _count(db, biz_id: str, field: str) -> int:
     return int(doc.get(field) or 0)
 
 
-def _visit(client, slug: str, *, referer: Optional[str], ua: str = _HUMAN_UA):
+def _visit(client, slug: str, *, referer: Optional[str], ua: str = _HUMAN_UA,
+           ref: Optional[str] = None):
     headers = {"host": _HOST, "user-agent": ua}
     if referer is not None:
         headers["referer"] = referer
-    return client.get(f"/b/{slug}", headers=headers)
+    path = f"/b/{slug}"
+    if ref is not None:
+        path = f"{path}?ref={ref}"
+    return client.get(path, headers=headers)
 
 
 # ─── Route-level counter behaviour (the core of KAT-039) ─────────────────────
@@ -145,6 +155,54 @@ def test_mkb_referred_never_exceeds_total_across_mixed_visits(seeded_db, client)
     assert _count(seeded_db, biz_id, "mkb_referred_view_count") == 2
 
 
+# ─── Website-badge clicks (the ?ref=mkb-badge marker) ────────────────────────
+
+
+def test_badge_marker_with_external_referer_increments_both(seeded_db, client):
+    """A click on our website badge arrives from the salon's OWN site (external
+    referer) but carries the ?ref=mkb-badge marker. It MUST count as MKB-driven —
+    the badge is our #1 way of sending the salon shoppers, and that traffic is
+    exactly what we want to prove we drove."""
+    biz_id = asyncio.run(_insert_business(seeded_db))
+    r = _visit(client, "referer-test-salon", referer=_BADGE_REFERER, ref=_BADGE_MARKER)
+    assert r.status_code == 200, r.text
+    assert _count(seeded_db, biz_id, "page_view_count") == 1
+    assert _count(seeded_db, biz_id, "mkb_referred_view_count") == 1
+
+
+def test_badge_marker_with_no_referer_increments_both(seeded_db, client):
+    """Some browsers strip the Referer on a cross-site navigation, so a badge
+    click can land with the marker but no referer at all. The marker alone is
+    enough to credit it as MKB-driven."""
+    biz_id = asyncio.run(_insert_business(seeded_db))
+    r = _visit(client, "referer-test-salon", referer=None, ref=_BADGE_MARKER)
+    assert r.status_code == 200, r.text
+    assert _count(seeded_db, biz_id, "page_view_count") == 1
+    assert _count(seeded_db, biz_id, "mkb_referred_view_count") == 1
+
+
+def test_external_referer_with_wrong_marker_increments_only_total(seeded_db, client):
+    """Only OUR exact badge marker counts. A different ?ref value plus an external
+    referer is still just external traffic — the marker carve-out must not become
+    a loophole that any ?ref query string can walk through."""
+    biz_id = asyncio.run(_insert_business(seeded_db))
+    r = _visit(client, "referer-test-salon", referer=_EXTERNAL_REFERER, ref="instagram")
+    assert r.status_code == 200, r.text
+    assert _count(seeded_db, biz_id, "page_view_count") == 1
+    assert _count(seeded_db, biz_id, "mkb_referred_view_count") == 0
+
+
+def test_badge_marker_bot_increments_neither(seeded_db, client):
+    """A crawler hitting the badge URL is still a bot — the marker must not let
+    bot traffic inflate either counter."""
+    biz_id = asyncio.run(_insert_business(seeded_db))
+    r = _visit(client, "referer-test-salon", referer=_BADGE_REFERER,
+               ref=_BADGE_MARKER, ua=_BOT_UA)
+    assert r.status_code == 200, r.text
+    assert _count(seeded_db, biz_id, "page_view_count") == 0
+    assert _count(seeded_db, biz_id, "mkb_referred_view_count") == 0
+
+
 # ─── _is_mkb_referred in isolation (no HTTP layer) ───────────────────────────
 
 
@@ -167,6 +225,23 @@ def test_is_mkb_referred_decision_function():
     assert _is_mkb_referred("", "miami.knowsbeauty.com") is False
     assert _is_mkb_referred("not a url", "miami.knowsbeauty.com") is False
     assert _is_mkb_referred("http://", "miami.knowsbeauty.com") is False
+
+    # Badge marker counts even with an EXTERNAL referer (the salon's own site).
+    assert _is_mkb_referred("https://thissalon.example.com/", "miami.knowsbeauty.com",
+                            "mkb-badge") is True
+    # Marker counts even with NO referer at all (browser stripped it).
+    assert _is_mkb_referred(None, "miami.knowsbeauty.com", "mkb-badge") is True
+    # A non-matching marker is NOT a free pass — external referer stays uncounted.
+    assert _is_mkb_referred("https://www.google.com/x", "miami.knowsbeauty.com",
+                            "instagram") is False
+    assert _is_mkb_referred("https://www.google.com/x", "miami.knowsbeauty.com",
+                            "") is False
+    # Same-host still wins regardless of the marker argument (backwards-compatible).
+    assert _is_mkb_referred("https://miami.knowsbeauty.com/c/hair",
+                            "miami.knowsbeauty.com", None) is True
+    # The marker constant the link builder uses is exactly what the detector checks.
+    from app.routes.public.pages import MKB_BADGE_REF_MARKER
+    assert MKB_BADGE_REF_MARKER == "mkb-badge"
 
 
 # ─── Owner stats endpoint surfaces the new field ─────────────────────────────

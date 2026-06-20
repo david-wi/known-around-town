@@ -20,13 +20,24 @@ the SAME `$inc` as `page_view_count`, in the same bot-filtered background task �
 the flag is computed in-request (headers aren't available in the deferred task)
 and passed into `_increment_business_view(business_id, mkb_referred)`.
 
-**Badge caveat (deliberate under-count):** the "As Featured on Miami Knows
-Beauty" website badge lives on the salon's OWN external site, so its clicks
-refer from the salon's domain — an external host — and land in the total, not
-the MKB number. The badge link carries our listing URL as its destination but
-the *referer* is the salon's site. Catching badge clicks would need a marker on
-the link (e.g. `?ref=mkb-badge`); deferred as a separate change. Under-counting
-our own credit is the safe direction.
+**Badge attribution (closed 2026-06-20, KAT-040):** the "As Featured on Miami
+Knows Beauty" website badge lives on the salon's OWN external site, so its
+clicks refer from the salon's domain — an external host that same-host matching
+can't credit. The original KAT-039 ship deliberately under-counted these. That
+gap is now closed: the badge link carries a stable `?ref=mkb-badge` marker
+(`MKB_BADGE_REF_MARKER` in `pages.py`, used by both the embed-code builder and
+the dashboard preview link), and `_is_mkb_referred` takes a third `ref_marker`
+argument that returns MKB-driven when the marker matches — even with an external
+or absent referer. The marker is the ONLY external-referer carve-out; every
+other external referer is still uncounted, so it's a tight carve-out, not a
+loophole. The marker is NOT stamped on `listing_absolute_url` (which also feeds
+the Instagram share caption and the preview link) — only on the dedicated
+`badge_link_url`, so only a real badge click is credited as a badge click.
+Bot filtering is unchanged (the marker check sits inside the same bot-gated
+block). Like the rest of this counter, badge attribution can't be backfilled —
+a marker-less badge link, once shoppers start clicking it, is indistinguishable
+from any other external traffic forever, so the marker had to ship before
+launch.
 
 **It rides the existing snapshot machinery:** adding `mkb_referred_view_count`
 to the `lifetime_actions` dict in `compute_report` means the monthly-report

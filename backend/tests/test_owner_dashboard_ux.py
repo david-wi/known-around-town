@@ -309,6 +309,16 @@ class TestWebsiteBadgeEmbed:
         assert "/b/ux-test-salon" in html
         assert "/badge/featured.svg" in html
 
+    def test_embed_code_link_carries_mkb_badge_marker(self, seeded_db):
+        """The badge link MUST carry the ?ref=mkb-badge marker. Without it, a
+        shopper who clicks the badge on the salon's own site arrives with an
+        external referer we can't credit — so badge-driven traffic (our #1
+        acquisition lever) would silently fail to count as Miami-Knows-Beauty
+        driven. The marker is what makes that click attributable, and it can't be
+        backfilled, so it must ship on the embed from launch."""
+        html = _render_dashboard(seeded_db, photos=[], subscribed=True)
+        assert "/b/ux-test-salon?ref=mkb-badge" in html
+
     def test_share_caption_present_for_featured_owner(self, seeded_db):
         """The secondary 'share your feature' affordance ships a ready-to-post
         caption and its own copy button."""
