@@ -56,7 +56,7 @@
 {% set placeholder_url = '/assets/placeholder-salon.svg' %}
 <section class="relative bg-stone-950 overflow-hidden">
   {% if neighborhood.photo_url %}
-  <div class="absolute inset-0 bg-center opacity-50" style='background-image: url("{{ neighborhood.photo_url }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>
+  <div class="absolute inset-0 bg-center opacity-50" style='background-image: url("{{ neighborhood.photo_url | img_sized(800) }}"), url("{{ placeholder_url }}"); background-size: cover, contain; background-position: center, center; background-repeat: no-repeat, no-repeat;'></div>
   {% endif %}
   <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/70 to-stone-950/30"></div>
   <div class="relative max-w-7xl mx-auto px-6 lg:px-10 pt-20 pb-16">

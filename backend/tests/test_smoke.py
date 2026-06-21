@@ -758,7 +758,12 @@ def test_photos_render_as_plain_string_urls(client, seeded_db):
     # WHY: "hair" matches the seed's category slugs (hair, nails, spa…).
     r2 = client.get("/c/hair", headers={"host": "miami.knowsbeauty.localhost"})
     assert r2.status_code == 200, r2.text
-    assert PHOTO_URL in r2.text, (
+    # WHY assert on the photo-id path segment, not the exact stored URL: the card
+    # now right-sizes Unsplash photos at render time (the img_sized filter rewrites
+    # the width to the card's render size), so the rendered URL legitimately differs
+    # from the stored w=800. The photo's identity (the photo-id segment) proves the
+    # REAL photo rendered rather than a grey placeholder — which is what this guards.
+    assert "images.unsplash.com/photo-test-string-format" in r2.text, (
         "String-format photo URL missing from the category-page card — "
         "business_card.html rendered a grey placeholder instead of the actual photo"
     )
