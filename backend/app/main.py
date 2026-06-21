@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from bson import ObjectId
 from fastapi import FastAPI, Request
@@ -104,6 +105,67 @@ def _jinja_fmt_time(t: str) -> str:
 # rather than calling a Python function — consistent with how other formatting
 # (tojson, replace, etc.) is expressed in the template layer.
 templates.env.filters["fmt_time"] = _jinja_fmt_time
+
+
+# WHY: cap Unsplash image quality at 70. Above ~70 the file size grows fast for
+# almost no visible gain at the small sizes we render (cards, tiles, mobile
+# heroes). Some seed URLs request q=90, which roughly doubles bytes for no
+# benefit on a phone screen. 70 is Unsplash's own sensible-default territory.
+_UNSPLASH_MAX_QUALITY = 70
+
+
+def _img_sized(url: Optional[str], width: int) -> str:
+    """Resize an Unsplash photo URL to a sane width (and cap its quality).
+
+    The homepage and listing templates paint photos that come from stored data,
+    and some of those URLs bake in a huge width (e.g. ?w=2400) that gets shipped
+    to a 390px phone — six times more pixels than the screen can show. This
+    rewrites the Unsplash `w=` query param to the width we actually render at,
+    and caps `q=` so quality stays reasonable, which is the single biggest lever
+    on homepage weight.
+
+    Contract:
+      * images.unsplash.com URLs: set/replace `w=<width>`, cap `q` at 70 if
+        higher (other params like auto=format & fit=crop are preserved).
+      * Any other URL (a non-Unsplash CDN such as the Tilda PNG, a relative
+        /static/... path, a placeholder): returned UNCHANGED — those can't be
+        resized by a query param, so touching them would only risk breaking them.
+      * Empty / None / non-string: returned as-is so templates never 500 on a
+        missing photo.
+
+    WHY urllib (not regex): query strings vary (param order, presence of `w`,
+    extra params), and rebuilding the parsed query is correct for every shape,
+    whereas a regex substitution silently mishandles the "no w= present" and
+    "w appears in a path segment" cases.
+    """
+    if not url or not isinstance(url, str):
+        return url
+    parts = urlsplit(url)
+    # Only Unsplash's image host supports the width/quality query params; every
+    # other host is passed through untouched (see contract above).
+    if parts.netloc != "images.unsplash.com":
+        return url
+    # keep_blank_values so a bare `?auto=format` style param survives the rebuild.
+    params = dict(parse_qsl(parts.query, keep_blank_values=True))
+    params["w"] = str(width)
+    q_raw = params.get("q")
+    if q_raw is not None:
+        try:
+            if int(q_raw) > _UNSPLASH_MAX_QUALITY:
+                params["q"] = str(_UNSPLASH_MAX_QUALITY)
+        except (TypeError, ValueError):
+            # A non-numeric q (shouldn't happen in seed data) is left as-is
+            # rather than guessing — Unsplash will fall back to its own default.
+            pass
+    new_query = urlencode(params)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, new_query, parts.fragment))
+
+
+# WHY: register as a Jinja2 filter so templates can write
+# {{ photo_url | img_sized(500) }} to right-size photos at the point of render,
+# keeping the sizing decision next to the layout context (card vs hero vs thumb)
+# that determines the correct width.
+templates.env.filters["img_sized"] = _img_sized
 
 app = FastAPI(title="Known Around Town", version="0.1.0", default_response_class=MongoSafeJSONResponse)
 

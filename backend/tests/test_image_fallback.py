@@ -36,6 +36,14 @@ class _Theme:
 
 def _render_card(b: dict) -> str:
     env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
+    # WHY: the business_card partial now calls `| img_sized(500)` to right-size
+    # photos at render time. A bare jinja2.Environment doesn't know that filter
+    # (it's registered on the app's env in main.py), so register the real one here
+    # — otherwise the partial raises "No filter named 'img_sized'". Using the
+    # actual app filter (not a stub) keeps this render faithful to production.
+    from app.main import _img_sized
+
+    env.filters["img_sized"] = _img_sized
     tpl = env.get_template("partials/business_card.html")
     return tpl.render(
         b=b,

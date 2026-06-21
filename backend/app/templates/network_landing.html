@@ -45,7 +45,7 @@
        class="group block rounded-2xl overflow-hidden bg-white border border-stone-200/70 hover:border-stone-300 transition shadow-sm hover:shadow-md">
       {% if c.hero_photo_url %}
       <div class="aspect-[4/3] w-full overflow-hidden bg-gradient-to-br {{ theme.category_banner_gradient }}">
-        <img src="{{ c.hero_photo_url }}" alt="{{ c.name }}"
+        <img src="{{ c.hero_photo_url | img_sized(800) }}" alt="{{ c.name }}"
              class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
              onerror="this.onerror=null;this.style.display='none';" />
       </div>
