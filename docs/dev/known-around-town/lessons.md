@@ -1130,3 +1130,46 @@ snapshot row and diffed identically (`_action_delta`), so the dormant monthly
 email can mention non-zero taps ("Of those, N tapped to call ...") with the same
 honest "since you joined" fallback on the first report. The email stays fully
 dormant — no `MONTHLY_REPORT_*_ENABLED` flag was touched.
+
+## Right-size photos at render time — the `img_sized` Jinja filter (PR #394, 2026-06-20)
+
+The mobile homepage weighed **~6.6MB** (15 images = 6.4MB on a 390px viewport).
+Two causes: photo URLs came straight from stored data with desktop-poster widths
+baked in (a `?w=2400&q=90` Unsplash photo shipped to a 390px phone is ~6× the
+pixels the screen shows), and one neighborhood tile used an unoptimized 1.9MB
+PNG. After this change the homepage is **~1.16MB of images / 1.33MB total** —
+about an 82% cut — with no visible quality loss.
+
+Key facts for the next person:
+
+- **`img_sized(url, width)`** is registered on the shared Jinja env in
+  `main.py` (next to `fmt_time`). It rewrites `w=` and caps `q=` at 70 **only**
+  for `images.unsplash.com` URLs; every other URL (the placeholder SVG, a
+  relative `/static` path, a non-Unsplash CDN like a Tilda PNG) is returned
+  untouched. Uses `urllib` (parse/rebuild the query), never regex — a regex
+  silently mishandles the "no `w=` present" and "`w` in a path segment" cases.
+- **Apply it at the render site with the width that element shows at** — the
+  sizing decision belongs next to the layout (hero 1200, full-bleed tiles 800,
+  cards 500, small thumbnails 200, business-detail hero 1000). It's wired into
+  home, category-via-`business_card.html`, neighborhood, business, network-
+  landing, and editorial-guide templates.
+- **Do NOT size the social-share image (`og:image` / `twitter:image`).** Those
+  are emitted raw by `base.html` (no filter) and SHOULD stay large — preview-card
+  platforms want a big image and the browser never downloads it to paint the
+  page, so it doesn't count toward page weight. A page-wide "no `w=2400`
+  anywhere" assertion is therefore WRONG; assert on the visible hero's
+  `background-image`, not the whole page text (this bit the first draft of
+  `test_img_sized.py`).
+- **Do NOT size the lightbox `data-photos` on `business.html`** (line ~408) —
+  that's the full-resolution zoom view; users open it to see detail.
+- **The 1.9MB PNG can't be shrunk by a URL param** (it's a non-Unsplash CDN),
+  so it was swapped for a sized Unsplash salon photo in BOTH the seed
+  (`_photos_by_slug.json`) and the live DB. A full scan across all 29 cities
+  found it in exactly ONE live record: the `sunny-isles-beach` neighborhood
+  (`photo_url`), fixed via `PATCH /api/v1/neighborhoods/{id}` (admin key).
+- **Pre-existing tests that string-matched a stored URL break** when you add the
+  filter: `test_image_fallback.py` renders the card partial through a BARE
+  `jinja2.Environment` that doesn't know `img_sized` (register the real filter on
+  it), and `test_smoke.py`'s string-photo test asserted the exact `?w=800` URL
+  (now assert the stable photo-id path segment, which proves the real photo
+  rendered rather than a placeholder).
