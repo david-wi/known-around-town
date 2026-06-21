@@ -1173,3 +1173,32 @@ Key facts for the next person:
   it), and `test_smoke.py`'s string-photo test asserted the exact `?w=800` URL
   (now assert the stable photo-id path segment, which proves the real photo
   rendered rather than a placeholder).
+
+## Editorial guide tenancy — featured salons must be in the SAME city as the guide (2026-06-21)
+
+When creating an editorial guide (`POST /api/v1/editorial-guides`), the guide's `city_id` must match
+the `city_id` of every salon it features. Two reasons, both in `editorial_guide_page`
+(`backend/app/routes/public/pages.py`, ~line 1549):
+
+1. **Slug→business resolution is city-scoped:** the fallback lookup is
+   `businesses.find({"city_id": <guide's city>, "slug": {"$in": business_slugs}})`. A guide whose
+   `city_id` is A cannot resolve salons whose `city_id` is B — they silently fail to render as
+   featured business cards and the `ItemList` structured data comes out empty (the body markdown still
+   renders, so the page looks *almost* right — only the linked salon cards + ItemList are missing).
+2. **Salon `/b/` links are host-based:** a salon's listing page only exists on its own city's
+   subdomain. A guide on `miami` that links to a North-Miami-Beach salon's `/b/` page 404s, because
+   that listing lives on `north-miami-beach.knowsbeauty.com`, not the flagship.
+
+`featured_business_ids` resolves by `_id` (not city-scoped), but it would still emit broken
+cross-tenant `/b/` links — so **same-city is the real constraint**, not just a resolution detail.
+
+**Tenancy model:** the Miami flagship city holds the CORE neighborhoods' salons (Coconut Grove,
+Brickell, Wynwood, etc. are miami-city records — which is why the flagship hosts ~107 guides covering
+them). Outer areas (North Miami Beach, Doral, Hialeah, and the Broward cities) are their own city
+subdomains with their own salons and guides. So: a guide for a core-Miami neighborhood goes on the
+flagship; a guide for an outer city goes on that city's subdomain.
+
+**Symptom that caught this:** a new "Best Nail Salons in North Miami Beach" guide rendered its salon
+names (markdown headers) but no linked cards and an empty ItemList when placed on the flagship;
+moving its `city_id` to `north-miami-beach` (where the salons live) made all 5 cards, links, and the
+ItemList render correctly.
