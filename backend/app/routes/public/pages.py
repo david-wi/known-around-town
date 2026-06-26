@@ -1809,6 +1809,14 @@ async def owner_dashboard_preview(request: Request) -> HTMLResponse:
                 "Preview of the owner dashboard for the Featured tier — "
                 "this is a mockup, not the live claim-and-pay flow."
             ),
+            # WHY: this is a static, unauthenticated MOCKUP of a real salon's
+            # dashboard with every control rigged to "Coming soon". The live
+            # owner dashboard now exists at /owners/me, so this page must never
+            # be indexed — otherwise Google could surface a half-built "Coming
+            # soon" version of our product to a prospect. base.html renders the
+            # robots meta from this var (its comment documents exactly this
+            # demo-page use); it was simply never set here.
+            "robots": "noindex, nofollow",
         }
     )
     return _templates.TemplateResponse("owner_dashboard.html", ctx)

@@ -469,6 +469,12 @@ def test_owner_dashboard_preview(client):
     # The "Coming soon" controls must be present and disabled.
     assert "Coming soon" in body
     assert "data-coming-soon" in body
+    # This is a static mockup of a real salon's dashboard. The live owner
+    # dashboard now exists at /owners/me, so this preview must be noindex —
+    # otherwise Google could surface a "Coming soon" mockup of our product
+    # to a prospect searching for the salon.
+    assert 'name="robots"' in body
+    assert "noindex" in body
 
 
 def test_owner_dashboard_links_back_to_public_listing(client):
