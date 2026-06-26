@@ -106,7 +106,8 @@ def test_build_system_prompt_includes_style_and_vertical():
     out = build_system_prompt(ctx)
     assert "salon" in out
     assert "polished" in out or "craftsmanship" in out  # nails style note
-    assert "ONLY the caption" in out
+    assert "EXACTLY 7" in out
+    assert "ONLY the seven numbered suggestions" in out
 
 
 def test_build_user_prompt_drops_optional_fields_cleanly():
@@ -129,6 +130,25 @@ def test_build_user_prompt_drops_optional_fields_cleanly():
     assert "Category:" not in out
     assert "Known for:" not in out
     assert "About:" not in out
+
+
+def test_build_user_prompt_includes_selected_photo_url():
+    from app.services.ai_caption import CaptionContext, build_user_prompt
+
+    ctx = CaptionContext(
+        business_name="Isla Nail Society",
+        neighborhood_name="Brickell",
+        city_name="Miami",
+        primary_category="nails",
+        vertical_word="salon",
+        known_for=None,
+        short_description=None,
+        prompt="new chrome set",
+        photo_url="/media/photo123",
+    )
+    out = build_user_prompt(ctx)
+    assert "Selected listing photo URL: /media/photo123" in out
+    assert "do not invent visual details" in out
 
 
 # --- Geographic disambiguation: the Hollywood, FL / "#LosAngelesHair" bug ---
@@ -354,6 +374,7 @@ def test_generate_caption_happy_path_sends_expected_body(monkeypatch):
         prompt="fall hair color promo",
         state="FL",
         market_label="South Florida (Miami metro area)",
+        photo_url="/media/photo123",
     )
 
     async def run():
@@ -367,15 +388,17 @@ def test_generate_caption_happy_path_sends_expected_body(monkeypatch):
     # Ensure all the expected fields flowed through
     body = captured["body"]
     assert body["use_case"] == "marketing_caption"
-    assert body["max_tokens_override"] == 300
+    assert body["max_tokens_override"] == 1100
     assert body["cost_tags"]["product"] == "known-around-town"
     assert "Isla Nail Society" in body["user_content"]
     assert "Brickell, Miami, FL" in body["user_content"]
     # The regional market anchor must reach the gateway body too.
     assert "South Florida (Miami metro area)" in body["user_content"]
+    assert "Selected listing photo URL: /media/photo123" in body["user_content"]
     assert "fall hair color promo" in body["user_content"]
     # System prompt should reflect the nails category style note
     assert "salon" in body["system_prompt"]
+    assert "EXACTLY 7" in body["system_prompt"]
     # Auth header must be present
     assert captured["headers"]["x-api-key"] == "test-key-abc"
 
@@ -560,6 +583,63 @@ def test_endpoint_builds_context_with_state_and_market(client, seeded_db, monkey
     built = ai_caption.build_user_prompt(ctx)
     assert ", FL" in built
     assert "South Florida (Miami metro area)" in built
+
+
+def test_endpoint_passes_owned_photo_url_to_caption_context(client, seeded_db, monkeypatch):
+    from app.services import ai_caption
+
+    biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
+    asyncio.get_event_loop().run_until_complete(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {"photos": [{"url": "/media/owned-photo", "alt": "Front room"}]}},
+        )
+    )
+
+    captured = {}
+
+    async def fake_generate(ctx, http_client=None):
+        captured["ctx"] = ctx
+        return "1. Caption one\n#test\n\n2. Caption two\n#test"
+
+    monkeypatch.setattr(ai_caption, "generate_caption", fake_generate)
+
+    resp = client.post(
+        "/api/v1/marketing-ai/instagram-caption",
+        json={
+            "business_id": biz["_id"],
+            "prompt": "new color room",
+            "photo_url": "/media/owned-photo",
+        },
+        cookies={"kb_owner_session": cookie},
+    )
+    assert resp.status_code == 200, resp.text
+    assert captured["ctx"].photo_url == "/media/owned-photo"
+
+
+def test_endpoint_400_when_photo_url_is_not_on_listing(client, seeded_db, monkeypatch):
+    biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
+    asyncio.get_event_loop().run_until_complete(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {"photos": [{"url": "/media/owned-photo", "alt": "Front room"}]}},
+        )
+    )
+    _patch_generate(monkeypatch)
+
+    resp = client.post(
+        "/api/v1/marketing-ai/instagram-caption",
+        json={
+            "business_id": biz["_id"],
+            "prompt": "new color room",
+            "photo_url": "/media/not-this-listing",
+        },
+        cookies={"kb_owner_session": cookie},
+    )
+    assert resp.status_code == 400
+    assert "not attached" in resp.json()["detail"]
 
 
 def test_endpoint_401_when_no_session_cookie(client, seeded_db, monkeypatch):

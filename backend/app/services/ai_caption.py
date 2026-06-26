@@ -55,10 +55,10 @@ DEFAULT_TIMEOUT_SECONDS = 30.0
 # would orphan the central config — keep them in lockstep.
 USE_CASE = "marketing_caption"
 
-# WHY: We send max_output_tokens=300 because the use case is already
-# configured for that; sending the override makes the contract explicit
-# in code review and survives a misconfiguration on the central side.
-MAX_OUTPUT_TOKENS = 300
+# WHY: Seven caption suggestions need substantially more room than the original
+# single-caption response. 1100 tokens keeps the output bounded while leaving
+# enough space for seven short 2-3 sentence options plus hashtags.
+MAX_OUTPUT_TOKENS = 1100
 
 # WHY: Cost-tag product and feature so the central usage report can
 # break out Known Around Town caption spend separately from other
@@ -116,6 +116,7 @@ class CaptionContext:
     # values via resolve_location().
     state: Optional[str] = None
     market_label: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 # WHY: This network is the South Florida / Miami-metro directory (every seeded
@@ -256,10 +257,11 @@ def build_system_prompt(ctx: CaptionContext) -> str:
         "You write short Instagram captions for "
         f"{vertical}s in their actual neighborhood voice. "
         f"Tone: {style}. "
-        "Keep it to 2-3 sentences, then 4-8 relevant hashtags on a new "
-        "line, then 1-3 tasteful emoji. No preamble, no quotation marks "
-        "around the caption. Return ONLY the caption text — the owner "
-        "will paste it directly into Instagram."
+        "Return EXACTLY 7 distinct caption suggestions, numbered 1 through 7. "
+        "Each suggestion should be 2-3 sentences, then 4-8 relevant hashtags "
+        "on a new line, then 1-3 tasteful emoji. No preamble, no quotation "
+        "marks around the captions. Return ONLY the seven numbered suggestions "
+        "because the owner will paste one directly into Instagram."
     )
 
 
@@ -301,8 +303,16 @@ def build_user_prompt(ctx: CaptionContext) -> str:
         lines.append(f"Known for: {ctx.known_for}")
     if ctx.short_description:
         lines.append(f"About: {ctx.short_description}")
+    if ctx.photo_url:
+        lines.append(f"Selected listing photo URL: {ctx.photo_url}")
     lines.append("")
     lines.append(f"Owner prompt: {ctx.prompt}")
+    if ctx.photo_url:
+        lines.append(
+            "Photo guidance: Write for the selected listing photo and owner "
+            "prompt, but do not invent visual details that are not in the "
+            "owner prompt or listing context."
+        )
     return "\n".join(lines)
 
 

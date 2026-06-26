@@ -559,7 +559,7 @@
         </svg>
         <span id="photo-upload-label-text">Upload photo</span>
         <input id="photo-file-input" type="file" accept="image/jpeg,image/png,image/webp"
-               class="sr-only" aria-label="Upload a photo" />
+               class="hidden" aria-label="Upload a photo" />
       </label>
       <svg id="photo-upload-spinner" class="hidden w-5 h-5 animate-spin text-stone-500"
            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -584,16 +584,61 @@
   <div class="max-w-3xl mx-auto px-6 lg:px-10 py-12">
     <h2 class="text-base font-semibold text-stone-900 mb-1">Instagram caption generator</h2>
     <p class="text-sm text-stone-500 mb-6">
-      Describe what you want to post about and we&rsquo;ll write a caption tailored to your salon and neighborhood.
+      Choose a listing photo, describe what you want to post about, and we&rsquo;ll write 7 caption suggestions tailored to your salon and neighborhood.
     </p>
     <div id="caption-panel" class="rounded-2xl border border-stone-200 bg-white p-6 space-y-4">
+      {% set caption_photos = owner_business.photos or [] %}
+      {% set selected_caption_photo = caption_photos[0] if caption_photos else none %}
+      {% set selected_caption_photo_url = selected_caption_photo.get('url','') if selected_caption_photo is mapping else ((selected_caption_photo.url or '') if selected_caption_photo else '') %}
+      <div id="caption-photo-control"
+           class="space-y-3"
+           data-selected-photo-url="{{ selected_caption_photo_url }}">
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-stone-500">Photo for this caption</p>
+          <a href="#photos-section" class="text-xs text-stone-500 hover:text-stone-900 underline decoration-stone-300 hover:decoration-stone-600 transition">Manage photos</a>
+        </div>
+        {% if selected_caption_photo_url %}
+        <div class="flex items-center gap-3">
+          <img id="caption-photo-preview"
+               src="{{ selected_caption_photo_url }}"
+               alt="{{ (selected_caption_photo.get('alt','') if selected_caption_photo is mapping else (selected_caption_photo.alt or '')) or 'Selected listing photo' }}"
+               class="shrink-0 rounded-lg object-cover bg-stone-100"
+               style="width:72px;height:72px" />
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-stone-900">Selected listing photo</p>
+            <p class="text-xs text-stone-500">Suggestions will be written for this photo and your prompt.</p>
+          </div>
+        </div>
+        <div id="caption-photo-options" class="flex items-center gap-2 overflow-x-auto pb-1" aria-label="Choose listing photo for caption">
+          {% for photo in caption_photos %}
+          {%- set photo_url = photo.get('url','') if photo is mapping else (photo.url or '') %}
+          {%- set photo_alt = (photo.get('alt','') if photo is mapping else (photo.alt or '')) or 'Listing photo ' ~ loop.index %}
+          {% if photo_url %}
+          <button type="button"
+                  class="caption-photo-option shrink-0 rounded-lg overflow-hidden border border-stone-200 bg-stone-100 focus:outline-none focus:ring-2 {{ theme.focus_ring }}"
+                  style="width:56px;height:56px{% if loop.first %};border-color:#1c1917;border-width:2px{% endif %}"
+                  data-caption-photo-url="{{ photo_url }}"
+                  aria-label="Use listing photo {{ loop.index }} for caption"
+                  aria-pressed="{{ 'true' if loop.first else 'false' }}">
+            <img src="{{ photo_url }}" alt="{{ photo_alt }}" class="w-full h-full object-cover" loading="lazy" />
+          </button>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% else %}
+        <div id="caption-photo-empty" class="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-3">
+          <p class="text-sm text-stone-700">Upload a listing photo first, then generate captions for the actual image you plan to post.</p>
+          <a href="#photos-section" class="inline-flex mt-2 text-xs font-medium text-stone-600 hover:text-stone-900 underline decoration-stone-300 hover:decoration-stone-600 transition">Upload a photo</a>
+        </div>
+        {% endif %}
+      </div>
       <textarea id="caption-prompt" rows="3" maxlength="600"
                 placeholder="e.g. fall hair color promo, 20% off balayage this weekend"
                 class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition resize-none"></textarea>
       <div class="flex flex-wrap items-center gap-3">
         <button id="caption-generate" type="button"
                 class="inline-flex items-center gap-2 {{ theme.button_bg }} {{ theme.button_bg_hover }} text-white font-medium px-5 py-2.5 rounded-full text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
-          <span id="caption-generate-label">Generate caption</span>
+          <span id="caption-generate-label">Generate 7 suggestions</span>
           <svg id="caption-generate-spinner" class="hidden w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
@@ -601,7 +646,7 @@
         </button>
         <button id="caption-regenerate" type="button"
                 class="hidden text-sm text-stone-500 hover:text-stone-900 underline decoration-stone-300 hover:decoration-stone-600 transition">
-          Generate another
+          Generate new suggestions
         </button>
       </div>
       <p id="caption-error" class="hidden text-sm text-rose-700" role="alert" aria-live="polite"></p>
@@ -1171,12 +1216,144 @@
   var resultEl   = document.getElementById('caption-result');
   var copyBtn    = document.getElementById('caption-copy');
   var copiedTag  = document.getElementById('caption-copied');
+  var photoCtl   = document.getElementById('caption-photo-control');
 
   if (!genBtn) return;
 
+  function selectedCaptionPhotoUrl() {
+    return photoCtl ? (photoCtl.dataset.selectedPhotoUrl || '') : '';
+  }
+
+  function markSelectedCaptionPhoto(url) {
+    if (!photoCtl) return;
+    photoCtl.dataset.selectedPhotoUrl = url || '';
+    var preview = document.getElementById('caption-photo-preview');
+    if (preview && url) preview.src = url;
+    document.querySelectorAll('[data-caption-photo-url]').forEach(function (btn) {
+      var active = btn.dataset.captionPhotoUrl === url;
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.style.borderColor = active ? '#1c1917' : '';
+      btn.style.borderWidth = active ? '2px' : '';
+    });
+  }
+
+  function makeCaptionPhotoOption(photo, index, selectedUrl) {
+    var url = (photo && photo.url) || '';
+    if (!url) return null;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'caption-photo-option shrink-0 rounded-lg overflow-hidden border border-stone-200 bg-stone-100 focus:outline-none focus:ring-2 {{ theme.focus_ring }}';
+    btn.style.width = '56px';
+    btn.style.height = '56px';
+    btn.dataset.captionPhotoUrl = url;
+    btn.setAttribute('aria-label', 'Use listing photo ' + (index + 1) + ' for caption');
+    btn.addEventListener('click', function () { markSelectedCaptionPhoto(url); });
+
+    var img = document.createElement('img');
+    img.src = url;
+    img.alt = (photo && photo.alt) || ('Listing photo ' + (index + 1));
+    img.className = 'w-full h-full object-cover';
+    img.loading = 'lazy';
+    btn.appendChild(img);
+
+    if (url === selectedUrl) {
+      btn.setAttribute('aria-pressed', 'true');
+      btn.style.borderColor = '#1c1917';
+      btn.style.borderWidth = '2px';
+    } else {
+      btn.setAttribute('aria-pressed', 'false');
+    }
+    return btn;
+  }
+
+  function bindCaptionPhotoOptions() {
+    document.querySelectorAll('[data-caption-photo-url]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        markSelectedCaptionPhoto(btn.dataset.captionPhotoUrl || '');
+      });
+    });
+  }
+
+  window.kbSetCaptionPhotos = function (photos) {
+    if (!photoCtl) return;
+    photos = photos || [];
+    photoCtl.innerHTML = '';
+
+    var header = document.createElement('div');
+    header.className = 'flex items-center justify-between gap-3';
+    var label = document.createElement('p');
+    label.className = 'text-xs font-semibold uppercase tracking-wide text-stone-500';
+    label.textContent = 'Photo for this caption';
+    var link = document.createElement('a');
+    link.href = '#photos-section';
+    link.className = 'text-xs text-stone-500 hover:text-stone-900 underline decoration-stone-300 hover:decoration-stone-600 transition';
+    link.textContent = 'Manage photos';
+    header.appendChild(label);
+    header.appendChild(link);
+    photoCtl.appendChild(header);
+
+    if (!photos.length) {
+      photoCtl.dataset.selectedPhotoUrl = '';
+      var empty = document.createElement('div');
+      empty.id = 'caption-photo-empty';
+      empty.className = 'rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-3';
+      var emptyText = document.createElement('p');
+      emptyText.className = 'text-sm text-stone-700';
+      emptyText.textContent = 'Upload a listing photo first, then generate captions for the actual image you plan to post.';
+      var emptyLink = document.createElement('a');
+      emptyLink.href = '#photos-section';
+      emptyLink.className = 'inline-flex mt-2 text-xs font-medium text-stone-600 hover:text-stone-900 underline decoration-stone-300 hover:decoration-stone-600 transition';
+      emptyLink.textContent = 'Upload a photo';
+      empty.appendChild(emptyText);
+      empty.appendChild(emptyLink);
+      photoCtl.appendChild(empty);
+      return;
+    }
+
+    var currentUrl = selectedCaptionPhotoUrl();
+    var selectedPhoto = photos.find(function (photo) { return photo && photo.url === currentUrl; }) || photos[0];
+    var selectedUrl = selectedPhoto.url || '';
+    photoCtl.dataset.selectedPhotoUrl = selectedUrl;
+
+    var row = document.createElement('div');
+    row.className = 'flex items-center gap-3';
+    var preview = document.createElement('img');
+    preview.id = 'caption-photo-preview';
+    preview.src = selectedUrl;
+    preview.alt = selectedPhoto.alt || 'Selected listing photo';
+    preview.className = 'shrink-0 rounded-lg object-cover bg-stone-100';
+    preview.style.width = '72px';
+    preview.style.height = '72px';
+    row.appendChild(preview);
+    var copy = document.createElement('div');
+    copy.className = 'min-w-0';
+    var title = document.createElement('p');
+    title.className = 'text-sm font-medium text-stone-900';
+    title.textContent = 'Selected listing photo';
+    var detail = document.createElement('p');
+    detail.className = 'text-xs text-stone-500';
+    detail.textContent = 'Suggestions will be written for this photo and your prompt.';
+    copy.appendChild(title);
+    copy.appendChild(detail);
+    row.appendChild(copy);
+    photoCtl.appendChild(row);
+
+    var options = document.createElement('div');
+    options.id = 'caption-photo-options';
+    options.className = 'flex items-center gap-2 overflow-x-auto pb-1';
+    options.setAttribute('aria-label', 'Choose listing photo for caption');
+    photos.forEach(function (photo, index) {
+      var option = makeCaptionPhotoOption(photo, index, selectedUrl);
+      if (option) options.appendChild(option);
+    });
+    photoCtl.appendChild(options);
+  };
+
+  bindCaptionPhotoOptions();
+
   function setCaptionBusy(busy) {
     genBtn.disabled = busy;
-    genLabel.textContent = busy ? 'Generating…' : 'Generate caption';
+    genLabel.textContent = busy ? 'Generating…' : 'Generate 7 suggestions';
     genSpin.classList.toggle('hidden', !busy);
   }
 
@@ -1192,10 +1369,13 @@
     }
     setCaptionBusy(true);
     try {
+      var payload = { business_id: BUSINESS_ID, prompt: prompt };
+      var photoUrl = selectedCaptionPhotoUrl();
+      if (photoUrl) payload.photo_url = photoUrl;
       var resp = await fetch('/api/v1/marketing-ai/instagram-caption', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ business_id: BUSINESS_ID, prompt: prompt }),
+        body: JSON.stringify(payload),
       });
       if (!resp.ok) {
         var detail = '';
@@ -1665,6 +1845,7 @@
   function refreshGrid(photos) {
     grid.innerHTML = '';
     (photos || []).forEach(function (p) { grid.appendChild(makeThumb(p)); });
+    if (window.kbSetCaptionPhotos) window.kbSetCaptionPhotos(photos || []);
     updateCountLabel();
   }
 

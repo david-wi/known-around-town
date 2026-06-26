@@ -113,6 +113,17 @@ class TestChecklistPhotoHooks:
         )
         assert 'id="checklist-item-photo" data-done="1"' in html
 
+    def test_photo_upload_input_uses_compiled_hidden_class(self, seeded_db):
+        """The native file input must stay hidden inside the styled upload label.
+
+        The old `sr-only` class is absent from reference.css, so the browser
+        showed "Choose File / No file chosen" inside the owner-facing button.
+        """
+        html = _render_dashboard(seeded_db, photos=[])
+        assert 'id="photo-file-input" type="file"' in html
+        assert 'class="hidden" aria-label="Upload a photo"' in html
+        assert "sr-only" not in html
+
     def test_checklist_hides_when_last_item_completes(self, seeded_db):
         """If a photo is the last unfinished item, uploading it should hide the
         whole "Complete your profile" section instead of leaving a finished
@@ -262,6 +273,40 @@ class TestLockedAiUpsellOverlay:
                 f"{cls} is back on the locked overlay; it has no compiled CSS "
                 f"rule so the overlay would render transparent again"
             )
+
+
+# ─── Featured caption generator uses real listing photos ─────────────────────
+
+
+class TestCaptionGeneratorPhotoSelection:
+    def test_featured_caption_tool_shows_selected_listing_photo(self, seeded_db):
+        html = _render_dashboard(
+            seeded_db,
+            photos=[{"url": "/media/caption-photo", "alt": "Balayage result"}],
+            subscribed=True,
+        )
+        assert 'id="caption-photo-control"' in html
+        assert 'id="caption-photo-preview"' in html
+        assert 'src="/media/caption-photo"' in html
+        assert 'data-caption-photo-url="/media/caption-photo"' in html
+        assert 'data-selected-photo-url="/media/caption-photo"' in html
+
+    def test_featured_caption_tool_promises_seven_suggestions(self, seeded_db):
+        html = _render_dashboard(
+            seeded_db,
+            photos=[{"url": "/media/caption-photo", "alt": "Balayage result"}],
+            subscribed=True,
+        )
+        assert "write 7 caption suggestions" in html
+        assert "Generate 7 suggestions" in html
+        assert "Generate new suggestions" in html
+        assert "Generate another" not in html
+
+    def test_featured_caption_tool_has_no_photo_empty_state(self, seeded_db):
+        html = _render_dashboard(seeded_db, photos=[], subscribed=True)
+        assert 'id="caption-photo-empty"' in html
+        assert "Upload a listing photo first" in html
+        assert 'href="#photos-section"' in html
 
 
 # ─── Website badge embed section (KAT-037) ───────────────────────────────────
