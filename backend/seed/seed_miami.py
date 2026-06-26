@@ -634,7 +634,10 @@ async def seed_network(network_slug: str) -> None:
             "quality_score": 90 if biz.get("editors_pick") else 60,
             "index_status": "indexed",
             "index_override": "auto",
-            "status": "live",
+            # WHY: the curated source sometimes marks a business "closed" after
+            # review. The seed must honor that flag; otherwise a known-bad
+            # listing resurfaces as live on the next deploy.
+            "status": biz.get("status", "live"),
             "address": address,
             "phone": biz.get("phone"),
             "website": biz.get("website"),

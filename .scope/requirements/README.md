@@ -24,7 +24,7 @@ tests, and fresh evidence (CI pass, visual verification, or Playwright screensho
 | `01-public-directory.md` | Neighborhood/category browsing, business pages, SEO |
 | `02-preview-gate.md` | Preview mode: email + code auth for private beta |
 | `03-owner-portal.md` | Owner login, dashboard, profile editing, photo management |
-| `04-billing.md` | Stripe Checkout, webhooks, Founding Partner badge |
+| `04-billing.md` | Stripe Checkout, webhooks, Featured subscription |
 | `05-admin.md` | Admin claims management, analytics, data seeding |
 | `06-roadmap.md` | Upcoming features in planning or blocked states |
 

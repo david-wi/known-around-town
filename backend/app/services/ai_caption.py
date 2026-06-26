@@ -510,7 +510,7 @@ async def generate_caption(
 # show Instagram caption spend vs ad copy spend independently.
 COST_TAG_FEATURE_AD_COPY = "owners.ad_copy"
 
-# WHY: 450 tokens is ~3× the minimum needed for 3 × (headline + description) to
+# WHY: 450 tokens is ~3x the minimum needed for 3 x (headline + description) to
 # leave room for the model's natural phrasing and any leading/trailing whitespace
 # the format requires. Keeps per-call cost bounded while preventing truncation.
 MAX_OUTPUT_TOKENS_AD_COPY = 450
@@ -619,4 +619,97 @@ async def generate_ad_copy(
     if not text:
         log.warning("AI gateway returned empty ad copy text: %s", json_data)
         raise CaptionGenerationError("gateway returned empty ad copy")
+    return text
+
+
+# WHY: Profile descriptions need more room than a caption but must still stay
+# bounded because owners are waiting in the dashboard and the text must fit the
+# 1000-character public listing field.
+MAX_OUTPUT_TOKENS_PROFILE_DESCRIPTION = 500
+
+# WHY: Separate cost tag so gateway reports can distinguish profile-polishing
+# calls from captions and ad-copy generation.
+COST_TAG_FEATURE_PROFILE_DESCRIPTION = "owners.profile_description"
+
+
+def build_profile_description_system_prompt(ctx: CaptionContext) -> str:
+    """System prompt for the owner profile-description helper."""
+    style = style_note_for_category(ctx.primary_category)
+    vertical = ctx.vertical_word or "local business"
+    return (
+        f"You write polished public directory descriptions for {vertical}s. "
+        f"Tone: {style}. "
+        "Write one warm, specific paragraph, 80-140 words. "
+        "Use only the details provided; do not invent awards, services, prices, "
+        "staff names, locations, or guarantees. "
+        "No headline, no bullet list, no quotation marks. Return ONLY the paragraph."
+    )
+
+
+async def generate_profile_description(
+    ctx: CaptionContext,
+    *,
+    http_client: Optional[httpx.AsyncClient] = None,
+) -> str:
+    """Generate a polished listing description via the centralized AI gateway."""
+    if not feature_enabled():
+        raise CaptionFeatureDisabled("marketing AI is disabled in this environment")
+
+    key = _gateway_key()
+    if not key:
+        log.error("Neither KAT_AI_GATEWAY_KEY nor AI_GATEWAY_KEY is set; profile description generation cannot proceed")
+        raise CaptionGenerationError("gateway not configured")
+
+    body: Dict[str, Any] = {
+        "use_case": USE_CASE,
+        "system_prompt": build_profile_description_system_prompt(ctx),
+        "user_content": build_user_prompt(ctx),
+        "max_tokens_override": MAX_OUTPUT_TOKENS_PROFILE_DESCRIPTION,
+        "cost_tags": {
+            "product": COST_TAG_PRODUCT,
+            "feature": COST_TAG_FEATURE_PROFILE_DESCRIPTION,
+            "call": f"{COST_TAG_FEATURE_PROFILE_DESCRIPTION}.generate",
+        },
+    }
+    headers = {
+        "X-API-Key": key,
+        "Content-Type": "application/json",
+    }
+
+    own_client = http_client is None
+    client = http_client or httpx.AsyncClient(timeout=DEFAULT_TIMEOUT_SECONDS)
+    try:
+        try:
+            resp = await client.post(_gateway_url(), json=body, headers=headers)
+        except httpx.RequestError as exc:
+            log.warning("AI gateway unreachable: %s", exc)
+            raise CaptionGenerationError("gateway unreachable") from exc
+
+        status = resp.status_code
+        raw_text_snippet = resp.text[:500]
+        json_data: Optional[Dict[str, Any]] = None
+        json_error: Optional[Exception] = None
+        if status < 400:
+            try:
+                json_data = resp.json()
+            except ValueError as exc:
+                json_error = exc
+                raw_text_snippet = resp.text[:500]
+    finally:
+        if own_client:
+            await client.aclose()
+
+    if status >= 400:
+        log.warning("AI gateway returned HTTP %s: %s", status, raw_text_snippet)
+        raise CaptionGenerationError(f"gateway returned HTTP {status}")
+
+    if json_error is not None:
+        log.warning("AI gateway returned non-JSON: %s", raw_text_snippet)
+        raise CaptionGenerationError("gateway returned invalid JSON") from json_error
+    assert json_data is not None  # WHY: status<400 and no json_error means we have data
+
+    text = (json_data.get("text") or "").strip()
+    if not text:
+        log.warning("AI gateway returned empty profile description text: %s", json_data)
+        raise CaptionGenerationError("gateway returned empty profile description")
     return text

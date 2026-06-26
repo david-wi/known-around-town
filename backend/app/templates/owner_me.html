@@ -39,7 +39,7 @@
       <span class="text-amber-200 text-lg leading-none shrink-0">★</span>
       <div class="min-w-0">
         <p class="font-semibold text-sm">You're now Featured on {{ tenant_label }}!</p>
-        <p class="text-amber-100 text-xs mt-0.5">Your subscription is active. Your salon now appears first in search results in your neighborhood.</p>
+        <p class="text-amber-100 text-xs mt-0.5">Your subscription is active. Your salon now gets premium placement in relevant directory results.</p>
       </div>
     </div>
     <button id="subscribed-banner-close" type="button"
@@ -105,7 +105,7 @@
       <span class="text-amber-500 text-sm leading-none">★</span>
       <span class="text-sm font-semibold text-stone-900">Featured listing active</span>
       <span class="text-stone-300 mx-0.5">|</span>
-      <span class="text-xs text-stone-500">Your salon is featured at the top of search results.</span>
+      <span class="text-xs text-stone-500">Your salon gets premium placement in relevant directory results.</span>
     </div>
     <button id="portal-btn" type="button"
             class="text-xs text-stone-400 hover:text-stone-700 underline underline-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed">
@@ -116,10 +116,11 @@
 </section>
 {% else %}
 {#- WHY: Resolve the owner's primary neighborhood name so the upgrade card
-    can say "Be the first salon in Wynwood" rather than the generic "your
-    neighborhood". nav_neighborhoods is already in the base context as a
-    list of {slug, name} dicts — same pattern used in business.html. Falls
-    back to the generic phrase if the business has no neighborhood assigned. #}
+    can promise specific local placement without claiming only one business
+    can hold the first slot. nav_neighborhoods is already in the base context
+    as a list of {slug, name} dicts — same pattern used in business.html.
+    Falls back to the generic phrase if the business has no neighborhood
+    assigned. #}
 {%- set _uc_nb_slug = owner_business.neighborhood_slugs[0] if (owner_business and owner_business.neighborhood_slugs) else '' %}
 {%- set _uc_nb = (nav_neighborhoods|selectattr('slug','eq',_uc_nb_slug)|list|first) if _uc_nb_slug else None %}
 {%- set _uc_nb_name = _uc_nb.name if _uc_nb else 'your neighborhood' %}
@@ -141,12 +142,12 @@
               increase" promise; the owner instruction is to never promise
               locked-in or permanent pricing. #}
           <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-2">Get Featured</p>
-          <h2 class="text-base font-semibold text-stone-900 mb-1.5">Be the first {{ listing_word_singular or 'salon' }} visitors see in {{ _uc_nb_name }}</h2>
+          <h2 class="text-base font-semibold text-stone-900 mb-1.5">Make your {{ listing_word_singular or 'salon' }} easier to spot in {{ _uc_nb_name }}</h2>
           <ul class="text-sm text-stone-600 space-y-1 leading-relaxed max-w-xs list-none">
             {% if _uc_tags %}
-            <li>✓ Featured first in {{ _uc_tags|join(' and ') }} searches in {{ _uc_nb_name }}</li>
+            <li>✓ Premium placement in {{ _uc_tags|join(' and ') }} searches in {{ _uc_nb_name }}</li>
             {% else %}
-            <li>✓ Featured first in every category and neighborhood search</li>
+            <li>✓ Premium placement in relevant category and neighborhood searches</li>
             {% endif %}
             <li>✓ Featured badge on your public listing</li>
             <li>✓ Instagram caption generator — AI-written posts for your salon</li>
@@ -259,71 +260,11 @@
 </section>
 {% endif %}
 
-{# ── Listing performance stats ─────────────────────────────────── #}
-{#
-   WHY: owners need a concrete signal that the directory is working so
-   they renew their subscription. "Your page was viewed N times" is the
-   most direct proof we can show — it ties their spend to real visitor
-   attention. This section only makes sense when the owner has a claimed
-   listing (owner_business is set), so it's nested inside that block.
-#}
-{% if owner_business %}
-<section class="bg-stone-50 border-t border-stone-100">
-  <div class="max-w-3xl mx-auto px-6 lg:px-10 py-10">
-    <h2 class="text-base font-semibold text-stone-900 mb-1">Listing performance</h2>
-    <p class="text-sm text-stone-500 mb-6">Your listing activity — page views, messages, and the high-intent taps shoppers make to reach you.</p>
-    {# WHY: a freshly-upgraded owner sees 0 page views and 0 messages, which on
-       its own reads as "the directory isn't working". These reassurance lines —
-       revealed by the stats JS only when the fetched count is exactly 0 — reframe
-       a zero as "tracking has started" instead of "nothing is happening". They
-       carry no numbers, so they never claim activity that didn't occur; the count
-       itself stays visible above each line. #}
-    <div class="flex gap-8 flex-wrap items-stretch">
-      <div class="bg-white rounded-2xl border border-stone-200 px-8 py-6 flex flex-col items-center text-center min-w-[10rem] max-w-[16rem]">
-        <span id="stat-views" class="text-4xl font-bold text-rose-600 tracking-tight">&hellip;</span>
-        <span class="mt-1 text-sm text-stone-500">page views</span>
-        <span id="stat-views-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Views appear here as Miami shoppers find your listing.</span>
-        {# WHY: "of those, N came from Miami Knows Beauty" is the line that proves
-           WE drove the traffic — the one thing a salon's free Google Business
-           Profile can't show them, and the whole reason this report is worth
-           keeping. Revealed by the stats JS only when at least one MKB-referred
-           view exists, so a listing whose visitors so far came from Google or a
-           typed URL simply doesn't show the line (no "0 from us" guilt-trip). #}
-        <span id="stat-views-mkb" class="hidden mt-2 text-xs font-medium text-rose-500 leading-relaxed"></span>
-      </div>
-      <a href="#visitor-inquiries" class="bg-white rounded-2xl border border-stone-200 px-8 py-6 flex flex-col items-center text-center min-w-[10rem] max-w-[16rem] hover:border-stone-300 transition no-underline">
-        <span id="stat-inquiries" class="text-4xl font-bold text-emerald-600 tracking-tight">&hellip;</span>
-        <span class="mt-1 text-sm text-stone-500">messages received</span>
-        <span id="stat-inquiries-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Messages from shoppers will show up here once they reach out.</span>
-      </a>
-    </div>
-    {# WHY: the three taps below — call, directions, website — are higher-intent
-       than a page view: a shopper who taps your number is trying to book, not
-       just browsing. They're shown in their own row, in a slightly smaller size,
-       so they read as a complement to (not a competitor with) the headline views
-       and messages numbers above. Same zero-state framing: a real zero gets a
-       reassurance line revealed by JS, never a fabricated number. #}
-    <div class="mt-5 flex gap-6 flex-wrap items-stretch">
-      <div class="bg-white rounded-2xl border border-stone-200 px-6 py-5 flex flex-col items-center text-center min-w-[9rem] max-w-[14rem]">
-        <span id="stat-calls" class="text-3xl font-bold text-amber-600 tracking-tight">&hellip;</span>
-        <span class="mt-1 text-sm text-stone-500">taps to call</span>
-        <span id="stat-calls-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Counts each time a shopper taps to call you from your listing.</span>
-      </div>
-      <div class="bg-white rounded-2xl border border-stone-200 px-6 py-5 flex flex-col items-center text-center min-w-[9rem] max-w-[14rem]">
-        <span id="stat-directions" class="text-3xl font-bold text-blue-600 tracking-tight">&hellip;</span>
-        <span class="mt-1 text-sm text-stone-500">taps for directions</span>
-        <span id="stat-directions-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Counts each time a shopper taps to map directions to you.</span>
-      </div>
-      <div class="bg-white rounded-2xl border border-stone-200 px-6 py-5 flex flex-col items-center text-center min-w-[9rem] max-w-[14rem]">
-        <span id="stat-website" class="text-3xl font-bold text-orange-600 tracking-tight">&hellip;</span>
-        <span class="mt-1 text-sm text-stone-500">website clicks</span>
-        <span id="stat-website-zero-note" class="hidden mt-2 text-xs text-stone-400 leading-relaxed">Counts each time a shopper clicks through to your website.</span>
-      </div>
-    </div>
-    <p id="stats-error" class="hidden mt-4 text-sm text-rose-700" role="alert" aria-live="polite"></p>
-  </div>
-</section>
-{% endif %}
+{# Listing performance is deliberately hidden pre-launch.
+   WHY: the counters still run in the background, but showing low or zero
+   numbers before the directory is driving meaningful traffic reads as an
+   anti-sell to early owners. Re-introduce this only once there is enough
+   real activity to make the panel encouraging instead of deflating. #}
 
 {# ── Edit form ─────────────────────────────────────────────────── #}
 <section class="bg-white">
@@ -384,6 +325,33 @@
         <textarea id="op-description" name="description" rows="4" maxlength="1000"
                   placeholder="Tell visitors what makes your salon special…"
                   class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition resize-none">{{ owner_business.description or '' }}</textarea>
+        <div id="description-helper" class="mt-3 rounded-xl border border-stone-200 bg-stone-50/60 p-4 space-y-3">
+          <div>
+            <p class="text-sm font-semibold text-stone-900">Want help writing it?</p>
+            <p class="text-xs text-stone-500 mt-0.5">Tell us the feeling, services, or clientele you want to express. We will suggest a polished paragraph you can use or edit.</p>
+          </div>
+          <textarea id="description-helper-prompt" rows="3" maxlength="800"
+                    placeholder="e.g. modern Wynwood salon, lived-in color, calm luxury, clients who want low-maintenance hair"
+                    class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 {{ theme.focus_ring }} focus:border-transparent transition resize-none"></textarea>
+          <div class="flex flex-wrap items-center gap-3">
+            <button id="description-helper-generate" type="button"
+                    class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-700 text-white font-medium px-4 py-2 rounded-full text-xs transition disabled:opacity-50 disabled:cursor-not-allowed">
+              <span id="description-helper-generate-label">Suggest wording</span>
+              <svg id="description-helper-spinner" class="hidden w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            </button>
+            <p id="description-helper-error" class="hidden text-xs text-rose-700" role="alert" aria-live="polite"></p>
+          </div>
+          <div id="description-helper-result-wrap" class="hidden rounded-lg bg-white border border-stone-200 p-3 space-y-3">
+            <p id="description-helper-result" class="text-sm text-stone-800 leading-relaxed"></p>
+            <button id="description-helper-use" type="button"
+                    class="inline-flex items-center gap-1.5 text-xs font-medium text-stone-700 hover:text-stone-900 border border-stone-200 hover:border-stone-400 rounded-full px-3 py-1.5 transition">
+              Use this wording
+            </button>
+          </div>
+        </div>
         <p class="text-xs text-stone-400 mt-1 text-right" id="op-desc-count">
           {{ (owner_business.description or '') | length }}/1000
         </p>
@@ -483,7 +451,7 @@
         <h2 class="text-lg font-semibold text-violet-900">Your AI Receptionist</h2>
         <span class="ml-auto px-2 py-1 text-xs font-medium bg-violet-100 text-violet-700 rounded-full">Active</span>
       </div>
-      <p class="text-sm text-violet-700 mb-3">Your salon's dedicated AI receptionist answers calls 24/7, handles questions about hours and services, and takes messages when you're busy.</p>
+      <p class="text-sm text-violet-700 mb-3">Your salon's dedicated AI receptionist answers calls 24/7, handles questions about hours and services, and books appointments in the scheduling software we set up with you.</p>
       <div class="bg-white rounded-lg p-4 border border-violet-100">
         <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Your Receptionist Number</p>
         <p class="text-2xl font-bold text-violet-800">{{ owner_business.get('voice_phone_number') }}</p>
@@ -497,10 +465,10 @@
         <h2 class="text-lg font-semibold text-gray-800">AI Receptionist</h2>
         <span class="ml-auto px-2 py-1 text-xs font-medium bg-gray-200 text-gray-600 rounded-full">Concierge</span>
       </div>
-      <p class="text-sm text-gray-600 mb-4">Never miss a client call. Upgrade to Concierge and get a dedicated phone number staffed by an AI receptionist — available 24/7, answers questions about your hours and services, takes messages when you're busy.</p>
+      <p class="text-sm text-gray-600 mb-4">Keep the chair time focused. Concierge gives you a dedicated AI receptionist that answers when you are with a client or closed, answers questions, and books appointments in the scheduling software we set up with you. Setup and the first week are free to try.</p>
       <a href="mailto:hello@knowsbeauty.com?subject=AI Receptionist - Concierge Upgrade&body=I'm interested in upgrading to the Concierge plan with AI receptionist. My listing: {{ owner_business.get('name', '') | urlencode }}"
          class="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition-colors">
-        Contact us to upgrade →
+        Ask about Concierge →
       </a>
     </section>
     {% endif %}
@@ -975,6 +943,72 @@
     });
   }
 
+  /* ── AI helper for "About your salon" ───────────────────────── */
+  var BUSINESS_ID = "{{ owner_business_id|default('')|e }}";
+  var descPromptEl = document.getElementById('description-helper-prompt');
+  var descGenBtn = document.getElementById('description-helper-generate');
+  var descGenLabel = document.getElementById('description-helper-generate-label');
+  var descSpin = document.getElementById('description-helper-spinner');
+  var descHelpErr = document.getElementById('description-helper-error');
+  var descResultWrap = document.getElementById('description-helper-result-wrap');
+  var descResultEl = document.getElementById('description-helper-result');
+  var descUseBtn = document.getElementById('description-helper-use');
+
+  function setDescriptionHelperBusy(busy) {
+    if (!descGenBtn) return;
+    descGenBtn.disabled = busy;
+    if (descGenLabel) descGenLabel.textContent = busy ? 'Writing…' : 'Suggest wording';
+    if (descSpin) descSpin.classList.toggle('hidden', !busy);
+  }
+
+  async function generateProfileDescription() {
+    if (!descPromptEl || !descHelpErr || !descResultWrap || !descResultEl) return;
+    descHelpErr.classList.add('hidden');
+    var prompt = (descPromptEl.value || '').trim();
+    if (!prompt) {
+      descHelpErr.textContent = 'Tell us what you want the description to express first.';
+      descHelpErr.classList.remove('hidden');
+      descPromptEl.focus();
+      return;
+    }
+    setDescriptionHelperBusy(true);
+    try {
+      var resp = await fetch('/api/v1/marketing-ai/profile-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: BUSINESS_ID, prompt: prompt }),
+      });
+      if (!resp.ok) {
+        var detail = '';
+        try { detail = (await resp.json()).detail || ''; } catch (ex) {}
+        descHelpErr.textContent = resp.status === 404
+          ? "The writing helper isn't enabled yet — try again later."
+          : (detail || 'Could not write a suggestion. Please try again.');
+        descHelpErr.classList.remove('hidden');
+        return;
+      }
+      var data = await resp.json();
+      descResultEl.textContent = data.description || '';
+      descResultWrap.classList.remove('hidden');
+    } catch (err) {
+      descHelpErr.textContent = 'Network error. Please try again.';
+      descHelpErr.classList.remove('hidden');
+    } finally {
+      setDescriptionHelperBusy(false);
+    }
+  }
+
+  if (descGenBtn) {
+    descGenBtn.addEventListener('click', generateProfileDescription);
+  }
+  if (descUseBtn && descEl && descResultEl) {
+    descUseBtn.addEventListener('click', function () {
+      descEl.value = (descResultEl.textContent || '').slice(0, 1000);
+      descEl.dispatchEvent(new Event('input', { bubbles: true }));
+      descEl.focus();
+    });
+  }
+
   /* ── Structured hours grid ──────────────────────────────────── */
   /* WHY: toggle the time inputs when "Closed" changes so the owner
      gets immediate feedback that those hours won't be saved. */
@@ -1127,8 +1161,6 @@
   });
 
   /* ── Instagram caption panel ───────────────────────────────── */
-  var BUSINESS_ID = "{{ owner_business_id|default('')|e }}";
-
   var promptEl   = document.getElementById('caption-prompt');
   var genBtn     = document.getElementById('caption-generate');
   var genLabel   = document.getElementById('caption-generate-label');
@@ -1812,74 +1844,6 @@
     });
 })();
 
-/* ── Listing performance stats ─────────────────────────────── */
-/* WHY: kept as a separate top-level IIFE so it runs independently of the
-   inquiries panel.  The previous code had this block nested inside the
-   inquiries IIFE — if that panel's early-exit guard fired (e.g. element
-   not in DOM), stats would never load even though they were separately
-   rendered on the same page. */
-(function () {
-  var viewsEl = document.getElementById('stat-views');
-  var errEl   = document.getElementById('stats-error');
-  if (!viewsEl) return;   /* not rendered when owner has no listing */
-
-  /* WHY: a small helper so each metric tile fills the same way — set the number,
-     and on a real zero reveal that tile's reassurance line. Keeps the four-tile
-     wiring (views + the three taps) consistent and avoids repeated code. The
-     count is formatted with toLocaleString so large numbers get thousands
-     separators, matching the page-views and messages numbers. */
-  function fillStat(numId, zeroNoteId, value) {
-    var el = document.getElementById(numId);
-    if (!el) return;
-    var n = value || 0;
-    el.textContent = n.toLocaleString();
-    var zero = document.getElementById(zeroNoteId);
-    if (zero && n === 0) zero.classList.remove('hidden');
-  }
-
-  fetch('/api/v1/owner/stats')
-    .then(function (r) {
-      if (!r.ok) throw new Error('Error ' + r.status);
-      return r.json();
-    })
-    .then(function (data) {
-      /* WHY: a brand-new listing legitimately has 0 of everything. fillStat
-         reveals each tile's reassurance line only on a real zero, so the panel
-         reads as "tracking has started" rather than "the directory isn't
-         working" — and never shows a fabricated number. */
-      fillStat('stat-views', 'stat-views-zero-note', data.page_view_count);
-      fillStat('stat-calls', 'stat-calls-zero-note', data.call_click_count);
-      fillStat('stat-directions', 'stat-directions-zero-note', data.directions_click_count);
-      fillStat('stat-website', 'stat-website-zero-note', data.website_click_count);
-
-      /* WHY: show the "of those, N came from Miami Knows Beauty" line ONLY when
-         we actually sent at least one visitor. Zero stays hidden — a listing
-         whose visitors so far came from Google or a typed URL shouldn't read
-         "0 from us", which would frame the report as a failure. When non-zero,
-         this is the line that proves WE drove the traffic, the one thing the
-         salon's free Google profile can't show them. */
-      var mkbEl = document.getElementById('stat-views-mkb');
-      var mkb = data.mkb_referred_view_count || 0;
-      if (mkbEl && mkb > 0) {
-        /* WHY "of these came from" reads correctly for any count (1 or many),
-           so no singular/plural branch is needed — "1 of these came from..."
-           and "12 of these came from..." both read naturally. */
-        mkbEl.textContent = mkb.toLocaleString() + ' of these came from Miami Knows Beauty';
-        mkbEl.classList.remove('hidden');
-      }
-    })
-    .catch(function () {
-      /* WHY: blank every tile that depends on this fetch (not just views) and
-         surface one error line, so a failed load never leaves a "…" hanging in
-         a tap tile. Messages load from a separate fetch and are unaffected. */
-      ['stat-views', 'stat-calls', 'stat-directions', 'stat-website'].forEach(function (id) {
-        var el = document.getElementById(id);
-        if (el) el.textContent = '—';
-      });
-      errEl.textContent = 'Could not load stats. Please refresh the page.';
-      errEl.classList.remove('hidden');
-    });
-})();
 </script>
 
 {% endblock %}

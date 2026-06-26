@@ -5,7 +5,7 @@
 **Who**: David Bodnick, the product owner who runs Miami Knows Beauty.
 
 **Goals**:
-- Fill the 25 Founding Partner slots and collect subscription revenue
+- Convert claimed listings into $29/month Featured subscriptions
 - Get Miami salon owners to claim and subscribe to their listings
 - Build a directory that ranks well on Google for Miami beauty search terms
 - Expand the platform to other cities and verticals ("Knows Wellness", "Knows Health", etc.)
@@ -29,7 +29,7 @@
 **Goals**:
 - Get found by new clients searching for salons
 - Show off their salon (photos, description, hours, services)
-- Earn the "Founding Partner" badge for credibility
+- Earn a Featured badge and premium placement while subscribed
 - Stay informed about inquiries from potential clients
 
 **Owner journey**:
@@ -38,8 +38,8 @@
 3. Fills out claim form (name, email, phone, message) → David reviews in admin
 4. Receives approval email → logs into owner portal (magic code to email)
 5. Uploads photos, edits profile, adds hours/description
-6. Subscribes to Founding Partner plan ($29/month) via Stripe Checkout
-7. Permanent badge appears on their listing immediately after payment
+6. Subscribes to the Featured plan ($29/month) via Stripe Checkout
+7. Featured badge and premium placement appear on their listing while subscribed
 
 **Owner touchpoints**:
 - `/owners/login` — magic-code email login (no password)
