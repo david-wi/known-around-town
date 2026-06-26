@@ -732,8 +732,8 @@ def test_home_hero_has_owner_entry_point(client):
 
 
 def test_business_detail_has_og_image_when_photos_exist(client, seeded_db):
-    """When a salon's detail page has photos, the og:image meta tag must
-    be present so WhatsApp/iMessage/Slack previews show the salon photo
+    """When a salon's detail page has a verified/owner-style photo, og:image must
+    be present so WhatsApp/iMessage/Slack previews show that salon photo
     instead of a blank grey box. The tag is critical for owner referrals —
     owners frequently share their newly-claimed listing with friends.
 
@@ -746,14 +746,19 @@ def test_business_detail_has_og_image_when_photos_exist(client, seeded_db):
     city = asyncio.run(
         seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
     )
-    # Find any Miami business that has at least one photo in the seed.
-    biz = asyncio.run(
-        seeded_db.businesses.find_one(
-            {"city_id": city["_id"], "photos": {"$elemMatch": {"url": {"$exists": True, "$ne": ""}}}}
-        )
-    )
-    if biz is None:
-        pytest.skip("No seeded businesses with photos — cannot test og:image tag")
+    photo_url = "https://cdn.example.com/owner-photo-og.jpg"
+    biz = {
+        "slug": "test-owner-photo-og-salon",
+        "name": "Test Owner Photo OG Salon",
+        "city_id": city["_id"],
+        "network_id": network["_id"],
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": [],
+        "photos": [{"url": photo_url}],
+        "claim_status": "none",
+        "status": "live",
+    }
+    asyncio.run(seeded_db.businesses.insert_one(biz))
 
     r = client.get(
         f"/b/{biz['slug']}", headers={"host": "miami.knowsbeauty.localhost"}
@@ -762,6 +767,7 @@ def test_business_detail_has_og_image_when_photos_exist(client, seeded_db):
     assert 'property="og:image"' in r.text, (
         f"og:image meta tag missing on /b/{biz['slug']} even though it has photos"
     )
+    assert f'property="og:image" content="{photo_url}"' in r.text
 
 
 def test_photos_render_as_plain_string_urls(client, seeded_db):
@@ -801,15 +807,19 @@ def test_photos_render_as_plain_string_urls(client, seeded_db):
     }
     asyncio.run(seeded_db.businesses.insert_one(biz_doc))
 
-    # Detail page: photo must appear as a background-image and in og:image.
+    # Detail page: photo must appear as a background-image, but because this
+    # is an Unsplash stock URL it must be disclosed instead of treated as an
+    # owner/business photo in metadata.
     r = client.get("/b/test-string-photo-salon", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
     assert PHOTO_URL in r.text, (
         "String-format photo URL missing from detail page — template rendered "
         "a grey placeholder instead of the actual photo"
     )
-    assert 'property="og:image"' in r.text, (
-        "og:image meta tag missing even though the business has a string-format photo"
+    assert "Representative image until the owner adds photos" in r.text
+    assert f'content="{PHOTO_URL}"' not in r.text, (
+        "Unsplash representative photo was emitted as og:image instead of being "
+        "kept out of business metadata"
     )
 
     # Category page: the card partial (business_card.html) must also render the
@@ -829,6 +839,7 @@ def test_photos_render_as_plain_string_urls(client, seeded_db):
         "String-format photo URL missing from the category-page card — "
         "business_card.html rendered a grey placeholder instead of the actual photo"
     )
+    assert "Representative image" in r2.text
 
 
 def test_photos_render_as_dict_url_format(client, seeded_db):
@@ -839,7 +850,7 @@ def test_photos_render_as_dict_url_format(client, seeded_db):
     existing dict format that every real business uses."""
     import asyncio
 
-    PHOTO_URL = "https://images.unsplash.com/photo-test-dict-format?w=800"
+    PHOTO_URL = "https://cdn.example.com/photo-test-dict-format?w=800"
 
     network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
     city = asyncio.run(
@@ -1267,9 +1278,9 @@ def test_business_detail_jsonld_has_canonical_id(client):
 
 def test_business_detail_jsonld_has_image_when_photos_exist(client, seeded_db):
     """The LocalBusiness JSON-LD must include an 'image' field when the business
-    has photos. Google shows this image in the Knowledge Panel next to the business
-    name in search results — without it the entry is text-only and gets less
-    visual prominence.
+    has a verified/owner-style photo. Google shows this image in the Knowledge
+    Panel next to the business name in search results — without it the entry is
+    text-only and gets less visual prominence.
 
     WHY: this is the single highest-value structured-data addition for beauty
     businesses. A photo appearing alongside the name in search results dramatically
@@ -1280,13 +1291,19 @@ def test_business_detail_jsonld_has_image_when_photos_exist(client, seeded_db):
     city = asyncio.run(
         seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
     )
-    biz = asyncio.run(
-        seeded_db.businesses.find_one(
-            {"city_id": city["_id"], "photos": {"$elemMatch": {"url": {"$exists": True, "$ne": ""}}}}
-        )
-    )
-    if biz is None:
-        pytest.skip("No seeded businesses with photos — cannot test JSON-LD image field")
+    photo_url = "https://cdn.example.com/owner-photo-jsonld.jpg"
+    biz = {
+        "slug": "test-owner-photo-jsonld-salon",
+        "name": "Test Owner Photo JSON-LD Salon",
+        "city_id": city["_id"],
+        "network_id": network["_id"],
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": [],
+        "photos": [{"url": photo_url}],
+        "claim_status": "none",
+        "status": "live",
+    }
+    asyncio.run(seeded_db.businesses.insert_one(biz))
 
     r = client.get(
         f"/b/{biz['slug']}", headers={"host": "miami.knowsbeauty.localhost"}
@@ -1295,6 +1312,7 @@ def test_business_detail_jsonld_has_image_when_photos_exist(client, seeded_db):
     assert '"image"' in r.text, (
         f"JSON-LD missing 'image' field on /b/{biz['slug']} even though it has photos"
     )
+    assert f'"image": "{photo_url}"' in r.text
 
 
 def test_business_detail_jsonld_has_same_as_with_instagram_and_website(client):
@@ -3937,6 +3955,17 @@ def test_non_featured_business_auto_recommendations_keep_same_category(client, s
 # ---------------------------------------------------------------------------
 # Unit tests for _dedup_photos helper
 # ---------------------------------------------------------------------------
+
+def test_representative_photo_detector_flags_unsplash_only():
+    """Only generic stock URLs should be disclosed as representative images."""
+    from app.routes.public.pages import _is_representative_photo_url
+
+    assert _is_representative_photo_url("https://images.unsplash.com/photo-abc?w=800")
+    assert _is_representative_photo_url("https://cdn.unsplash.com/photo-abc")
+    assert not _is_representative_photo_url("https://cdn.example.com/owner-photo.jpg")
+    assert not _is_representative_photo_url("/media/abcdef123")
+    assert not _is_representative_photo_url("")
+
 
 def test_dedup_photos_removes_duplicate_url():
     """When two businesses share the same photo URL, the second one's photos
