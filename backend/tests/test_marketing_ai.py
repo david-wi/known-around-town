@@ -320,6 +320,7 @@ def test_generate_caption_missing_key_raises(monkeypatch):
 
     monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
     monkeypatch.delenv("AI_GATEWAY_KEY", raising=False)
+    monkeypatch.delenv("KAT_AI_GATEWAY_KEY", raising=False)
     ctx = CaptionContext(
         business_name="X",
         neighborhood_name=None,
@@ -338,6 +339,7 @@ def test_generate_caption_happy_path_sends_expected_body(monkeypatch):
     from app.services import ai_caption
 
     monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.delenv("KAT_AI_GATEWAY_KEY", raising=False)
     monkeypatch.setenv("AI_GATEWAY_KEY", "test-key-abc")
     transport, captured = _ok_transport("Caption text 💅\n#test")
 
@@ -382,6 +384,7 @@ def test_generate_caption_502_on_gateway_error(monkeypatch):
     from app.services import ai_caption
 
     monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.delenv("KAT_AI_GATEWAY_KEY", raising=False)
     monkeypatch.setenv("AI_GATEWAY_KEY", "test-key-abc")
     transport = _status_transport(500, {"detail": "boom"})
 
@@ -408,6 +411,7 @@ def test_generate_caption_empty_text_raises(monkeypatch):
     from app.services import ai_caption
 
     monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.delenv("KAT_AI_GATEWAY_KEY", raising=False)
     monkeypatch.setenv("AI_GATEWAY_KEY", "test-key-abc")
     transport, _ = _ok_transport(text="   ")  # whitespace-only
 
@@ -438,6 +442,7 @@ def client(seeded_db, monkeypatch):
     # Feature flag on by default for endpoint tests; individual tests
     # flip it off as needed.
     monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.delenv("KAT_AI_GATEWAY_KEY", raising=False)
     monkeypatch.setenv("AI_GATEWAY_KEY", "test-key-abc")
     # Make sure we don't accidentally hit the real network if a path
     # bypasses the patched generate_caption.
@@ -777,6 +782,7 @@ def test_generate_ad_copy_happy_path_sends_expected_body(monkeypatch):
     from app.services import ai_caption
 
     monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.delenv("KAT_AI_GATEWAY_KEY", raising=False)
     monkeypatch.setenv("AI_GATEWAY_KEY", "test-key-abc")
     ad_text = "Get the Look\nBook your fall balayage today — limited spots.\n\nFall Into Color\nWarm tones, expert hands. New clients welcome.\n\nYear-Round Gorgeous\nBalayage that grows out beautifully. Book now."
     transport, captured = _ok_transport(ad_text)
@@ -819,6 +825,7 @@ def test_generate_ad_copy_gateway_error_raises(monkeypatch):
     from app.services import ai_caption
 
     monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.delenv("KAT_AI_GATEWAY_KEY", raising=False)
     monkeypatch.setenv("AI_GATEWAY_KEY", "test-key-abc")
     transport = _status_transport(500, {"detail": "boom"})
 
@@ -845,6 +852,7 @@ def test_generate_ad_copy_empty_text_raises(monkeypatch):
     from app.services import ai_caption
 
     monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.delenv("KAT_AI_GATEWAY_KEY", raising=False)
     monkeypatch.setenv("AI_GATEWAY_KEY", "test-key-abc")
     transport, _ = _ok_transport(text="   ")  # whitespace-only
 

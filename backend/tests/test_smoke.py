@@ -1492,8 +1492,18 @@ def test_search_page_no_query(client):
     assert 'name="q"' in r.text
 
 
-def test_search_page_with_results(client, seeded_db):
+def _patch_search_page_ai_results(monkeypatch):
+    from app.services import content as content_svc
+
+    async def fake_selector(*, query, businesses):
+        return [str(business["_id"]) for business in businesses[:3]]
+
+    monkeypatch.setattr(content_svc, "_select_matching_business_ids", fake_selector)
+
+
+def test_search_page_with_results(client, seeded_db, monkeypatch):
     """GET /search?q=<term> returns matching businesses in a grid."""
+    _patch_search_page_ai_results(monkeypatch)
     r = client.get(
         "/search?q=brickell",
         headers={"host": "miami.knowsbeauty.localhost"},
@@ -1519,12 +1529,13 @@ def test_search_page_zero_results(client):
     assert 'href="/owners"' in r.text
 
 
-def test_search_page_shows_owner_banner_when_results(client, seeded_db):
+def test_search_page_shows_owner_banner_when_results(client, seeded_db, monkeypatch):
     """When search returns results, the owner acquisition banner must appear.
 
     Owners often search for their own business name or service type.
     Without a banner here they'd see the results and leave without
     knowing they can claim their listing."""
+    _patch_search_page_ai_results(monkeypatch)
     r = client.get(
         "/search?q=brickell",
         headers={"host": "miami.knowsbeauty.localhost"},
