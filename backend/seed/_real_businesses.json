@@ -593,20 +593,6 @@
       ]
     },
     {
-      "slug": "the-nail-lab-wynwood",
-      "name": "The Nail Lab",
-      "neighborhood_slug": "wynwood",
-      "category_slug": "nails",
-      "price_cues": "$$",
-      "short_description": "A design-conscious nail studio known for clean lines, trending colors, and detail work.",
-      "address": "2701 N Miami Ave, Miami, FL 33127",
-      "phone": "(305) 456-2570",
-      "website": "https://thenailab.com/",
-      "instagram": "@thenailab",
-      "editors_pick": false,
-      "premium": false
-    },
-    {
       "slug": "dazzle-dry-nail-spa-coral-gables",
       "name": "Dazzle Dry Nail Spa - Coral Gables",
       "neighborhood_slug": "coral-gables",
