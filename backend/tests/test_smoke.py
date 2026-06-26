@@ -56,6 +56,22 @@ def test_miami_beauty_home(client):
     assert "Claim Your Listing" in body  # title block includes owner-facing phrase
 
 
+def test_known_bad_nail_lab_source_is_not_seeded(client):
+    """The Nail Lab source conflicted across official site, address, and Place ID.
+
+    The record looked like a Wynwood nail studio, but the official website points
+    to Sarasota and the stored place source pointed to a different North Miami
+    Beach identity. Keep it out until we have a verified local source.
+    """
+    r = client.get("/b/the-nail-lab-wynwood", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 404
+
+    home = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert home.status_code == 200, home.text
+    assert "the-nail-lab-wynwood" not in home.text
+    assert "The Nail Lab" not in home.text
+
+
 def test_miami_beauty_category(client):
     r = client.get("/c/nails", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
