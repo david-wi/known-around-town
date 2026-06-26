@@ -110,7 +110,7 @@ def test_expertly_voice_page(client):
         "/expertly-voice.html", headers={"host": "miami.knowsbeauty.localhost"}
     )
     assert r.status_code == 200, r.text
-    assert "Never miss a booking" in r.text
+    assert "Catch more calls" in r.text
     assert "Expertly · Voice for Salons" in r.text
     # Trial length: the salon-facing offer is one week free.
     # If this assertion ever fails because the trial copy changed, update
@@ -121,6 +121,10 @@ def test_expertly_voice_page(client):
         assert vendor not in r.text
     assert "Two-way sync" not in r.text
     assert "never double-book" not in r.text
+    assert "An actual call" not in r.text
+    assert "Booked. Sarah is on Jamie" not in r.text
+    assert "+27%" not in r.text
+    assert "scheduling software" not in r.text
 
 
 def test_owners_page(client):
@@ -249,6 +253,7 @@ def test_pricing_page_leads_with_ai_tools_and_omits_false_claims(client):
     assert "Featured listing badge" in body
 
     # False/over-promise claims must be gone.
+    assert "appear first" not in body.lower()
     assert "switch tiers" not in body.lower()
     assert "pro-rated" not in body.lower() and "prorated" not in body.lower()
     assert "50 Instagram caption" not in body
@@ -288,7 +293,8 @@ def test_owners_page_omits_false_claims(client):
     for vendor in ("Fresha", "Vagaro", "Mindbody", "Booksy"):
         assert vendor not in body
     # Concierge reads as contact-us / setup-assisted.
-    assert "set up with you" in body.lower() or "talk to us" in body.lower()
+    assert "workflow we configure with you" in body.lower() or "talk to us" in body.lower()
+    assert "appear first" not in body.lower()
 
 
 def test_owners_page_prefills_from_slug(client, seeded_db):
