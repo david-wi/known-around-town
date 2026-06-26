@@ -339,6 +339,78 @@ def feature_enabled() -> bool:
     return raw in {"true", "1", "yes", "on"}
 
 
+async def call_gateway_text(
+    *,
+    use_case: str,
+    system_prompt: str,
+    user_content: str,
+    max_tokens_override: int,
+    cost_tags: Dict[str, Any],
+    http_client: Optional[httpx.AsyncClient] = None,
+) -> str:
+    """Call the centralized AI gateway and return its text payload.
+
+    WHY: Known Around Town has more than one LLM-backed feature now. Public
+    search and owner marketing copy both need the same gateway/key/error
+    handling, but public search must not be tied to MARKETING_AI_ENABLED because
+    that flag only controls owner-facing marketing tools.
+    """
+    key = _gateway_key()
+    if not key:
+        log.error("Neither KAT_AI_GATEWAY_KEY nor AI_GATEWAY_KEY is set; AI gateway call cannot proceed")
+        raise CaptionGenerationError("gateway not configured")
+
+    body: Dict[str, Any] = {
+        "use_case": use_case,
+        "system_prompt": system_prompt,
+        "user_content": user_content,
+        "max_tokens_override": max_tokens_override,
+        "cost_tags": cost_tags,
+    }
+    headers = {
+        "X-API-Key": key,
+        "Content-Type": "application/json",
+    }
+
+    own_client = http_client is None
+    client = http_client or httpx.AsyncClient(timeout=DEFAULT_TIMEOUT_SECONDS)
+    try:
+        try:
+            resp = await client.post(_gateway_url(), json=body, headers=headers)
+        except httpx.RequestError as exc:
+            log.warning("AI gateway unreachable: %s", exc)
+            raise CaptionGenerationError("gateway unreachable") from exc
+
+        status = resp.status_code
+        raw_text_snippet = resp.text[:500]
+        json_data: Optional[Dict[str, Any]] = None
+        json_error: Optional[Exception] = None
+        if status < 400:
+            try:
+                json_data = resp.json()
+            except ValueError as exc:
+                json_error = exc
+                raw_text_snippet = resp.text[:500]
+    finally:
+        if own_client:
+            await client.aclose()
+
+    if status >= 400:
+        log.warning("AI gateway returned HTTP %s: %s", status, raw_text_snippet)
+        raise CaptionGenerationError(f"gateway returned HTTP {status}")
+
+    if json_error is not None:
+        log.warning("AI gateway returned non-JSON: %s", raw_text_snippet)
+        raise CaptionGenerationError("gateway returned invalid JSON") from json_error
+    assert json_data is not None
+
+    text = (json_data.get("text") or "").strip()
+    if not text:
+        log.warning("AI gateway returned empty text: %s", json_data)
+        raise CaptionGenerationError("gateway returned empty text")
+    return text
+
+
 async def generate_caption(
     ctx: CaptionContext,
     *,

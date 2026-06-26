@@ -1,12 +1,9 @@
-"""Tests for content_svc.search_businesses — multi-word, AND-across-terms search.
+"""Tests for content_svc.search_businesses semantic search.
 
-The bug this guards against: a multi-word query like "nails brickell" used to be
-regex-matched as one contiguous string against name/description/tags only, so it
-returned nothing (no business holds that literal phrase, and category +
-neighborhood were never searched). Now each whitespace-separated term must match
-at least one searchable field (name, short_description, tags, category_slugs,
-neighborhood_slugs), and every term must match — so "nails brickell" returns nail
-salons that are in Brickell.
+The bug this guards against: visitor searches are semantic, not fixed-format
+strings. A multi-word query like "nails brickell" should return nail salons in
+Brickell even if no listing contains that literal phrase. The service now scopes
+candidate listings with Mongo and delegates result selection to AI.
 
 Patch path: search_businesses calls app.database.get_db, which resolves the
 client via app.database.get_client. The mock_db fixture patches get_client, so
@@ -82,13 +79,26 @@ async def _seed(db) -> None:
     await db.businesses.insert_many([dict(d) for d in _SEED])
 
 
-@pytest.mark.asyncio
-async def test_nails_brickell_returns_brickell_nail_salons(mock_db):
-    """The headline bug: "nails brickell" must return Brickell nail salons —
-    and only those that are BOTH nails AND in Brickell."""
+def _patch_ai_matches(monkeypatch, matches_by_query: Dict[str, set[str]]):
     from app.services import content as content_svc
 
+    async def fake_selector(*, query: str, businesses: List[Dict[str, Any]]) -> List[str]:
+        allowed = matches_by_query.get(" ".join(query.lower().split()), set())
+        return [str(business["_id"]) for business in businesses if str(business["_id"]) in allowed]
+
+    monkeypatch.setattr(content_svc, "_select_matching_business_ids", fake_selector)
+    return content_svc
+
+
+@pytest.mark.asyncio
+async def test_nails_brickell_returns_brickell_nail_salons(mock_db, monkeypatch):
+    """The headline bug: "nails brickell" must return Brickell nail salons —
+    and only those that are BOTH nails AND in Brickell."""
     await _seed(mock_db)
+    content_svc = _patch_ai_matches(
+        monkeypatch,
+        {"nails brickell": {"lets-nail-bar-brickell"}},
+    )
     res = await content_svc.search_businesses(CITY, "nails brickell")
 
     ids = {r["_id"] for r in res}
@@ -100,10 +110,12 @@ async def test_nails_brickell_returns_brickell_nail_salons(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_nails_alone_returns_all_nail_salons(mock_db):
-    from app.services import content as content_svc
-
+async def test_nails_alone_returns_all_nail_salons(mock_db, monkeypatch):
     await _seed(mock_db)
+    content_svc = _patch_ai_matches(
+        monkeypatch,
+        {"nails": {"lets-nail-bar-brickell", "wynwood-nails"}},
+    )
     res = await content_svc.search_businesses(CITY, "nails")
     ids = {r["_id"] for r in res}
     # Both Miami nail salons, regardless of neighborhood.
@@ -111,10 +123,12 @@ async def test_nails_alone_returns_all_nail_salons(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_brickell_alone_returns_all_brickell_businesses(mock_db):
-    from app.services import content as content_svc
-
+async def test_brickell_alone_returns_all_brickell_businesses(mock_db, monkeypatch):
     await _seed(mock_db)
+    content_svc = _patch_ai_matches(
+        monkeypatch,
+        {"brickell": {"lets-nail-bar-brickell", "blow-dry-bar-brickell"}},
+    )
     res = await content_svc.search_businesses(CITY, "brickell")
     ids = {r["_id"] for r in res}
     # Both live Miami businesses in Brickell (the spa is draft → excluded).
@@ -122,33 +136,31 @@ async def test_brickell_alone_returns_all_brickell_businesses(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_nonsense_term_returns_empty(mock_db):
-    from app.services import content as content_svc
-
+async def test_nonsense_term_returns_empty(mock_db, monkeypatch):
     await _seed(mock_db)
+    content_svc = _patch_ai_matches(monkeypatch, {"zzqxnope": set()})
     res = await content_svc.search_businesses(CITY, "zzqxnope")
     assert res == []
 
 
 @pytest.mark.asyncio
-async def test_partial_match_across_terms_excludes_non_matches(mock_db):
+async def test_partial_match_across_terms_excludes_non_matches(mock_db, monkeypatch):
     """"hair brickell" must return the Brickell hair salon, not the nail bar."""
-    from app.services import content as content_svc
-
     await _seed(mock_db)
+    content_svc = _patch_ai_matches(
+        monkeypatch,
+        {"hair brickell": {"blow-dry-bar-brickell"}},
+    )
     res = await content_svc.search_businesses(CITY, "hair brickell")
     ids = {r["_id"] for r in res}
     assert ids == {"blow-dry-bar-brickell"}, ids
 
 
 @pytest.mark.asyncio
-async def test_term_with_no_match_yields_empty(mock_db):
-    """If one term matches but another matches nothing, AND semantics → []."""
-    from app.services import content as content_svc
-
+async def test_term_with_no_match_yields_empty(mock_db, monkeypatch):
+    """If the AI selector finds no coherent result, search returns []."""
     await _seed(mock_db)
-    # "nails" matches, "wynwood" matches wynwood-nails — but wynwood-nails is
-    # not a brickell business, so "nails wynwood brickell" must be empty.
+    content_svc = _patch_ai_matches(monkeypatch, {"nails wynwood brickell": set()})
     res = await content_svc.search_businesses(CITY, "nails wynwood brickell")
     assert res == []
 
@@ -163,20 +175,24 @@ async def test_empty_query_returns_empty(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_search_is_case_insensitive(mock_db):
-    from app.services import content as content_svc
-
+async def test_search_normalizes_case_before_ai_selection(mock_db, monkeypatch):
     await _seed(mock_db)
+    content_svc = _patch_ai_matches(
+        monkeypatch,
+        {"nails brickell": {"lets-nail-bar-brickell"}},
+    )
     res = await content_svc.search_businesses(CITY, "NAILS BRICKELL")
     ids = {r["_id"] for r in res}
     assert ids == {"lets-nail-bar-brickell"}, ids
 
 
 @pytest.mark.asyncio
-async def test_other_city_results_excluded(mock_db):
-    from app.services import content as content_svc
-
+async def test_other_city_results_excluded(mock_db, monkeypatch):
     await _seed(mock_db)
+    content_svc = _patch_ai_matches(
+        monkeypatch,
+        {"nails brickell": {"lets-nail-bar-brickell", "other-city-nail-bar"}},
+    )
     # other-city-nail-bar is nails in brickell but in a different city.
     res = await content_svc.search_businesses(CITY, "nails brickell")
     ids = {r["_id"] for r in res}
@@ -184,11 +200,9 @@ async def test_other_city_results_excluded(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_featured_and_editors_pick_ordering_preserved(mock_db):
+async def test_featured_and_editors_pick_ordering_preserved(mock_db, monkeypatch):
     """When multiple businesses match, featured-first then editor's-pick then
     quality_score then name — the same ordering the old code used."""
-    from app.services import content as content_svc
-
     # Three nail salons that all match "nails", with a deliberate sort order.
     rows = [
         _biz("plain-nails", "AAA Plain Nails",
@@ -203,6 +217,10 @@ async def test_featured_and_editors_pick_ordering_preserved(mock_db):
     ]
     await mock_db.businesses.insert_many([dict(r) for r in rows])
 
+    content_svc = _patch_ai_matches(
+        monkeypatch,
+        {"nails": {"plain-nails", "featured-nails", "editors-nails"}},
+    )
     res = await content_svc.search_businesses(CITY, "nails")
     order = [r["_id"] for r in res]
     # Featured first, then editor's pick, then the plain one.
@@ -210,9 +228,7 @@ async def test_featured_and_editors_pick_ordering_preserved(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_limit_is_respected(mock_db):
-    from app.services import content as content_svc
-
+async def test_limit_is_respected(mock_db, monkeypatch):
     rows = [
         _biz(f"nail-{i}", f"Nail Salon {i:02d}",
              category_slugs=["nails"], neighborhood_slugs=["brickell"])
@@ -220,5 +236,54 @@ async def test_limit_is_respected(mock_db):
     ]
     await mock_db.businesses.insert_many([dict(r) for r in rows])
 
+    content_svc = _patch_ai_matches(
+        monkeypatch,
+        {"nails": {f"nail-{i}" for i in range(10)}},
+    )
     res = await content_svc.search_businesses(CITY, "nails", limit=3)
     assert len(res) == 3
+
+
+@pytest.mark.asyncio
+async def test_select_matching_business_ids_uses_gateway_and_filters_invented_ids(monkeypatch):
+    from app.services import content as content_svc
+
+    async def fake_gateway(**kwargs):
+        assert kwargs["use_case"] == "light"
+        assert kwargs["cost_tags"]["feature"] == "public.search"
+        assert "nails near Brickell" in kwargs["user_content"]
+        return '{"business_ids": ["lets-nail-bar-brickell", "not-real"]}'
+
+    monkeypatch.setattr(content_svc, "call_gateway_text", fake_gateway)
+
+    result = await content_svc._select_matching_business_ids(
+        query="nails near Brickell",
+        businesses=[
+            _biz("lets-nail-bar-brickell", "Let's Nail Bar Brickell",
+                 category_slugs=["nails"], neighborhood_slugs=["brickell"]),
+            _biz("wynwood-nails", "Wynwood Nails",
+                 category_slugs=["nails"], neighborhood_slugs=["wynwood"]),
+        ],
+    )
+
+    assert result == ["lets-nail-bar-brickell"]
+
+
+@pytest.mark.asyncio
+async def test_select_matching_business_ids_fails_closed_on_gateway_failure(monkeypatch):
+    from app.services import content as content_svc
+
+    async def fake_gateway(**kwargs):
+        raise content_svc.CaptionGenerationError("gateway unavailable")
+
+    monkeypatch.setattr(content_svc, "call_gateway_text", fake_gateway)
+
+    result = await content_svc._select_matching_business_ids(
+        query="nails",
+        businesses=[
+            _biz("lets-nail-bar-brickell", "Let's Nail Bar Brickell",
+                 category_slugs=["nails"], neighborhood_slugs=["brickell"]),
+        ],
+    )
+
+    assert result == []

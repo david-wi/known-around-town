@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-import re
+import json
+import logging
 from typing import Any, Dict, List, Optional
 
 from app.database import get_db
+from app.services.ai_caption import CaptionGenerationError, call_gateway_text
+
+log = logging.getLogger(__name__)
 
 
 async def list_neighborhoods(city_id: str) -> List[Dict[str, Any]]:
@@ -90,20 +94,33 @@ async def list_businesses(
     return await cur.to_list(length=limit)
 
 
-# WHY: the fields every search term is matched against. Beyond free-text name
-# and description, we include the slug arrays so a term like "nails" or
-# "brickell" finds a salon by its category or neighborhood even though those
-# words never appear in the salon's own copy. The slugs ARE the searchable
-# words for Miami's single-word categories/neighborhoods ("nails", "hair",
-# "brickell", "wynwood"); a regex (substring) match also catches multi-word
-# slugs like "brickell-ave-mary-brickell-village" from a "brickell" term.
-_SEARCH_FIELDS = (
-    "name",
-    "short_description",
-    "tags",
-    "category_slugs",
-    "neighborhood_slugs",
-)
+# WHY: Public search is a semantic selector over business summaries, so sending
+# every live listing to the LLM would scale poorly. Current city catalogs are
+# far below this size; the cap keeps future prompt cost bounded while preserving
+# the same featured/editorial ordering users already see.
+SEARCH_AI_CANDIDATE_LIMIT = 80
+
+# WHY: The model only returns business IDs. 450 tokens leaves room for JSON and
+# whitespace while preventing the gateway call from turning into copywriting.
+SEARCH_AI_MAX_TOKENS = 450
+
+# WHY: "light" is a registered centralized gateway alias. The model choice stays
+# in Admin AI Config while code-level cost tags still attribute KAT public search.
+SEARCH_AI_USE_CASE = "light"
+
+SEARCH_AI_SYSTEM_PROMPT = """You select local business search results.
+
+Return ONLY JSON with this shape:
+{"business_ids": ["business-id"]}
+
+Rules:
+- Match the user's meaning, not just exact words.
+- Use category, neighborhood, tags, and descriptions.
+- Include only IDs from the provided candidate list.
+- Do not invent IDs.
+- Exclude weak or generic matches.
+- Return {"business_ids": []} if nothing clearly matches.
+"""
 
 
 async def search_businesses(
@@ -112,43 +129,18 @@ async def search_businesses(
     """Full-text-style search across a business's name, description, tags,
     category, and neighborhood.
 
-    Uses case-insensitive regex because Atlas free-tier clusters do not
-    guarantee a $text index is available. Regex on name + short_description +
-    tags + category/neighborhood slugs covers the vast majority of real search
-    intent ("lash bar", "curly hair", "nail art", "nails brickell").
-
-    Multi-word queries use AND-across-terms semantics: every whitespace-
-    separated term must match at least one searchable field. So "nails
-    brickell" returns nail salons in Brickell — it does NOT require any single
-    field to contain the literal phrase "nails brickell" (no business has it).
+    Uses AI because visitor searches are semantic: "date-night manicure near
+    Brickell" should match nail salons in Brickell even when the exact phrase is
+    absent from the listing. Mongo still handles only the deterministic tenant
+    and status filter.
     """
-    # WHY: split into terms so a multi-word query like "nails brickell" matches
-    # nail salons that are in Brickell, instead of looking for the literal
-    # contiguous phrase "nails brickell" (which no business name or slug holds).
-    terms = query.split()
-    if not terms:
+    search_text = " ".join(query.split())
+    if not search_text or limit <= 0:
         return []
-
-    # WHY: re.escape prevents a term like "a.b" from being treated as a regex
-    # wildcard and matching "a<any-char>b" — user input must be literal.
-    # Each term gets its own $or across all searchable fields; combining the
-    # per-term blocks with $and requires EVERY term to match SOMEWHERE.
-    and_clauses: List[Dict[str, Any]] = []
-    for term in terms:
-        pattern = re.escape(term)
-        and_clauses.append(
-            {
-                "$or": [
-                    {field: {"$regex": pattern, "$options": "i"}}
-                    for field in _SEARCH_FIELDS
-                ]
-            }
-        )
 
     q: Dict[str, Any] = {
         "city_id": city_id,
         "status": "live",
-        "$and": and_clauses,
     }
     db = get_db()
     cur = db.businesses.find(q)
@@ -157,8 +149,89 @@ async def search_businesses(
     cur = cur.sort(
         [("featured.enabled", -1), ("editors_pick", -1), ("quality_score", -1), ("name", 1)]
     )
-    cur = cur.limit(limit)
-    return await cur.to_list(length=limit)
+    cur = cur.limit(SEARCH_AI_CANDIDATE_LIMIT)
+    candidates = await cur.to_list(length=SEARCH_AI_CANDIDATE_LIMIT)
+    selected_ids = await _select_matching_business_ids(
+        query=search_text,
+        businesses=candidates,
+    )
+    selected = set(selected_ids)
+    return [business for business in candidates if str(business.get("_id")) in selected][:limit]
+
+
+async def _select_matching_business_ids(
+    *,
+    query: str,
+    businesses: List[Dict[str, Any]],
+) -> List[str]:
+    """Select search results with AI rather than regex over listing text.
+
+    WHY: The user's search intent can be broader than listing wording ("mani",
+    "self-care day", "natural curls near downtown"). Regex terms either miss
+    those matches or over-match incidental words. The LLM receives a bounded
+    candidate set that Mongo has already scoped to the city, and callers keep no
+    results if the gateway cannot make a reliable semantic decision.
+    """
+    if not query or not businesses:
+        return []
+
+    candidate_ids = {str(business.get("_id")) for business in businesses}
+    candidate_payload = [
+        {
+            "id": str(business.get("_id")),
+            "name": business.get("name", ""),
+            "short_description": business.get("short_description", ""),
+            "tags": business.get("tags") or [],
+            "category_slugs": business.get("category_slugs") or [],
+            "neighborhood_slugs": business.get("neighborhood_slugs") or [],
+        }
+        for business in businesses
+    ]
+
+    try:
+        response = await call_gateway_text(
+            use_case=SEARCH_AI_USE_CASE,
+            system_prompt=SEARCH_AI_SYSTEM_PROMPT,
+            user_content=(
+                f"Search query: {query}\n\n"
+                "Candidate businesses:\n"
+                f"{json.dumps(candidate_payload, ensure_ascii=True)}"
+            ),
+            max_tokens_override=SEARCH_AI_MAX_TOKENS,
+            cost_tags={
+                "product": "known-around-town",
+                "feature": "public.search",
+                "call": "public.search.match_businesses",
+            },
+        )
+        parsed = json.loads(_strip_json_code_fence(response))
+    except (CaptionGenerationError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        log.warning("AI business search unavailable; returning no semantic matches: %s", exc)
+        return []
+
+    raw_ids = parsed.get("business_ids") if isinstance(parsed, dict) else []
+    if not isinstance(raw_ids, list):
+        return []
+
+    selected: List[str] = []
+    for raw_id in raw_ids:
+        business_id = str(raw_id)
+        if business_id in candidate_ids and business_id not in selected:
+            selected.append(business_id)
+    return selected
+
+
+def _strip_json_code_fence(text: str) -> str:
+    cleaned = text.strip()
+    if not cleaned.startswith("```"):
+        return cleaned
+
+    lines = cleaned.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
 
 
 async def count_businesses(
