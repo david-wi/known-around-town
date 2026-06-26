@@ -227,7 +227,11 @@ NETWORK_CITY_CONFIG = {
         "spotlight_business_slugs": ["wynwood-hair-co", "nue-studio-wynwood", "the-spot-barbershop-wynwood"],
         "footer_blurb": "The curated directory of Miami's best salons, spas, and beauty professionals. Discovered by locals, loved by visitors.",
         "footer_also_in": "Also in Boca Raton",
-        "footer_also_in_url": "https://boca.knowsbeauty.com",
+        # WHY: the live Boca edition is served at boca-raton.knowsbeauty.com.
+        # The bare boca.knowsbeauty.com host has no valid certificate and dead-ends
+        # the visitor on a browser security warning, so the cross-link must use the
+        # full canonical host (with trailing slash to match the served root).
+        "footer_also_in_url": "https://boca-raton.knowsbeauty.com/",
         "footer_publication_label": "A Knows Beauty publication.",
         "footer_owners_label": "SALONS",
         "footer_owners_items": ["List your salon", "Pricing"],
