@@ -30,6 +30,18 @@ router = APIRouter()
 _templates: Optional[Jinja2Templates] = None
 
 
+def _is_representative_photo_url(url: Any) -> bool:
+    """True when a photo URL is a generic/stock image, not an owner photo."""
+    if not isinstance(url, str) or not url.strip():
+        return False
+    try:
+        host = urlparse(url).hostname or ""
+    except (TypeError, ValueError):
+        return False
+    host = host.lower()
+    return host == "images.unsplash.com" or host.endswith(".unsplash.com")
+
+
 def attach_templates(t: Jinja2Templates) -> None:
     global _templates
     _templates = t
@@ -49,6 +61,7 @@ def attach_templates(t: Jinja2Templates) -> None:
     t.env.filters["iso_datetime"] = lambda when: (
         when.isoformat() if isinstance(when, datetime) else str(when or "")
     )
+    t.env.filters["is_representative_photo"] = _is_representative_photo_url
 
 
 async def _require_tenant(request: Request) -> TenantContext:
@@ -1409,7 +1422,9 @@ async def business_page(
             "owner_is_subscribed": owner_is_subscribed,
             # WHY: prefer the salon's own photo over the city hero — it's more accurate
             # for sharing. Fall back to city hero so cards are never blank.
-            "og_image": _hero_url or city.get("hero_photo_url"),
+            "og_image": (
+                None if _is_representative_photo_url(_hero_url) else _hero_url
+            ) or city.get("hero_photo_url"),
             "cta_book": await copy.get("business.cta.book", business_id=business["_id"]),
             "cta_call": await copy.get("business.cta.call", business_id=business["_id"]),
             "cta_website": await copy.get("business.cta.website", business_id=business["_id"]),
