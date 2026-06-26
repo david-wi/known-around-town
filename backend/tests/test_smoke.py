@@ -125,6 +125,8 @@ def test_expertly_voice_page(client):
     assert "Booked. Sarah is on Jamie" not in r.text
     assert "+27%" not in r.text
     assert "scheduling software" not in r.text
+    assert "Never miss a booking" not in r.text
+    assert "books appointments straight into your calendar" not in r.text
 
 
 def test_owners_page(client):
