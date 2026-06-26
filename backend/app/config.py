@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     # (price_...).  Stored in config rather than hard-coded so we can
     # swap it between test mode and live mode without a code change.
     stripe_price_id_pro: str = ""
+    # Optional city-specific Stripe Price IDs, formatted as:
+    # `miami:price_...,austin:price_...`. Stripe subscription card
+    # descriptors are controlled by Product/Price setup, so each city that
+    # needs a distinct descriptor gets its own Price here while unrelated
+    # billing keeps using stripe_price_id_pro.
+    stripe_price_ids_by_city: str = ""
 
     # WHY: read through pydantic-settings (same as all other config) rather
     # than os.environ.get() directly, so the setting is documented in one
@@ -123,6 +129,22 @@ class Settings(BaseSettings):
             slug, suffix = chunk.split(":", 1)
             pairs.append((slug.strip().lower(), suffix.strip().lower()))
         return pairs
+
+    def parse_stripe_price_ids_by_city(self) -> Dict[str, str]:
+        price_ids: Dict[str, str] = {}
+        for chunk in self.stripe_price_ids_by_city.split(","):
+            chunk = chunk.strip()
+            if not chunk or ":" not in chunk:
+                continue
+            city_slug, price_id = chunk.split(":", 1)
+            city_slug = city_slug.strip().lower()
+            price_id = price_id.strip()
+            if city_slug and price_id:
+                price_ids[city_slug] = price_id
+        return price_ids
+
+    def has_stripe_price_config(self) -> bool:
+        return bool(self.stripe_price_id_pro or self.parse_stripe_price_ids_by_city())
 
     def _mongo_host(self) -> str:
         """Best-effort extraction of the host from the MongoDB URL.

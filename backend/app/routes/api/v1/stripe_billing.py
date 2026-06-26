@@ -36,6 +36,20 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _stripe_price_id_for_business(settings, db, business: dict) -> str:
+    """Return the Stripe Price ID for this listing's Featured checkout."""
+    city_prices = settings.parse_stripe_price_ids_by_city()
+    city_id = business.get("city_id")
+    if city_prices and city_id:
+        city = await db.cities.find_one({"_id": city_id}, {"slug": 1})
+        city_slug = (city or {}).get("slug")
+        if city_slug:
+            city_price = city_prices.get(str(city_slug).lower())
+            if city_price:
+                return city_price
+    return settings.stripe_price_id_pro
+
+
 @router.post("/billing/checkout")
 async def create_checkout_session(request: Request) -> JSONResponse:
     """Start a Stripe Checkout Session for the Featured monthly subscription.
@@ -44,7 +58,7 @@ async def create_checkout_session(request: Request) -> JSONResponse:
     to that URL so Stripe handles card collection securely.
     """
     settings = get_settings()
-    if not settings.stripe_secret_key or not settings.stripe_price_id_pro:
+    if not settings.stripe_secret_key or not settings.has_stripe_price_config():
         raise HTTPException(503, "Billing is not yet configured")
 
     cookie = request.cookies.get(SESSION_COOKIE_NAME)
@@ -62,6 +76,10 @@ async def create_checkout_session(request: Request) -> JSONResponse:
     if business.get("stripe_subscription_id"):
         raise HTTPException(409, "Already subscribed to Pro")
 
+    price_id = await _stripe_price_id_for_business(settings, db, business)
+    if not price_id:
+        raise HTTPException(503, "Billing is not configured for this city")
+
     stripe.api_key = settings.stripe_secret_key
 
     # WHY: base_url from the request works on both HTTP staging and HTTPS
@@ -70,7 +88,7 @@ async def create_checkout_session(request: Request) -> JSONResponse:
 
     params: dict = {
         "mode": "subscription",
-        "line_items": [{"price": settings.stripe_price_id_pro, "quantity": 1}],
+        "line_items": [{"price": price_id, "quantity": 1}],
         "success_url": f"{base_url}/owners/me?subscribed=1",
         "cancel_url": f"{base_url}/owners/me",
         # WHY: business_id in metadata lets the webhook update the right
