@@ -13,6 +13,18 @@
 -#}
 
 {% set header_variant = 'sticky' %}
+{% set _instagram_handle = (
+  business.instagram
+  | default('', true)
+  | replace('https://www.instagram.com/', '')
+  | replace('https://instagram.com/', '')
+  | replace('http://www.instagram.com/', '')
+  | replace('http://instagram.com/', '')
+  | replace('@', '')
+  | replace('/', '')
+  | trim
+) %}
+{% set _instagram_href = 'https://instagram.com/' ~ _instagram_handle if _instagram_handle else '' %}
 
 {% block head_extra %}
 {#- WHY: computed before the JSON-LD block so _og_hero_url is available for the
@@ -375,6 +387,40 @@
             Editor's Pick (above) is intentionally left exactly as it was. Gradient +
             ring classes verified present in reference.css. #}
         {% if business.featured and business.featured.enabled %}<div class="text-sm font-bold text-white bg-gradient-to-r from-amber-400 to-amber-600 rounded-full px-4 py-1.5 inline-flex items-center gap-1.5 shadow-lg ring-1 ring-amber-200"><span>✦</span> Featured salon</div>{% endif %}
+        {% if business.featured and business.featured.enabled and (business.website or _instagram_href) %}
+        <div class="mt-4 pt-4 border-t border-amber-100" data-featured-official-links>
+          <div class="text-[10px] uppercase tracking-[0.2em] font-semibold text-stone-500 mb-2">Official links</div>
+          <div class="grid gap-2">
+            {% if business.website %}
+            {#- WHY: Featured owners pay for a public profile that drives shoppers
+                back to their owned channels. Keep the tracked website redirect
+                above the fold instead of burying it in the lower sidebar. #}
+            <a href="/b/{{ business.slug }}/go/website"
+               data-featured-official-link="website"
+               class="inline-flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-stone-900 hover:bg-amber-100 transition-colors"
+               target="_blank" rel="noreferrer">
+              <span class="inline-flex items-center gap-2 min-w-0">
+                <svg class="w-4 h-4 text-amber-700 shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"></circle><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12h20M12 2c3 3 4.5 6.3 4.5 10S15 19 12 22m0-20C9 5 7.5 8.3 7.5 12S9 19 12 22"></path></svg>
+                <span class="truncate">Visit website</span>
+              </span>
+              <span aria-hidden="true">→</span>
+            </a>
+            {% endif %}
+            {% if _instagram_href %}
+            <a href="{{ _instagram_href }}"
+               data-featured-official-link="instagram"
+               class="inline-flex items-center justify-between gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-semibold text-stone-900 hover:bg-stone-50 transition-colors"
+               target="_blank" rel="noreferrer">
+              <span class="inline-flex items-center gap-2 min-w-0">
+                <svg class="w-4 h-4 text-stone-600 shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5" stroke-width="2"></rect><circle cx="12" cy="12" r="3.5" stroke-width="2"></circle><circle cx="17" cy="7" r="1" fill="currentColor" stroke="none"></circle></svg>
+                <span class="truncate">Instagram</span>
+              </span>
+              <span aria-hidden="true">→</span>
+            </a>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -636,7 +682,7 @@
           <div>
             <div class="text-xs uppercase tracking-wide text-stone-500 font-semibold mb-2">On the web</div>
             <div class="space-y-1 text-sm">
-              {% if business.instagram %}<a href="https://instagram.com/{{ business.instagram|replace('@','') }}" class="block text-stone-900 hover:{{ theme.accent_text_full }}" target="_blank" rel="noreferrer">@{{ business.instagram|replace('@','') }}</a>{% endif %}
+              {% if _instagram_href %}<a href="{{ _instagram_href }}" class="block text-stone-900 hover:{{ theme.accent_text_full }}" target="_blank" rel="noreferrer">@{{ _instagram_handle }}</a>{% endif %}
               {#- WHY: the website link points at /go/website so a website click
                   is counted server-side (the route 302s to the salon's real
                   site). The displayed text stays the salon's own domain. #}

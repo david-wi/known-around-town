@@ -85,6 +85,13 @@ async def test_featured_detail_page_shows_premium_treatment(seeded_db, client):
     assert GRADIENT_CLASSES in body
     # The info card itself gets the gold edge (amber ring) when Featured.
     assert "ring-1 ring-amber-200" in body
+    # Featured owners get above-the-fold official links, not only the lower
+    # sidebar "On the web" text links.
+    assert "data-featured-official-links" in body
+    assert 'data-featured-official-link="website"' in body
+    assert f'/b/{SALON_SLUG}/go/website' in body
+    assert 'data-featured-official-link="instagram"' in body
+    assert "https://instagram.com/thesetaimiamibeach" in body
 
 
 @pytest.mark.asyncio
@@ -145,3 +152,4 @@ async def test_featured_flag_off_means_no_premium_treatment(seeded_db, client):
     assert r.status_code == 200, r.text
     body = r.text
     assert "Selected for premium placement" not in body
+    assert "data-featured-official-links" not in body
