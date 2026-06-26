@@ -145,6 +145,19 @@ def test_expertly_voice_page(client):
     assert "scheduling software" not in r.text
     assert "Never miss a booking" not in r.text
     assert "books appointments straight into your calendar" not in r.text
+    # Trust: no fabricated placeholder phone number (was a fake "(305) 555-1212").
+    # The page must not invite owners to call a number that does not work.
+    assert "555-1212" not in r.text
+    assert "tel:+13055551212" not in r.text
+    # Trust: no fabricated named testimonial. MKB has no real Voice customers
+    # yet, so a specific named "Maya R. · Owner · Brickell" quote misrepresents
+    # an illustration as a real customer. The quote may stay only if clearly
+    # labelled as an illustration.
+    assert "Maya R" not in r.text
+    assert "Owner · Brickell" not in r.text
+    # Trust: the "sample" link scrolls to a written mockup, not real audio —
+    # it must not promise something to "Listen to".
+    assert "Listen to a sample call" not in r.text
 
 
 def test_owners_page(client):
