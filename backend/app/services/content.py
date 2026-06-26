@@ -60,7 +60,9 @@ async def get_neighborhood(city_id: str, slug: str) -> Optional[Dict[str, Any]]:
 
 
 async def get_business(city_id: str, slug: str) -> Optional[Dict[str, Any]]:
-    return await get_db().businesses.find_one({"city_id": city_id, "slug": slug})
+    return await get_db().businesses.find_one(
+        {"city_id": city_id, "slug": slug, "status": "live"}
+    )
 
 
 async def list_businesses(

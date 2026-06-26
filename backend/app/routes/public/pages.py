@@ -1265,7 +1265,7 @@ async def business_page(
         raise HTTPException(404, "City required")
     city = tenant.city
     business = await content_svc.get_business(city["_id"], business_slug)
-    if not business:
+    if not business or business.get("status") != "live":
         raise HTTPException(404, "Business not found")
 
     copy = CopyResolver(
@@ -1278,7 +1278,7 @@ async def business_page(
     nearby: List[Dict[str, Any]] = []
     if business.get("nearby_business_ids"):
         nearby_cur = content_svc.get_db().businesses.find(
-            {"_id": {"$in": business["nearby_business_ids"]}}
+            {"_id": {"$in": business["nearby_business_ids"]}, "status": "live"}
         )
         nearby = await nearby_cur.to_list(length=12)
     else:
@@ -1500,7 +1500,7 @@ async def business_action_redirect(
     if not tenant.city:
         raise HTTPException(404, "City required")
     business = await content_svc.get_business(tenant.city["_id"], business_slug)
-    if not business:
+    if not business or business.get("status") != "live":
         raise HTTPException(404, "Business not found")
 
     target = _action_target_url(action, business)
