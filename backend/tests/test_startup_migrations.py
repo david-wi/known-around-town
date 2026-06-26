@@ -136,6 +136,19 @@ async def test_migration_does_not_publish_archived_businesses(mock_db):
 
 
 @pytest.mark.asyncio
+async def test_migration_does_not_publish_closed_businesses(mock_db):
+    """Reviewed-closed businesses must not be promoted to live."""
+    await mock_db.businesses.insert_one(
+        {"_id": "biz-closed", "name": "Verified Closed Spa", "status": "closed"}
+    )
+
+    await database.run_startup_migrations()
+
+    biz = await mock_db.businesses.find_one({"_id": "biz-closed"})
+    assert biz["status"] == "closed"
+
+
+@pytest.mark.asyncio
 async def test_migration_publish_draft_guard_runs_only_once(mock_db):
     """The guard record prevents the migration from running a second time."""
     await mock_db.businesses.insert_one(

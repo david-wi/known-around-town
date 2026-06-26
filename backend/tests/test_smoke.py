@@ -651,6 +651,22 @@ def test_business_detail_has_no_founding_partner_badge(client):
     assert "Founding Partner" not in r.text
 
 
+def test_closed_business_detail_and_action_links_404(client, seeded_db):
+    """Reviewed-closed source records must not render as public listings."""
+    r = client.get(
+        "/b/kingsmen-barbershop-wynwood",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 404
+
+    r = client.get(
+        "/b/kingsmen-barbershop-wynwood/go/call",
+        headers={"host": "miami.knowsbeauty.localhost"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 404
+
+
 def test_home_hero_has_owner_entry_point(client):
     """The homepage hero must contain a subtle one-line prompt for salon
     owners — "Own a salon in Miami? Claim your listing →". Without this,
@@ -797,6 +813,7 @@ def test_photos_render_as_dict_url_format(client, seeded_db):
         "neighborhood_slugs": [],
         "photos": [{"url": PHOTO_URL}],  # standard dict format
         "claim_status": "none",
+        "status": "live",
         "is_active": True,
     }
     asyncio.run(seeded_db.businesses.insert_one(biz_doc))
@@ -1323,7 +1340,7 @@ def test_business_page_title_falls_back_gracefully_when_no_neighborhood(client, 
         "name": "Test No Neighborhood Hair",
         "category_slugs": ["hair"],
         "neighborhood_slugs": [],  # explicitly empty
-        "status": "active",
+        "status": "live",
     }
     asyncio.run(seeded_db.businesses.insert_one(biz_doc))
 

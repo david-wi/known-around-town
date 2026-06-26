@@ -418,6 +418,7 @@ def _load_real_businesses() -> Dict[str, List[Dict[str, Any]]]:
                 "website":            it.get("website"),
                 "instagram":          it.get("instagram"),
                 "address_full":       it.get("address"),
+                "status":             it.get("status", "live"),
                 # No specific photo from the LLM — fall back to a category photo
                 "photo_url":          pick_category_photo(it["slug"], it["category_slug"]),
                 # WHY: seed-time services let us pre-populate curated menus for

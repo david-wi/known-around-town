@@ -224,15 +224,14 @@ async def run_startup_migrations() -> None:
     # of the directory was hidden. Owners of those salons would get
     # "couldn't find your business" if they tried to claim.
     #
-    # All 147 businesses in the Miami seed data are intended to be
-    # publicly visible. "Archived" is the intentional "hidden" status;
-    # "draft" is just the model default that got stuck. This migration
-    # promotes every non-live, non-archived business to "live" once.
+    # "draft" is the model default that got stuck. Other non-live statuses,
+    # including reviewed-closed listings, are intentional editorial states and
+    # must stay hidden.
     # ------------------------------------------------------------------
     migration_id = "publish-all-draft-businesses-20260611"
     if not await db.app_migrations.find_one({"_id": migration_id}):
         result = await db.businesses.update_many(
-            {"status": {"$nin": ["live", "archived"]}},
+            {"status": "draft"},
             {"$set": {"status": "live"}},
         )
         published_count = result.modified_count

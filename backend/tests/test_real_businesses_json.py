@@ -74,6 +74,10 @@ def test_seed_miami_honors_source_status():
         "seed_miami.py must preserve _real_businesses.json status values; "
         "forcing status='live' resurrects reviewed-closed listings."
     )
+    assert '"status":             it.get("status", "live")' in source, (
+        "seed_miami.py must carry source status through _load_real_businesses; "
+        "dropping it during normalization resurrects reviewed-closed listings."
+    )
 
 
 # ── New businesses must have all required fields ──────────────────────────────
