@@ -3,8 +3,9 @@
 Currently exposes two operations:
 
   POST /api/v1/marketing-ai/instagram-caption
-    Generate an Instagram caption (2-3 sentences + hashtags + emoji)
-    for a claimed business, tuned to the business's voice and category.
+    Generate 7 Instagram caption suggestions (2-3 sentences + hashtags +
+    emoji each) for a claimed business, tuned to the business's voice,
+    category, and selected listing photo.
 
   POST /api/v1/marketing-ai/ad-copy
     Generate 3 short ad copy variations (headline + description each)
@@ -74,10 +75,19 @@ class InstagramCaptionRequest(BaseModel):
         max_length=600,
         description="The owner's free-text description of what the post is about.",
     )
+    photo_url: Optional[str] = Field(
+        None,
+        min_length=1,
+        # WHY: Listing photos are internal /media/<ObjectId> paths today, but
+        # imported records may carry CDN URLs later. 1000 chars leaves room for a
+        # signed/CDN URL while still bounding prompt size and request payloads.
+        max_length=1000,
+        description="Optional URL of a photo already attached to this business listing.",
+    )
 
 
 class InstagramCaptionResponse(BaseModel):
-    """Caption returned to the dashboard panel."""
+    """Caption suggestions returned to the dashboard panel."""
 
     caption: str
     # WHY: Echo the business id so a future client that fires multiple
@@ -217,6 +227,17 @@ async def _resolve_city(city_id: str) -> Optional[Dict[str, Any]]:
     return await get_db().cities.find_one({"_id": city_id})
 
 
+def _photo_url_belongs_to_business(business: Dict[str, Any], photo_url: str) -> bool:
+    """Return True when photo_url is one of the business's saved listing photos."""
+    clean_url = (photo_url or "").strip()
+    if not clean_url:
+        return False
+    for photo in business.get("photos") or []:
+        if isinstance(photo, dict) and (photo.get("url") or "").strip() == clean_url:
+            return True
+    return False
+
+
 @router.post(
     "/instagram-caption",
     response_model=InstagramCaptionResponse,
@@ -239,6 +260,15 @@ async def generate_instagram_caption(
     await _feature_required()
 
     business = await _require_pro_owner(request, body.business_id)
+    selected_photo_url = body.photo_url.strip() if body.photo_url else None
+    if selected_photo_url and not _photo_url_belongs_to_business(
+        business, selected_photo_url
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Selected photo is not attached to this listing.",
+        )
+
     city_id = business.get("city_id")
     if not city_id:
         # Shouldn't happen for real seeded data; defend against partial records.
@@ -274,6 +304,7 @@ async def generate_instagram_caption(
         known_for=business.get("known_for"),
         short_description=business.get("short_description"),
         prompt=body.prompt.strip(),
+        photo_url=selected_photo_url,
     )
 
     try:
