@@ -4000,6 +4000,13 @@ async def test_cross_city_footer_shows_sibling_cities(seeded_db):
         "name": "Fort Lauderdale",
         "status": "live",
     })
+    await seeded_db.cities.insert_one({
+        "_id": "city-wynwood-legacy-test",
+        "network_id": network["_id"],
+        "slug": "wynwood",
+        "name": "Wynwood",
+        "status": "live",
+    })
 
     client = TestClient(app)
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
@@ -4008,6 +4015,10 @@ async def test_cross_city_footer_shows_sibling_cities(seeded_db):
     # The sibling city should appear in the footer with its cross-city URL
     assert "Fort Lauderdale" in r.text
     assert "https://fort-lauderdale.knowsbeauty.localhost/" in r.text
+    # Wynwood is a Miami neighborhood now, not a separate city-domain link.
+    assert "Wynwood" in r.text
+    assert "https://wynwood.knowsbeauty.localhost/" not in r.text
+    assert "https://miami.knowsbeauty.localhost/n/wynwood" in r.text
     # The section header must be present
     assert "More cities" in r.text
 
