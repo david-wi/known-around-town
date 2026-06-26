@@ -51,6 +51,14 @@ class TestClaimVerifiedText:
         assert "Featured" in text
         assert "$29/month" in text
 
+    def test_no_top_placement_promise(self):
+        text = _claim_verified_text("Maria", "Salon X", LOGIN_URL, PRICING_URL)
+        lowered = text.lower()
+        assert "top of every page" not in lowered
+        assert "top of category" not in lowered
+        assert "appear first" not in lowered
+        assert "appears first" not in lowered
+
 
 class TestClaimVerifiedHtml:
     def test_includes_login_button(self):
@@ -80,6 +88,14 @@ class TestClaimVerifiedHtml:
         html = _claim_verified_html("", "Salon X", LOGIN_URL, PRICING_URL)
         assert "Hi there" in html
 
+    def test_no_top_placement_promise(self):
+        html = _claim_verified_html("Maria", "Salon X", LOGIN_URL, PRICING_URL)
+        lowered = html.lower()
+        assert "top of every page" not in lowered
+        assert "top of category" not in lowered
+        assert "appear first" not in lowered
+        assert "appears first" not in lowered
+
 
 DASHBOARD_URL = "https://miami.knowsbeauty.com/owners/me"
 
@@ -108,6 +124,24 @@ class TestSubscriptionConfirmedAdVariationCount:
     def test_html_does_not_overpromise_twenty(self):
         html = _subscription_confirmed_html("Maria", "Curl Studio", DASHBOARD_URL)
         assert "20 ready-to-run variations" not in html
+
+    def test_subscription_email_has_no_top_placement_promise(self):
+        text = _subscription_confirmed_text("Maria", "Curl Studio", DASHBOARD_URL)
+        html = _subscription_confirmed_html("Maria", "Curl Studio", DASHBOARD_URL)
+        combined = f"{text}\n{html}".lower()
+        assert "top of every page" not in combined
+        assert "top of category" not in combined
+        assert "appear first" not in combined
+        assert "appears first" not in combined
+
+    def test_subscription_email_uses_featured_not_pro(self):
+        text = _subscription_confirmed_text("Maria", "Curl Studio", DASHBOARD_URL)
+        html = _subscription_confirmed_html("Maria", "Curl Studio", DASHBOARD_URL)
+        combined = f"{text}\n{html}"
+        assert "Featured listing" in combined
+        assert "Pro listing" not in combined
+        assert "Featured Pro" not in combined
+        assert "Pro Featured" not in combined
 
 
 class TestNoFoundingPartnerInEmails:

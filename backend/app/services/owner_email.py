@@ -386,9 +386,9 @@ def _claim_verified_text(
         "3. Write two sentences about what makes your salon special\n\n"
         "─────────────────────────────────\n"
         "Stand out with Featured — $29/month\n"
-        "• Priority placement at the top of every page\n"
-        "• Verified Pro badge on your listing\n"
-        "• AI Instagram caption generator (50/month)\n"
+        "• Featured visibility across category and neighborhood pages\n"
+        "• Featured listing badge on your public page\n"
+        "• AI Instagram caption and ad copy tools\n"
         f"See pricing and sign up: {pricing_url}\n"
         "─────────────────────────────────\n\n"
         f"Questions? Email {get_settings().support_email}.\n\n"
@@ -450,8 +450,8 @@ def _claim_verified_html(
         ⭐ Stand out with Featured — $29/month
       </p>
       <p style="font-size: 13px; color: #57534e; line-height: 1.6; margin: 0 0 14px;">
-        Priority placement at the top of every page, a verified Pro badge, and our
-        AI Instagram caption generator (50 captions/month).
+        Featured visibility across category and neighborhood pages, a Featured listing
+        badge on your public page, and AI tools for Instagram captions and ad copy.
       </p>
       <a href="{pricing_url}"
          style="display: inline-block; background: #f43f5e; color: #ffffff; font-size: 14px;
@@ -621,7 +621,7 @@ async def send_subscription_confirmed_email(
     exactly what they just unlocked.  Fire-and-forget from the webhook so
     a slow email provider never delays the Stripe 200 response.
     """
-    subject = f"Welcome to Featured — {business_name} is now a Pro listing"
+    subject = f"Welcome to Featured — {business_name} is now a Featured listing"
     first = email.split("@")[0].replace(".", " ").replace("_", " ").title()
     text_body = _subscription_confirmed_text(first, business_name, dashboard_url)
     html_body = _subscription_confirmed_html(first, business_name, dashboard_url)
@@ -664,10 +664,10 @@ async def send_subscription_confirmed_email(
 def _subscription_confirmed_text(first: str, business_name: str, dashboard_url: str) -> str:
     return (
         f"Hi {first},\n\n"
-        f"You're in — {business_name} is now a Featured Pro listing on Miami Knows Beauty.\n\n"
+        f"You're in — {business_name} is now a Featured listing on Miami Knows Beauty.\n\n"
         "What just unlocked:\n"
-        "• Featured placement — your listing appears at the top of category and neighborhood pages\n"
-        "• Pro badge — signals quality and helps visitors choose you over unverified listings\n"
+        "• Featured visibility across category and neighborhood pages\n"
+        "• Featured listing badge — helps your listing stand out in the directory\n"
         "• Instagram caption generator — describe your post, get a polished caption with hashtags\n"
         "• Google, Facebook, and Instagram ad copy — describe what you're promoting, get 3 ready-to-run ad variations\n\n"
         f"Head to your dashboard to see your listing and start using these features:\n{dashboard_url}\n\n"
@@ -692,17 +692,17 @@ def _subscription_confirmed_html(first: str, business_name: str, dashboard_url: 
       You&rsquo;re now Featured
     </h1>
     <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 24px;">
-      Hi {first} — <strong>{business_name}</strong> has been upgraded to a Pro Featured listing.
+      Hi {first} — <strong>{business_name}</strong> has been upgraded to a Featured listing.
       Here&rsquo;s what just unlocked:
     </p>
     <ul style="padding: 0; margin: 0 0 24px; list-style: none;">
       <li style="padding: 8px 0; border-bottom: 1px solid #f5f0eb; font-size: 14px; color: #1c1917;">
         <span style="color: #be185d; font-weight: 700;">&#10003;</span>&nbsp;
-        <strong>Featured placement</strong> &mdash; top of category and neighborhood pages
+        <strong>Featured visibility</strong> &mdash; category and neighborhood pages
       </li>
       <li style="padding: 8px 0; border-bottom: 1px solid #f5f0eb; font-size: 14px; color: #1c1917;">
         <span style="color: #be185d; font-weight: 700;">&#10003;</span>&nbsp;
-        <strong>Pro badge</strong> &mdash; instantly recognisable mark of quality
+        <strong>Featured listing badge</strong> &mdash; helps your listing stand out
       </li>
       <li style="padding: 8px 0; border-bottom: 1px solid #f5f0eb; font-size: 14px; color: #1c1917;">
         <span style="color: #be185d; font-weight: 700;">&#10003;</span>&nbsp;

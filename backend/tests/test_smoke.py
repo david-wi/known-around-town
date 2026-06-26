@@ -299,6 +299,22 @@ def test_owners_page_omits_false_claims(client):
     assert "appear first" not in body.lower()
 
 
+def test_walkthrough_page_omits_top_placement_promise(client):
+    """The shareable owner walkthrough must not revive top-placement claims.
+
+    WHY: /walkthrough is used in owner acquisition, so its Featured benefits
+    need the same truthfulness guard as /owners and /pricing.
+    """
+    r = client.get("/walkthrough", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    body = r.text.lower()
+    assert "priority placement" not in body
+    assert "top of every page" not in body
+    assert "top of category" not in body
+    assert "appear first" not in body
+    assert "premium visibility" in body
+
+
 def test_owners_page_prefills_from_slug(client, seeded_db):
     """When the visitor lands at /owners?slug=<biz>, the form shows the
     listing as a read-only confirmation and locks the business name to it.
@@ -981,6 +997,37 @@ def test_unclaimed_business_detail_has_sticky_claim_bar(client):
     assert "claim-sticky-dismiss" in body
     # The bar links to the right destination
     assert "/owners?slug=blow-dry-bar-brickell#claim-form" in body
+
+
+def test_business_claim_ctas_do_not_use_uncompiled_background_classes(client):
+    """The claim CTAs must not rely on Tailwind classes absent from reference.css.
+
+    WHY: this app ships a precompiled stylesheet. `bg-amber-700`,
+    `hover:bg-amber-800`, and `hover:bg-amber-50` are not compiled into
+    reference.css, so using them leaves white CTA text on a transparent
+    background.
+    """
+    r = client.get(
+        "/b/blow-dry-bar-brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.text
+    assert "background-color: #b45309" in body
+    assert "bg-amber-700 hover:bg-amber-800 text-white font-semibold px-6 py-3" not in body
+    assert "bg-white text-amber-800 font-semibold px-4 py-1.5 rounded-full text-sm hover:bg-amber-50" not in body
+
+
+def test_sticky_header_cta_hover_uses_compiled_background_class(client):
+    """The language and owner CTA hover state must stay visible on sticky pages."""
+    r = client.get(
+        "/b/blow-dry-bar-brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.text
+    assert "hover:bg-stone-800 hover:text-white" in body
+    assert "hover:bg-stone-900 hover:text-white" not in body
 
 
 def test_neighborhood_page_shows_owner_acquisition_banner(client):
@@ -2330,6 +2377,10 @@ def test_owner_me_upgrade_button_shows_correct_price():
         "owner_me.html must not show the annual option ($290/year) — "
         "no annual Stripe price exists; advertising it misleads paying customers"
     )
+    lowered = content.lower()
+    assert "priority placement" not in lowered
+    assert "rank higher in search" not in lowered
+    assert "appear first" not in lowered
 
 
 def test_owner_me_upgrade_card_shows_specific_neighborhood():
