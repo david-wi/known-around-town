@@ -97,7 +97,8 @@ To disable the gate (public launch): set `PREVIEW_MODE_ENABLED=false` in `/opt/k
 | `ADMIN_API_KEY` | Yes | Bearer token for write API endpoints |
 | `STRIPE_SECRET_KEY` | For billing | `rk_live_...` restricted key |
 | `STRIPE_WEBHOOK_SECRET` | For billing | `whsec_...` from Stripe dashboard |
-| `STRIPE_PRICE_ID_PRO` | For billing | `price_...` for $29/month plan |
+| `STRIPE_PRICE_ID_PRO` | For billing | Fallback `price_...` for the $29/month Featured plan |
+| `STRIPE_PRICE_IDS_BY_CITY` | Optional billing override | Comma-separated `city_slug:price_...` map for city-specific Knows Beauty Products/Prices, e.g. `miami:price_...,austin:price_...` |
 | `RESEND_API_KEY` | For email | Owner + preview magic codes |
 | `OWNER_SESSION_SECRET` | For owner auth | Random secret; losing it logs out all owners |
 | `CANONICAL_BASE_URL` | For SEO | `https://miami.knowsbeauty.com` |
@@ -128,7 +129,7 @@ To disable the gate (public launch): set `PREVIEW_MODE_ENABLED=false` in `/opt/k
 
 ## Stripe Billing Flow
 
-1. Owner clicks "Subscribe" on their dashboard → POST `/api/v1/billing/checkout` → Stripe Checkout Session URL returned
+1. Owner clicks "Subscribe" on their dashboard → POST `/api/v1/billing/checkout` → Stripe Checkout Session URL returned. If `STRIPE_PRICE_IDS_BY_CITY` contains the listing city slug, checkout uses that city-specific Price; otherwise it falls back to `STRIPE_PRICE_ID_PRO`.
 2. Owner completes payment on Stripe → redirected back to `/owners/me?checkout=success`
 3. Stripe fires `checkout.session.completed` webhook → `/api/v1/billing/webhook`
 4. Webhook sets `stripe_customer_id`, `stripe_subscription_id`, `featured.tier=premium`, `featured.enabled=true` (it no longer touches `is_founding_partner` — that concept was removed in PR #362)

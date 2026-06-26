@@ -32,7 +32,13 @@ def _signed_cookie(email: str) -> str:
     return sign_session(email)
 
 
-async def _insert_business(db, *, email: str, subscription_id: str | None = None) -> str:
+async def _insert_business(
+    db,
+    *,
+    email: str,
+    subscription_id: str | None = None,
+    city_id: str | None = None,
+) -> str:
     """Seed a minimal claimed business and return its _id."""
     import uuid
     biz_id = str(uuid.uuid4())
@@ -43,6 +49,8 @@ async def _insert_business(db, *, email: str, subscription_id: str | None = None
         "claimed_email": email,
         "featured": {"tier": "free", "enabled": False},
     }
+    if city_id:
+        doc["city_id"] = city_id
     if subscription_id:
         doc["stripe_subscription_id"] = subscription_id
     await db.businesses.insert_one(doc)
@@ -187,6 +195,88 @@ class TestCheckout:
         assert r.status_code == 200
         body = r.json()
         assert body["url"] == "https://checkout.stripe.com/pay/cs_test"
+
+    @pytest.mark.asyncio
+    async def test_checkout_uses_city_specific_price_when_configured(self, client, seeded_db):
+        """Knows Beauty city editions can use city-specific Stripe Products/Prices."""
+        email = "miami-price@test.com"
+        await seeded_db.cities.insert_one({
+            "_id": "city-miami-billing",
+            "name": "Miami",
+            "slug": "miami",
+            "status": "live",
+        })
+        await _insert_business(seeded_db, email=email, city_id="city-miami-billing")
+        cookie = _signed_cookie(email)
+        captured_params: dict = {}
+
+        mock_session = MagicMock()
+        mock_session.url = "https://checkout.stripe.com/pay/cs_test"
+
+        def fake_create(**params):
+            captured_params.update(params)
+            return mock_session
+
+        with patch.dict(os.environ, {
+            "STRIPE_SECRET_KEY": "sk_test",
+            "STRIPE_PRICE_ID_PRO": "price_generic_pro",
+            "STRIPE_PRICE_IDS_BY_CITY": "miami:price_miami_knows_beauty,austin:price_austin_knows_beauty",
+        }):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            with patch("stripe.checkout.Session.create", side_effect=fake_create):
+                r = client.post(
+                    "/api/v1/billing/checkout",
+                    cookies={"kb_owner_session": cookie},
+                )
+            get_settings.cache_clear()
+
+        assert r.status_code == 200
+        assert captured_params["line_items"] == [
+            {"price": "price_miami_knows_beauty", "quantity": 1}
+        ]
+
+    @pytest.mark.asyncio
+    async def test_checkout_falls_back_to_global_price_for_unmapped_city(
+        self, client, seeded_db
+    ):
+        """The city map must not break existing/non-city-specific billing."""
+        email = "fallback-price@test.com"
+        await seeded_db.cities.insert_one({
+            "_id": "city-tampa-billing",
+            "name": "Tampa",
+            "slug": "tampa",
+            "status": "live",
+        })
+        await _insert_business(seeded_db, email=email, city_id="city-tampa-billing")
+        cookie = _signed_cookie(email)
+        captured_params: dict = {}
+
+        mock_session = MagicMock()
+        mock_session.url = "https://checkout.stripe.com/pay/cs_test"
+
+        def fake_create(**params):
+            captured_params.update(params)
+            return mock_session
+
+        with patch.dict(os.environ, {
+            "STRIPE_SECRET_KEY": "sk_test",
+            "STRIPE_PRICE_ID_PRO": "price_generic_pro",
+            "STRIPE_PRICE_IDS_BY_CITY": "miami:price_miami_knows_beauty",
+        }):
+            from app.config import get_settings
+            get_settings.cache_clear()
+            with patch("stripe.checkout.Session.create", side_effect=fake_create):
+                r = client.post(
+                    "/api/v1/billing/checkout",
+                    cookies={"kb_owner_session": cookie},
+                )
+            get_settings.cache_clear()
+
+        assert r.status_code == 200
+        assert captured_params["line_items"] == [
+            {"price": "price_generic_pro", "quantity": 1}
+        ]
 
     @pytest.mark.asyncio
     async def test_checkout_passes_customer_email_for_new_customer(self, client, seeded_db):
