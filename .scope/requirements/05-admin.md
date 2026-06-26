@@ -11,11 +11,11 @@ claim appears with all submitted details; when David approves it, then the busin
 
 ### KAT-051 — Analytics dashboard · V1 · implemented
 **Persona:** David (operator).
-The admin analytics page at `/admin/analytics` shows: total businesses, total
-inquiries, Founding Partner count, and inquiry volume over time.
+The admin analytics page at `/admin/analytics` shows total businesses, total
+inquiries, subscription metrics, and inquiry volume over time.
 **Acceptance:** Given David at `/admin/analytics`, when the page loads, then
-key metrics are displayed including total businesses (147), Founding Partner count,
-and inquiry counts.
+key metrics are displayed including total businesses, subscription metrics, and
+inquiry counts.
 
 ### KAT-052 — Database seeding (production-guarded) · V1 · implemented
 **Persona:** David (operator).

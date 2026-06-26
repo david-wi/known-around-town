@@ -44,11 +44,11 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Stripe Checkout | ✅ Live | `POST /api/v1/billing/checkout` |
-| Founding Partner badge | ✅ Live | Permanent; first 25 paying owners |
+| Featured listing badge | ✅ Live | Active for subscribed listings |
 | Subscription webhook | ✅ Live | `STRIPE_WEBHOOK_SECRET` configured in production .env as of 2026-06-11 |
-| Cancellation handling | ✅ Code ready | Clears `stripe_subscription_id`, badge stays |
+| Cancellation handling | ✅ Code ready | Clears `stripe_subscription_id`; Featured badge no longer displays |
 | Customer portal (self-serve cancel) | ⚠️ Pending | Enable at stripe.com/settings/billing/portal |
-| Founding partner cap | ✅ Live | 25 slots, configurable via `FOUNDING_PARTNER_CAP` |
+| Founding Partner removal | ✅ Live | Badge/cap concept removed in PR #362; do not rebuild on dead data |
 
 ## Marketing AI (Featured Tier)
 

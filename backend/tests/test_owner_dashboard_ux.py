@@ -6,14 +6,9 @@ pre-launch UX fixes from the owner walk-through:
 1. The "Complete your profile" checklist carries the hooks the photo-upload
    JavaScript needs to flip "Add a photo" to done the moment a photo is
    uploaded — so the checklist never contradicts what the owner just did.
-2. The listing-performance panel ships the encouraging empty-state lines that
-   reframe a brand-new "0 page views / 0 messages" as "tracking has started"
-   rather than "the directory isn't working". They carry no fabricated numbers.
-
-The performance empty-state lines are rendered into the page hidden and revealed
-by JavaScript only when the fetched count is exactly 0, so here we assert the
-copy is present in the served HTML (its delivery into view is a JS concern the
-esprima syntax guard covers).
+2. The listing-performance panel stays hidden during the pre-traffic owner
+   experience, so the dashboard does not frame a brand-new listing as empty or
+   underperforming before the directory has meaningful usage.
 """
 
 from __future__ import annotations
@@ -128,69 +123,55 @@ class TestChecklistPhotoHooks:
         assert "section.classList.add('hidden')" in html
 
 
-# ─── Fix 3: encouraging empty-state copy on the performance panel ────────────
+# ─── Fix 3: performance stats hidden until useful ────────────────────────────
 
 
 class TestPerformanceEmptyState:
-    def test_views_zero_note_present(self, seeded_db):
+    def test_listing_performance_panel_is_not_rendered(self, seeded_db):
         html = _render_dashboard(seeded_db, photos=[])
-        assert 'id="stat-views-zero-note"' in html
-        assert "Views appear here as Miami shoppers find your listing." in html
+        assert "Listing performance" not in html
+        assert 'id="stat-views"' not in html
+        assert 'id="stats-error"' not in html
 
-    def test_messages_zero_note_present(self, seeded_db):
+    def test_zero_state_performance_copy_is_not_rendered(self, seeded_db):
         html = _render_dashboard(seeded_db, photos=[])
-        assert 'id="stat-inquiries-zero-note"' in html
-        assert "Messages from shoppers will show up here once they reach out." in html
+        assert "Views appear here as Miami shoppers find your listing." not in html
+        assert "Messages from shoppers will show up here once they reach out." not in html
 
-    def test_zero_notes_start_hidden(self, seeded_db):
-        """The notes are hidden on render and revealed by JS only on a real
-        zero, so a busy listing never shows them."""
+    def test_owner_stats_fetch_is_not_shipped(self, seeded_db):
         html = _render_dashboard(seeded_db, photos=[])
-        # Both note spans ship with the 'hidden' utility class so they don't
-        # show until the stats JavaScript reveals them on a real zero.
-        for note_id in ("stat-views-zero-note", "stat-inquiries-zero-note"):
-            idx = html.index(f'id="{note_id}"')
-            tag_end = html.index(">", idx)
-            tag = html[idx:tag_end]
-            assert "hidden" in tag, f"{note_id} should start hidden"
+        assert "/api/v1/owner/stats" not in html
 
 
-# ─── Shopper-action tap tiles (call / directions / website) ─────────────────
+# ─── Shopper-action tap tiles hidden with performance panel ─────────────────
 
 
 class TestActionTapTiles:
-    """The dashboard performance panel shows the three high-intent tap counts
-    next to page views and messages, each with the same encouraging zero-state."""
+    """The hidden performance panel must not leave tap-count UI fragments around."""
 
-    def test_three_tap_tiles_render(self, seeded_db):
+    def test_three_tap_tiles_do_not_render(self, seeded_db):
         html = _render_dashboard(seeded_db, photos=[])
         for tile_id in ("stat-calls", "stat-directions", "stat-website"):
-            assert f'id="{tile_id}"' in html, f"{tile_id} tile missing"
-        assert "taps to call" in html
-        assert "taps for directions" in html
-        assert "website clicks" in html
+            assert f'id="{tile_id}"' not in html, f"{tile_id} tile should be hidden"
+        assert "taps to call" not in html
+        assert "taps for directions" not in html
+        assert "website clicks" not in html
 
-    def test_tap_tiles_have_zero_state_notes(self, seeded_db):
+    def test_tap_tile_zero_state_notes_do_not_render(self, seeded_db):
         html = _render_dashboard(seeded_db, photos=[])
         for note_id in (
             "stat-calls-zero-note",
             "stat-directions-zero-note",
             "stat-website-zero-note",
         ):
-            assert f'id="{note_id}"' in html, f"{note_id} missing"
-            idx = html.index(f'id="{note_id}"')
-            tag = html[idx:html.index(">", idx)]
-            assert "hidden" in tag, f"{note_id} should start hidden"
+            assert f'id="{note_id}"' not in html, f"{note_id} should be hidden"
 
-    def test_stats_js_fills_all_four_metrics(self, seeded_db):
-        """The stats JavaScript must populate views AND the three tap tiles from
-        the keys the owner-stats endpoint returns — otherwise a tile stays at the
-        '…' placeholder forever."""
+    def test_stats_js_does_not_reference_hidden_metrics(self, seeded_db):
         html = _render_dashboard(seeded_db, photos=[])
-        assert "data.call_click_count" in html
-        assert "data.directions_click_count" in html
-        assert "data.website_click_count" in html
-        assert "stat-calls" in html and "stat-directions" in html and "stat-website" in html
+        assert "data.call_click_count" not in html
+        assert "data.directions_click_count" not in html
+        assert "data.website_click_count" not in html
+        assert "stat-calls" not in html
 
     def test_tap_tile_color_classes_exist_in_compiled_css(self, seeded_db):
         """The tap-tile number colors must be real classes in the pre-compiled

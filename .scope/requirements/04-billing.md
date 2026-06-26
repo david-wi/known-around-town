@@ -1,8 +1,8 @@
-# Epic: Billing — Stripe Checkout, webhooks, Founding Partner badge
+# Epic: Billing — Stripe Checkout, webhooks, Featured subscription
 
 ### KAT-040 — Stripe Checkout integration · V1 · implemented
 **Persona:** Salon Owner.
-Owners can subscribe to the Founding Partner plan ($29/month) from their dashboard
+Owners can subscribe to the Featured plan ($29/month) from their dashboard
 via Stripe Checkout. The checkout session is created server-side via
 `POST /api/v1/billing/checkout` using the restricted Stripe key.
 **Acceptance:** Given a logged-in owner, when they click "Subscribe", then they are
@@ -13,38 +13,36 @@ redirected to Stripe's hosted checkout page; after payment, they are redirected 
 **Persona:** David (operator), Stripe.
 The webhook endpoint at `POST /api/v1/billing/webhook` receives Stripe events.
 `checkout.session.completed` sets `stripe_customer_id`, `stripe_subscription_id`,
-`is_founding_partner` (if within cap), and `claim_status=verified`.
-`customer.subscription.deleted` clears `stripe_subscription_id` only (badge stays).
+`tier`, `subscription_status`, and `claim_status=verified`.
+`customer.subscription.deleted` clears `stripe_subscription_id` and removes active Featured display.
 Idempotency is enforced via the `stripe_events` collection.
 **Acceptance:** Given a valid `checkout.session.completed` event, when the webhook
-fires, then the business gains the Founding Partner badge within seconds; given
+fires, then the business gains active Featured status within seconds; given
 the same event ID sent twice, then the second delivery is a no-op.
 
-### KAT-042 — Founding Partner badge (permanent) · V1 · implemented
+### KAT-042 — Founding Partner badge (permanent) · V1 · retired
 **Persona:** Salon Owner, Salon Seeker.
-The "Founding Partner" badge is granted to the first 25 paying subscribers and is
-permanent — it stays on the listing even if the subscription is later cancelled.
-Permanence is guarded by `stripe_customer_id` (set once at checkout, never cleared),
-NOT by `stripe_subscription_id` (which is cleared on cancellation).
-**Acceptance:** Given a founding partner who cancels their subscription, when their
-business detail page is loaded, then the Founding Partner badge is still visible.
+The Founding Partner badge, permanence promise, and first-25 cap were removed
+entirely in PR #362. Do not grant, count, or display this badge from new code.
+**Acceptance:** Given any business document, when its public listing, owner
+dashboard, and subscription emails render, then no Founding Partner wording or
+badge is shown.
 
-### KAT-043 — Founding Partner cap (25 slots) · V1 · implemented
+### KAT-043 — Founding Partner cap (25 slots) · V1 · retired
 **Persona:** David (operator).
-The number of Founding Partner badges is capped at 25 (configurable via
-`FOUNDING_PARTNER_CAP` env var). Once the cap is reached, additional subscribers
-still pay $29/month but do not receive the badge.
-**Acceptance:** Given 25 existing Founding Partners, when a 26th owner subscribes,
-then their listing does NOT show the Founding Partner badge.
+The cap is no longer part of the product. `FOUNDING_PARTNER_CAP` may exist only as
+legacy environment/configuration residue and must not affect subscription display.
+**Acceptance:** Given any number of subscribers, when a new owner subscribes, then
+they receive the same active Featured subscription display as other subscribers.
 
 ### KAT-044 — Cancellation handling · V1 · implemented
 **Persona:** Salon Owner, Stripe.
 When a `customer.subscription.deleted` event arrives, `stripe_subscription_id` is
-cleared on the business document. The `stripe_customer_id` and `is_founding_partner`
-flags remain unchanged (badge permanence).
+cleared on the business document. Legacy `is_founding_partner` data, if present,
+must not cause any public badge to render.
 **Acceptance:** Given an active subscriber whose subscription is cancelled, when the
-webhook fires, then `stripe_subscription_id` is null but `is_founding_partner` is
-still true and `stripe_customer_id` is unchanged.
+webhook fires, then `stripe_subscription_id` is null and the public listing no
+longer renders active Featured subscription benefits.
 
 ### KAT-045 — Webhook secret guard · V1 · implemented
 **Persona:** David (operator).

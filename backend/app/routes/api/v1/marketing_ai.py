@@ -10,6 +10,9 @@ Currently exposes two operations:
     Generate 3 short ad copy variations (headline + description each)
     ready to paste into Google Ads, Facebook, or Instagram Ads.
 
+  POST /api/v1/marketing-ai/profile-description
+    Generate a polished "About your salon" paragraph from owner-provided notes.
+
 Auth requirements (owner sessions are live):
 - Caller must present a valid ``kb_owner_session`` cookie (401 if missing
   or invalid).
@@ -83,6 +86,32 @@ class InstagramCaptionResponse(BaseModel):
     business_id: str
 
 
+class ProfileDescriptionRequest(BaseModel):
+    """Input shape for the owner profile-description helper."""
+
+    business_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="The _id of the business the owner is improving.",
+    )
+    prompt: str = Field(
+        ...,
+        min_length=1,
+        # WHY: 800 chars gives the owner room to paste a few rough notes about
+        # vibe, specialties, and clientele while keeping the AI call bounded.
+        max_length=800,
+        description="The owner's rough notes about what the description should express.",
+    )
+
+
+class ProfileDescriptionResponse(BaseModel):
+    """Profile description returned to the dashboard helper."""
+
+    description: str
+    business_id: str
+
+
 async def _feature_required() -> None:
     """Common feature-flag gate, raised as 404 (not 403) to fully hide
     the feature in environments where it is not enabled.
@@ -95,19 +124,23 @@ async def _feature_required() -> None:
         raise HTTPException(status_code=404, detail="Not found")
 
 
-async def _require_pro_owner(request: Request, business_id: str) -> Dict[str, Any]:
-    """Authenticate the request and verify the caller is a Featured subscriber.
+async def _require_owner(
+    request: Request, business_id: str, *, require_subscription: bool
+) -> Dict[str, Any]:
+    """Authenticate the request and verify the caller owns the business.
 
     Raises:
         401 -- no valid owner session cookie
         403 -- the authenticated owner's business does not match business_id
         404 -- the business doesn't exist in the database
-        402 -- the business exists and is owned by the caller but has no active
-               Featured subscription (stripe_subscription_id is absent)
+        402 -- when require_subscription=True and the business exists and is
+               owned by the caller but has no active Featured subscription
+               (stripe_subscription_id is absent)
 
-    WHY: centralised so both caption and ad-copy endpoints share identical
-    auth logic without duplication. Any future Marketing-AI endpoint should
-    call this helper rather than re-implementing the checks.
+    WHY: centralised so all Marketing-AI endpoints share identical ownership
+    checks. Caption and ad-copy additionally require Featured; the profile
+    description helper is available to any verified owner because richer
+    descriptions improve the public directory even before the owner upgrades.
 
     Auth design: owner sessions store the owner's email (not business_id).
     The canonical ownership link is business.claimed_email == session.email,
@@ -146,13 +179,18 @@ async def _require_pro_owner(request: Request, business_id: str) -> Dict[str, An
     # WHY: stripe_subscription_id is written by the Stripe webhook on successful
     # payment and cleared on cancellation -- it's the authoritative subscription
     # signal, more reliable than featured.tier which can be set manually by admins.
-    if not doc.get("stripe_subscription_id"):
+    if require_subscription and not doc.get("stripe_subscription_id"):
         raise HTTPException(
             status_code=402,
             detail="Featured subscription required to use AI tools",
         )
 
     return doc
+
+
+async def _require_pro_owner(request: Request, business_id: str) -> Dict[str, Any]:
+    """Authenticate the request and verify the caller is a Featured subscriber."""
+    return await _require_owner(request, business_id, require_subscription=True)
 
 
 async def _resolve_neighborhood_name(
@@ -357,3 +395,65 @@ async def generate_ad_copy(
         ) from exc
 
     return AdCopyResponse(ad_copy=copy, business_id=body.business_id)
+
+
+@router.post(
+    "/profile-description",
+    response_model=ProfileDescriptionResponse,
+    # WHY: feature flag still hides the AI surface globally, but ownership does
+    # not require a subscription because a better profile benefits visitors too.
+)
+async def generate_profile_description(
+    request: Request,
+    body: ProfileDescriptionRequest,
+) -> ProfileDescriptionResponse:
+    """Generate a polished public profile description from rough owner notes."""
+    await _feature_required()
+
+    business = await _require_owner(
+        request, body.business_id, require_subscription=False
+    )
+    city_id = business.get("city_id")
+    if not city_id:
+        raise HTTPException(status_code=409, detail="Business has no city")
+
+    city = await _resolve_city(city_id)
+    primary_category_slug = (business.get("category_slugs") or [None])[0]
+    neighborhood_name = await _resolve_neighborhood_name(
+        city_id, business.get("neighborhood_slugs")
+    )
+    vertical_word = (city or {}).get("listing_word_singular")
+    state, market_label = ai_caption.resolve_location(business, city)
+
+    ctx = ai_caption.CaptionContext(
+        business_name=business.get("name", ""),
+        neighborhood_name=neighborhood_name,
+        city_name=(city or {}).get("name"),
+        state=state,
+        market_label=market_label,
+        primary_category=primary_category_slug,
+        vertical_word=vertical_word,
+        known_for=business.get("known_for"),
+        short_description=business.get("short_description") or business.get("description"),
+        prompt=body.prompt.strip(),
+    )
+
+    try:
+        description = await ai_caption.generate_profile_description(ctx)
+    except ai_caption.CaptionFeatureDisabled:
+        raise HTTPException(status_code=404, detail="Not found")
+    except ai_caption.CaptionGenerationError as exc:
+        log.warning(
+            "Profile description generation failed for business=%s: %s",
+            body.business_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Couldn't reach the model right now. Please try again.",
+        ) from exc
+
+    return ProfileDescriptionResponse(
+        description=description,
+        business_id=body.business_id,
+    )

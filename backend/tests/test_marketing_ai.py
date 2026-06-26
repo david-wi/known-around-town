@@ -1022,6 +1022,144 @@ def test_ad_copy_endpoint_502_on_gateway_error(client, seeded_db, monkeypatch):
     assert "try again" in resp.json()["detail"].lower()
 
 
+# --- Profile description: owner-facing "About your salon" helper ---
+
+
+def test_build_profile_description_system_prompt_forbids_invention():
+    from app.services.ai_caption import (
+        CaptionContext,
+        build_profile_description_system_prompt,
+    )
+
+    ctx = CaptionContext(
+        business_name="Wynwood Color Studio",
+        neighborhood_name="Wynwood",
+        city_name="Miami",
+        primary_category="hair",
+        vertical_word="salon",
+        known_for=None,
+        short_description=None,
+        prompt="modern color studio",
+    )
+    out = build_profile_description_system_prompt(ctx)
+    assert "80-140 words" in out
+    assert "do not invent" in out.lower()
+    assert "ONLY the paragraph" in out
+
+
+def test_generate_profile_description_happy_path_sends_expected_body(monkeypatch):
+    from app.services import ai_caption
+
+    monkeypatch.setenv("MARKETING_AI_ENABLED", "true")
+    monkeypatch.setenv("AI_GATEWAY_KEY", "test-key-abc")
+    transport, captured = _ok_transport(
+        "Wynwood Color Studio is a relaxed Miami salon focused on lived-in color."
+    )
+
+    ctx = ai_caption.CaptionContext(
+        business_name="Wynwood Color Studio",
+        neighborhood_name="Wynwood",
+        city_name="Miami",
+        primary_category="hair",
+        vertical_word="salon",
+        known_for="lived-in color",
+        short_description="A calm color studio.",
+        prompt="calm luxury, low-maintenance hair",
+        state="FL",
+        market_label="South Florida (Miami metro area)",
+    )
+
+    async def run():
+        async with httpx.AsyncClient(transport=transport) as client:
+            return await ai_caption.generate_profile_description(ctx, http_client=client)
+
+    out = asyncio.run(run())
+
+    assert out.startswith("Wynwood Color Studio")
+    body = captured["body"]
+    assert body["cost_tags"]["feature"] == "owners.profile_description"
+    assert body["max_tokens_override"] == 500
+    assert "calm luxury" in body["user_content"]
+    assert "do not invent" in body["system_prompt"].lower()
+
+
+def _patch_generate_profile_description(
+    monkeypatch, *, raises: Exception | None = None, returns: str | None = None
+):
+    from app.services import ai_caption
+
+    async def fake_generate(ctx, http_client=None):
+        if raises is not None:
+            raise raises
+        return returns or "A polished profile paragraph from the test."
+
+    monkeypatch.setattr(ai_caption, "generate_profile_description", fake_generate)
+
+
+def _make_claimed_business(seeded_db, biz, email: str = _TEST_OWNER_EMAIL):
+    asyncio.get_event_loop().run_until_complete(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {"claimed_email": email}, "$unset": {"stripe_subscription_id": ""}},
+        )
+    )
+    from app.services.owner_auth import sign_session
+
+    return sign_session(email)
+
+
+def test_profile_description_endpoint_allows_claimed_free_owner(
+    client, seeded_db, monkeypatch
+):
+    """The profile-writing helper is useful before payment, so it only requires ownership."""
+    biz = _pick_seeded_business(seeded_db)
+    cookie = _make_claimed_business(seeded_db, biz)
+    _patch_generate_profile_description(
+        monkeypatch,
+        returns="A warm, specific paragraph the owner can paste into their listing.",
+    )
+
+    resp = client.post(
+        "/api/v1/marketing-ai/profile-description",
+        json={
+            "business_id": biz["_id"],
+            "prompt": "calm salon, lived-in color, low-maintenance clients",
+        },
+        cookies={"kb_owner_session": cookie},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert "warm, specific paragraph" in data["description"]
+    assert data["business_id"] == biz["_id"]
+
+
+def test_profile_description_endpoint_rejects_wrong_owner(
+    client, seeded_db, monkeypatch
+):
+    biz = _pick_seeded_business(seeded_db)
+    _make_claimed_business(seeded_db, biz, email="owner@example.com")
+    from app.services.owner_auth import sign_session
+
+    _patch_generate_profile_description(monkeypatch)
+    resp = client.post(
+        "/api/v1/marketing-ai/profile-description",
+        json={"business_id": biz["_id"], "prompt": "nice wording"},
+        cookies={"kb_owner_session": sign_session("other@example.com")},
+    )
+    assert resp.status_code == 403
+
+
+def test_profile_description_endpoint_422_on_overlong_prompt(client, seeded_db):
+    biz = _pick_seeded_business(seeded_db)
+    cookie = _make_claimed_business(seeded_db, biz)
+    resp = client.post(
+        "/api/v1/marketing-ai/profile-description",
+        json={"business_id": biz["_id"], "prompt": "x" * 801},
+        cookies={"kb_owner_session": cookie},
+    )
+    assert resp.status_code == 422
+
+
 # --- Optional live integration test (skipped in CI) ---
 
 

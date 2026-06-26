@@ -117,6 +117,10 @@ def test_expertly_voice_page(client):
     # the marketing copy and the quote at the same time — the page and the
     # sales quote must agree.
     assert "1-week free trial" in r.text or "1 week free" in r.text.lower()
+    for vendor in ("Fresha", "Vagaro", "Mindbody", "Booksy", "Square Appointments"):
+        assert vendor not in r.text
+    assert "Two-way sync" not in r.text
+    assert "never double-book" not in r.text
 
 
 def test_owners_page(client):
@@ -232,7 +236,7 @@ def test_pricing_page_leads_with_ai_tools_and_omits_false_claims(client):
 
     # The AI marketing tools are present and are the hero benefit of Featured.
     assert "AI writes your Instagram captions" in body
-    assert "AI generates your Google and Meta ad copy" in body
+    assert "AI generates your Google, Facebook, and Instagram ad copy" in body
     # The AI caption bullet must come BEFORE the Featured badge bullet in the
     # Featured card — that ordering is what "AI tools lead" means.
     ai_pos = body.find("AI writes your Instagram captions")
@@ -275,7 +279,7 @@ def test_owners_page_omits_false_claims(client):
     body = r.text
 
     assert "AI writes your Instagram captions" in body
-    assert "AI generates your Google and Meta ad copy" in body
+    assert "AI generates your Google, Facebook, and Instagram ad copy" in body
     # No specific AI monthly cap numbers.
     assert "20 ready-to-run ad variations per month" not in body
     # No pro-rated refund promise (one-plan monthly billing doesn't do this).
@@ -2307,11 +2311,10 @@ def test_owner_me_upgrade_card_shows_specific_neighborhood():
     """The upgrade card must render the owner's actual neighborhood name, not
     the generic phrase 'your neighborhood'.
 
-    WHY: when an owner who just got verified sees 'Be the first salon visitors
-    see in your neighborhood', it reads as a generic template placeholder.
-    Seeing 'Be the first salon visitors see in Wynwood' is concrete, personal,
-    and far more compelling — the owner can picture their listing at the top of
-    the Wynwood page they know visitors use.
+    WHY: when an owner who just got verified sees a generic placement promise,
+    it reads as a template placeholder. Showing the actual neighborhood and
+    categories is concrete and personal without over-promising that only one
+    Featured listing can appear first.
     """
     import pathlib
     from jinja2 import Environment, FileSystemLoader

@@ -38,6 +38,10 @@ CLOSED_SLUGS = [
     "vita-aesthetics-miami",              # closed
 ]
 
+STATUS_CLOSED_SLUGS = [
+    "kingsmen-barbershop-wynwood",  # verified as not a safe live Miami listing
+]
+
 
 @pytest.mark.parametrize("slug", CLOSED_SLUGS)
 def test_closed_business_removed(beauty_slugs, slug):
@@ -45,6 +49,30 @@ def test_closed_business_removed(beauty_slugs, slug):
     assert slug not in beauty_slugs, (
         f"{slug!r} is a confirmed-closed business that must be removed from "
         "_real_businesses.json; leaving it in causes it to reappear live every midnight."
+    )
+
+
+@pytest.mark.parametrize("slug", STATUS_CLOSED_SLUGS)
+def test_status_closed_business_is_explicitly_closed(real_data, slug):
+    """Some reviewed records stay in the source file for audit but must not be live.
+
+    WHY: Kingsmen was marked closed in _real_businesses.json, but seed_miami.py
+    ignored the source status and wrote it as live. A reviewed-closed listing
+    may remain in the source data, but only if it carries status=closed.
+    """
+    biz = next((b for b in real_data["beauty"] if b["slug"] == slug), None)
+    assert biz is not None, f"{slug!r} should remain in source only as an audit record"
+    assert biz.get("status") == "closed", (
+        f"{slug!r} must be status='closed' so it cannot be surfaced as live"
+    )
+
+
+def test_seed_miami_honors_source_status():
+    """The Miami seed must write the source status, not force every record live."""
+    source = (Path(__file__).parent.parent / "seed" / "seed_miami.py").read_text()
+    assert '"status": biz.get("status", "live")' in source, (
+        "seed_miami.py must preserve _real_businesses.json status values; "
+        "forcing status='live' resurrects reviewed-closed listings."
     )
 
 

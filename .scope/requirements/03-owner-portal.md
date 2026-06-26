@@ -11,8 +11,8 @@ code flow, then a `kb_owner_session` cookie is set and the owner is redirected t
 
 ### KAT-031 — Owner dashboard · V1 · implemented
 **Persona:** Salon Owner.
-The owner dashboard at `/owners/me` shows: listing preview, Founding Partner
-status, subscription status, inquiry statistics, and photo management. It is the
+The owner dashboard at `/owners/me` shows: listing preview, Featured
+subscription status, owner profile tools, AI marketing tools, inquiries, and photo management. It is the
 primary interface for owners after login.
 **Acceptance:** Given a logged-in owner, when `/owners/me` is requested, then the
 page shows their business name, photo count, subscription status, and recent inquiry count.

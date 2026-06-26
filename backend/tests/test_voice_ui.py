@@ -93,7 +93,7 @@ class TestOwnerDashboardVoiceSection:
         )
 
         # Upsell card must NOT be shown
-        assert "Contact us to upgrade" not in body, (
+        assert "Ask about Concierge" not in body, (
             "Upsell card shown when voice is already active — confusing UX"
         )
 
@@ -132,7 +132,7 @@ class TestOwnerDashboardVoiceSection:
         assert "AI Receptionist" in body, (
             "AI Receptionist feature name missing from upsell card"
         )
-        assert "Contact us to upgrade" in body, (
+        assert "Ask about Concierge" in body, (
             "Upgrade CTA missing — owner has no path to get the feature"
         )
         assert "Concierge" in body, (

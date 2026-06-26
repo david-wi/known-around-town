@@ -669,7 +669,7 @@ def _subscription_confirmed_text(first: str, business_name: str, dashboard_url: 
         "• Featured placement — your listing appears at the top of category and neighborhood pages\n"
         "• Pro badge — signals quality and helps visitors choose you over unverified listings\n"
         "• Instagram caption generator — describe your post, get a polished caption with hashtags\n"
-        "• Google & Meta ad copy — describe what you're promoting, get 3 ready-to-run ad variations\n\n"
+        "• Google, Facebook, and Instagram ad copy — describe what you're promoting, get 3 ready-to-run ad variations\n\n"
         f"Head to your dashboard to see your listing and start using these features:\n{dashboard_url}\n\n"
         f"Questions? Email {get_settings().support_email} and we'll get back to you same day.\n\n"
         "— The Miami Knows Beauty team\n"
@@ -710,7 +710,7 @@ def _subscription_confirmed_html(first: str, business_name: str, dashboard_url: 
       </li>
       <li style="padding: 8px 0; font-size: 14px; color: #1c1917;">
         <span style="color: #be185d; font-weight: 700;">&#10003;</span>&nbsp;
-        <strong>Google &amp; Meta ad copy</strong> &mdash; 3 ready-to-run variations per campaign
+        <strong>Google, Facebook, and Instagram ad copy</strong> &mdash; 3 ready-to-run variations per campaign
       </li>
     </ul>
     <a href="{dashboard_url}"
