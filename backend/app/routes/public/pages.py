@@ -290,6 +290,22 @@ def _network_theme(network: Dict[str, Any]) -> Dict[str, str]:
     return _NETWORK_THEMES.get(network.get("slug", ""), _NETWORK_THEMES["beauty"])
 
 
+_CITY_FOOTER_PATH_OVERRIDES: Dict[tuple[str, str], tuple[str, str]] = {
+    # WHY: Wynwood was once seeded as its own city edition, but in the current
+    # Miami product it is a neighborhood landing page. Keep footer cross-links
+    # from reviving the stale `wynwood.knowsbeauty.*` domain.
+    ("beauty", "wynwood"): ("miami", "/n/wynwood"),
+}
+
+
+def _city_footer_url(network_slug: str, city_slug: str, suffix: str) -> str:
+    override = _CITY_FOOTER_PATH_OVERRIDES.get((network_slug, city_slug))
+    if override:
+        host_slug, path = override
+        return f"https://{host_slug}.{suffix}{path}"
+    return f"https://{city_slug}.{suffix}/"
+
+
 async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, Any]:
     copy = await _build_copy(tenant)
     city = tenant.city
@@ -315,7 +331,10 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
             # WHY: exclude the current city — a link back to the page the visitor
             # is already on adds noise rather than helpful navigation.
             network_cities = [
-                {"name": c["name"], "url": f"https://{c['slug']}.{suffix}/"}
+                {
+                    "name": c["name"],
+                    "url": _city_footer_url(network.get("slug", ""), c["slug"], suffix),
+                }
                 for c in all_network_cities
                 if c.get("_id") != current_city_id
             ]
