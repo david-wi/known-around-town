@@ -80,3 +80,31 @@ async def test_upsert_preserves_id_and_created_at(db):
     # test the invariant that created_at is preserved, not its tz-awareness.
     stored = doc["created_at"].replace(tzinfo=None) if doc["created_at"] else None
     assert stored == original_ts.replace(tzinfo=None)
+
+
+def test_seeded_footer_cross_links_use_canonical_hosts():
+    """Footer 'Also in <city>' cross-links must point at hosts that are actually
+    served, not a bare slug that has no certificate.
+
+    Regression: the Miami edition seeded footer_also_in_url as
+    https://boca.knowsbeauty.com — a host with no valid TLS cert that dead-ends
+    the visitor on a browser security warning. The live Boca edition is served at
+    boca-raton.knowsbeauty.com. A broken cross-link in the footer of every page
+    is a trust defect, so guard the seeded value.
+    """
+    from seed.seed_miami import NETWORK_CITY_CONFIG
+
+    for network_slug, cfg in NETWORK_CITY_CONFIG.items():
+        url = cfg.get("footer_also_in_url", "")
+        if not url:
+            continue
+        # The known-broken bare-boca host must never be seeded again.
+        assert "//boca.knowsbeauty" not in url, (
+            f"{network_slug}: footer_also_in_url points at the broken "
+            f"boca.knowsbeauty host: {url!r}"
+        )
+        # Sanity: any seeded cross-link must be an https knowsbeauty URL.
+        assert url.startswith("https://") and "knowsbeauty" in url, (
+            f"{network_slug}: footer_also_in_url is not a valid knowsbeauty "
+            f"https URL: {url!r}"
+        )
