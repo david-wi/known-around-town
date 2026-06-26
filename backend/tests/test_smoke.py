@@ -2,6 +2,8 @@
 # Tests for the Miami Knows Beauty public-facing pages. Updated alongside PR #93 docs.
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -3772,6 +3774,148 @@ def test_business_page_hides_guide_section_when_no_guides(client):
         "/b/blow-dry-bar-brickell shows 'Featured in our guides' even though "
         "this business is not in any editorial guide — the conditional guard is broken"
     )
+
+
+def test_featured_business_auto_recommendations_avoid_same_category(client, seeded_db):
+    """Featured listings should not auto-fill "You might also love" with direct competitors.
+
+    WHY: when a paid owner has no curated nearby_business_ids, showing other
+    businesses from the same category directly underneath their listing weakens
+    the value of being Featured. Complementary categories are safer; if there
+    are not enough, show fewer cards rather than competitors.
+    """
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    assert city, "test seed missing Miami beauty city"
+
+    # Make the rest of the city same-category so only the inserted
+    # complementary businesses can satisfy the Featured cross-category fallback.
+    asyncio.run(
+        seeded_db.businesses.update_many(
+            {"city_id": city["_id"]},
+            {
+                "$set": {
+                    "category_slugs": ["hair"],
+                    "nearby_business_ids": [],
+                    "status": "archived",
+                }
+            },
+        )
+    )
+    docs = [
+        {
+            "_id": "featured-cross-rec-subject",
+            "name": "Featured Cross Rec Subject",
+            "slug": "featured-cross-rec-subject",
+            "city_id": city["_id"],
+            "network_id": network["_id"],
+            "status": "live",
+            "category_slugs": ["hair"],
+            "nearby_business_ids": [],
+            "featured": {"enabled": True, "tier": "featured"},
+        },
+        {
+            "_id": "featured-cross-rec-competitor",
+            "name": "Direct Hair Competitor",
+            "slug": "direct-hair-competitor",
+            "city_id": city["_id"],
+            "network_id": network["_id"],
+            "status": "live",
+            "category_slugs": ["hair"],
+        },
+        {
+            "_id": "featured-cross-rec-nails",
+            "name": "Complementary Nail Studio",
+            "slug": "complementary-nail-studio",
+            "city_id": city["_id"],
+            "network_id": network["_id"],
+            "status": "live",
+            "category_slugs": ["nails"],
+        },
+        {
+            "_id": "featured-cross-rec-spa",
+            "name": "Complementary Spa Studio",
+            "slug": "complementary-spa-studio",
+            "city_id": city["_id"],
+            "network_id": network["_id"],
+            "status": "live",
+            "category_slugs": ["spa"],
+        },
+    ]
+    asyncio.run(seeded_db.businesses.insert_many(docs))
+
+    r = client.get(
+        "/b/featured-cross-rec-subject",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "You might also love" in r.text
+    assert "Complementary Nail Studio" in r.text
+    assert "Complementary Spa Studio" in r.text
+    assert "Direct Hair Competitor" not in r.text
+
+
+def test_non_featured_business_auto_recommendations_keep_same_category(client, seeded_db):
+    """The cross-category rule is only for Featured listings."""
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    city = asyncio.run(
+        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
+    )
+    assert city, "test seed missing Miami beauty city"
+    asyncio.run(
+        seeded_db.businesses.update_many(
+            {"city_id": city["_id"]},
+            {
+                "$set": {
+                    "category_slugs": ["hair"],
+                    "nearby_business_ids": [],
+                    "status": "archived",
+                }
+            },
+        )
+    )
+    docs = [
+        {
+            "_id": "free-same-rec-subject",
+            "name": "Free Same Rec Subject",
+            "slug": "free-same-rec-subject",
+            "city_id": city["_id"],
+            "network_id": network["_id"],
+            "status": "live",
+            "category_slugs": ["hair"],
+            "nearby_business_ids": [],
+            "featured": {"enabled": False, "tier": "free"},
+        },
+        {
+            "_id": "free-same-rec-competitor",
+            "name": "Free Hair Peer",
+            "slug": "free-hair-peer",
+            "city_id": city["_id"],
+            "network_id": network["_id"],
+            "status": "live",
+            "category_slugs": ["hair"],
+        },
+        {
+            "_id": "free-same-rec-nails",
+            "name": "Free Complementary Nails",
+            "slug": "free-complementary-nails",
+            "city_id": city["_id"],
+            "network_id": network["_id"],
+            "status": "live",
+            "category_slugs": ["nails"],
+        },
+    ]
+    asyncio.run(seeded_db.businesses.insert_many(docs))
+
+    r = client.get(
+        "/b/free-same-rec-subject",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert "Free Hair Peer" in r.text
+    assert "Free Complementary Nails" not in r.text
 
 
 # ---------------------------------------------------------------------------

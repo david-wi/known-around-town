@@ -1282,17 +1282,24 @@ async def business_page(
         )
         nearby = await nearby_cur.to_list(length=12)
     else:
-        # WHY: When no editorial nearby list is set, auto-suggest businesses
-        # from the same category in the same city so the "You might also love"
-        # section is always populated. Visitors browsing hair salons should
-        # see more hair salons, not nothing.
+        # WHY: When no editorial nearby list is set, auto-suggest businesses in
+        # the same city so the "You might also love" section is populated.
+        # Ordinary listings keep the original same-category fallback because
+        # shoppers comparing hair salons often want more hair salons. Featured
+        # listings are different: showing direct same-category competitors next
+        # to a paid owner undercuts the Featured value. For Featured listings,
+        # prefer complementary cross-category businesses and show fewer cards if
+        # necessary rather than filling the section with competitors.
         primary_cat = (business.get("category_slugs") or [None])[0]
+        is_featured = bool((business.get("featured") or {}).get("enabled"))
         auto_q: Dict[str, Any] = {
             "_id": {"$ne": business["_id"]},
             "city_id": city["_id"],
             "status": "live",
         }
-        if primary_cat:
+        if primary_cat and is_featured:
+            auto_q["category_slugs"] = {"$ne": primary_cat}
+        elif primary_cat:
             auto_q["category_slugs"] = primary_cat
         nearby_cur = content_svc.get_db().businesses.find(auto_q).limit(3)
         nearby = await nearby_cur.to_list(length=3)
