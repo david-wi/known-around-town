@@ -181,12 +181,12 @@ async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> 
             return
 
         # WHY (defense-in-depth duplicate-place guard): one real Google business
-        # must never be attached to two different live listings. The name matcher
-        # (google_places._names_match) is the primary defense, but if it ever
-        # admits a wrong match the symptom is the SAME google_place_id landing on
-        # multiple distinct businesses — which is exactly how ~283 listings ended
-        # up showing the wrong business's star rating before the matcher was
-        # hardened. So before storing a NEWLY-discovered place_id, check whether
+        # must never be attached to two different live listings. The AI match
+        # judge (google_places._llm_same_business) is the primary defense, but if
+        # it ever admits a wrong match the symptom is the SAME google_place_id
+        # landing on multiple distinct businesses — which is exactly how ~283
+        # listings ended up showing the wrong business's star rating before the
+        # matcher was hardened. So before storing a NEWLY-discovered place_id, check whether
         # it is already assigned to a DIFFERENT live business. If it is, treat
         # this as a no-match (leave the business unrated) and warn, rather than
         # silently duplicating the rating.

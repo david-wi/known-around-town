@@ -27,16 +27,16 @@ regularOpeningHours with integer hour/minute fields instead of the legacy
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
-import re
 from dataclasses import dataclass, field
-from difflib import SequenceMatcher
 from typing import List, Optional
 
 import httpx
 
 from app.config import get_settings
 from app.models import HoursEntry
+from app.services.ai_caption import CaptionGenerationError, call_gateway_text
 
 log = logging.getLogger(__name__)
 
@@ -51,51 +51,61 @@ _PLACES_DETAILS_BASE = "https://places.googleapis.com/v1/places"
 # typically responds in 200–800ms on a healthy connection.
 _TIMEOUT_SECONDS = 8
 
-# WHY a stopword-based brand match, NOT raw whole-string similarity: the old
-# approach scored two names with SequenceMatcher over the FULL strings and
-# accepted any pair above 0.40. That rewards SHARED GENERIC WORDS — the
-# business-type word ("spa", "salon") and the neighborhood/geo word
-# ("Brickell") that appear in almost every name in a given area — so two
-# clearly-different businesses in the same neighborhood scored high enough to
-# be treated as the same place. Real failures this caused (each WRONGLY
-# accepted under the old 0.40 rule):
-#   "Kure Spa — Brickell City Centre"  vs "Lux MedSpa Brickell"  → 0.56
-#   "Ciel Spa at SLS Brickell"         vs "Lux MedSpa Brickell"  → 0.605
-# Both pass the old test purely because they share "spa"/"brickell" — even
-# though the actual brand ("Kure"/"Ciel" vs "Lux") is completely different.
-# The consequence was that one real Google business got attached to many
-# distinct directory listings, so ~283 of 894 rated salons showed the wrong
-# business's star rating.
+# WHY an LLM judges the match instead of a string heuristic: deciding whether a
+# Google listing is the SAME real-world business as one of our directory entries
+# is a judgment call, not a string-distance problem. The previous approach scored
+# the two names with token/word overlap and accepted them above a threshold. Word
+# overlap rewards shared generic words ("spa", "salon") and shared neighborhood
+# words ("Brickell") and is blind to meaning, so it made real mistakes — e.g. it
+# treated "Kure Spa" and "Lux MedSpa" as the same business because both contained
+# "spa" and "Brickell", even though the actual brand ("Kure" vs "Lux") is totally
+# different. When one real Google business gets attached to several of our
+# listings, all of those listings end up showing the wrong star rating.
 #
-# The fix: strip the generic business-type and location words, then require the
-# DISTINCTIVE (brand) tokens to actually correspond. See _names_match.
+# The fix: hand the model the two businesses' identifying details (our name + the
+# city we searched, and the candidate's display name, full address, and Google
+# business type) and ask it directly whether they are the same real-world place.
+# We accept the candidate's rating only when the model says yes; on ANY failure
+# (model unavailable, timeout, or an answer we can't read) we treat it as NO
+# match and leave the business unrated — a wrong rating is worse than no rating.
 
-# WHY this stopword set: these are the generic business-type and location words
-# that recur across beauty-directory names and carry no identifying signal. The
-# matcher removes them (PLUS the queried city/state tokens) before comparing, so
-# the comparison is driven by the distinctive brand part of the name. "Brickell"
-# is not listed here because it is a Miami neighborhood, not a queried city — the
-# brand-token requirement below is what stops a shared neighborhood word from
-# being enough on its own to call two businesses a match.
-_NAME_STOPWORDS = frozenset({
-    "spa", "salon", "studio", "medspa", "med", "beauty", "bar", "lash", "brow",
-    "brows", "nails", "nail", "hair", "skin", "the", "and", "at", "of", "by",
-    "co", "llc", "inc", "city", "center", "centre", "suite", "fl", "florida",
-})
+# WHY use_case "light": this is the same registered, centralized AI gateway
+# configuration the public search already uses. It points at a lightweight model
+# that is more than capable of a one-line same-business yes/no, and keeps the
+# model choice in Admin AI Config (changeable without a redeploy of this app).
+_MATCH_USE_CASE = "light"
 
-# WHY 0.34 Jaccard floor for the multi-token path: a Jaccard overlap of 1/3
-# means at least one in three distinctive tokens is shared. It is only consulted
-# on the "strong overlap" path (two or more shared distinctive tokens), as a
-# secondary signal to the brand-token requirement, so the exact value is not
-# load-bearing — the brand match is the primary gate.
-_DISTINCTIVE_JACCARD_FLOOR = 0.34
+# WHY 256 tokens: the model only needs to return a tiny JSON object
+# ({"same_business": true, "confidence": "high"} is ~15 tokens). Some gateway
+# models "think" before answering, and a starved budget would truncate the JSON
+# and force a fail-safe NO on every call. 256 is generous headroom for any short
+# reasoning plus the answer, while still keeping the response — and its cost —
+# small.
+_MATCH_MAX_TOKENS = 256
 
-# WHY 0.85 fallback ratio when neither name has any distinctive token: if BOTH
-# names are entirely generic after stripping (e.g. a business literally named
-# "Nail Salon"), there is no brand to compare, so we fall back to a strict
-# whole-name similarity. 0.85 is intentionally high — without a brand to anchor
-# on, only a near-identical normalized string should be trusted.
-_GENERIC_FALLBACK_RATIO = 0.85
+# WHY this system prompt: it pins the model to a single, strict job — decide
+# whether two businesses are the same real-world place — and to a machine-
+# readable answer so the code can parse it deterministically. The "different
+# brand → not the same business even if the type/area match" instruction is the
+# exact judgment the old heuristic got wrong (Kure vs Lux).
+_MATCH_SYSTEM_PROMPT = (
+    "You decide whether two business descriptions refer to the SAME real-world "
+    "business — the same physical establishment a customer would walk into.\n\n"
+    "Return ONLY a JSON object with this exact shape:\n"
+    '{"same_business": true, "confidence": "high"}\n'
+    "where same_business is true or false and confidence is \"high\" or \"low\".\n\n"
+    "Judge by the BRAND/NAME identity, not by shared generic words. Two "
+    "businesses that merely share a category word (spa, salon, nails) or a "
+    "neighborhood/city name are NOT the same business if their actual brand "
+    "names differ (for example \"Kure Spa\" and \"Lux MedSpa\" are different "
+    "businesses even though both are spas in Brickell). Allow for harmless "
+    "variations of the SAME brand: extra category words, a location suffix, "
+    "abbreviations, punctuation, or word-order differences (for example \"IGK "
+    "Salon\" and \"IGK Hair Salon\" ARE the same business). When the address or "
+    "Google business type is provided, use it as supporting evidence, but the "
+    "brand/name match is what decides it. If you are not confident they are the "
+    "same business, answer false."
+)
 
 # WHY: Google Places day-of-week integer (0=Sunday … 6=Saturday) maps to
 # HoursEntry.day strings. This lets us translate the API's numeric format
@@ -163,107 +173,98 @@ async def lookup_rating(
         return await _search_and_fetch(client, business_name, city, state, api_key)
 
 
-def _distinctive_tokens(name: str, extra_stopwords: frozenset) -> List[str]:
-    """Lowercase, strip punctuation, and drop generic + queried-location words.
+def _strip_json_code_fence(text: str) -> str:
+    """Remove a leading/trailing ``` code fence if the model wrapped its JSON.
 
-    Returns the remaining DISTINCTIVE (brand-bearing) tokens in original order.
-    "&" is treated as a separator (so "Hair & Co" → ["hair"... dropped]); all
-    other punctuation collapses to spaces. ``extra_stopwords`` carries the
-    queried city/state tokens so the city itself never contributes to a match.
-
-    WHY order is preserved: the FIRST distinctive token is treated as the brand
-    in _names_match, and the brand is the most identifying part of a name.
+    WHY: some gateway models return the JSON inside a Markdown code fence
+    (```json ... ```). Stripping it lets json.loads succeed instead of failing
+    and forcing a fail-safe NO on an otherwise-valid answer.
     """
-    lowered = name.lower().replace("&", " ")
-    # WHY: collapse every non-alphanumeric run to a single space so "—", "|",
-    # "'", and stray punctuation never split or glue tokens unexpectedly.
-    cleaned = re.sub(r"[^a-z0-9]+", " ", lowered)
-    stop = _NAME_STOPWORDS | extra_stopwords
-    return [tok for tok in cleaned.split() if tok and tok not in stop]
+    cleaned = text.strip()
+    if not cleaned.startswith("```"):
+        return cleaned
+    lines = cleaned.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
 
 
-def _location_stopwords(city: str, state: str) -> frozenset:
-    """Tokenize the queried city + state into stopwords.
+async def _llm_same_business(
+    *,
+    searched_name: str,
+    city: str,
+    state: str,
+    candidate_name: str,
+    candidate_address: str,
+    candidate_types: List[str],
+) -> bool:
+    """Ask the AI gateway whether a Google candidate is our same real-world business.
 
-    WHY: the city we searched ("Miami") and the state ("FL") appear in the
-    query, so a Google listing that echoes them back must not earn match credit
-    for that — only the brand should. Stripping them prevents "<brand> Miami FL"
-    vs "<other brand> Miami" from looking similar via the shared location words.
+    Returns True ONLY when the model explicitly answers that they are the same
+    business. Any failure path — gateway unreachable, timeout, non-JSON, an
+    answer in an unexpected shape, or anything we cannot confidently read as
+    "yes" — returns False. This is a deliberate FAIL-SAFE: attaching the wrong
+    Google rating to a listing is worse than leaving that listing unrated, so on
+    any uncertainty we decline the match.
+
+    WHY this replaces the old token-overlap heuristic: deciding that "Kure Spa"
+    and "Lux MedSpa Brickell" are different businesses (despite sharing the words
+    "spa" and "Brickell") is a judgment a model makes correctly and a word-overlap
+    score does not.
     """
-    extra: set[str] = set()
-    for arg in (city, state):
-        for tok in re.sub(r"[^a-z0-9]+", " ", (arg or "").lower()).split():
-            if tok:
-                extra.add(tok)
-    return frozenset(extra)
+    our_lines = [f"Our business name: {searched_name}", f"Our city: {city}, {state}"]
+    candidate_lines = [f"Candidate name: {candidate_name}"]
+    if candidate_address:
+        candidate_lines.append(f"Candidate address: {candidate_address}")
+    if candidate_types:
+        # WHY: Google's business types (e.g. "beauty_salon", "spa") are weak
+        # supporting evidence — many distinct businesses share a type — so they
+        # inform but never decide the match. The prompt makes that explicit.
+        candidate_lines.append(f"Candidate Google business type(s): {', '.join(candidate_types)}")
 
+    user_content = (
+        "Business A (our directory listing):\n"
+        + "\n".join(our_lines)
+        + "\n\nBusiness B (a candidate Google Places result):\n"
+        + "\n".join(candidate_lines)
+        + "\n\nAre Business A and Business B the same real-world business?"
+    )
 
-def _names_match(searched_name: str, place_name: str, city: str, state: str) -> bool:
-    """Decide whether a Google place name refers to the same business we searched.
-
-    The match is driven by the DISTINCTIVE (brand) tokens, not whole-string
-    similarity, so two businesses that merely share a business-type word ("spa")
-    and a neighborhood word ("Brickell") are NOT treated as the same place. See
-    the _NAME_STOPWORDS comment for the Kure/Ciel → Lux failures this fixes.
-
-    Rules (in order):
-      1. Strip generic + queried-location words from both names.
-      2. If neither name has any distinctive token left, fall back to a strict
-         whole-name similarity (both are fully generic — no brand to anchor on).
-      3. Require at least one shared distinctive token; with none, reject.
-      4. Accept when the BRAND (first distinctive token) of either name appears
-         in the other's distinctive tokens — this is the primary gate and is
-         what rejects "Kure"/"Ciel" vs "Lux" while accepting "IGK" vs
-         "IGK Hair Salon" and "Allure Medspa" vs "Allure Medspa Aventura".
-      5. Otherwise accept only on STRONG overlap: two-or-more shared distinctive
-         tokens AND a Jaccard overlap at/above the floor (covers multi-word
-         brands whose leading word differs in order, e.g. "Spa Kure" vs "Kure").
-    """
-    extra = _location_stopwords(city, state)
-    a = _distinctive_tokens(searched_name, extra)
-    b = _distinctive_tokens(place_name, extra)
-
-    # WHY: both names entirely generic after stripping — no brand to compare, so
-    # fall back to a strict similarity on the stripped-of-location forms. If even
-    # one side is empty here, _distinctive_tokens with no location stopwords is
-    # used so a name like "Nails" still has something to compare.
-    if not a and not b:
-        an = " ".join(_distinctive_tokens(searched_name, frozenset()))
-        bn = " ".join(_distinctive_tokens(place_name, frozenset()))
-        if not an or not bn:
-            an, bn = searched_name.lower(), place_name.lower()
-        return SequenceMatcher(None, an, bn).ratio() >= _GENERIC_FALLBACK_RATIO
-
-    # WHY: one side has no distinctive tokens (fully generic) but the other does
-    # — there is no brand correspondence to confirm, so reject. A generic name
-    # ("Nail Salon") must not match a specific brand ("Lux Nails").
-    if not a or not b:
+    try:
+        response = await call_gateway_text(
+            use_case=_MATCH_USE_CASE,
+            system_prompt=_MATCH_SYSTEM_PROMPT,
+            user_content=user_content,
+            max_tokens_override=_MATCH_MAX_TOKENS,
+            cost_tags={
+                "product": "known-around-town",
+                "feature": "admin.ratings_sync",
+                "call": "admin.ratings_sync.match_business",
+            },
+        )
+        parsed = json.loads(_strip_json_code_fence(response))
+    except (CaptionGenerationError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        # WHY warning + False: a gateway failure or unreadable answer must not
+        # accept the candidate. Logged so an operator can see how often the judge
+        # is unavailable when auditing a sync run.
+        log.warning(
+            "AI business-match judge unavailable for %r vs %r — treating as no match: %s",
+            searched_name, candidate_name, exc,
+        )
         return False
 
-    set_a, set_b = set(a), set(b)
-    overlap = set_a & set_b
-    if not overlap:
+    if not isinstance(parsed, dict):
+        log.warning(
+            "AI business-match judge returned non-object for %r vs %r — treating as no match",
+            searched_name, candidate_name,
+        )
         return False
 
-    # Primary gate: the brand (first distinctive token) must correspond.
-    brand_match = (a[0] in set_b) or (b[0] in set_a)
-    if brand_match:
-        return True
-
-    # Secondary: strong multi-token distinctive overlap (handles brand word-order
-    # differences where the first token isn't the shared one).
-    jaccard = len(overlap) / len(set_a | set_b)
-    return len(overlap) >= 2 and jaccard >= _DISTINCTIVE_JACCARD_FLOOR
-
-
-def _name_similarity(a: str, b: str) -> float:
-    """Case-insensitive whole-string similarity ratio between two names.
-
-    WHY retained: used only for diagnostic logging now (the accept/reject
-    decision lives in _names_match). Logging the raw ratio alongside a rejection
-    helps an operator see how close a near-miss was when auditing the sync logs.
-    """
-    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+    # WHY: accept ONLY on an explicit boolean True. A missing field, a string,
+    # or any other shape is treated as "not confirmed" → no match.
+    return parsed.get("same_business") is True
 
 
 def _parse_hours(opening_hours: dict) -> List[HoursEntry]:
@@ -356,10 +357,13 @@ async def _search_and_fetch(
     query = f"{business_name} {city} {state}"
     headers = {
         "X-Goog-Api-Key": api_key,
-        # WHY: field mask requests only the fields we need (id and
-        # display name for the match check). Rating + hours come from
-        # the subsequent Details call so are not requested here.
-        "X-Goog-FieldMask": "places.id,places.displayName",
+        # WHY: request the fields the AI match judge needs — id, display name,
+        # full address, and Google business type — so the model has real signal
+        # (not just two name strings) when deciding if this is the same business.
+        # Rating + hours still come from the subsequent Details call.
+        "X-Goog-FieldMask": (
+            "places.id,places.displayName,places.formattedAddress,places.primaryType,places.types"
+        ),
     }
     data: Optional[dict] = None
     for attempt in range(_MAX_RETRY_ATTEMPTS + 1):
@@ -402,19 +406,44 @@ async def _search_and_fetch(
         log.info("No Places match for %r", query)
         return None
 
-    # WHY: take the first result (highest-relevance match), but guard against
-    # a completely wrong business ranking first for a short or common name.
-    # The guard compares the DISTINCTIVE brand tokens, not the whole strings,
-    # so two businesses that only share a business-type word ("spa") and a
-    # neighborhood word ("Brickell") are rejected — see _names_match and the
-    # Kure/Ciel → Lux failures it fixes.
+    # WHY: take the first result (highest-relevance match), then have the AI
+    # gateway judge whether it is actually the same real-world business before
+    # we trust its rating. The model gets our name + city and the candidate's
+    # name, address, and Google business type; it rejects look-alikes that merely
+    # share a category or neighborhood word (the Kure-vs-Lux failure the old
+    # string heuristic let through). On ANY judge failure the call returns False,
+    # so an uncertain or unavailable judge leaves the business unrated rather than
+    # risking a wrong rating.
     top = places[0]
     top_name = (top.get("displayName") or {}).get("text", "")
-    if not _names_match(business_name, top_name, city, state):
+    # WHY: a candidate with no name gives the judge nothing to identify it by, so
+    # skip the gateway call entirely and treat it as no match. This both avoids a
+    # wasted LLM call and keeps us from ever attaching a rating to an unnamed
+    # result we couldn't actually verify.
+    if not top_name:
+        log.info("Top Places result for query %r has no display name — skipping", query)
+        return None
+    candidate_address = top.get("formattedAddress", "") or ""
+    # WHY: primaryType is the single best type; types is the full list. We pass a
+    # de-duplicated combined list (primary first) so the model sees every type
+    # signal Google has without repeating one.
+    candidate_types: List[str] = []
+    for t in [top.get("primaryType")] + list(top.get("types") or []):
+        if t and t not in candidate_types:
+            candidate_types.append(t)
+
+    is_same = await _llm_same_business(
+        searched_name=business_name,
+        city=city,
+        state=state,
+        candidate_name=top_name,
+        candidate_address=candidate_address,
+        candidate_types=candidate_types,
+    )
+    if not is_same:
         log.info(
-            "Top Places result %r for query %r does not match on brand "
-            "(whole-string similarity %.2f) — skipping",
-            top_name, query, _name_similarity(business_name, top_name),
+            "AI judge: top Places result %r for query %r is not the same business — skipping",
+            top_name, query,
         )
         return None
 
