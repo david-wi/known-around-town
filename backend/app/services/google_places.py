@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import List, Optional
@@ -50,14 +51,51 @@ _PLACES_DETAILS_BASE = "https://places.googleapis.com/v1/places"
 # typically responds in 200–800ms on a healthy connection.
 _TIMEOUT_SECONDS = 8
 
-# WHY: minimum name-similarity ratio (0–1) required before we trust a Text
-# Search result. Google's top result is usually correct, but with a short or
-# common name ("Nails", "Salon") a completely unrelated business can rank
-# first. A threshold of 0.4 allows abbreviations, punctuation differences, and
-# common words ("Beauty", "Studio") while rejecting clearly wrong matches.
-# Lowered from the conventional 0.6 because salon names often legitimately
-# omit city or business-type words that the Google listing includes.
-_NAME_SIMILARITY_THRESHOLD = 0.40
+# WHY a stopword-based brand match, NOT raw whole-string similarity: the old
+# approach scored two names with SequenceMatcher over the FULL strings and
+# accepted any pair above 0.40. That rewards SHARED GENERIC WORDS — the
+# business-type word ("spa", "salon") and the neighborhood/geo word
+# ("Brickell") that appear in almost every name in a given area — so two
+# clearly-different businesses in the same neighborhood scored high enough to
+# be treated as the same place. Real failures this caused (each WRONGLY
+# accepted under the old 0.40 rule):
+#   "Kure Spa — Brickell City Centre"  vs "Lux MedSpa Brickell"  → 0.56
+#   "Ciel Spa at SLS Brickell"         vs "Lux MedSpa Brickell"  → 0.605
+# Both pass the old test purely because they share "spa"/"brickell" — even
+# though the actual brand ("Kure"/"Ciel" vs "Lux") is completely different.
+# The consequence was that one real Google business got attached to many
+# distinct directory listings, so ~283 of 894 rated salons showed the wrong
+# business's star rating.
+#
+# The fix: strip the generic business-type and location words, then require the
+# DISTINCTIVE (brand) tokens to actually correspond. See _names_match.
+
+# WHY this stopword set: these are the generic business-type and location words
+# that recur across beauty-directory names and carry no identifying signal. The
+# matcher removes them (PLUS the queried city/state tokens) before comparing, so
+# the comparison is driven by the distinctive brand part of the name. "Brickell"
+# is not listed here because it is a Miami neighborhood, not a queried city — the
+# brand-token requirement below is what stops a shared neighborhood word from
+# being enough on its own to call two businesses a match.
+_NAME_STOPWORDS = frozenset({
+    "spa", "salon", "studio", "medspa", "med", "beauty", "bar", "lash", "brow",
+    "brows", "nails", "nail", "hair", "skin", "the", "and", "at", "of", "by",
+    "co", "llc", "inc", "city", "center", "centre", "suite", "fl", "florida",
+})
+
+# WHY 0.34 Jaccard floor for the multi-token path: a Jaccard overlap of 1/3
+# means at least one in three distinctive tokens is shared. It is only consulted
+# on the "strong overlap" path (two or more shared distinctive tokens), as a
+# secondary signal to the brand-token requirement, so the exact value is not
+# load-bearing — the brand match is the primary gate.
+_DISTINCTIVE_JACCARD_FLOOR = 0.34
+
+# WHY 0.85 fallback ratio when neither name has any distinctive token: if BOTH
+# names are entirely generic after stripping (e.g. a business literally named
+# "Nail Salon"), there is no brand to compare, so we fall back to a strict
+# whole-name similarity. 0.85 is intentionally high — without a brand to anchor
+# on, only a near-identical normalized string should be trusted.
+_GENERIC_FALLBACK_RATIO = 0.85
 
 # WHY: Google Places day-of-week integer (0=Sunday … 6=Saturday) maps to
 # HoursEntry.day strings. This lets us translate the API's numeric format
@@ -125,11 +163,105 @@ async def lookup_rating(
         return await _search_and_fetch(client, business_name, city, state, api_key)
 
 
-def _name_similarity(a: str, b: str) -> float:
-    """Case-insensitive token-overlap ratio between two business names.
+def _distinctive_tokens(name: str, extra_stopwords: frozenset) -> List[str]:
+    """Lowercase, strip punctuation, and drop generic + queried-location words.
 
-    WHY SequenceMatcher on lowercased strings: gives partial credit for
-    matching word stems even when word order or small details differ.
+    Returns the remaining DISTINCTIVE (brand-bearing) tokens in original order.
+    "&" is treated as a separator (so "Hair & Co" → ["hair"... dropped]); all
+    other punctuation collapses to spaces. ``extra_stopwords`` carries the
+    queried city/state tokens so the city itself never contributes to a match.
+
+    WHY order is preserved: the FIRST distinctive token is treated as the brand
+    in _names_match, and the brand is the most identifying part of a name.
+    """
+    lowered = name.lower().replace("&", " ")
+    # WHY: collapse every non-alphanumeric run to a single space so "—", "|",
+    # "'", and stray punctuation never split or glue tokens unexpectedly.
+    cleaned = re.sub(r"[^a-z0-9]+", " ", lowered)
+    stop = _NAME_STOPWORDS | extra_stopwords
+    return [tok for tok in cleaned.split() if tok and tok not in stop]
+
+
+def _location_stopwords(city: str, state: str) -> frozenset:
+    """Tokenize the queried city + state into stopwords.
+
+    WHY: the city we searched ("Miami") and the state ("FL") appear in the
+    query, so a Google listing that echoes them back must not earn match credit
+    for that — only the brand should. Stripping them prevents "<brand> Miami FL"
+    vs "<other brand> Miami" from looking similar via the shared location words.
+    """
+    extra: set[str] = set()
+    for arg in (city, state):
+        for tok in re.sub(r"[^a-z0-9]+", " ", (arg or "").lower()).split():
+            if tok:
+                extra.add(tok)
+    return frozenset(extra)
+
+
+def _names_match(searched_name: str, place_name: str, city: str, state: str) -> bool:
+    """Decide whether a Google place name refers to the same business we searched.
+
+    The match is driven by the DISTINCTIVE (brand) tokens, not whole-string
+    similarity, so two businesses that merely share a business-type word ("spa")
+    and a neighborhood word ("Brickell") are NOT treated as the same place. See
+    the _NAME_STOPWORDS comment for the Kure/Ciel → Lux failures this fixes.
+
+    Rules (in order):
+      1. Strip generic + queried-location words from both names.
+      2. If neither name has any distinctive token left, fall back to a strict
+         whole-name similarity (both are fully generic — no brand to anchor on).
+      3. Require at least one shared distinctive token; with none, reject.
+      4. Accept when the BRAND (first distinctive token) of either name appears
+         in the other's distinctive tokens — this is the primary gate and is
+         what rejects "Kure"/"Ciel" vs "Lux" while accepting "IGK" vs
+         "IGK Hair Salon" and "Allure Medspa" vs "Allure Medspa Aventura".
+      5. Otherwise accept only on STRONG overlap: two-or-more shared distinctive
+         tokens AND a Jaccard overlap at/above the floor (covers multi-word
+         brands whose leading word differs in order, e.g. "Spa Kure" vs "Kure").
+    """
+    extra = _location_stopwords(city, state)
+    a = _distinctive_tokens(searched_name, extra)
+    b = _distinctive_tokens(place_name, extra)
+
+    # WHY: both names entirely generic after stripping — no brand to compare, so
+    # fall back to a strict similarity on the stripped-of-location forms. If even
+    # one side is empty here, _distinctive_tokens with no location stopwords is
+    # used so a name like "Nails" still has something to compare.
+    if not a and not b:
+        an = " ".join(_distinctive_tokens(searched_name, frozenset()))
+        bn = " ".join(_distinctive_tokens(place_name, frozenset()))
+        if not an or not bn:
+            an, bn = searched_name.lower(), place_name.lower()
+        return SequenceMatcher(None, an, bn).ratio() >= _GENERIC_FALLBACK_RATIO
+
+    # WHY: one side has no distinctive tokens (fully generic) but the other does
+    # — there is no brand correspondence to confirm, so reject. A generic name
+    # ("Nail Salon") must not match a specific brand ("Lux Nails").
+    if not a or not b:
+        return False
+
+    set_a, set_b = set(a), set(b)
+    overlap = set_a & set_b
+    if not overlap:
+        return False
+
+    # Primary gate: the brand (first distinctive token) must correspond.
+    brand_match = (a[0] in set_b) or (b[0] in set_a)
+    if brand_match:
+        return True
+
+    # Secondary: strong multi-token distinctive overlap (handles brand word-order
+    # differences where the first token isn't the shared one).
+    jaccard = len(overlap) / len(set_a | set_b)
+    return len(overlap) >= 2 and jaccard >= _DISTINCTIVE_JACCARD_FLOOR
+
+
+def _name_similarity(a: str, b: str) -> float:
+    """Case-insensitive whole-string similarity ratio between two names.
+
+    WHY retained: used only for diagnostic logging now (the accept/reject
+    decision lives in _names_match). Logging the raw ratio alongside a rejection
+    helps an operator see how close a near-miss was when auditing the sync logs.
     """
     return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
@@ -272,13 +404,17 @@ async def _search_and_fetch(
 
     # WHY: take the first result (highest-relevance match), but guard against
     # a completely wrong business ranking first for a short or common name.
+    # The guard compares the DISTINCTIVE brand tokens, not the whole strings,
+    # so two businesses that only share a business-type word ("spa") and a
+    # neighborhood word ("Brickell") are rejected — see _names_match and the
+    # Kure/Ciel → Lux failures it fixes.
     top = places[0]
     top_name = (top.get("displayName") or {}).get("text", "")
-    similarity = _name_similarity(business_name, top_name)
-    if similarity < _NAME_SIMILARITY_THRESHOLD:
+    if not _names_match(business_name, top_name, city, state):
         log.info(
-            "Top Places result %r for query %r has low name similarity %.2f — skipping",
-            top_name, query, similarity,
+            "Top Places result %r for query %r does not match on brand "
+            "(whole-string similarity %.2f) — skipping",
+            top_name, query, _name_similarity(business_name, top_name),
         )
         return None
 
