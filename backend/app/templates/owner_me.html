@@ -137,13 +137,16 @@
       <div class="flex flex-wrap items-start justify-between gap-6">
         <div class="min-w-0">
           {#- WHY: the upgrade card sells the Featured tier on its concrete
-              benefits — premium visibility, the Featured badge, and the AI marketing
-              tools — rather than a scarcity hook. No price-lock or "rates
-              increase" promise; the owner instruction is to never promise
+              benefits — led by 0% commission (our strongest differentiator vs
+              booking apps that take ~30%, and the lead benefit on /pricing and
+              /owners), then premium placement, the Featured badge, and the AI
+              marketing tools — rather than a scarcity hook. No price-lock or
+              "rates increase" promise; the owner instruction is to never promise
               locked-in or permanent pricing. #}
           <p class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-2">Get Featured</p>
           <h2 class="text-base font-semibold text-stone-900 mb-1.5">Make your {{ listing_word_singular or 'salon' }} easier to spot in {{ _uc_nb_name }}</h2>
           <ul class="text-sm text-stone-600 space-y-1 leading-relaxed max-w-xs list-none">
+            <li>✓ <strong class="text-stone-900 font-semibold">0% commission — keep 100% of every booking.</strong></li>
             {% if _uc_tags %}
             <li>✓ Premium placement in {{ _uc_tags|join(' and ') }} searches in {{ _uc_nb_name }}</li>
             {% else %}

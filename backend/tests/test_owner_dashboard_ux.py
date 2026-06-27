@@ -275,6 +275,45 @@ class TestLockedAiUpsellOverlay:
             )
 
 
+# ─── Upgrade card leads with the 0% commission benefit ───────────────────────
+
+
+class TestUpgradeCardSellsZeroCommission:
+    """The free-tier owner's "Get Featured" upgrade card is the screen where an
+    owner decides whether to pay $29/month. Our strongest selling point — 0%
+    commission / keep 100% of every booking, vs booking apps that take ~30% — is
+    the lead benefit on /pricing and /owners, so it must also appear here, at the
+    actual pay decision. It was missing; this guards against it going missing again."""
+
+    def test_upgrade_card_shows_zero_commission_benefit(self, seeded_db):
+        html = _render_dashboard(seeded_db, photos=[], subscribed=False)
+        assert "0% commission" in html
+        assert "keep 100% of every booking" in html.lower()
+
+    def test_zero_commission_leads_the_benefit_list(self, seeded_db):
+        """It should be the FIRST benefit bullet — ahead of placement/badge/AI —
+        because it's the most compelling reason to pay."""
+        html = _render_dashboard(seeded_db, photos=[], subscribed=False)
+        commission_pos = html.find("0% commission")
+        placement_pos = html.find("Premium placement")
+        assert commission_pos != -1 and placement_pos != -1
+        assert commission_pos < placement_pos
+
+    def test_subscribed_owner_does_not_see_upgrade_card(self, seeded_db):
+        """A paying owner shouldn't be pitched the upgrade they already have.
+
+        WHY assert on the 0% commission bullet rather than the button text:
+        the "Get Featured — $29/month" string also lives in the page's inline
+        JavaScript (which wires the locked AI-tool overlays to checkout), so it
+        is present for every owner. The 0% commission bullet appears ONLY in the
+        visible upgrade card, so its absence cleanly proves the card is hidden.
+        """
+        html = _render_dashboard(seeded_db, photos=[], subscribed=True)
+        # Subscribed owners see the active-status badge, not the upgrade card.
+        assert "Featured listing active" in html
+        assert "0% commission — keep 100% of every booking." not in html
+
+
 # ─── Featured caption generator uses real listing photos ─────────────────────
 
 
