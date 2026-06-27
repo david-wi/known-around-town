@@ -32,7 +32,11 @@ The `:stage` image is built from the `stage` branch and served at
 ## Feature flags
 
 `MARKETING_AI_ENABLED` gates the AI features (caption + ad copy). Currently
-off in production, on in stage. Set in `/opt/known-around-town/.env` or as
+**ON in production** and on in stage (verified live 2026-06-27: the
+`/api/v1/marketing-ai/*` endpoints return 401 auth-required, not 404
+feature-disabled). The flag is read from the `site_settings` collection
+(admin-toggleable without a restart), falling back to the
+`MARKETING_AI_ENABLED` env var; set in `/opt/known-around-town/.env` or as
 `MARKETING_AI_ENABLED_PROD` env var on the server.
 
 ## gh pr checks
