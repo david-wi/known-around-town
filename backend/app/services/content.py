@@ -117,7 +117,10 @@ Return ONLY JSON with this shape:
 
 Rules:
 - Match the user's meaning, not just exact words.
-- Use category, neighborhood, tags, and descriptions.
+- Use category, neighborhood, tags, descriptions, what the business is
+  known for, and the specific services it offers. A query naming a service
+  (e.g. "keratin", "brazilian blowout", "balayage") should match any
+  business whose services or known-for text covers that service.
 - Include only IDs from the provided candidate list.
 - Do not invent IDs.
 - Exclude weak or generic matches.
@@ -129,12 +132,14 @@ async def search_businesses(
     city_id: str, query: str, *, limit: int = 40
 ) -> List[Dict[str, Any]]:
     """Full-text-style search across a business's name, description, tags,
-    category, and neighborhood.
+    category, neighborhood, what it's known for, and the services it offers.
 
     Uses AI because visitor searches are semantic: "date-night manicure near
     Brickell" should match nail salons in Brickell even when the exact phrase is
-    absent from the listing. Mongo still handles only the deterministic tenant
-    and status filter.
+    absent from the listing. Including the salon's service-menu names also lets a
+    service-intent query ("keratin", "brazilian blowout") match every salon that
+    actually offers it, not just one with the word in its description. Mongo still
+    handles only the deterministic tenant and status filter.
     """
     search_text = " ".join(query.split())
     if not search_text or limit <= 0:
@@ -183,6 +188,24 @@ async def _select_matching_business_ids(
             "id": str(business.get("_id")),
             "name": business.get("name", ""),
             "short_description": business.get("short_description", ""),
+            # WHY: known_for is the "what they're celebrated for" line, often
+            # the most service-specific signal a salon has ("known for balayage
+            # and keratin"). Including it lets the matcher surface a salon for a
+            # service-intent query even when the service isn't in name/tags.
+            "known_for": business.get("known_for", "") or "",
+            # WHY: a salon's own service-menu item names ("Keratin Treatment",
+            # "Brazilian Blowout") are ground-truth for what it offers. Without
+            # them, a high-intent query like "keratin" matched only the 1 salon
+            # with the word in its description; with them it matches every salon
+            # that actually lists the service. Capped at 15 names to keep the
+            # candidate payload bounded across up to SEARCH_AI_CANDIDATE_LIMIT
+            # candidates (most menus are well under 15; the cap just guards a
+            # pathological outlier from bloating the prompt).
+            "services": [
+                s.get("name", "")
+                for s in (business.get("services") or [])[:15]
+                if isinstance(s, dict) and s.get("name")
+            ],
             "tags": business.get("tags") or [],
             "category_slugs": business.get("category_slugs") or [],
             "neighborhood_slugs": business.get("neighborhood_slugs") or [],
