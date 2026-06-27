@@ -48,7 +48,9 @@ class TestLookupRating:
         """
         from app.services import google_places
 
-        with patch("app.services.google_places.get_settings") as mock_settings:
+        with patch("app.services.google_places.get_settings") as mock_settings, \
+             patch("app.services.google_places.call_gateway_text", new_callable=AsyncMock,
+                   return_value='{"same_business": true, "confidence": "high"}'):
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
             respx_mock.post(
@@ -160,7 +162,9 @@ class TestLookupRating:
         """lookup_rating returns None when Place Details has no rating (brand-new business)."""
         from app.services import google_places
 
-        with patch("app.services.google_places.get_settings") as mock_settings:
+        with patch("app.services.google_places.get_settings") as mock_settings, \
+             patch("app.services.google_places.call_gateway_text", new_callable=AsyncMock,
+                   return_value='{"same_business": true, "confidence": "high"}'):
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
             respx_mock.post(
@@ -421,7 +425,9 @@ class TestLookupRating:
         from unittest.mock import AsyncMock
 
         with patch("app.services.google_places.get_settings") as mock_settings, \
-             patch("app.services.google_places.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+             patch("app.services.google_places.asyncio.sleep", new_callable=AsyncMock) as mock_sleep, \
+             patch("app.services.google_places.call_gateway_text", new_callable=AsyncMock,
+                   return_value='{"same_business": true, "confidence": "high"}'):
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
             # Text search: first 429, then success
@@ -449,100 +455,133 @@ class TestLookupRating:
         assert mock_sleep.call_count == 1
 
 
-# ── name-match (brand) logic ─────────────────────────────────────────────────
+# ── AI business-match judge ──────────────────────────────────────────────────
 
-class TestNamesMatch:
-    """Unit tests for _names_match — the brand-token matcher that decides whether
-    a Google Text Search result actually refers to the business we searched.
+class TestLlmSameBusiness:
+    """Unit tests for _llm_same_business — the AI judge that decides whether a
+    Google Text Search result is the SAME real-world business we searched for.
 
-    WHY this class exists: the OLD matcher compared whole strings with
-    SequenceMatcher and accepted anything above 0.40. That rewarded shared
-    generic words ("spa") and shared neighborhood words ("Brickell"), so two
-    clearly-different businesses in the same area were treated as the same place.
-    Concretely, BOTH of these passed the old 0.40 rule and attached the wrong
-    Google rating:
-        "Kure Spa — Brickell City Centre"  vs "Lux MedSpa Brickell"  → 0.56
-        "Ciel Spa at SLS Brickell"         vs "Lux MedSpa Brickell"  → 0.605
-    ~283 of 894 rated listings carried the wrong business's rating as a result.
-    The new matcher rejects both because the BRAND token differs (Kure/Ciel ≠ Lux).
+    WHY this class exists: a string-overlap heuristic used to make this call and
+    got it wrong — it treated "Kure Spa" and "Lux MedSpa Brickell" as the same
+    business because both contained "spa" and "Brickell". The judgment now belongs
+    to the model. These tests MOCK the AI gateway helper so no network call is made;
+    they prove the model's verdict (and only the model's verdict) gates the result,
+    and that ANY failure of the judge is treated as "not the same business".
     """
 
-    def _match(self, searched, place, city="Miami", state="FL"):
-        from app.services.google_places import _names_match
-        return _names_match(searched, place, city, state)
+    def _patch_gateway(self, **kwargs):
+        # Patches the gateway helper as the google_places module sees it.
+        return patch("app.services.google_places.call_gateway_text", new_callable=AsyncMock, **kwargs)
 
-    def test_rejects_kure_vs_lux_shared_geo_and_type_words_only(self):
-        """Kure → Lux: shares only "spa"/"brickell"; brand differs → reject."""
-        assert self._match("Kure Spa — Brickell City Centre", "Lux MedSpa Brickell") is False
+    def _call(self, searched="Kure Spa", candidate="Lux MedSpa Brickell"):
+        from app.services.google_places import _llm_same_business
+        import asyncio
+        return asyncio.get_event_loop().run_until_complete(
+            _llm_same_business(
+                searched_name=searched,
+                city="Miami",
+                state="FL",
+                candidate_name=candidate,
+                candidate_address="123 Brickell Ave, Miami, FL",
+                candidate_types=["spa", "beauty_salon"],
+            )
+        )
 
-    def test_rejects_ciel_vs_lux_shared_geo_and_type_words_only(self):
-        """Ciel → Lux: shares only "spa"/"brickell"; brand differs → reject."""
-        assert self._match("Ciel Spa at SLS Brickell", "Lux MedSpa Brickell") is False
+    def test_returns_false_when_model_says_not_same(self):
+        """Model answers same_business=false → judge returns False (reject)."""
+        with self._patch_gateway(return_value='{"same_business": false, "confidence": "high"}'):
+            assert self._call() is False
 
-    def test_accepts_exact_brand_match(self):
-        assert self._match("Sana Skin Studio", "Sana Skin Studio") is True
+    def test_returns_true_when_model_says_same(self):
+        """Model answers same_business=true → judge returns True (accept)."""
+        with self._patch_gateway(return_value='{"same_business": true, "confidence": "high"}'):
+            assert self._call("IGK Salon", "IGK Hair Salon") is True
 
-    def test_accepts_brand_with_extra_generic_words(self):
-        """Brand "IGK" present in both; place adds a generic "Hair" → accept."""
-        assert self._match("IGK Salon", "IGK Hair Salon") is True
+    def test_strips_code_fence_around_json(self):
+        """A model that wraps the JSON in a ``` fence is still parsed correctly."""
+        fenced = '```json\n{"same_business": true, "confidence": "low"}\n```'
+        with self._patch_gateway(return_value=fenced):
+            assert self._call("IGK Salon", "IGK Hair Salon") is True
 
-    def test_accepts_brand_when_place_is_bare_brand(self):
-        """Searched name has generic suffix, place is just the brand → accept."""
-        assert self._match("IGK Salon", "IGK") is True
+    def test_fail_safe_when_gateway_raises(self):
+        """Gateway error (unreachable/timeout/HTTP error) → False, never accept on failure."""
+        from app.services.ai_caption import CaptionGenerationError
+        with self._patch_gateway(side_effect=CaptionGenerationError("gateway unreachable")):
+            assert self._call() is False
 
-    def test_accepts_brand_with_city_suffix_difference(self):
-        """Allure brand matches even though the place adds the city name."""
-        assert self._match("Allure Medspa", "Allure Medspa Aventura", city="Aventura") is True
+    def test_fail_safe_when_response_not_json(self):
+        """Unparseable answer → False (fail-safe)."""
+        with self._patch_gateway(return_value="I think these are probably the same place!"):
+            assert self._call() is False
 
-    def test_rejects_two_distinct_generic_brands(self):
-        """Different brands sharing only business-type words → reject."""
-        assert self._match("Glow Beauty Bar", "Radiance Skin Studio") is False
+    def test_fail_safe_when_response_is_json_but_not_object(self):
+        """Valid JSON that isn't an object (e.g. a bare string/array) → False."""
+        with self._patch_gateway(return_value='"yes"'):
+            assert self._call() is False
 
-    def test_rejects_same_geo_different_brand(self):
-        """Same neighborhood word, different brand → reject (geo isn't identity)."""
-        assert self._match("Kure Spa Brickell", "Ciel Spa Brickell") is False
+    def test_fail_safe_when_same_business_field_missing(self):
+        """Object without same_business → not confirmed → False."""
+        with self._patch_gateway(return_value='{"confidence": "high"}'):
+            assert self._call() is False
 
-    def test_rejects_when_no_distinctive_token_on_one_side(self):
-        """A fully-generic searched name must not match a specific brand."""
-        # "Nail Salon" → no distinctive tokens; "Lux Nails" → "lux".
-        assert self._match("Nail Salon", "Lux Nails") is False
+    def test_only_explicit_boolean_true_accepts(self):
+        """A truthy non-boolean (string "true") is NOT accepted — only real True."""
+        with self._patch_gateway(return_value='{"same_business": "true"}'):
+            assert self._call() is False
 
-    def test_accepts_brand_word_order_difference(self):
-        """Brand as a trailing word still matches via the brand-in-other-set check."""
-        assert self._match("Spa Kure", "Kure") is True
+    def test_prompt_includes_our_name_and_candidate_fields(self):
+        """The judge must actually send our name + the candidate's name/address/type.
 
-    def test_city_token_does_not_create_a_match(self):
-        """The queried city echoed by the place must not, by itself, earn a match.
-
-        WHY: "<brand A> Miami" vs "<brand B> Miami" share only the queried city.
-        Stripping the city token leaves differing brands → reject.
+        WHY: this proves the model is given real signal to judge on (not an empty
+        or wrong prompt) and documents the exact content sent to the gateway.
         """
-        assert self._match("Aura Salon Miami", "Bloom Salon Miami", city="Miami") is False
+        with self._patch_gateway(return_value='{"same_business": false}') as mock_gw:
+            self._call("Kure Spa", "Lux MedSpa Brickell")
+
+        assert mock_gw.call_count == 1
+        kwargs = mock_gw.call_args.kwargs
+        assert kwargs["use_case"] == "light"
+        # Generous token budget so a reasoning model's answer isn't truncated.
+        assert kwargs["max_tokens_override"] >= 100
+        content = kwargs["user_content"]
+        assert "Kure Spa" in content
+        assert "Lux MedSpa Brickell" in content
+        assert "123 Brickell Ave" in content
+        assert "beauty_salon" in content
 
 
 class TestLookupRatingNameMatch:
-    """End-to-end accept/reject via lookup_rating (mocked Text Search + Details).
+    """End-to-end accept/reject via lookup_rating (mocked Text Search + Details +
+    AI judge). These exercise the real _search_and_fetch path: text search returns
+    a candidate place; the AI judge (mocked here) decides whether to proceed to the
+    details fetch. A REJECT must return None and NOT fetch details; an ACCEPT must
+    return the rating from the details call.
 
-    These exercise the real _search_and_fetch path: text search returns a place
-    with a displayName; _names_match decides whether to proceed to the details
-    fetch. A REJECT must return None (no details call); an ACCEPT must return the
-    rating from the details call.
+    WHY mock the judge (not call the live gateway): these tests must be
+    deterministic and offline, and they prove the GATE — that the model's verdict
+    is what allows or blocks the rating. The reject/fail-safe tests fail loudly if
+    the gate is ever bypassed (they assert details was NOT fetched).
     """
 
     def _settings_patch(self):
         return patch("app.services.google_places.get_settings")
 
+    def _judge_patch(self, **kwargs):
+        return patch("app.services.google_places.call_gateway_text", new_callable=AsyncMock, **kwargs)
+
     @pytest.mark.asyncio
     async def test_rejects_kure_when_google_returns_lux(self, respx_mock):
         """Searched "Kure Spa — Brickell City Centre"; Google's top result is
-        "Lux MedSpa Brickell" → lookup_rating returns None (wrong business).
+        "Lux MedSpa Brickell"; the AI judge says NOT the same business →
+        lookup_rating returns None and never fetches the (wrong) rating.
 
-        This is the core regression: under the old 0.40 threshold this pair
-        scored 0.56 and was ACCEPTED, attaching Lux's rating to Kure.
+        This is the core regression: the previous string heuristic accepted this
+        look-alike pair (shared "spa"/"Brickell") and attached Lux's rating to Kure.
         """
         from app.services import google_places
 
-        with self._settings_patch() as mock_settings:
+        with self._settings_patch() as mock_settings, \
+             self._judge_patch(return_value='{"same_business": false, "confidence": "high"}'):
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
             search_route = respx_mock.post(
@@ -552,6 +591,8 @@ class TestLookupRatingNameMatch:
                 json={"places": [{
                     "id": "ChIJ_lux_brickell",
                     "displayName": {"text": "Lux MedSpa Brickell"},
+                    "formattedAddress": "78 SW 7th St, Miami, FL 33130",
+                    "primaryType": "medical_spa",
                 }]},
             ))
             # A details fetch here would mean we wrongly accepted the match.
@@ -570,12 +611,17 @@ class TestLookupRatingNameMatch:
         assert not details_route.called, "must NOT fetch details for a rejected match"
 
     @pytest.mark.asyncio
-    async def test_rejects_ciel_when_google_returns_lux(self, respx_mock):
-        """Searched "Ciel Spa at SLS Brickell"; Google returns "Lux MedSpa
-        Brickell" → None. Scored 0.605 (accepted) under the old threshold."""
-        from app.services import google_places
+    async def test_fail_safe_leaves_unrated_when_judge_errors(self, respx_mock):
+        """If the AI judge call errors, lookup_rating must return None (fail-safe).
 
-        with self._settings_patch() as mock_settings:
+        A wrong rating is worse than no rating, so an unavailable judge must leave
+        the business unrated — and must NOT fetch the candidate's rating.
+        """
+        from app.services import google_places
+        from app.services.ai_caption import CaptionGenerationError
+
+        with self._settings_patch() as mock_settings, \
+             self._judge_patch(side_effect=CaptionGenerationError("gateway down")):
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
             respx_mock.post(
@@ -585,6 +631,7 @@ class TestLookupRatingNameMatch:
                 json={"places": [{
                     "id": "ChIJ_lux_brickell",
                     "displayName": {"text": "Lux MedSpa Brickell"},
+                    "formattedAddress": "78 SW 7th St, Miami, FL 33130",
                 }]},
             ))
             details_route = respx_mock.get(
@@ -593,17 +640,21 @@ class TestLookupRatingNameMatch:
                 200, json={"id": "ChIJ_lux_brickell", "rating": 4.9, "userRatingCount": 500},
             ))
 
-            result = await google_places.lookup_rating("Ciel Spa at SLS Brickell", "Miami")
+            result = await google_places.lookup_rating(
+                "Kure Spa — Brickell City Centre", "Miami"
+            )
 
-        assert result is None, "wrong business (Lux) must be rejected for Ciel"
-        assert not details_route.called
+        assert result is None, "judge failure must leave the business unrated"
+        assert not details_route.called, "must NOT fetch details when the judge failed"
 
     @pytest.mark.asyncio
     async def test_accepts_exact_brand_match(self, respx_mock):
-        """Searched "Sana Skin Studio"; Google returns the same → returns rating."""
+        """Searched "Sana Skin Studio"; Google returns the same; judge says yes
+        → returns rating."""
         from app.services import google_places
 
-        with self._settings_patch() as mock_settings:
+        with self._settings_patch() as mock_settings, \
+             self._judge_patch(return_value='{"same_business": true, "confidence": "high"}'):
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
             respx_mock.post(
@@ -613,6 +664,7 @@ class TestLookupRatingNameMatch:
                 json={"places": [{
                     "id": "ChIJ_sana",
                     "displayName": {"text": "Sana Skin Studio"},
+                    "formattedAddress": "1 Main St, Miami, FL",
                 }]},
             ))
             respx_mock.get(
@@ -629,14 +681,16 @@ class TestLookupRatingNameMatch:
 
     @pytest.mark.asyncio
     async def test_accepts_brand_match_with_extra_generic_words(self, respx_mock):
-        """Searched "IGK Salon"; Google returns "IGK Hair Salon" → accept.
+        """Searched "IGK Salon"; Google returns "IGK Hair Salon"; judge says yes
+        → accept.
 
-        Proves the fix does not over-reject legitimate brand matches where the
+        Proves the gate does not over-reject legitimate brand matches where the
         Google listing carries an extra generic business-type word.
         """
         from app.services import google_places
 
-        with self._settings_patch() as mock_settings:
+        with self._settings_patch() as mock_settings, \
+             self._judge_patch(return_value='{"same_business": true, "confidence": "high"}'):
             mock_settings.return_value.google_places_api_key = "AIza-test-key"
 
             respx_mock.post(
@@ -646,6 +700,7 @@ class TestLookupRatingNameMatch:
                 json={"places": [{
                     "id": "ChIJ_igk",
                     "displayName": {"text": "IGK Hair Salon"},
+                    "formattedAddress": "2 Ocean Dr, Miami, FL",
                 }]},
             ))
             respx_mock.get(
