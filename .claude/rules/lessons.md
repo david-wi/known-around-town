@@ -1,4 +1,45 @@
 
+## Google ratings: match on the BRAND, not whole-string similarity (2026-06-27, PR #425)
+
+The ratings sync decides whether a Google Text Search result is the business we
+searched. The OLD check used `difflib.SequenceMatcher` over the FULL name strings
+and accepted anything `>= 0.40`. That scoring rewards SHARED GENERIC WORDS — the
+business-type word ("spa", "salon") and the neighborhood word ("Brickell") that
+recur across nearly every name in a given area — so two clearly-different
+businesses scored high enough to be treated as the same place. Real wrong matches
+that passed 0.40:
+
+- "Kure Spa — Brickell City Centre" vs "Lux MedSpa Brickell" → 0.56 (accepted)
+- "Ciel Spa at SLS Brickell" vs "Lux MedSpa Brickell" → 0.605 (accepted)
+
+Consequence: one real Google place got attached to many distinct listings, so
+~283 of 894 rated salons showed the WRONG business's star rating (the symptom is
+the SAME `google_place_id` on multiple distinct live businesses).
+
+Fix (`google_places._names_match`): normalize both names (lowercase, punctuation
+→ spaces, `&` as a separator), strip a STOPWORD set of generic business-type +
+location words PLUS the queried city/state tokens, then require the DISTINCTIVE
+(brand) tokens to correspond. The primary gate is that the BRAND — the first
+distinctive token — of one name appears in the other's distinctive tokens; a
+strong multi-token overlap (≥2 shared tokens, Jaccard ≥ 0.34) is the secondary
+path for word-order differences. "Kure"/"Ciel" reject vs "Lux"; "IGK Salon" ↔
+"IGK Hair Salon", "Allure Medspa" ↔ "Allure Medspa Aventura", and exact brand
+matches accept. NOTE: "Brickell" is intentionally NOT in the stopword set (it's a
+neighborhood, not the queried city) — the brand requirement is what stops a shared
+neighborhood word from being enough on its own.
+
+Defense-in-depth in `sync_admin._run_sync_background`: before storing a
+newly-discovered place_id, it checks whether that id is already on a DIFFERENT
+live business and, if so, leaves the business unrated and warns. Scoped to the
+discovery path only, so a business re-fetching its OWN cached place_id is
+unaffected. (A perfectly atomic guard would need a unique index on
+`google_place_id` — out of scope while existing duplicate data is cleaned up
+separately; the matcher is the real fix, this is the backstop.)
+
+Red/green tip for future matcher changes: the reject tests must FAIL on the old
+0.40 threshold and PASS after the fix — `test_google_places.py::TestLookupRatingNameMatch`
+proves both Kure→Lux and Ciel→Lux reject end-to-end.
+
 ## Guide pages 500 when published_at is stored as a string, not a datetime (2026-06-20, PR #377)
 
 A pre-launch sweep of every page TYPE across all 26 city editions (1,800+ live
