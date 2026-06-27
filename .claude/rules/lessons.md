@@ -281,3 +281,36 @@ the dead class remain in `pricing.html`, `walkthrough.html`, and `owner_me.html`
 those, switch to `underline-offset-4`. This is the same "class must be in the
 compiled CSS or it silently no-ops" gotcha already recorded for the locked
 AI-tool overlay opacities (PR #373). New code added in PR #382 uses `-4`.
+
+## Re-seeds wipe manual edits to seeded collections — fix in code, not just the DB (2026-06-27)
+
+The homepage city picker (network landing) renders a photo per city from the
+city's `hero_photo_url`. Only ~5 of 29 cities had that field set, so the other
+24 cards rendered as **empty pink gradient capsules above the fold** — the first
+thing a visitor sees looked unfinished. (David caught this on the live site.)
+
+Two traps bit us fixing it:
+
+1. **A database-only fix gets reverted by the next seed run.** Setting
+   `hero_photo_url` directly on each city doc looked fixed in a screenshot, but a
+   seed re-ran around deploy time (each city `update`d ~2s apart — a sequential
+   seed loop) and wiped every hand-set hero, because `seed/_helpers.upsert`
+   refreshes all non-preserved fields. **Lesson: for anything served off a
+   seeded collection, the durable fix is in code (a render-time fallback) +
+   making the seed preserve the field — not a one-off DB write.** The DB write is
+   fine as an immediate patch, but it is not the fix.
+
+2. **Watchtower deploy timing: verify AFTER the new image is live, not after the
+   local fix.** The container restarted onto the *previous* image ~1 min before
+   our image finished building, so for a window the live page showed the old
+   (photoless) behavior even though CI was green. `gh run watch` finishing ≠
+   deployed. Confirm the running container actually has the new code
+   (`docker exec ... grep <new-symbol> /app/...`) before declaring done, and
+   re-screenshot the live page post-deploy. To force it without waiting for the
+   5-min Watchtower poll: `docker compose -f docker-compose.prod.yml pull backend
+   && ... up -d backend` (always `-f docker-compose.prod.yml`, per deploy.md).
+
+Fixes: PR #427 (render-time curated fallback in `_render_network_landing` +
+branded monogram placeholder in `network_landing.html` so a card is never
+photoless) and PR #428 (`upsert` preserves a non-empty `hero_photo_url` across
+re-seeds, using a truthy check so a seed passing `""` can't blank a real photo).
