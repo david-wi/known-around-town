@@ -356,12 +356,13 @@ def test_neighborhood_page_adds_no_placeholder_box_when_photo_absent():
     )
 
 
-# ── Network landing page (gradient fallback beneath the hero photo) ───────────
+# ── Network landing page (branded fallback beneath the hero photo) ────────────
 # The platform-root page that lists live cities renders each city as a card with
 # a hero photo. Unlike salon cards (which fall back to the placeholder SVG), this
-# page's no-photo case shows a branded color gradient. So a broken hero photo
-# here must degrade to that SAME gradient: the gradient lives on the image's
-# container div, and the <img> hides itself onerror so the gradient shows through.
+# page's no-photo case shows a branded city monogram on top of the brand gradient.
+# So a broken hero photo here must degrade to that SAME intentional content: the
+# fallback lives under the image, and the <img> hides itself onerror so the
+# branded placeholder shows through.
 
 
 def _network_landing_ctx(live_cities: list[dict]) -> dict:
@@ -386,10 +387,9 @@ def _network_landing_ctx(live_cities: list[dict]) -> dict:
     )
 
 
-def test_network_landing_city_with_hero_hides_broken_img_revealing_gradient():
+def test_network_landing_city_with_hero_hides_broken_img_revealing_branded_placeholder():
     """A live city WITH a hero photo: the <img> must carry an onerror that hides
-    itself (revealing the gradient beneath), and the gradient must live on the
-    image's container div so it shows through when the photo 404s."""
+    itself, revealing a branded city placeholder rather than a blank gradient."""
     html = _render_page(
         "network_landing.html",
         **_network_landing_ctx(
@@ -409,21 +409,22 @@ def test_network_landing_city_with_hero_hides_broken_img_revealing_gradient():
     img = imgs[0]
     assert "https://example.com/broken-hero.jpg" in img
     # onerror must null itself first (loop guard) THEN hide the image so the
-    # gradient underneath is revealed.
+    # branded fallback underneath is revealed.
     onerror = re.search(r'onerror="([^"]*)"', img).group(1)
     assert "this.onerror=null" in onerror
     assert "display='none'" in onerror
     assert onerror.index("this.onerror=null") < onerror.index("display='none'")
-    # The gradient must sit on the img's CONTAINER div, beneath the photo.
+    # The branded fallback must sit on the img's CONTAINER div, beneath the photo.
     assert re.search(
-        r'<div class="aspect-\[4/3\][^"]*bg-gradient-to-br[^"]*">\s*<img',
+        r'<div class="relative aspect-\[4/3\][^"]*items-center justify-center[^"]*">',
         html,
     ), html[html.find("aspect-[4/3]"): html.find("aspect-[4/3]") + 300]
+    assert re.search(r">\s*M\s*</div>", html), "broken-image fallback monogram is missing"
+    assert 'aria-hidden="true"' in html
 
 
-def test_network_landing_city_without_hero_shows_gradient_only():
-    """A live city with NO hero photo keeps the existing gradient-only fallback:
-    a gradient block and no <img> at all (we did not regress the else branch)."""
+def test_network_landing_city_without_hero_shows_branded_placeholder():
+    """A live city with NO hero photo shows a branded placeholder and no <img>."""
     html = _render_page(
         "network_landing.html",
         **_network_landing_ctx(
@@ -440,6 +441,8 @@ def test_network_landing_city_without_hero_shows_gradient_only():
     )
     assert _imgs(html) == []
     assert "bg-gradient-to-br" in html
+    assert "items-center justify-center" in html
+    assert re.search(r">\s*A\s*</div>", html), "no-hero fallback monogram is missing"
 
 
 @pytest.fixture
