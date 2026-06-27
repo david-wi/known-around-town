@@ -127,6 +127,31 @@ def test_city_with_hero_photo_renders_an_img():
     assert 'alt="Aventura"' in imgs[0]
 
 
+def test_city_with_hero_photo_has_branded_broken_image_fallback():
+    """A card with a hero URL still needs fallback content underneath the image.
+
+    The live failure mode was not only "missing hero_photo_url": a remote image
+    can fail after render. The onerror handler hides the image, so the container
+    must already contain branded city content rather than revealing an empty
+    gradient.
+    """
+    html = _render_landing(
+        [
+            {
+                "name": "Aventura",
+                "slug": "aventura",
+                "tagline": "Aventura's best.",
+                "hero_photo_url": "https://example.com/broken-hero.jpg",
+                "url": "https://aventura.knowsbeauty.test/",
+            }
+        ]
+    )
+    assert 'aria-hidden="true"' in html
+    assert "items-center justify-center" in html
+    assert re.search(r">\s*A\s*</div>", html), "fallback monogram under hero image is missing"
+    assert "this.onerror=null;this.style.display='none';" in html
+
+
 def test_city_without_hero_photo_renders_branded_placeholder_not_blank():
     """A city card with no hero photo must NOT be an empty gradient box — it must
     carry the city monogram + name so it still reads as finished content."""
