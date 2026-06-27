@@ -212,9 +212,13 @@ async def favicon() -> RedirectResponse:
 
 # Static assets are served at /assets so it doesn't conflict with /api or
 # tenant-specific URL patterns.
-# WHY: html=True enables directory-index serving — a request to /assets/walkthrough/
-# returns /assets/walkthrough/index.html automatically, so the walkthrough landing
-# page works at a clean URL without a separate route handler.
+# WHY: html=True enables directory-index serving — a request to a directory
+# returns its index.html automatically, without a separate route handler.
+# IMPORTANT: this folder is PUBLICLY servable, so it must only ever contain
+# public assets (CSS, favicons, placeholder images). Do NOT place private or
+# internal documents here — the owner walkthrough PDFs/previews were removed
+# from static/walkthrough/ for exactly this reason (they are private docs and
+# are shared directly, never via a public URL).
 app.mount("/assets", StaticFiles(directory=str(BASE_DIR / "static"), html=True), name="assets")
 
 # JSON management API (tenant-agnostic — admins manage every network/city from
