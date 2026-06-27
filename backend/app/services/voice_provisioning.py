@@ -24,6 +24,8 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from app.config import get_settings
+
 log = logging.getLogger(__name__)
 
 # WHY: base URL factored out so tests can easily patch it to a mock server.
@@ -194,12 +196,13 @@ def _build_assistant_payload(business: Dict[str, Any]) -> Dict[str, Any]:
     name = business.get("name", "the salon")
     system_prompt = _build_system_prompt(business)
     first_message = f"{name}, how can I help you today?"
+    settings = get_settings()
 
     return {
         "name": f"{name} — AI Receptionist",
         "model": {
-            "provider": "openai",
-            "model": "gpt-4o",
+            "provider": settings.vapi_assistant_model_provider,
+            "model": settings.vapi_assistant_model,
             # WHY: 0.4 is warm enough for natural conversation but low enough to
             # keep responses factual and on-topic — the assistant shouldn't
             # improvise information about services or prices.
