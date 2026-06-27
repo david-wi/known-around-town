@@ -210,11 +210,26 @@ async def upsert(collection_name: str, query: Dict[str, Any], doc: Dict[str, Any
         # expensive to re-fetch (~$0.017/call) and the seed file has no way to
         # know the correct values. Copy any google_* field and hours from the
         # existing record if the new doc omits them.
+        #
         _PRESERVE_KEYS = ("google_place_id", "google_rating", "google_review_count",
                           "google_rating_synced_at", "hours")
         for key in _PRESERVE_KEYS:
             if key in existing and key not in doc:
                 doc[key] = existing[key]
+        # WHY hero_photo_url is preserved separately (truthy check, not just
+        # "key absent"): the network landing page shows a photo for each city.
+        # Most per-city seeds don't set a city hero photo, so a hero photo set
+        # later (in the database or admin) used to be wiped every time the seed
+        # re-ran — the city card then fell back to an empty capsule on the
+        # homepage. Many seeds DO pass `hero_photo_url` but as an empty string
+        # (e.g. seed_hallandale_beach), which the "key not in doc" rule above
+        # would treat as present and let overwrite a real saved photo with "".
+        # So preserve an existing non-empty hero whenever the incoming doc would
+        # leave it blank. (The live page also has its own curated fallback, so a
+        # never-set city is never photoless — this just keeps the database
+        # consistent with what the page renders.)
+        if existing.get("hero_photo_url") and not doc.get("hero_photo_url"):
+            doc["hero_photo_url"] = existing["hero_photo_url"]
         await db[collection_name].replace_one({"_id": existing["_id"]}, doc)
         return doc
     await db[collection_name].insert_one(doc)
