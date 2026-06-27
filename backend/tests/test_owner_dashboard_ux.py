@@ -295,9 +295,9 @@ class TestUpgradeCardSellsZeroCommission:
         because it's the most compelling reason to pay."""
         html = _render_dashboard(seeded_db, photos=[], subscribed=False)
         commission_pos = html.find("0% commission")
-        placement_pos = html.find("Premium placement")
-        assert commission_pos != -1 and placement_pos != -1
-        assert commission_pos < placement_pos
+        visibility_pos = html.find("Premium visibility")
+        assert commission_pos != -1 and visibility_pos != -1
+        assert commission_pos < visibility_pos
 
     def test_subscribed_owner_does_not_see_upgrade_card(self, seeded_db):
         """A paying owner shouldn't be pitched the upgrade they already have.
