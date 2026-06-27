@@ -1,5 +1,38 @@
 
-## Google ratings: match on the BRAND, not whole-string similarity (2026-06-27, PR #425)
+## Google ratings: an LLM judges the business match now, not a string heuristic (2026-06-27, PR #430)
+
+Supersedes the brand-token heuristic below (PR #425). The ratings sync still has
+to decide whether a Google Text Search result is the business we searched, but
+that decision is now made by the centralized AI gateway, not by token overlap.
+
+`google_places._llm_same_business` (async) sends the gateway our name + city and
+the candidate's display name, full address, and Google business type(s), and asks
+one strict question: are these the same real-world business? It accepts ONLY when
+the model returns `{"same_business": true}` (explicit boolean True — a string
+"true", a missing field, a non-object, non-JSON, or any gateway error all return
+False). **Fail-safe is the whole point: on ANY failure the candidate is rejected
+and the business is left unrated** — a wrong rating on a public page is worse than
+no rating. The Text Search field mask was widened to request
+`formattedAddress,primaryType,types` so the judge has real signal.
+
+Wiring: it routes through `ai_caption.call_gateway_text` (the SAME helper public
+search uses) under `use_case="light"`, which IS registered in the live Admin AI
+Config registry (verified at `GET /api/public/ai-config`). Never call a provider
+directly from server code, and never invent an unregistered use_case (it would
+raise at runtime and, because the except returns False, silently leave everything
+unrated). `_MATCH_MAX_TOKENS = 256` is deliberately generous so a reasoning model
+that "thinks" before answering can't truncate the tiny JSON and force a fail-safe
+NO on every call (the `reasoning-model-json-truncation` trap).
+
+The defense-in-depth place-id guard in `sync_admin._run_sync_background` is
+UNCHANGED — one Google place_id still can't attach to two live listings.
+
+Red/green proof: `test_google_places.py::TestLlmSameBusiness` (unit, mocks the
+gateway: yes/no/raise/garbage/odd-shape) and `::TestLookupRatingNameMatch`
+(end-to-end, mocks Google + gateway). The reject and fail-safe tests FAIL loudly
+if the gate is bypassed — verified by temporarily forcing `is_same = True`.
+
+## Google ratings: match on the BRAND, not whole-string similarity (2026-06-27, PR #425) — superseded by PR #430 above
 
 The ratings sync decides whether a Google Text Search result is the business we
 searched. The OLD check used `difflib.SequenceMatcher` over the FULL name strings
