@@ -1,5 +1,30 @@
 # known-around-town — Lessons Learned
 
+## `www.<city>.<network>` 404'd — strip a leading `www.` in tenant resolution (2026-06-27, PR #422)
+
+`www.miami.knowsbeauty.com` returned a 404 while `miami.knowsbeauty.com` worked.
+Root cause is in `tenant.py::_match_suffix`: it strips the known network-domain
+suffix, leaving everything to the left as the candidate city label. For a `www`
+host that leftover is `www.miami` — two labels with a dot in it — and the matcher
+deliberately rejects any multi-label remainder (`if "." in sub: continue`) because
+nested subdomains aren't supported. So the `www` form found no tenant and 404'd.
+
+Fix: strip a single leading `www.` in `resolve_tenant` **before** suffix matching,
+so `www.<city>.<network>` resolves exactly like `<city>.<network>`. This is the
+same shape as the existing `stage-`/`preview-` prefix stripping, just applied one
+level earlier (to the whole host, not the city label) because `www` precedes the
+city. Covers every city, not just Miami. Regression test:
+`test_www_prefix_resolves_same_as_bare_city` in `test_smoke.py`.
+
+Gotcha worth remembering: a `www` host that *does* have a TLS cert (Traefik served
+a real cert with a `www.<city>` SAN) reaches the app and 404s at the application
+layer — which looks like a routing problem but is actually this tenant-resolution
+rule. By contrast `www.knowsbeauty.com` (the brand root, no city) fails earlier,
+at TLS, with a self-signed cert because no Traefik router/cert exists for it — a
+genuinely separate infra gap, not this code path. When a `www` host misbehaves,
+check whether you're getting an HTTP 404 (app/tenant layer, this fix) or a
+connection/cert failure (Traefik routing, infra).
+
 ## sitemap.xml and robots.txt must use the REQUEST host, not CANONICAL_BASE_URL (2026-06-20, PR #392)
 
 This is a multi-tenant site: each city is its own website on its own subdomain
