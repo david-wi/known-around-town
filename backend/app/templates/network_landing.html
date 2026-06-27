@@ -50,7 +50,17 @@
              onerror="this.onerror=null;this.style.display='none';" />
       </div>
       {% else %}
-      <div class="aspect-[4/3] w-full bg-gradient-to-br {{ theme.category_banner_gradient }}"></div>
+      {# WHY: never show a blank gradient capsule. When a city has no hero photo
+         yet, render a branded placeholder with the city monogram + name so the
+         card still reads as intentional content above the fold, not an empty
+         box. This is the visible-defect guard for the "photoless capsules"
+         regression — a new city that launches before its hero is set still
+         looks finished. #}
+      <div class="aspect-[4/3] w-full bg-gradient-to-br {{ theme.category_banner_gradient }} flex flex-col items-center justify-center text-center px-4">
+        <div class="font-serif text-5xl font-light {{ theme.accent_text_strong }} opacity-90 leading-none mb-2"
+             style='font-family: Georgia, "Times New Roman", serif;'>{{ c.name[:1] | upper }}</div>
+        <div class="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-semibold">{{ c.name }}</div>
+      </div>
       {% endif %}
       <div class="p-7">
         <div class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_strong }} font-semibold mb-2">
