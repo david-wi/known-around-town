@@ -64,6 +64,14 @@ def _match_suffix(host: str) -> tuple[Optional[str], Optional[str], Optional[str
 
 async def resolve_tenant(host: str) -> Optional[TenantContext]:
     host = _strip_port(host)
+    # WHY: treat a leading "www." as an alias for the same host — a visitor
+    # who types "www.miami.knowsbeauty.com" should get the Miami site, not a
+    # 404. Without this, the suffix matcher strips the domain suffix, sees the
+    # extra "www." label (sub = "www.miami"), rejects it as an unsupported
+    # nested subdomain, and returns no tenant. Stripping the prefix here means
+    # www.<city>.<network> resolves exactly like <city>.<network>.
+    if host.startswith("www."):
+        host = host[len("www."):]
     net_slug, suffix, city_slug = _match_suffix(host)
     if not net_slug:
         return None
