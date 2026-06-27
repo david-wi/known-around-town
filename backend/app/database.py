@@ -56,6 +56,10 @@ async def ensure_indexes() -> None:
     await db.businesses.create_index([("city_id", 1), ("neighborhood_slugs", 1)])
     await db.businesses.create_index([("city_id", 1), ("featured.enabled", 1)])
     await db.businesses.create_index([("city_id", 1), ("editors_pick", 1)])
+    # WHY: ratings sync skips recently-attempted Google discovery for unrated
+    # businesses. Indexing the timestamp keeps future ops/reporting queries over
+    # the lookup cache cheap as the directory grows.
+    await db.businesses.create_index([("status", 1), ("google_lookup_attempted_at", 1)])
     # WHY: Stripe webhooks and billing-portal creation identify the listing by
     # Stripe ids, and sparse unique indexes keep one Stripe object from being
     # accidentally attached to multiple businesses while allowing unsubscribed

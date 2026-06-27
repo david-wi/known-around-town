@@ -291,6 +291,10 @@ class Business(BaseModel):
     google_rating: Optional[float] = None
     google_review_count: Optional[int] = None
     google_rating_synced_at: Optional[datetime] = None
+    # WHY: for unrated businesses with no accepted Google place_id, remember
+    # when discovery was last attempted so a repeated admin sync does not spend
+    # paid Google quota re-searching the same no-match minutes later.
+    google_lookup_attempted_at: Optional[datetime] = None
     # WHY: hide_ratings lets the admin suppress Google ratings for a specific
     # business without losing the stored data. Useful for businesses that ask
     # to have ratings removed from their listing, or for edge cases where the
