@@ -7,6 +7,7 @@ template only receives plain data — no DB access from the template.
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus, urlparse
@@ -496,6 +497,43 @@ _PLANNED_CITIES_BY_NETWORK: Dict[str, List[Dict[str, str]]] = {
     ],
 }
 
+# WHY: the network landing's city cards render a photo from each city's
+# `hero_photo_url`. A city that launches before an editor sets that field used to
+# render a blank gradient capsule above the fold — the visible "photoless capsule"
+# defect a visitor sees first. As a backend safety net, any live city still
+# missing a hero gets a deterministic pick from this curated set (distinct,
+# license-clear Unsplash beauty/spa images, sized to match the template's
+# img_sized(800) usage) so no card is ever photoless, even before the database is
+# backfilled. Deterministic-by-slug so the same city always gets the same image
+# (stable across renders) and adjacent cities don't collide.
+_LANDING_CITY_HERO_FALLBACKS: List[str] = [
+    "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1522337660859-02fbefca4702?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1600948836101-f9ffda59d250?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1571875257727-256c39da42af?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1633681926035-ec1ac984418a?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1532710093739-9470acff878f?w=1600&q=80&auto=format&fit=crop",
+]
+
+
+def _landing_city_hero_fallback(slug: str) -> str:
+    """Deterministic curated hero image for a city that has no `hero_photo_url`.
+
+    WHY exists: keeps the network landing's city cards from ever rendering a blank
+    gradient capsule (see `_LANDING_CITY_HERO_FALLBACKS`). Stable per slug so a
+    city's card image doesn't change between page loads.
+    """
+    if not _LANDING_CITY_HERO_FALLBACKS:
+        return ""
+    digest = hashlib.md5(slug.encode("utf-8")).hexdigest()
+    return _LANDING_CITY_HERO_FALLBACKS[int(digest, 16) % len(_LANDING_CITY_HERO_FALLBACKS)]
+
 
 async def _render_network_landing(request: Request, tenant: TenantContext) -> HTMLResponse:
     """Render the bare-apex landing page that lists the cities for a network.
@@ -518,7 +556,12 @@ async def _render_network_landing(request: Request, tenant: TenantContext) -> HT
                 "name": city.get("name", ""),
                 "slug": city.get("slug", ""),
                 "tagline": city.get("tagline") or city.get("hero_description") or "",
-                "hero_photo_url": city.get("hero_photo_url"),
+                # WHY: fall back to a deterministic curated image when the city has
+                # no hero photo set, so the card is never a blank gradient capsule.
+                "hero_photo_url": (
+                    city.get("hero_photo_url")
+                    or _landing_city_hero_fallback(city.get("slug", ""))
+                ),
                 # WHY: the city is served at its own subdomain (e.g.
                 # `miami.knowsbeauty.ai.devintensive.com/`), so we build an
                 # absolute URL from the resolved network suffix rather than
