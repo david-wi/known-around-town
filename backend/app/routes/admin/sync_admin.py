@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
@@ -39,6 +39,11 @@ _templates: Optional[Jinja2Templates] = None
 # every GET to /admin/sync. It resets on container restart, which is acceptable
 # because a restart would also abort any in-progress sync.
 _sync_running: bool = False
+
+# WHY: six hours prevents same-evening manual reruns from spending Google quota
+# on businesses we just searched, but expires before the 3:12 AM daily sync after
+# a normal afternoon/evening cleanup so fresh overnight quota can repopulate.
+_RECENT_DISCOVERY_SKIP_WINDOW = timedelta(hours=6)
 
 
 def attach_templates(t: Jinja2Templates) -> None:
@@ -79,6 +84,38 @@ def _strip_city_suffix(name: str, city_name: str) -> str:
     return ""
 
 
+def _coerce_utc_datetime(value) -> Optional[datetime]:
+    """Return a timezone-aware UTC datetime for persisted lookup-cache values.
+
+    WHY tolerate strings and naive datetimes: older ad-hoc scripts and tests have
+    stored datetimes inconsistently in this app. The cache is only an optimization,
+    so an unreadable value should be treated as absent rather than crashing sync.
+    """
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    return None
+
+
+def _has_recent_discovery_attempt(biz: dict, now: datetime) -> bool:
+    """True when this unrated discovery path was attempted recently enough to skip."""
+    if biz.get("google_place_id"):
+        return False
+    attempted_at = _coerce_utc_datetime(biz.get("google_lookup_attempted_at"))
+    if attempted_at is None:
+        return False
+    return now - attempted_at < _RECENT_DISCOVERY_SKIP_WINDOW
+
+
 async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> None:
     """Background coroutine: sync ratings for all businesses then log results.
 
@@ -96,9 +133,11 @@ async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> 
     updated = 0
     failed = 0
     no_match = 0
+    skipped_recent = 0
+    sync_started_at = datetime.now(timezone.utc)
 
     async def _sync_one(biz: dict) -> None:
-        nonlocal updated, failed, no_match
+        nonlocal updated, failed, no_match, skipped_recent
         city_id = biz.get("city_id", "")
         if city_id and city_id not in city_names:
             log.warning(
@@ -106,6 +145,13 @@ async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> 
                 biz.get("name"), city_id,
             )
         city_name = city_names.get(city_id, "Miami")
+        if _has_recent_discovery_attempt(biz, sync_started_at):
+            skipped_recent += 1
+            log.info(
+                "Skipping Google discovery for %r — lookup was attempted recently at %s",
+                biz.get("name"), biz.get("google_lookup_attempted_at"),
+            )
+            return
         try:
             async with sem:
                 rating_result = await google_places.lookup_rating(
@@ -177,6 +223,10 @@ async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> 
                 # Had a place_id but fetch failed — transient error; keep old data
                 failed += 1
             else:
+                await db.businesses.update_one(
+                    {"_id": biz["_id"]},
+                    {"$set": {"google_lookup_attempted_at": sync_started_at}},
+                )
                 no_match += 1
             return
 
@@ -226,6 +276,10 @@ async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> 
                     conflicting.get("name"), conflicting["_id"],
                     biz.get("name"), biz["_id"],
                 )
+                await db.businesses.update_one(
+                    {"_id": biz["_id"]},
+                    {"$set": {"google_lookup_attempted_at": sync_started_at}},
+                )
                 no_match += 1
                 return
 
@@ -243,15 +297,18 @@ async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> 
 
         await db.businesses.update_one(
             {"_id": biz["_id"]},
-            {"$set": update_fields},
+            {
+                "$set": update_fields,
+                "$unset": {"google_lookup_attempted_at": ""},
+            },
         )
         updated += 1
 
     try:
         await asyncio.gather(*[_sync_one(b) for b in businesses])
         log.info(
-            "Google ratings sync complete: updated=%d no_match=%d failed=%d",
-            updated, no_match, failed,
+            "Google ratings sync complete: updated=%d no_match=%d failed=%d skipped_recent=%d",
+            updated, no_match, failed, skipped_recent,
         )
     finally:
         # WHY: always clear the flag so the admin page doesn't stay stuck in
@@ -384,7 +441,14 @@ async def sync_ratings(
     # it so the operator knows they need to re-run or implement pagination.
     businesses = await db.businesses.find(
         biz_filter,
-        {"_id": 1, "name": 1, "city_id": 1, "google_place_id": 1, "neighborhood_slugs": 1},
+        {
+            "_id": 1,
+            "name": 1,
+            "city_id": 1,
+            "google_place_id": 1,
+            "google_lookup_attempted_at": 1,
+            "neighborhood_slugs": 1,
+        },
     ).to_list(5000)
 
     if len(businesses) == 5000:

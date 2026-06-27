@@ -1314,6 +1314,185 @@ class TestSyncRatingsPost:
         assert "failed=1" in summary, f"Expected failed=1 (transient); got: {summary}"
         assert "no_match=0" in summary, f"Expected no_match=0 (not permanent); got: {summary}"
 
+    def test_recent_no_match_discovery_is_skipped(self, mock_db, monkeypatch):
+        """Recent unrated discovery attempts should not call Google again.
+
+        WHY: a manual rerun minutes after a no-match sync should not spend paid
+        Google Places quota repeating the same text search and fallback searches.
+        """
+        import asyncio
+        import logging
+        from datetime import datetime, timedelta, timezone
+        from app.routes.admin.sync_admin import _coerce_utc_datetime, _run_sync_background
+        import app.services.google_places as gp
+
+        recent_attempt = datetime.now(timezone.utc) - timedelta(hours=1)
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.insert_one(
+                {
+                    "_id": "biz-recent-no-match",
+                    "name": "Recent No Match Salon",
+                    "slug": "recent-no-match",
+                    "city_id": "city-cache",
+                    "network_id": "net-cache",
+                    "status": "live",
+                    "google_lookup_attempted_at": recent_attempt,
+                }
+            )
+        )
+
+        calls = []
+
+        async def mock_lookup(*args, **kwargs):
+            calls.append((args, kwargs))
+            return None
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        log_records = []
+
+        class LogCapture(logging.Handler):
+            def emit(self, record):
+                log_records.append(record.getMessage())
+
+        handler = LogCapture()
+        sync_logger = logging.getLogger("app.routes.admin.sync_admin")
+        orig_level = sync_logger.level
+        sync_logger.setLevel(logging.DEBUG)
+        sync_logger.addHandler(handler)
+        try:
+            asyncio.get_event_loop().run_until_complete(
+                _run_sync_background(
+                    {"city-cache": "Miami"},
+                    [
+                        {
+                            "_id": "biz-recent-no-match",
+                            "name": "Recent No Match Salon",
+                            "city_id": "city-cache",
+                            "status": "live",
+                            "google_lookup_attempted_at": recent_attempt,
+                        }
+                    ],
+                )
+            )
+        finally:
+            sync_logger.removeHandler(handler)
+            sync_logger.setLevel(orig_level)
+
+        assert calls == [], "recent no-match cache should skip Google lookup entirely"
+        summary = next((m for m in log_records if "sync complete" in m), "")
+        assert "skipped_recent=1" in summary, f"expected skipped_recent=1; got logs: {log_records}"
+
+    def test_no_match_records_recent_lookup_attempt(self, mock_db, monkeypatch):
+        """A discovery miss stores google_lookup_attempted_at for later reruns.
+
+        WHY: without this persistent timestamp, an unrated business that just
+        returned no accepted Google match gets searched again on every sync run.
+        """
+        import asyncio
+        from datetime import datetime, timedelta, timezone
+        from app.routes.admin.sync_admin import _coerce_utc_datetime, _run_sync_background
+        import app.services.google_places as gp
+
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.insert_one(
+                {
+                    "_id": "biz-cache-miss",
+                    "name": "Cache Miss Salon",
+                    "slug": "cache-miss",
+                    "city_id": "city-cache",
+                    "network_id": "net-cache",
+                    "status": "live",
+                }
+            )
+        )
+
+        async def mock_lookup(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        before = datetime.now(timezone.utc)
+        asyncio.get_event_loop().run_until_complete(
+            _run_sync_background(
+                {"city-cache": "Miami"},
+                [
+                    {
+                        "_id": "biz-cache-miss",
+                        "name": "Cache Miss Salon",
+                        "city_id": "city-cache",
+                        "status": "live",
+                    }
+                ],
+            )
+        )
+
+        updated = asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.find_one({"_id": "biz-cache-miss"})
+        )
+        attempted_at = _coerce_utc_datetime(updated.get("google_lookup_attempted_at"))
+        assert attempted_at is not None, "no-match discovery should persist lookup timestamp"
+        assert attempted_at >= before - timedelta(seconds=1), (
+            "timestamp should be from this sync run, allowing Mongo's millisecond precision"
+        )
+        assert updated.get("google_rating") is None
+
+    def test_stale_lookup_attempt_is_retried_and_cleared_on_success(self, mock_db, monkeypatch):
+        """A lookup older than the skip window is retried, and success clears the marker."""
+        import asyncio
+        from datetime import datetime, timedelta, timezone
+        from app.routes.admin.sync_admin import _run_sync_background
+        import app.services.google_places as gp
+        from app.services.google_places import PlaceRating
+
+        stale_attempt = datetime.now(timezone.utc) - timedelta(hours=7)
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.insert_one(
+                {
+                    "_id": "biz-stale-cache",
+                    "name": "Stale Cache Salon",
+                    "slug": "stale-cache",
+                    "city_id": "city-cache",
+                    "network_id": "net-cache",
+                    "status": "live",
+                    "google_lookup_attempted_at": stale_attempt,
+                }
+            )
+        )
+
+        calls = []
+
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            calls.append(business_name)
+            return PlaceRating(place_id="ChIJ_stale_cache", rating=4.4, review_count=44)
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        asyncio.get_event_loop().run_until_complete(
+            _run_sync_background(
+                {"city-cache": "Miami"},
+                [
+                    {
+                        "_id": "biz-stale-cache",
+                        "name": "Stale Cache Salon",
+                        "city_id": "city-cache",
+                        "status": "live",
+                        "google_lookup_attempted_at": stale_attempt,
+                    }
+                ],
+            )
+        )
+
+        updated = asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.find_one({"_id": "biz-stale-cache"})
+        )
+        assert calls == ["Stale Cache Salon"], "stale cache marker should not block a fresh lookup"
+        assert updated.get("google_place_id") == "ChIJ_stale_cache"
+        assert updated.get("google_rating") == 4.4
+        assert "google_lookup_attempted_at" not in updated, (
+            "successful match should clear the old no-match cache marker"
+        )
+
 
 class TestDuplicatePlaceIdGuard:
     """The sync must never assign one Google place_id to two different live listings.

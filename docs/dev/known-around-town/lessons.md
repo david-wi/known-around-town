@@ -1,5 +1,28 @@
 # known-around-town — Lessons Learned
 
+## Cache recent Google discovery misses, but do not block the next quota window (2026-06-27)
+
+Google ratings are stored on `businesses.google_*` once a listing has an accepted
+`google_place_id`, so successful page display is already cached. The expensive
+gap was the unrated discovery path: a business with no accepted `google_place_id`
+could be text-searched again on every manual/admin sync, including all fallback
+city/name searches, even if Google had just been queried minutes earlier.
+
+Fix: `_run_sync_background` writes `google_lookup_attempted_at` when discovery
+finishes with no accepted match or a duplicate-place conflict, and skips another
+discovery lookup for six hours. Six hours is deliberate: it stops same-evening
+manual reruns from burning paid Google quota, but normally expires before the
+3:12 AM daily sync after an afternoon/evening cleanup, so fresh overnight quota
+can still repopulate ratings. Do not lengthen this window casually; a longer
+window can delay legitimate post-quota recovery. `RateLimitError` is not cached
+as a miss because quota exhaustion is transient.
+
+Successful matches clear `google_lookup_attempted_at` when storing
+`google_place_id`/rating, so the marker is only a recent negative-discovery
+cache. Regression coverage lives in `tests/test_google_places.py`:
+recent misses skip Google entirely, no-match discovery records the marker, and
+stale markers are retried and cleared on success.
+
 ## `www.<city>.<network>` 404'd — strip a leading `www.` in tenant resolution (2026-06-27, PR #422)
 
 `www.miami.knowsbeauty.com` returned a 404 while `miami.knowsbeauty.com` worked.
