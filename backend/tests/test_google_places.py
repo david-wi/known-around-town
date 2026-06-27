@@ -449,6 +449,218 @@ class TestLookupRating:
         assert mock_sleep.call_count == 1
 
 
+# ── name-match (brand) logic ─────────────────────────────────────────────────
+
+class TestNamesMatch:
+    """Unit tests for _names_match — the brand-token matcher that decides whether
+    a Google Text Search result actually refers to the business we searched.
+
+    WHY this class exists: the OLD matcher compared whole strings with
+    SequenceMatcher and accepted anything above 0.40. That rewarded shared
+    generic words ("spa") and shared neighborhood words ("Brickell"), so two
+    clearly-different businesses in the same area were treated as the same place.
+    Concretely, BOTH of these passed the old 0.40 rule and attached the wrong
+    Google rating:
+        "Kure Spa — Brickell City Centre"  vs "Lux MedSpa Brickell"  → 0.56
+        "Ciel Spa at SLS Brickell"         vs "Lux MedSpa Brickell"  → 0.605
+    ~283 of 894 rated listings carried the wrong business's rating as a result.
+    The new matcher rejects both because the BRAND token differs (Kure/Ciel ≠ Lux).
+    """
+
+    def _match(self, searched, place, city="Miami", state="FL"):
+        from app.services.google_places import _names_match
+        return _names_match(searched, place, city, state)
+
+    def test_rejects_kure_vs_lux_shared_geo_and_type_words_only(self):
+        """Kure → Lux: shares only "spa"/"brickell"; brand differs → reject."""
+        assert self._match("Kure Spa — Brickell City Centre", "Lux MedSpa Brickell") is False
+
+    def test_rejects_ciel_vs_lux_shared_geo_and_type_words_only(self):
+        """Ciel → Lux: shares only "spa"/"brickell"; brand differs → reject."""
+        assert self._match("Ciel Spa at SLS Brickell", "Lux MedSpa Brickell") is False
+
+    def test_accepts_exact_brand_match(self):
+        assert self._match("Sana Skin Studio", "Sana Skin Studio") is True
+
+    def test_accepts_brand_with_extra_generic_words(self):
+        """Brand "IGK" present in both; place adds a generic "Hair" → accept."""
+        assert self._match("IGK Salon", "IGK Hair Salon") is True
+
+    def test_accepts_brand_when_place_is_bare_brand(self):
+        """Searched name has generic suffix, place is just the brand → accept."""
+        assert self._match("IGK Salon", "IGK") is True
+
+    def test_accepts_brand_with_city_suffix_difference(self):
+        """Allure brand matches even though the place adds the city name."""
+        assert self._match("Allure Medspa", "Allure Medspa Aventura", city="Aventura") is True
+
+    def test_rejects_two_distinct_generic_brands(self):
+        """Different brands sharing only business-type words → reject."""
+        assert self._match("Glow Beauty Bar", "Radiance Skin Studio") is False
+
+    def test_rejects_same_geo_different_brand(self):
+        """Same neighborhood word, different brand → reject (geo isn't identity)."""
+        assert self._match("Kure Spa Brickell", "Ciel Spa Brickell") is False
+
+    def test_rejects_when_no_distinctive_token_on_one_side(self):
+        """A fully-generic searched name must not match a specific brand."""
+        # "Nail Salon" → no distinctive tokens; "Lux Nails" → "lux".
+        assert self._match("Nail Salon", "Lux Nails") is False
+
+    def test_accepts_brand_word_order_difference(self):
+        """Brand as a trailing word still matches via the brand-in-other-set check."""
+        assert self._match("Spa Kure", "Kure") is True
+
+    def test_city_token_does_not_create_a_match(self):
+        """The queried city echoed by the place must not, by itself, earn a match.
+
+        WHY: "<brand A> Miami" vs "<brand B> Miami" share only the queried city.
+        Stripping the city token leaves differing brands → reject.
+        """
+        assert self._match("Aura Salon Miami", "Bloom Salon Miami", city="Miami") is False
+
+
+class TestLookupRatingNameMatch:
+    """End-to-end accept/reject via lookup_rating (mocked Text Search + Details).
+
+    These exercise the real _search_and_fetch path: text search returns a place
+    with a displayName; _names_match decides whether to proceed to the details
+    fetch. A REJECT must return None (no details call); an ACCEPT must return the
+    rating from the details call.
+    """
+
+    def _settings_patch(self):
+        return patch("app.services.google_places.get_settings")
+
+    @pytest.mark.asyncio
+    async def test_rejects_kure_when_google_returns_lux(self, respx_mock):
+        """Searched "Kure Spa — Brickell City Centre"; Google's top result is
+        "Lux MedSpa Brickell" → lookup_rating returns None (wrong business).
+
+        This is the core regression: under the old 0.40 threshold this pair
+        scored 0.56 and was ACCEPTED, attaching Lux's rating to Kure.
+        """
+        from app.services import google_places
+
+        with self._settings_patch() as mock_settings:
+            mock_settings.return_value.google_places_api_key = "AIza-test-key"
+
+            search_route = respx_mock.post(
+                "https://places.googleapis.com/v1/places:searchText"
+            ).mock(return_value=httpx.Response(
+                200,
+                json={"places": [{
+                    "id": "ChIJ_lux_brickell",
+                    "displayName": {"text": "Lux MedSpa Brickell"},
+                }]},
+            ))
+            # A details fetch here would mean we wrongly accepted the match.
+            details_route = respx_mock.get(
+                "https://places.googleapis.com/v1/places/ChIJ_lux_brickell"
+            ).mock(return_value=httpx.Response(
+                200, json={"id": "ChIJ_lux_brickell", "rating": 4.9, "userRatingCount": 500},
+            ))
+
+            result = await google_places.lookup_rating(
+                "Kure Spa — Brickell City Centre", "Miami"
+            )
+
+        assert result is None, "wrong business (Lux) must be rejected for Kure"
+        assert search_route.called
+        assert not details_route.called, "must NOT fetch details for a rejected match"
+
+    @pytest.mark.asyncio
+    async def test_rejects_ciel_when_google_returns_lux(self, respx_mock):
+        """Searched "Ciel Spa at SLS Brickell"; Google returns "Lux MedSpa
+        Brickell" → None. Scored 0.605 (accepted) under the old threshold."""
+        from app.services import google_places
+
+        with self._settings_patch() as mock_settings:
+            mock_settings.return_value.google_places_api_key = "AIza-test-key"
+
+            respx_mock.post(
+                "https://places.googleapis.com/v1/places:searchText"
+            ).mock(return_value=httpx.Response(
+                200,
+                json={"places": [{
+                    "id": "ChIJ_lux_brickell",
+                    "displayName": {"text": "Lux MedSpa Brickell"},
+                }]},
+            ))
+            details_route = respx_mock.get(
+                "https://places.googleapis.com/v1/places/ChIJ_lux_brickell"
+            ).mock(return_value=httpx.Response(
+                200, json={"id": "ChIJ_lux_brickell", "rating": 4.9, "userRatingCount": 500},
+            ))
+
+            result = await google_places.lookup_rating("Ciel Spa at SLS Brickell", "Miami")
+
+        assert result is None, "wrong business (Lux) must be rejected for Ciel"
+        assert not details_route.called
+
+    @pytest.mark.asyncio
+    async def test_accepts_exact_brand_match(self, respx_mock):
+        """Searched "Sana Skin Studio"; Google returns the same → returns rating."""
+        from app.services import google_places
+
+        with self._settings_patch() as mock_settings:
+            mock_settings.return_value.google_places_api_key = "AIza-test-key"
+
+            respx_mock.post(
+                "https://places.googleapis.com/v1/places:searchText"
+            ).mock(return_value=httpx.Response(
+                200,
+                json={"places": [{
+                    "id": "ChIJ_sana",
+                    "displayName": {"text": "Sana Skin Studio"},
+                }]},
+            ))
+            respx_mock.get(
+                "https://places.googleapis.com/v1/places/ChIJ_sana"
+            ).mock(return_value=httpx.Response(
+                200, json={"id": "ChIJ_sana", "rating": 4.8, "userRatingCount": 240},
+            ))
+
+            result = await google_places.lookup_rating("Sana Skin Studio", "Miami")
+
+        assert result is not None
+        assert result.place_id == "ChIJ_sana"
+        assert result.rating == 4.8
+
+    @pytest.mark.asyncio
+    async def test_accepts_brand_match_with_extra_generic_words(self, respx_mock):
+        """Searched "IGK Salon"; Google returns "IGK Hair Salon" → accept.
+
+        Proves the fix does not over-reject legitimate brand matches where the
+        Google listing carries an extra generic business-type word.
+        """
+        from app.services import google_places
+
+        with self._settings_patch() as mock_settings:
+            mock_settings.return_value.google_places_api_key = "AIza-test-key"
+
+            respx_mock.post(
+                "https://places.googleapis.com/v1/places:searchText"
+            ).mock(return_value=httpx.Response(
+                200,
+                json={"places": [{
+                    "id": "ChIJ_igk",
+                    "displayName": {"text": "IGK Hair Salon"},
+                }]},
+            ))
+            respx_mock.get(
+                "https://places.googleapis.com/v1/places/ChIJ_igk"
+            ).mock(return_value=httpx.Response(
+                200, json={"id": "ChIJ_igk", "rating": 4.6, "userRatingCount": 130},
+            ))
+
+            result = await google_places.lookup_rating("IGK Salon", "Miami")
+
+        assert result is not None
+        assert result.place_id == "ChIJ_igk"
+        assert result.rating == 4.6
+
+
 # ── admin sync endpoint tests ────────────────────────────────────────────────
 
 @pytest.fixture
@@ -1046,6 +1258,142 @@ class TestSyncRatingsPost:
         summary = complete_msgs[0]
         assert "failed=1" in summary, f"Expected failed=1 (transient); got: {summary}"
         assert "no_match=0" in summary, f"Expected no_match=0 (not permanent); got: {summary}"
+
+
+class TestDuplicatePlaceIdGuard:
+    """The sync must never assign one Google place_id to two different live listings.
+
+    WHY: even with the hardened name matcher, the SAME google_place_id landing on
+    multiple distinct businesses is the exact symptom that caused ~283 listings to
+    show the wrong business's rating. As defense-in-depth, the sync checks — before
+    storing a newly-discovered place_id — whether that place_id already belongs to a
+    different live business, and if so leaves the second business unrated.
+    """
+
+    def test_second_business_skipped_when_place_id_already_used(self, mock_db, monkeypatch):
+        """Two live businesses both resolve (via the mock) to the same place_id;
+        only the FIRST one synced gets the rating — the second stays unrated.
+
+        WHY run _run_sync_background directly (not via HTTP): the duplicate guard
+        lives in the per-business sync coroutine. Driving it directly lets us
+        process the two businesses in a deterministic order so we can assert
+        exactly one ends up rated, without TestClient background-task scheduling
+        in the way.
+        """
+        import asyncio
+        from app.routes.admin.sync_admin import _run_sync_background
+        import app.services.google_places as gp
+        from app.services.google_places import PlaceRating
+
+        # Seed two distinct live businesses, NEITHER with a cached place_id.
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.cities.insert_one({"_id": "city-dup", "name": "Miami", "slug": "miami"})
+        )
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.networks.insert_one(
+                {"_id": "net-dup", "name": "Beauty", "domain_suffix": "knowsbeauty.localhost"}
+            )
+        )
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.insert_many([
+                {"_id": "biz-first", "name": "First Salon", "slug": "first", "city_id": "city-dup",
+                 "network_id": "net-dup", "status": "live"},
+                {"_id": "biz-second", "name": "Second Salon", "slug": "second", "city_id": "city-dup",
+                 "network_id": "net-dup", "status": "live"},
+            ])
+        )
+
+        # Both businesses resolve to the SAME Google place_id (the bug scenario).
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            return PlaceRating(place_id="ChIJ_shared_place", rating=4.7, review_count=300)
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        # Process in a fixed order so exactly one wins. _run_sync_background uses
+        # asyncio.gather, but each business's guard runs read-then-decision inside
+        # its own coroutine; serialising the list here makes the outcome
+        # deterministic for the assertion (first inserted is rated).
+        businesses = [
+            {"_id": "biz-first", "name": "First Salon", "city_id": "city-dup", "status": "live"},
+        ]
+        asyncio.get_event_loop().run_until_complete(
+            _run_sync_background({"city-dup": "Miami"}, businesses)
+        )
+        businesses = [
+            {"_id": "biz-second", "name": "Second Salon", "city_id": "city-dup", "status": "live"},
+        ]
+        asyncio.get_event_loop().run_until_complete(
+            _run_sync_background({"city-dup": "Miami"}, businesses)
+        )
+
+        first = asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.find_one({"_id": "biz-first"})
+        )
+        second = asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.find_one({"_id": "biz-second"})
+        )
+
+        # First business owns the place_id and rating.
+        assert first.get("google_place_id") == "ChIJ_shared_place"
+        assert first.get("google_rating") == 4.7
+        # Second business was skipped: no place_id, no rating.
+        assert second.get("google_place_id") is None, (
+            "second business must NOT receive a place_id already used by another live business"
+        )
+        assert second.get("google_rating") is None, (
+            "second business must stay unrated to avoid showing another business's rating"
+        )
+
+    def test_own_place_id_refresh_not_blocked(self, mock_db, monkeypatch):
+        """Re-fetching a business's OWN cached place_id is legitimate and must
+        not be blocked by the duplicate guard.
+
+        WHY: the guard only runs on the discovery path (no existing place_id). A
+        business that already owns "ChIJ_self" re-syncing through the place-details
+        endpoint must update its rating normally — otherwise routine refreshes
+        would all be wrongly rejected as "duplicates" of themselves.
+        """
+        import asyncio
+        from app.routes.admin.sync_admin import _run_sync_background
+        import app.services.google_places as gp
+        from app.services.google_places import PlaceRating
+
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.cities.insert_one({"_id": "city-self", "name": "Miami", "slug": "miami"})
+        )
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.networks.insert_one(
+                {"_id": "net-self", "name": "Beauty", "domain_suffix": "knowsbeauty.localhost"}
+            )
+        )
+        asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.insert_one(
+                {"_id": "biz-self", "name": "Self Salon", "slug": "self", "city_id": "city-self",
+                 "network_id": "net-self", "status": "live",
+                 "google_place_id": "ChIJ_self", "google_rating": 4.0}
+            )
+        )
+
+        async def mock_lookup(business_name, city, state="FL", existing_place_id=None):
+            # The refresh path passes the business's own place_id back in.
+            assert existing_place_id == "ChIJ_self"
+            return PlaceRating(place_id="ChIJ_self", rating=4.9, review_count=400)
+
+        monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
+
+        businesses = [
+            {"_id": "biz-self", "name": "Self Salon", "city_id": "city-self", "status": "live",
+             "google_place_id": "ChIJ_self"},
+        ]
+        asyncio.get_event_loop().run_until_complete(
+            _run_sync_background({"city-self": "Miami"}, businesses)
+        )
+
+        updated = asyncio.get_event_loop().run_until_complete(
+            mock_db.businesses.find_one({"_id": "biz-self"})
+        )
+        assert updated.get("google_place_id") == "ChIJ_self"
+        assert updated.get("google_rating") == 4.9, "own-place refresh must update the rating"
 
 
 # ── Business model hide_ratings field ────────────────────────────────────────

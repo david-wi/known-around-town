@@ -180,6 +180,55 @@ async def _run_sync_background(city_names: Dict[str, str], businesses: list) -> 
                 no_match += 1
             return
 
+        # WHY (defense-in-depth duplicate-place guard): one real Google business
+        # must never be attached to two different live listings. The name matcher
+        # (google_places._names_match) is the primary defense, but if it ever
+        # admits a wrong match the symptom is the SAME google_place_id landing on
+        # multiple distinct businesses — which is exactly how ~283 listings ended
+        # up showing the wrong business's star rating before the matcher was
+        # hardened. So before storing a NEWLY-discovered place_id, check whether
+        # it is already assigned to a DIFFERENT live business. If it is, treat
+        # this as a no-match (leave the business unrated) and warn, rather than
+        # silently duplicating the rating.
+        #
+        # WHY scoped to the discovery path (no existing_place_id): re-fetching a
+        # business's OWN cached place_id is legitimate and must not be blocked —
+        # that lookup queries the place_id this very business already owns, so it
+        # would always "collide" with itself. The guard only runs when this
+        # business did not already own the place_id we're about to write.
+        #
+        # WHY a read-then-write check (not a unique index): this catches any
+        # place_id that was ALREADY stored on another business before this run,
+        # plus the common sequential case within a run. A theoretical race
+        # remains if two tasks discover the SAME place_id in the same run before
+        # either writes (the sync runs 3 at a time) — closing that fully would
+        # need a unique index on google_place_id, a schema/data change out of
+        # scope here while existing duplicate data is being cleaned up
+        # separately. The hardened matcher above is what stops two distinct
+        # businesses from resolving to the same place in the first place; this
+        # guard is the backstop, and it shrinks the blast radius from "any
+        # matcher gap duplicates ratings widely" to "at most one same-run race".
+        if not biz.get("google_place_id"):
+            conflicting = await db.businesses.find_one(
+                {
+                    "google_place_id": rating_result.place_id,
+                    "status": "live",
+                    "_id": {"$ne": biz["_id"]},
+                },
+                {"_id": 1, "name": 1},
+            )
+            if conflicting is not None:
+                log.warning(
+                    "Google place_id %r already assigned to live business %r (%s); "
+                    "skipping assignment to %r (%s) to avoid duplicating one Google "
+                    "business across two listings — left unrated",
+                    rating_result.place_id,
+                    conflicting.get("name"), conflicting["_id"],
+                    biz.get("name"), biz["_id"],
+                )
+                no_match += 1
+                return
+
         update_fields: dict = {
             "google_place_id": rating_result.place_id,
             "google_rating": rating_result.rating,
