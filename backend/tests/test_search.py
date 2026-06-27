@@ -287,3 +287,86 @@ async def test_select_matching_business_ids_fails_closed_on_gateway_failure(monk
     )
 
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_search_payload_includes_services_and_known_for(monkeypatch):
+    """The candidate payload sent to the AI matcher must include each salon's
+    service-menu names and its known_for text.
+
+    Regression for the bug where a service-intent query ("keratin", "brazilian
+    blowout") returned only the single salon that happened to have the word in
+    its short_description — because the matcher was never shown the salons'
+    actual service menus. With services + known_for in the payload, every salon
+    that genuinely offers the service is eligible to match.
+    """
+    from app.services import content as content_svc
+
+    captured: Dict[str, Any] = {}
+
+    async def fake_gateway(*, use_case, system_prompt, user_content, **kwargs):
+        captured["user_content"] = user_content
+        return '{"business_ids": []}'
+
+    monkeypatch.setattr(content_svc, "call_gateway_text", fake_gateway)
+
+    business = {
+        "_id": "glow-studio",
+        "name": "Glow Studio",
+        "short_description": "Hair and color studio",
+        "known_for": "Famous for lived-in balayage",
+        "services": [
+            {"name": "Keratin Treatment", "price": "$250"},
+            {"name": "Brazilian Blowout", "price": "$300"},
+        ],
+        "tags": ["color"],
+        "category_slugs": ["hair"],
+        "neighborhood_slugs": ["wynwood"],
+    }
+
+    await content_svc._select_matching_business_ids(
+        query="keratin", businesses=[business]
+    )
+
+    user_content = captured.get("user_content", "")
+    # The service names the salon actually lists must reach the matcher.
+    assert "Keratin Treatment" in user_content
+    assert "Brazilian Blowout" in user_content
+    # known_for text must reach the matcher too.
+    assert "balayage" in user_content
+
+
+@pytest.mark.asyncio
+async def test_search_payload_tolerates_malformed_services(monkeypatch):
+    """Malformed service entries (non-dict items, missing names) must not crash
+    payload construction — they are simply skipped."""
+    from app.services import content as content_svc
+
+    captured: Dict[str, Any] = {}
+
+    async def fake_gateway(*, use_case, system_prompt, user_content, **kwargs):
+        captured["user_content"] = user_content
+        return '{"business_ids": []}'
+
+    monkeypatch.setattr(content_svc, "call_gateway_text", fake_gateway)
+
+    business = {
+        "_id": "messy-salon",
+        "name": "Messy Data Salon",
+        "services": [
+            "not-a-dict",              # non-dict entry — must be skipped
+            {"price": "$50"},          # dict without a name — must be skipped
+            {"name": "Gel Manicure"},  # valid — must be kept
+        ],
+        "category_slugs": ["nails"],
+        "neighborhood_slugs": ["brickell"],
+    }
+
+    # Must not raise.
+    await content_svc._select_matching_business_ids(
+        query="manicure", businesses=[business]
+    )
+
+    user_content = captured.get("user_content", "")
+    assert "Gel Manicure" in user_content
+    assert "not-a-dict" not in user_content
