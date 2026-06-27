@@ -801,19 +801,21 @@ a photo is missing or fails to load.
 
 - **Network landing page** (`network_landing.html`, the platform-root page listing live
   cities — rendered at the bare network host like `knowsbeauty.ai.devintensive.com`, no
-  city subdomain) is the one surface that does NOT use the placeholder SVG. Its no-photo
-  case already shows the brand color GRADIENT (`bg-gradient-to-br {{ theme.category_banner_gradient }}`),
-  so a broken city hero photo must degrade to that SAME gradient, not the SVG. The fix
-  (PR #366): put the gradient on the `<img>`'s container div so it sits beneath the photo,
-  and add `onerror="this.onerror=null;this.style.display='none';"` so a failed photo hides
-  itself and reveals the gradient. (`this.onerror=null` FIRST is the loop guard, same as the
-  card pattern.) Pick the fallback that matches the surface's existing no-photo design:
-  cards/detail/home/guide/neighborhood → placeholder SVG; this page → gradient.
+  city subdomain) does NOT use the placeholder SVG, but it also must not fall back to a
+  blank gradient. Its no-photo case now shows a branded city monogram + city name on top
+  of the brand gradient. A city with a hero URL must carry that same branded fallback
+  underneath the `<img>`, because a remote image can fail after render even when the URL
+  exists. The fix (PR #432): keep `onerror="this.onerror=null;this.style.display='none';"`
+  so a failed photo hides itself, but place the branded city fallback under the image so
+  the error path reveals intentional content, not an empty capsule. (`this.onerror=null`
+  FIRST is the loop guard, same as the card pattern.) Pick the fallback that matches the
+  surface's existing no-photo design: cards/detail/home/guide/neighborhood →
+  placeholder SVG; this page → branded city monogram/name over the brand gradient.
 
 Tests: `backend/tests/test_image_fallback.py` (now also covers the network-landing
-gradient fallback). The `test_template_js_syntax.py` esprima guard only scans `<script>`
-block bodies, so an `onerror=` HTML attribute is not checked by it — still run
-`node --check` on the handler manually.
+branded fallback) and `backend/tests/test_network_landing_hero.py` (covers missing
+hero URLs and broken hero URLs). The `test_template_js_syntax.py` esprima guard only
+scans `<script>` block bodies, so an `onerror=` HTML attribute is not checked by it.
 
 ## reference.css is a STATIC precompiled file — many Tailwind utilities are absent (2026-06-19)
 
