@@ -82,6 +82,57 @@ async def test_upsert_preserves_id_and_created_at(db):
     assert stored == original_ts.replace(tzinfo=None)
 
 
+@pytest.mark.asyncio
+async def test_upsert_preserves_existing_city_hero_photo_when_seed_omits_it(db):
+    """A hero photo set on a city must survive a re-seed that doesn't provide one.
+
+    Regression: most per-city seeds don't set a city hero photo, so a hero set
+    later (in the DB/admin) was wiped on every re-seed and the homepage city card
+    fell back to an empty capsule. The upsert must keep the existing hero.
+    """
+    await db.cities.insert_one(
+        {"_id": "c1", "slug": "aventura", "name": "Aventura", "status": "live",
+         "hero_photo_url": "https://images.unsplash.com/photo-keep?w=1600", "created_at": None}
+    )
+    # Re-seed doc omits hero_photo_url entirely (the common case).
+    await upsert("cities", {"slug": "aventura"},
+                 {"slug": "aventura", "name": "Aventura", "status": "live", "created_at": None})
+
+    doc = await db.cities.find_one({"slug": "aventura"})
+    assert doc["hero_photo_url"] == "https://images.unsplash.com/photo-keep?w=1600"
+
+
+@pytest.mark.asyncio
+async def test_upsert_preserves_existing_city_hero_photo_when_seed_passes_blank(db):
+    """An existing hero must NOT be overwritten by a seed that passes an empty
+    string (seed_hallandale_beach passes hero_photo_url="" when it has no photo)."""
+    await db.cities.insert_one(
+        {"_id": "c2", "slug": "boca-raton", "name": "Boca Raton", "status": "live",
+         "hero_photo_url": "https://images.unsplash.com/photo-real?w=1600", "created_at": None}
+    )
+    await upsert("cities", {"slug": "boca-raton"},
+                 {"slug": "boca-raton", "name": "Boca Raton", "status": "live",
+                  "hero_photo_url": "", "created_at": None})
+
+    doc = await db.cities.find_one({"slug": "boca-raton"})
+    assert doc["hero_photo_url"] == "https://images.unsplash.com/photo-real?w=1600"
+
+
+@pytest.mark.asyncio
+async def test_upsert_lets_seed_set_a_real_hero_photo(db):
+    """When the seed DOES provide a real hero photo, it is used (not blocked)."""
+    await db.cities.insert_one(
+        {"_id": "c3", "slug": "miami", "name": "Miami", "status": "live",
+         "hero_photo_url": "https://images.unsplash.com/old?w=1600", "created_at": None}
+    )
+    await upsert("cities", {"slug": "miami"},
+                 {"slug": "miami", "name": "Miami", "status": "live",
+                  "hero_photo_url": "https://images.unsplash.com/new?w=1600", "created_at": None})
+
+    doc = await db.cities.find_one({"slug": "miami"})
+    assert doc["hero_photo_url"] == "https://images.unsplash.com/new?w=1600"
+
+
 def test_seeded_footer_cross_links_use_canonical_hosts():
     """Footer 'Also in <city>' cross-links must point at hosts that are actually
     served, not a bare slug that has no certificate.
