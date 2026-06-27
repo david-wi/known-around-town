@@ -186,6 +186,31 @@ class TestProvisionSalonReceptionist:
         assert "Sunday" in system_prompt
         assert "Closed" in system_prompt
 
+    def test_provision_uses_configured_vapi_model(self, monkeypatch):
+        """The VAPI assistant model/provider should be env-configurable."""
+        monkeypatch.setenv("VAPI_ASSISTANT_MODEL_PROVIDER", "google")
+        monkeypatch.setenv("VAPI_ASSISTANT_MODEL", "gemini-2.5-flash")
+
+        from app.config import get_settings
+
+        get_settings.cache_clear()
+
+        business = self._make_business()
+        db = self._make_mock_db(business)
+        mock_client = self._mock_httpx_responses()
+
+        from app.services.voice_provisioning import provision_salon_receptionist
+
+        try:
+            with patch("app.services.voice_provisioning.httpx.AsyncClient", return_value=mock_client):
+                asyncio.run(provision_salon_receptionist(db, "biz-123"))
+
+            payload = mock_client.post.call_args_list[0].kwargs.get("json")
+            assert payload["model"]["provider"] == "google"
+            assert payload["model"]["model"] == "gemini-2.5-flash"
+        finally:
+            get_settings.cache_clear()
+
     def test_provision_phone_number_formatting(self):
         """E.164 number +16692328894 must be formatted as (669) 232-8894."""
         business = self._make_business()

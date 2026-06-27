@@ -106,6 +106,8 @@ To disable the gate (public launch): set `PREVIEW_MODE_ENABLED=false` in `/opt/k
 | `GA_MEASUREMENT_ID` | For analytics | Google Analytics 4 measurement ID |
 | `GOOGLE_SITE_VERIFICATION` | For GSC | Meta tag for Search Console verification |
 | `ALLOW_LOCAL_MONGODB` | Dev only | `true` to allow localhost Mongo |
+| `VAPI_ASSISTANT_MODEL_PROVIDER` | For Concierge voice | VAPI provider for the live phone assistant model loop (default `openai`) |
+| `VAPI_ASSISTANT_MODEL` | For Concierge voice | VAPI model for the live phone assistant model loop (default `gpt-4o`) |
 
 ## URL Structure
 

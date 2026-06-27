@@ -117,6 +117,12 @@ class Settings(BaseSettings):
     # hello@knowsbeauty.com — update to a real monitored address before launch.
     support_email: str = "hello@knowsbeauty.com"
 
+    # WHY: VAPI hosts the live phone-assistant model loop, so this cannot route
+    # through Expertly call_llm. Keeping the provider/model in Settings lets us
+    # rotate VAPI choices with env vars instead of code changes.
+    vapi_assistant_model_provider: str = "openai"
+    vapi_assistant_model: str = "gpt-4o"
+
     port: int = 8000
     log_level: str = "INFO"
 
