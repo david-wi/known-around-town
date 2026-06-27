@@ -32,6 +32,20 @@ def test_favicon_routes_do_not_404(client):
     assert r.headers["content-type"].startswith("image/svg+xml")
 
 
+def test_www_prefix_resolves_same_as_bare_city(client):
+    """A visitor who types "www.miami.knowsbeauty.com" should get the Miami
+    site, not a 404. The tenant resolver treats a leading "www." as an alias.
+
+    Regression: before this, the host matcher saw the extra "www." label and
+    rejected it as an unsupported nested subdomain, so www.<city> 404'd."""
+    bare = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    wwwd = client.get("/", headers={"host": "www.miami.knowsbeauty.localhost"})
+    assert bare.status_code == 200, bare.text
+    assert wwwd.status_code == 200, wwwd.text
+    # Both should render the Miami site.
+    assert "Miami" in wwwd.text
+
+
 def test_miami_beauty_home(client):
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
