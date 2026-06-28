@@ -32,3 +32,10 @@ def test_sticky_active_category_link_keeps_network_accent():
     html = _render_header("sticky")
 
     assert 'class="text-sm tracking-wide transition-colors text-rose-700 font-semibold"' in html
+
+
+def test_visual_language_toggle_is_desktop_only():
+    html = _render_header("sticky")
+
+    assert '<div class="relative hidden md:block">' in html
+    assert 'aria-label="Language: English"' in html
