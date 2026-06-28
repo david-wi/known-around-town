@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.database import get_db
 from app.models import Business
+from app.responses import MongoSafeJSONResponse
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import merge_update, now_utc, to_doc
 
@@ -43,7 +44,7 @@ async def list_businesses(
         .skip(offset)
         .limit(limit)
     )
-    return await cur.to_list(length=limit)
+    return MongoSafeJSONResponse(await cur.to_list(length=limit))
 
 
 @router.get("/by-slug/{city_id}/{slug}")
@@ -51,7 +52,7 @@ async def get_business_by_slug(city_id: str, slug: str) -> Dict[str, Any]:
     doc = await get_db().businesses.find_one({"city_id": city_id, "slug": slug})
     if not doc:
         raise HTTPException(404, "Business not found")
-    return doc
+    return MongoSafeJSONResponse(doc)
 
 
 @router.get("/{business_id}")
@@ -59,7 +60,7 @@ async def get_business(business_id: str) -> Dict[str, Any]:
     doc = await get_db().businesses.find_one({"_id": business_id})
     if not doc:
         raise HTTPException(404, "Business not found")
-    return doc
+    return MongoSafeJSONResponse(doc)
 
 
 @router.post("", dependencies=[Depends(require_admin)])
@@ -73,7 +74,7 @@ async def create_business(body: Business) -> Dict[str, Any]:
     ):
         raise HTTPException(409, "Business slug already exists in this city")
     await db.businesses.insert_one(doc)
-    return doc
+    return MongoSafeJSONResponse(doc)
 
 
 @router.patch("/{business_id}", dependencies=[Depends(require_admin)])
@@ -84,7 +85,7 @@ async def update_business(business_id: str, patch: Dict[str, Any]) -> Dict[str, 
         raise HTTPException(404, "Business not found")
     merged = merge_update(existing, patch)
     await db.businesses.replace_one({"_id": business_id}, merged)
-    return merged
+    return MongoSafeJSONResponse(merged)
 
 
 @router.delete("/{business_id}", dependencies=[Depends(require_admin)])

@@ -24,28 +24,7 @@ from fastapi.templating import Jinja2Templates
 from app.config import get_settings
 
 
-class _MongoJSONEncoder(json.JSONEncoder):
-    """WHY: some MongoDB collections still have BSON ObjectId values in _id
-    and foreign-key fields (pre-UUID-migration documents).  FastAPI's default
-    Pydantic serialization can't handle ObjectId, causing 500s on any endpoint
-    that returns raw cursor results."""
-
-    def default(self, o: Any) -> Any:
-        if isinstance(o, ObjectId):
-            return str(o)
-        return super().default(o)
-
-
-class MongoSafeJSONResponse(JSONResponse):
-    def render(self, content: Any) -> bytes:
-        return json.dumps(
-            content,
-            ensure_ascii=False,
-            allow_nan=False,
-            indent=None,
-            separators=(",", ":"),
-            cls=_MongoJSONEncoder,
-        ).encode("utf-8")
+from app.responses import MongoSafeJSONResponse
 from app.database import ensure_indexes, run_startup_migrations
 from app.middleware.preview_gate import PreviewGateMiddleware
 from app.routes.api.v1 import (
