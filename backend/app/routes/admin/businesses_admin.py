@@ -107,6 +107,9 @@ async def business_edit_page(
     if not business:
         raise HTTPException(404, "Business not found")
 
+    from app.services.tenant import build_absolute_business_url
+    business["public_url"] = await build_absolute_business_url(request, business)
+
     return _templates.TemplateResponse(
         "admin/business_edit.html",
         {

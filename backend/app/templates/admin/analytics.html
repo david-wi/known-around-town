@@ -52,7 +52,7 @@
           {{ "{:,}".format(biz.get("page_view_count", 0)) }}
         </span>
         <div class="flex-1 min-w-0">
-          <a href="{{ biz.public_url or ('/b/' ~ biz.slug) }}" target="_blank"
+          <a href="{{ biz.public_url }}" target="_blank"
              class="text-sm font-medium text-stone-900 hover:text-rose-700 truncate block">
             {{ biz.name }}
           </a>

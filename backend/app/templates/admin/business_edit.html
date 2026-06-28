@@ -57,9 +57,9 @@
       {% if business.google_rating_synced_at %}
         <p class="mt-1 text-xs text-stone-500">Last synced: {{ business.google_rating_synced_at.strftime('%b %-d, %Y %-I:%M %p UTC') if business.google_rating_synced_at else '—' }}</p>
       {% endif %}
-      {% if business.slug %}
+      {% if business.public_url %}
         <p class="mt-2">
-          <a href="/b/{{ business.slug }}" target="_blank" rel="noopener"
+          <a href="{{ business.public_url }}" target="_blank" rel="noopener"
              class="text-rose-600 underline decoration-rose-300 hover:decoration-rose-600 text-xs">
             View public listing ↗
           </a>

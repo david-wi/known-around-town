@@ -320,5 +320,9 @@ app.include_router(public_pages.router)
 
 @app.exception_handler(404)
 async def handle_404(request: Request, exc):
+    # If the request is for an API endpoint, return JSON detail instead of HTML page
+    if request.url.path.startswith("/api/"):
+        detail = getattr(exc, "detail", "Not Found")
+        return JSONResponse({"detail": detail}, status_code=404)
     # Render a tenant-aware 404 when we have a recognized host.
     return await public_pages.render_not_found(request, templates)

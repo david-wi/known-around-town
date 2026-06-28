@@ -140,3 +140,23 @@ def test_analytics_top_listing_links_use_listing_city_host(client, seeded_db):
     r = client.get("/admin/analytics", headers={"host": "knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
     assert 'href="http://hollywood.knowsbeauty.localhost/b/hollywood-test-salon"' in r.text
+
+
+def test_analytics_page_listing_link_is_absolute(client, seeded_db):
+    """Business listings in the top-views table should link to absolute URLs (with city subdomain)."""
+    biz = asyncio.run(seeded_db.businesses.find_one({}))
+    assert biz is not None
+
+    # Inject page views to make it show up in the top listings list
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"_id": biz["_id"]},
+            {"$set": {"page_view_count": 999}},
+        )
+    )
+
+    r = client.get("/admin/analytics", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    # Should contain the absolute URL including miami subdomain
+    expected_url = f"http://miami.knowsbeauty.localhost/b/{biz['slug']}"
+    assert expected_url in r.text

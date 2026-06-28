@@ -12,6 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+from fastapi import Request
+
 from app.config import get_settings
 from app.database import get_db
 
@@ -101,3 +103,46 @@ async def resolve_tenant(host: str) -> Optional[TenantContext]:
         network_domain_suffix=suffix or "",
         city_slug=city_slug,
     )
+
+
+async def build_absolute_business_url(request: Request, business: dict) -> str:
+    """Build the absolute public URL for a business, ensuring it points to the correct city subdomain,
+    preserving any port, scheme, and staging/preview prefix from the request.
+    
+    If the business has no city or it cannot be resolved, falls back to a relative path.
+    """
+    city_id = business.get("city_id")
+    if not city_id:
+        return f"/b/{business.get('slug', '')}"
+
+    db = get_db()
+    city = await db.cities.find_one({"_id": city_id}, {"slug": 1})
+    if not city or not city.get("slug"):
+        return f"/b/{business.get('slug', '')}"
+
+    city_slug = city["slug"]
+    if city_slug == "wynwood":
+        city_slug = "miami"
+
+    request_host = request.headers.get("host", "")
+    scheme = request.url.scheme or "https"
+
+    port_suffix = ""
+    if ":" in request_host:
+        host_part, port_part = request_host.split(":", 1)
+        port_suffix = f":{port_part}"
+        request_host = host_part
+
+    tenant = await resolve_tenant(request_host)
+    if not tenant or not tenant.network_domain_suffix:
+        return f"/b/{business.get('slug', '')}"
+
+    suffix = tenant.network_domain_suffix
+
+    prefix = ""
+    for p in ("stage-", "preview-"):
+        if request_host.startswith(p):
+            prefix = p
+            break
+
+    return f"{scheme}://{prefix}{city_slug}.{suffix}{port_suffix}/b/{business.get('slug', '')}"
