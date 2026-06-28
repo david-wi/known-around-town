@@ -85,7 +85,10 @@ async def analytics_page(request: Request) -> HTMLResponse:
     # WHY: uses business_claims collection (same as claims_admin.py uses).
     total_claims: int = await db.business_claims.count_documents({})
     pending_claims: int = await db.business_claims.count_documents({"status": "pending"})
-    approved_claims: int = await db.business_claims.count_documents({"status": "approved"})
+    # WHY: the claim verification endpoint stores the successful review state
+    # as "verified"; the admin dashboard labels that business-facing outcome as
+    # "approved" so David sees plain-language funnel counts.
+    approved_claims: int = await db.business_claims.count_documents({"status": "verified"})
     rejected_claims: int = await db.business_claims.count_documents({"status": "rejected"})
 
     # ── Owner accounts ───────────────────────────────────────────────────────
