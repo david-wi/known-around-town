@@ -39,3 +39,11 @@ def test_visual_language_toggle_is_desktop_only():
 
     assert '<div class="relative hidden md:block">' in html
     assert 'aria-label="Language: English"' in html
+
+
+def test_mobile_brand_can_shrink_without_pushing_hamburger():
+    html = _render_header("sticky")
+
+    assert 'class="group min-w-0 flex-1 md:flex-none"' in html
+    assert 'class="flex shrink-0 items-center gap-3"' in html
+    assert "block truncate font-serif text-xl md:text-[26px]" in html

@@ -18,12 +18,35 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app.config import get_settings
 from app.database import get_db
 from app.routes.api.v1._auth import require_admin
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 _templates: Optional[Jinja2Templates] = None
+
+
+def _network_host_suffix(request: Request) -> str:
+    """Return the city-subdomain suffix for absolute admin listing links."""
+    host = request.url.hostname or ""
+    configured = get_settings().parse_network_domains()
+    for network_slug, suffix in configured:
+        if network_slug == "beauty" and (host == suffix or host.endswith(f".{suffix}")):
+            return suffix
+    for network_slug, suffix in configured:
+        if network_slug == "beauty":
+            return suffix
+    if "." in host:
+        return host.split(".", 1)[1]
+    return host
+
+
+def _business_public_url(request: Request, city_slug: str | None, business_slug: str) -> str:
+    if not city_slug:
+        return f"/b/{business_slug}"
+    scheme = "https" if request.url.scheme == "https" else request.url.scheme
+    return f"{scheme}://{city_slug}.{_network_host_suffix(request)}/b/{business_slug}"
 
 
 def attach_templates(t: Jinja2Templates) -> None:
@@ -68,8 +91,16 @@ async def analytics_page(request: Request) -> HTMLResponse:
     # Top 20 most-visited listings
     top_listings: List[Dict[str, Any]] = await db.businesses.find(
         {**city_filter, "page_view_count": {"$gt": 0}},
-        {"name": 1, "slug": 1, "neighborhood": 1, "page_view_count": 1, "featured": 1},
+        {"name": 1, "slug": 1, "city_id": 1, "neighborhood": 1, "page_view_count": 1, "featured": 1},
     ).sort("page_view_count", -1).limit(20).to_list(20)
+    city_ids = {biz.get("city_id") for biz in top_listings if biz.get("city_id")}
+    cities_by_id: Dict[str, Dict[str, Any]] = {}
+    if city_ids:
+        async for city in db.cities.find({"_id": {"$in": list(city_ids)}}, {"slug": 1}):
+            cities_by_id[city["_id"]] = city
+    for biz in top_listings:
+        city_slug = (cities_by_id.get(biz.get("city_id")) or {}).get("slug")
+        biz["public_url"] = _business_public_url(request, city_slug, biz["slug"])
 
     # Businesses with zero or no page_view_count field (not yet visited)
     total_biz: int = await db.businesses.count_documents(city_filter)
