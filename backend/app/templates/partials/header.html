@@ -12,8 +12,9 @@
 {% if hv == 'over_hero' %}
   {% set header_classes = 'absolute top-0 left-0 right-0 z-50 bg-transparent' %}
   {% set brand_text_color = 'text-white' %}
-  {% set nav_link_color = 'text-white/90' %}
+  {% set nav_link_color = 'text-white' %}
   {% set nav_link_hover = 'hover:text-white' %}
+  {% set active_nav_link_color = 'text-white font-semibold drop-shadow-sm' %}
   {% set cta_border = 'border-white/40' %}
   {% set cta_text = 'text-white' %}
   {% set cta_hover = 'hover:bg-white hover:text-stone-900' %}
@@ -22,6 +23,7 @@
   {% set brand_text_color = 'text-stone-900' %}
   {% set nav_link_color = 'text-stone-700' %}
   {% set nav_link_hover = theme.accent_hover_text %}
+  {% set active_nav_link_color = theme.accent_text_full ~ ' font-semibold' %}
   {% set cta_border = 'border-stone-900/30' %}
   {% set cta_text = 'text-stone-900' %}
   {% set cta_hover = 'hover:bg-stone-800 hover:text-white' %}
@@ -36,7 +38,7 @@
     <nav class="hidden md:flex items-center gap-8">
       {% for item in header_nav %}
         {% set is_active = (active_category_slug == item.slug) %}
-        <a class="text-sm tracking-wide transition-colors {% if is_active %}{{ theme.accent_text_full }} font-semibold{% else %}{{ nav_link_color }} {{ nav_link_hover }}{% endif %}" href="/c/{{ item.slug }}">{{ item.label }}</a>
+        <a class="text-sm tracking-wide transition-colors {% if is_active %}{{ active_nav_link_color }}{% else %}{{ nav_link_color }} {{ nav_link_hover }}{% endif %}" href="/c/{{ item.slug }}">{{ item.label }}</a>
       {% endfor %}
     </nav>
     {% endif %}
