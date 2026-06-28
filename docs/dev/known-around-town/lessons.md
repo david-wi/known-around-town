@@ -1,5 +1,15 @@
 # known-around-town — Lessons Learned
 
+## Business claim status uses `verified`, even when admin UI says approved (2026-06-28)
+
+The claim verification endpoint writes successful reviews as `business_claims.status = "verified"` and
+`businesses.claim_status = "verified"`. The admin analytics page uses the owner-friendly label "approved",
+but its query must count `status: "verified"`, not `status: "approved"`.
+
+Symptom: after David verifies the first real salon claim, `/admin/claims` removes the pending row and the
+business is verified, but `/admin/analytics` still shows `0 approved`. Regression coverage lives in
+`tests/test_admin_analytics.py::test_analytics_counts_verified_claims_as_approved`.
+
 ## Cache recent Google discovery misses, but do not block the next quota window (2026-06-27)
 
 Google ratings are stored on `businesses.google_*` once a listing has an accepted

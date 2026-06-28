@@ -66,6 +66,29 @@ def test_analytics_page_with_claims(client, seeded_db):
     assert biz["name"] in r.text
 
 
+def test_analytics_counts_verified_claims_as_approved(client, seeded_db):
+    """A verified claim should move from pending to the approved funnel count."""
+    biz = asyncio.run(seeded_db.businesses.find_one({}))
+    assert biz is not None
+
+    r = client.post("/api/v1/claims", json={
+        "business_id": biz["_id"],
+        "submitter_name": "Verified Owner",
+        "submitter_email": "verified@example.com",
+        "submitter_phone": "+1 305-555-0000",
+        "notes": "Analytics verified-count test",
+    })
+    assert r.status_code == 200, r.text
+    claim = r.json()
+
+    r = client.post(f"/api/v1/claims/{claim['_id']}/verify")
+    assert r.status_code == 200, r.text
+
+    r = client.get("/admin/analytics")
+    assert r.status_code == 200, r.text
+    assert "0 pending · 1 approved" in r.text
+
+
 def test_analytics_page_with_page_views(client, seeded_db):
     """After injecting a page_view_count, the analytics page reflects it."""
     biz = asyncio.run(seeded_db.businesses.find_one({}))
