@@ -106,3 +106,37 @@ def test_analytics_page_with_page_views(client, seeded_db):
     assert r.status_code == 200, r.text
     assert "42" in r.text
     assert biz["name"] in r.text
+
+
+def test_analytics_top_listing_links_use_listing_city_host(client, seeded_db):
+    """Cross-city top listings should not link to the admin page's current city."""
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    assert network is not None
+    city = {
+        "_id": "city-hollywood-admin-analytics",
+        "network_id": network["_id"],
+        "slug": "hollywood",
+        "name": "Hollywood",
+        "status": "live",
+    }
+    biz = {
+        "_id": "biz-hollywood-admin-analytics",
+        "network_id": network["_id"],
+        "city_id": city["_id"],
+        "name": "Hollywood Test Salon",
+        "slug": "hollywood-test-salon",
+        "neighborhood": "Hollywood",
+        "status": "live",
+        "page_view_count": 99,
+    }
+    asyncio.run(seeded_db.cities.insert_one(city))
+    asyncio.run(seeded_db.businesses.insert_one(biz))
+
+    r = client.get("/admin/analytics", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert 'href="http://hollywood.knowsbeauty.localhost/b/hollywood-test-salon"' in r.text
+    assert 'href="/b/hollywood-test-salon"' not in r.text
+
+    r = client.get("/admin/analytics", headers={"host": "knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    assert 'href="http://hollywood.knowsbeauty.localhost/b/hollywood-test-salon"' in r.text
