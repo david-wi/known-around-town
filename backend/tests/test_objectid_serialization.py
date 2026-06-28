@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from bson import ObjectId
 from fastapi.encoders import jsonable_encoder
 from fastapi.testclient import TestClient
@@ -25,7 +26,7 @@ def test_objectid_serialization():
 
 
 async def test_businesses_api_objectid_serialization(client, mock_db):
-    # Insert a business with BSON ObjectId as its _id
+    # Insert a business with BSON ObjectId as its _id and datetime field
     obj_id = ObjectId("6a2e6713442d35eb8a936916")
     city_id = "c9a53e0a-638c-43f9-96c0-d72a6e830c5c"
     
@@ -37,6 +38,7 @@ async def test_businesses_api_objectid_serialization(client, mock_db):
         "status": "live",
         "category_slugs": ["med-spa"],
         "neighborhood_slugs": ["brickell"],
+        "updated_at": datetime(2026, 6, 28, 12, 0, 0),
     })
     
     # We must insert the city so that any references can resolve
@@ -52,3 +54,4 @@ async def test_businesses_api_objectid_serialization(client, mock_db):
     assert len(data) == 1
     assert data[0]["_id"] == "6a2e6713442d35eb8a936916"
     assert data[0]["name"] == "LUX MedSpa Brickell"
+    assert data[0]["updated_at"] == "2026-06-28T12:00:00"
