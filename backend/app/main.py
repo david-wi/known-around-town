@@ -7,7 +7,16 @@ from typing import Any, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from bson import ObjectId
+import fastapi.encoders
 from fastapi import FastAPI, Request
+
+# WHY: fastapi's internal jsonable_encoder runs before Response.render, and
+# throws a ValueError when it encounters bson.ObjectId. Globally registering
+# it in ENCODERS_BY_TYPE coerces it to a string during fastapi's serialization
+# pass, preventing 500 Internal Server Errors on endpoints that return raw
+# MongoDB cursor results containing ObjectIds.
+fastapi.encoders.ENCODERS_BY_TYPE[ObjectId] = str
+
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
