@@ -4505,3 +4505,11 @@ def test_subscribed_owner_does_not_see_upgrade_nudge(client, seeded_db):
     # The nudge banner must NOT appear for a paying owner.
     assert "You're viewing your listing" not in r.text
     assert "Get Featured" not in r.text
+
+
+def test_api_404_returns_json(client):
+    """An API endpoint that 404s must return a JSON response, not HTML."""
+    r = client.get("/api/v1/nonexistent-endpoint")
+    assert r.status_code == 404
+    assert r.headers["content-type"].startswith("application/json")
+    assert r.json() == {"detail": "Not Found"}

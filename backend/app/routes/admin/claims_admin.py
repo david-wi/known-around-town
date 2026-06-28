@@ -125,7 +125,9 @@ async def pending_claims_page(request: Request) -> HTMLResponse:
     businesses_by_id: Dict[str, Dict[str, Any]] = {}
     if biz_ids:
         biz_cur = db.businesses.find({"_id": {"$in": biz_ids}})
+        from app.services.tenant import build_absolute_business_url
         async for b in biz_cur:
+            b["public_url"] = await build_absolute_business_url(request, b)
             businesses_by_id[b["_id"]] = b
 
     return _templates.TemplateResponse(

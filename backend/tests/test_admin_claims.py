@@ -62,6 +62,12 @@ def test_admin_claims_page_lists_pending(client, seeded_db):
     # The row carries the claim id so the JS handler can target the right endpoint.
     assert f'data-claim-id="{claim["_id"]}"' in r.text
 
+    # The link to the listing must be absolute (including the city subdomain)
+    r = client.get("/admin/claims", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200, r.text
+    expected_url = f"http://miami.knowsbeauty.localhost/b/{business['slug']}"
+    assert expected_url in r.text
+
 
 def test_admin_claims_page_empty_state(client):
     r = client.get("/admin/claims")

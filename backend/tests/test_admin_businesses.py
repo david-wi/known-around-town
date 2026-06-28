@@ -98,12 +98,16 @@ def test_admin_businesses_page_shows_hidden_badge(client, seeded_db):
 def test_admin_business_edit_page_renders(client, seeded_db):
     """Edit page loads and shows the business name and the hide_ratings toggle."""
     biz = _first_business(seeded_db)
-    r = client.get(f"/admin/businesses/{biz['_id']}/edit")
+    r = client.get(f"/admin/businesses/{biz['_id']}/edit", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
     assert biz["name"] in r.text
     # The toggle input must be present.
     assert 'name="hide_ratings"' in r.text
     assert "Hide star ratings" in r.text
+
+    # The link to the public listing must be absolute
+    expected_url = f"http://miami.knowsbeauty.localhost/b/{biz['slug']}"
+    assert expected_url in r.text
 
 
 def test_admin_business_edit_page_shows_unchecked_by_default(client, seeded_db):
