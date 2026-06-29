@@ -450,3 +450,26 @@ def client(seeded_db):
     from app.main import app
 
     return TestClient(app)
+
+
+def test_lightbox_img_has_no_empty_src(client):
+    """The hidden lightbox <img id="lb-img"> must NOT ship an empty src="".
+
+    An empty src resolves against the page URL, so every listing load fires a
+    wasteful failed image request to the listing page itself (a phantom broken
+    image in the DOM, invisible only because the lightbox is hidden). The
+    lightbox JS sets img.src from the photos array when a photo is opened, so the
+    tag needs no initial source. This guards against the empty src creeping back.
+    """
+    r = client.get("/b/igk-salon-south-beach", headers={"host": "miami.knowsbeauty.localhost"})
+    if r.status_code != 200:
+        r = client.get(
+            "/b/rossano-ferretti-hair-spa-miami",
+            headers={"host": "miami.knowsbeauty.localhost"},
+        )
+    if r.status_code != 200:
+        pytest.skip("no business page available in seed")
+    assert 'id="lb-img"' in r.text, "lightbox img element should be present"
+    tag = re.search(r'<img\s+id="lb-img"[^>]*>', r.text, re.S)
+    assert tag, "lightbox img tag not found"
+    assert 'src=""' not in tag.group(0), f"lightbox img must not carry an empty src: {tag.group(0)}"

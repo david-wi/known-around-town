@@ -893,8 +893,13 @@
           class="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl leading-none z-10 p-3 hidden"
           onclick="lightboxNav(1)"
           aria-label="Next photo">›</button>
+  {#- WHY: no initial src attribute. An empty src="" resolves against the page
+      URL, so the browser fires a wasteful failed image request to the listing
+      page itself on every load (the listing renders a broken phantom image in
+      the DOM, invisible only because the lightbox is hidden). The lightbox stays
+      hidden until openLightbox() sets img.src from the photos array, so no source
+      is needed up front — an attribute-less <img> makes zero network request. #}
   <img id="lb-img"
-       src=""
        alt="Salon photo"
        class="max-h-[90vh] max-w-[90vw] object-contain rounded-xl shadow-2xl"
        onclick="event.stopPropagation()">
