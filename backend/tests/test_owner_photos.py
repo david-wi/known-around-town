@@ -119,7 +119,7 @@ class TestPhotoUpload:
             r = client.post(
                 "/api/v1/owner/photos",
                 files={"file": ("photo.jpg", _jpeg_bytes(), "image/jpeg")},
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
         assert r.status_code == 404
 
@@ -135,7 +135,7 @@ class TestPhotoUpload:
             r = client.post(
                 "/api/v1/owner/photos",
                 files={"file": ("salon.jpg", _jpeg_bytes(), "image/jpeg")},
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 200
@@ -157,7 +157,7 @@ class TestPhotoUpload:
             r = client.post(
                 "/api/v1/owner/photos",
                 files={"file": ("logo.png", _png_bytes(), "image/png")},
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 200
@@ -173,7 +173,7 @@ class TestPhotoUpload:
             r = client.post(
                 "/api/v1/owner/photos",
                 files={"file": ("salon.webp", _webp_bytes(), "image/webp")},
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 200
@@ -189,7 +189,7 @@ class TestPhotoUpload:
             r = client.post(
                 "/api/v1/owner/photos",
                 files={"file": ("evil.jpg", _text_bytes(), "image/jpeg")},
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 415
@@ -209,7 +209,7 @@ class TestPhotoUpload:
             r = client.post(
                 "/api/v1/owner/photos",
                 files={"file": ("huge.jpg", big_data, "image/jpeg")},
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 413
@@ -229,7 +229,7 @@ class TestPhotoUpload:
             r = client.post(
                 "/api/v1/owner/photos",
                 files={"file": ("second.jpg", _jpeg_bytes(), "image/jpeg")},
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 200
@@ -254,7 +254,7 @@ class TestPhotoUpload:
             r = client.post(
                 "/api/v1/owner/photos",
                 files={"file": ("one-more.jpg", _jpeg_bytes(), "image/jpeg")},
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 409
@@ -287,7 +287,7 @@ class TestPhotoDelete:
         with patch(_PATCH_OWNER, return_value=bucket):
             r = client.delete(
                 f"/api/v1/owner/photos/{photo_id}",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 200
@@ -309,7 +309,7 @@ class TestPhotoDelete:
         with patch(_PATCH_OWNER, return_value=_mock_gridfs_bucket()):
             r = client.delete(
                 f"/api/v1/owner/photos/{hero_id}",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 200
@@ -329,7 +329,7 @@ class TestPhotoDelete:
         with patch(_PATCH_OWNER, return_value=_mock_gridfs_bucket()):
             r = client.delete(
                 "/api/v1/owner/photos/not-a-valid-objectid",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 400
@@ -347,7 +347,7 @@ class TestPhotoDelete:
         with patch(_PATCH_OWNER, return_value=_mock_gridfs_bucket()):
             r = client.delete(
                 f"/api/v1/owner/photos/{unrelated_id}",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 404
@@ -372,7 +372,7 @@ class TestPhotoDelete:
         with patch(_PATCH_OWNER, return_value=_mock_gridfs_bucket()):
             r = client.delete(
                 f"/api/v1/owner/photos/{second_id}",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 200
@@ -403,7 +403,7 @@ class TestPhotoDelete:
         with patch(_PATCH_OWNER, return_value=bucket):
             r = client.delete(
                 f"/api/v1/owner/photos/{photo_id}",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
 
         assert r.status_code == 200
