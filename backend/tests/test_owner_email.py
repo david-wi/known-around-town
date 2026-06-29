@@ -159,3 +159,83 @@ class TestNoFoundingPartnerInEmails:
         html = _claim_verified_html("Maria", "Salon X", LOGIN_URL, PRICING_URL)
         for phrase in ("founding partner", "founding price", "spots left"):
             assert phrase not in html.lower(), f"html must not mention {phrase!r}"
+
+
+@pytest.mark.asyncio
+class TestDynamicSiteNameResolution:
+    async def test_resolves_default_for_empty_inputs(self, seeded_db):
+        from app.services.owner_email import _resolve_site_names
+        site_name, net_name = await _resolve_site_names()
+        assert site_name == "Miami Knows Beauty"
+        assert net_name == "Knows Beauty"
+
+    async def test_resolves_from_url_hostname(self, seeded_db):
+        from app.services.owner_email import _resolve_site_names
+        
+        # Test with a known seeded city (Miami)
+        site_name, net_name = await _resolve_site_names(url="https://miami.knowsbeauty.localhost:8000/owners/login")
+        assert site_name == "Miami Knows Beauty"
+        assert net_name == "Knows Beauty"
+        
+        db = seeded_db
+        # Let's get the seeded beauty network ID
+        net = await db.networks.find_one({"slug": "beauty"})
+        assert net is not None
+        
+        # Let's seed a new city in the existing beauty network
+        await db.cities.insert_one({
+            "_id": "test-city-id",
+            "network_id": net["_id"],
+            "slug": "weston",
+            "name": "Weston",
+        })
+        
+        # Now resolve from the Weston URL hostname
+        site_name, net_name = await _resolve_site_names(url="https://weston.knowsbeauty.localhost:8000/owners/login")
+        assert site_name == "Weston Knows Beauty"
+        assert net_name == "Knows Beauty"
+        
+        # Test with another network
+        net_well = await db.networks.find_one({"slug": "wellness"})
+        assert net_well is not None
+        await db.cities.insert_one({
+            "_id": "test-well-city-id",
+            "network_id": net_well["_id"],
+            "slug": "fort-lauderdale",
+            "name": "Fort Lauderdale",
+        })
+        site_name, net_name = await _resolve_site_names(url="https://fort-lauderdale.knowswellness.localhost/owners/login")
+        assert site_name == "Fort Lauderdale Knows Wellness"
+        assert net_name == "Knows Wellness"
+
+    async def test_resolves_from_business_id(self, seeded_db):
+        from app.services.owner_email import _resolve_site_names
+        db = seeded_db
+        
+        await db.networks.insert_one({"_id": "net-1", "slug": "beauty-net", "name": "Knows Beauty"})
+        await db.cities.insert_one({"_id": "city-1", "network_id": "net-1", "slug": "doral", "name": "Doral"})
+        await db.businesses.insert_one({
+            "_id": "biz-1",
+            "city_id": "city-1",
+            "name": "Doral Nail Salon",
+        })
+        
+        site_name, net_name = await _resolve_site_names(business_id="biz-1")
+        assert site_name == "Doral Knows Beauty"
+        assert net_name == "Knows Beauty"
+
+    async def test_resolves_from_business_name(self, seeded_db):
+        from app.services.owner_email import _resolve_site_names
+        db = seeded_db
+        
+        await db.networks.insert_one({"_id": "net-2", "slug": "beauty-net-2", "name": "Knows Beauty"})
+        await db.cities.insert_one({"_id": "city-2", "network_id": "net-2", "slug": "fort-lauderdale", "name": "Fort Lauderdale"})
+        await db.businesses.insert_one({
+            "_id": "biz-2",
+            "city_id": "city-2",
+            "name": "Las Olas Hair Design",
+        })
+        
+        site_name, net_name = await _resolve_site_names(business_name="Las Olas Hair Design")
+        assert site_name == "Fort Lauderdale Knows Beauty"
+        assert net_name == "Knows Beauty"

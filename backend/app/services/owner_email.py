@@ -58,6 +58,72 @@ def _admin_notify_address() -> str:
     return os.environ.get("ADMIN_NOTIFY_EMAIL", get_settings().support_email).strip()
 
 
+async def _resolve_site_names(
+    *,
+    url: Optional[str] = None,
+    business_id: Optional[str] = None,
+    business_name: Optional[str] = None,
+) -> tuple[str, str]:
+    """Return (site_name, network_name) dynamically resolved.
+    
+    Defaults to ("Miami Knows Beauty", "Knows Beauty").
+    """
+    from urllib.parse import urlparse
+    from app.services.tenant import resolve_tenant
+    from app.database import get_db
+    
+    network_name = "Knows Beauty"
+    city_name = "Miami"
+    
+    # 1. Try resolving from URL hostname first
+    if url:
+        try:
+            parsed = urlparse(url)
+            hostname = parsed.hostname or ""
+            tenant = await resolve_tenant(hostname)
+            if tenant:
+                if tenant.network and tenant.network.get("name"):
+                    network_name = tenant.network["name"]
+                if tenant.city and tenant.city.get("name"):
+                    city_name = tenant.city["name"]
+                    return f"{city_name} {network_name}", network_name
+        except Exception:
+            pass
+            
+    # 2. Try resolving from business_id
+    db = get_db()
+    if business_id:
+        try:
+            biz = await db.businesses.find_one({"_id": business_id}, {"city_id": 1})
+            if biz and biz.get("city_id"):
+                city = await db.cities.find_one({"_id": biz["city_id"]}, {"name": 1, "network_id": 1})
+                if city:
+                    city_name = city.get("name", "Miami")
+                    net = await db.networks.find_one({"_id": city.get("network_id")}, {"name": 1})
+                    if net:
+                        network_name = net.get("name", "Knows Beauty")
+                    return f"{city_name} {network_name}", network_name
+        except Exception:
+            pass
+            
+    # 3. Try resolving from business_name (fuzzy lookup as fallback)
+    if business_name:
+        try:
+            biz = await db.businesses.find_one({"name": business_name}, {"city_id": 1})
+            if biz and biz.get("city_id"):
+                city = await db.cities.find_one({"_id": biz["city_id"]}, {"name": 1, "network_id": 1})
+                if city:
+                    city_name = city.get("name", "Miami")
+                    net = await db.networks.find_one({"_id": city.get("network_id")}, {"name": 1})
+                    if net:
+                        network_name = net.get("name", "Knows Beauty")
+                    return f"{city_name} {network_name}", network_name
+        except Exception:
+            pass
+
+    return f"{city_name} {network_name}", network_name
+
+
 async def send_admin_new_claim_email(
     *, submitter_name: str, submitter_email: str, business_name: str, admin_url: str
 ) -> bool:
@@ -67,14 +133,15 @@ async def send_admin_new_claim_email(
     claims — if he misses a day the "within one business day" promise breaks
     and the owner assumes they were ignored.  This makes claims zero-latency.
     """
+    site_name, network_name = await _resolve_site_names(url=admin_url, business_name=business_name)
     recipient = _admin_notify_address()
     subject = f"New claim: {business_name}"
     text_body = (
-        f"A new ownership claim was submitted on Miami Knows Beauty.\n\n"
+        f"A new ownership claim was submitted on {site_name}.\n\n"
         f"Business: {business_name}\n"
         f"Submitted by: {submitter_name} <{submitter_email}>\n\n"
         f"Review and approve or reject at:\n{admin_url}\n\n"
-        "— Miami Knows Beauty notifications\n"
+        f"— {site_name} notifications\n"
     )
     html_body = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
@@ -84,7 +151,7 @@ async def send_admin_new_claim_email(
               padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
     <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
               text-transform: uppercase; margin: 0 0 16px;">
-      Miami Knows Beauty · Admin
+      {site_name} · Admin
     </p>
     <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
                font-size: 28px; line-height: 1.2; margin: 0 0 16px; color: #1c1917;">
@@ -153,9 +220,10 @@ async def send_claim_confirmation_email(
     provider error.  Callers treat False as a no-op so a delivery failure does
     not surface as an API error.
     """
+    site_name, network_name = await _resolve_site_names(business_name=business_name)
     subject = f"We received your claim for {business_name}"
-    text_body = _claim_confirmation_text(submitter_name, business_name)
-    html_body = _claim_confirmation_html(submitter_name, business_name)
+    text_body = _claim_confirmation_text(submitter_name, business_name, site_name)
+    html_body = _claim_confirmation_html(submitter_name, business_name, site_name)
 
     api_key = _provider_api_key()
     if not api_key:
@@ -312,13 +380,14 @@ async def send_claim_verified_email(
     try logging in.  This email closes the loop and gives them a direct
     link to the login page.
     """
+    site_name, network_name = await _resolve_site_names(url=site_base_url, business_name=business_name)
     subject = f"Your listing for {business_name} is verified — log in now"
     pricing_url = site_base_url.rstrip("/") + "/pricing"
     text_body = _claim_verified_text(
-        submitter_name, business_name, login_url, pricing_url
+        submitter_name, business_name, login_url, pricing_url, site_name
     )
     html_body = _claim_verified_html(
-        submitter_name, business_name, login_url, pricing_url
+        submitter_name, business_name, login_url, pricing_url, site_name
     )
 
     api_key = _provider_api_key()
@@ -361,19 +430,19 @@ async def send_claim_verified_email(
         return False
 
 
-def _claim_confirmation_text(submitter_name: str, business_name: str) -> str:
+def _claim_confirmation_text(submitter_name: str, business_name: str, site_name: str = "Miami Knows Beauty") -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
     return (
         f"Hi {first},\n\n"
         f"We received your claim for {business_name} and will review it within one business day.\n\n"
         "Once verified, we'll email you a login link. Click it, request your 6-digit code, and you're in — no password to set.\n\n"
         f"Questions while you wait? Email {get_settings().support_email}.\n\n"
-        "— The Miami Knows Beauty team\n"
+        f"— The {site_name} team\n"
     )
 
 
 def _claim_verified_text(
-    submitter_name: str, business_name: str, login_url: str, pricing_url: str,
+    submitter_name: str, business_name: str, login_url: str, pricing_url: str, site_name: str = "Miami Knows Beauty",
 ) -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
     return (
@@ -392,12 +461,12 @@ def _claim_verified_text(
         f"See pricing and sign up: {pricing_url}\n"
         "─────────────────────────────────\n\n"
         f"Questions? Email {get_settings().support_email}.\n\n"
-        "— The Miami Knows Beauty team\n"
+        f"— The {site_name} team\n"
     )
 
 
 def _claim_verified_html(
-    submitter_name: str, business_name: str, login_url: str, pricing_url: str,
+    submitter_name: str, business_name: str, login_url: str, pricing_url: str, site_name: str = "Miami Knows Beauty",
 ) -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
     return f"""<!DOCTYPE html>
@@ -408,7 +477,7 @@ def _claim_verified_html(
               padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
     <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
               text-transform: uppercase; margin: 0 0 16px;">
-      Miami Knows Beauty
+      {site_name}
     </p>
     <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
                font-size: 28px; line-height: 1.2; margin: 0 0 16px; color: #1c1917;">
@@ -478,9 +547,10 @@ async def send_claim_rejected_email(
     correct a mistake. This closes the loop on the rejection path the
     same way send_claim_verified_email closes the approval path.
     """
+    site_name, network_name = await _resolve_site_names(business_name=business_name)
     subject = f"Update on your claim for {business_name}"
-    text_body = _claim_rejected_text(submitter_name, business_name)
-    html_body = _claim_rejected_html(submitter_name, business_name)
+    text_body = _claim_rejected_text(submitter_name, business_name, site_name)
+    html_body = _claim_rejected_html(submitter_name, business_name, site_name)
 
     api_key = _provider_api_key()
     if not api_key:
@@ -522,21 +592,21 @@ async def send_claim_rejected_email(
         return False
 
 
-def _claim_rejected_text(submitter_name: str, business_name: str) -> str:
+def _claim_rejected_text(submitter_name: str, business_name: str, site_name: str = "Miami Knows Beauty") -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
     return (
         f"Hi {first},\n\n"
-        f"Thank you for claiming {business_name} on Miami Knows Beauty.\n\n"
+        f"Thank you for claiming {business_name} on {site_name}.\n\n"
         "After reviewing your submission we weren't able to verify the claim at this time. "
         "This sometimes happens when we can't confirm the connection between the submitter "
         "and the business — it doesn't necessarily mean your claim is wrong.\n\n"
         "If you think this is a mistake or want to provide more information, please email "
         f"{get_settings().support_email} and we'll take another look.\n\n"
-        "— The Miami Knows Beauty team\n"
+        f"— The {site_name} team\n"
     )
 
 
-def _claim_rejected_html(submitter_name: str, business_name: str) -> str:
+def _claim_rejected_html(submitter_name: str, business_name: str, site_name: str = "Miami Knows Beauty") -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
@@ -546,7 +616,7 @@ def _claim_rejected_html(submitter_name: str, business_name: str) -> str:
               padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
     <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
               text-transform: uppercase; margin: 0 0 16px;">
-      Miami Knows Beauty
+      {site_name}
     </p>
     <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
                font-size: 28px; line-height: 1.2; margin: 0 0 16px; color: #1c1917;">
@@ -572,7 +642,7 @@ def _claim_rejected_html(submitter_name: str, business_name: str) -> str:
 </body></html>"""
 
 
-def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:
+def _claim_confirmation_html(submitter_name: str, business_name: str, site_name: str = "Miami Knows Beauty") -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
@@ -582,7 +652,7 @@ def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:
               padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
     <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
               text-transform: uppercase; margin: 0 0 16px;">
-      Miami Knows Beauty
+      {site_name}
     </p>
     <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
                font-size: 28px; line-height: 1.2; margin: 0 0 16px; color: #1c1917;">
@@ -621,10 +691,11 @@ async def send_subscription_confirmed_email(
     exactly what they just unlocked.  Fire-and-forget from the webhook so
     a slow email provider never delays the Stripe 200 response.
     """
+    site_name, network_name = await _resolve_site_names(url=dashboard_url, business_name=business_name)
     subject = f"Welcome to Featured — {business_name} is now a Featured listing"
     first = email.split("@")[0].replace(".", " ").replace("_", " ").title()
-    text_body = _subscription_confirmed_text(first, business_name, dashboard_url)
-    html_body = _subscription_confirmed_html(first, business_name, dashboard_url)
+    text_body = _subscription_confirmed_text(first, business_name, dashboard_url, site_name)
+    html_body = _subscription_confirmed_html(first, business_name, dashboard_url, site_name)
 
     api_key = _provider_api_key()
     if not api_key:
@@ -661,10 +732,10 @@ async def send_subscription_confirmed_email(
         return False
 
 
-def _subscription_confirmed_text(first: str, business_name: str, dashboard_url: str) -> str:
+def _subscription_confirmed_text(first: str, business_name: str, dashboard_url: str, site_name: str = "Miami Knows Beauty") -> str:
     return (
         f"Hi {first},\n\n"
-        f"You're in — {business_name} is now a Featured listing on Miami Knows Beauty.\n\n"
+        f"You're in — {business_name} is now a Featured listing on {site_name}.\n\n"
         "What just unlocked:\n"
         "• Featured visibility across category and neighborhood pages\n"
         "• Featured listing badge — helps your listing stand out in the directory\n"
@@ -672,11 +743,11 @@ def _subscription_confirmed_text(first: str, business_name: str, dashboard_url: 
         "• Google, Facebook, and Instagram ad copy — describe what you're promoting, get 3 ready-to-run ad variations\n\n"
         f"Head to your dashboard to see your listing and start using these features:\n{dashboard_url}\n\n"
         f"Questions? Email {get_settings().support_email} and we'll get back to you same day.\n\n"
-        "— The Miami Knows Beauty team\n"
+        f"— The {site_name} team\n"
     )
 
 
-def _subscription_confirmed_html(first: str, business_name: str, dashboard_url: str) -> str:
+def _subscription_confirmed_html(first: str, business_name: str, dashboard_url: str, site_name: str = "Miami Knows Beauty") -> str:
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
@@ -685,7 +756,7 @@ def _subscription_confirmed_html(first: str, business_name: str, dashboard_url: 
               padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
     <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
               text-transform: uppercase; margin: 0 0 16px;">
-      Miami Knows Beauty
+      {site_name}
     </p>
     <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
                font-size: 28px; line-height: 1.2; margin: 0 0 8px; color: #1c1917;">
@@ -749,12 +820,13 @@ async def send_owner_inquiry_email(
     Setting Reply-To lets the owner reply directly from their email client —
     removing all friction from following up with the visitor.
     """
-    subject = f"New message for {business_name} on Miami Knows Beauty"
+    site_name, network_name = await _resolve_site_names(url=dashboard_url, business_name=business_name)
+    subject = f"New message for {business_name} on {site_name}"
     text_body = _inquiry_owner_text(
-        business_name, visitor_name, visitor_email, visitor_phone, message, dashboard_url
+        business_name, visitor_name, visitor_email, visitor_phone, message, dashboard_url, site_name
     )
     html_body = _inquiry_owner_html(
-        business_name, visitor_name, visitor_email, visitor_phone, message, dashboard_url
+        business_name, visitor_name, visitor_email, visitor_phone, message, dashboard_url, site_name
     )
 
     api_key = _provider_api_key()
@@ -817,6 +889,7 @@ async def send_admin_inquiry_email(
     up with the owner while the lead is fresh, and ensures the visitor message
     isn't silently dropped.
     """
+    site_name, network_name = await _resolve_site_names(business_id=business_id, business_name=business_name)
     recipient = _admin_notify_address()
     subject = f"Inquiry for unclaimed listing: {business_name}"
     safe_name = html.escape(visitor_name)
@@ -832,7 +905,7 @@ async def send_admin_inquiry_email(
         + f"\nMessage:\n{message}\n\n"
         f"Business ID: {business_id}\n\n"
         "Consider reaching out to this salon to encourage them to claim their listing.\n\n"
-        "— Miami Knows Beauty notifications\n"
+        f"— {site_name} notifications\n"
     )
     html_body = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
@@ -842,7 +915,7 @@ async def send_admin_inquiry_email(
               padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
     <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
               text-transform: uppercase; margin: 0 0 16px;">
-      Miami Knows Beauty · Admin
+      {site_name} · Admin
     </p>
     <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
                font-size: 26px; line-height: 1.2; margin: 0 0 8px; color: #1c1917;">
@@ -907,6 +980,7 @@ def _inquiry_owner_text(
     visitor_phone: Optional[str],
     message: str,
     dashboard_url: str,
+    site_name: str = "Miami Knows Beauty",
 ) -> str:
     contact_lines = ""
     if visitor_email:
@@ -915,13 +989,13 @@ def _inquiry_owner_text(
         contact_lines += f"Phone: {visitor_phone}\n"
     return (
         f"Hi,\n\n"
-        f"A visitor sent a message to {business_name} on Miami Knows Beauty.\n\n"
+        f"A visitor sent a message to {business_name} on {site_name}.\n\n"
         f"From: {visitor_name}\n"
         + contact_lines
         + f"\nMessage:\n{message}\n\n"
         "You can reply directly to this email, or view the full message in your dashboard:\n"
         f"{dashboard_url}\n\n"
-        "— Miami Knows Beauty\n"
+        f"— {site_name}\n"
     )
 
 
@@ -932,6 +1006,7 @@ def _inquiry_owner_html(
     visitor_phone: Optional[str],
     message: str,
     dashboard_url: str,
+    site_name: str = "Miami Knows Beauty",
 ) -> str:
     safe_business = html.escape(business_name)
     safe_name = html.escape(visitor_name)
@@ -941,6 +1016,7 @@ def _inquiry_owner_html(
     # escape the injected tags. Handle \r\n (Windows), \r (old Mac), and \n (Unix).
     safe_msg = html.escape(message).replace("\r\n", "<br>").replace("\r", "<br>").replace("\n", "<br>")
     safe_dashboard_url = html.escape(dashboard_url)
+    safe_site_name = html.escape(site_name)
 
     contact_rows = ""
     # WHY: pre-build the reply button outside the main f-string to avoid nested
@@ -981,7 +1057,7 @@ def _inquiry_owner_html(
               padding: 40px 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
     <p style="font-size: 11px; letter-spacing: 0.3em; color: #be185d; font-weight: 600;
               text-transform: uppercase; margin: 0 0 16px;">
-      Miami Knows Beauty
+      {safe_site_name}
     </p>
     <h1 style="font-family: Georgia, 'Times New Roman', serif; font-weight: 300;
                font-size: 26px; line-height: 1.2; margin: 0 0 8px; color: #1c1917;">
