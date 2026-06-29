@@ -515,11 +515,11 @@ async def seed_hollywood() -> None:
         raise RuntimeError("Beauty network not found — run seed_networks.py first.")
     network_id = network["_id"]
 
-    city_id = "hollywood-fl"
+    city_id = "07a1b2c3-d4e5-6789-abcd-ef0123456789"
     city_doc = {
         "_id": city_id,
         "network_id": network_id,
-        "slug": city_id,
+        "slug": "hollywood",
         "name": "Hollywood",
         "state": "FL",
         "country": "US",
@@ -654,7 +654,7 @@ async def seed_hollywood() -> None:
     print("Businesses: %d inserted, %d updated." % (inserted, updated))
     print("")
     print("Hollywood seed complete:")
-    print("  City:          hollywood-fl (id=%s)" % city_id)
+    print("  City:          hollywood (id=%s)" % city_id)
     print("  Network:       beauty (id=%s)" % network_id)
     print("  Neighborhoods: %d" % len(NEIGHBORHOODS))
     print("  Categories:    %d" % len(network.get("category_map") or []))
