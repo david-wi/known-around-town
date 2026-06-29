@@ -347,8 +347,10 @@ def test_me_page_renders_with_valid_session(client):
     cookie_value = sign_session("owner@example.com")
     r = client.get(
         "/owners/me",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: cookie_value},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={cookie_value}",
+        },
     )
     assert r.status_code == 200, r.text
     assert "owner@example.com" in r.text
@@ -361,8 +363,10 @@ def test_login_page_redirects_when_already_signed_in(client):
     cookie_value = sign_session("owner@example.com")
     r = client.get(
         "/owners/login",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: cookie_value},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={cookie_value}",
+        },
         follow_redirects=False,
     )
     assert r.status_code == 303
