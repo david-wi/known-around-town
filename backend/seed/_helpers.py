@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import os
 from typing import Any, Dict, List, Optional
+import uuid
 
 from app.config import get_settings
 from app.database import ensure_indexes, get_db
@@ -232,6 +233,8 @@ async def upsert(collection_name: str, query: Dict[str, Any], doc: Dict[str, Any
             doc["hero_photo_url"] = existing["hero_photo_url"]
         await db[collection_name].replace_one({"_id": existing["_id"]}, doc)
         return doc
+    if "_id" not in doc:
+        doc["_id"] = str(uuid.uuid4())
     await db[collection_name].insert_one(doc)
     return doc
 
