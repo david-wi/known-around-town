@@ -71,8 +71,10 @@ def _render_dashboard(
     # one the smoke tests use for Miami Beauty.
     r = client.get(
         "/owners/me",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={"kb_owner_session": _signed_cookie(email)},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"kb_owner_session={_signed_cookie(email)}",
+        },
     )
     assert r.status_code == 200, r.text
     return r.text
@@ -460,8 +462,10 @@ class TestWebsiteBadgeEmbedCitySubdomain:
         client = _make_client()
         r = client.get(
             "/owners/me",
-            headers={"host": "miami.knowsbeauty.localhost"},
-            cookies={"kb_owner_session": _signed_cookie(email)},
+            headers={
+                "host": "miami.knowsbeauty.localhost",
+                "Cookie": f"kb_owner_session={_signed_cookie(email)}",
+            },
         )
         assert r.status_code == 200
         html = r.text
