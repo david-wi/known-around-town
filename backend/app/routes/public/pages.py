@@ -535,6 +535,23 @@ def _landing_city_hero_fallback(slug: str) -> str:
     return _LANDING_CITY_HERO_FALLBACKS[int(digest, 16) % len(_LANDING_CITY_HERO_FALLBACKS)]
 
 
+def _city_og_image(city: Optional[Dict[str, Any]]) -> Optional[str]:
+    """City-level photo for the og:image / twitter:image share-preview card,
+    guaranteed non-blank for ANY launched city — not just Miami.
+
+    WHY exists: every og_image site fell back to ``city.get("hero_photo_url")``,
+    but only Miami has that field set. So a listing or city page shared from
+    Brickell, Coconut Grove, Pinecrest, etc. unfurled as a bare link with no
+    photo — which kills click-through in exactly the moment a salon owner first
+    sees their listing link. This terminal fallback reuses the same deterministic
+    curated image set the network-landing city cards already use, so the preview
+    card always carries a tasteful, on-brand beauty photo.
+    """
+    if not city:
+        return None
+    return city.get("hero_photo_url") or _landing_city_hero_fallback(city.get("slug", ""))
+
+
 async def _render_network_landing(request: Request, tenant: TenantContext) -> HTMLResponse:
     """Render the bare-apex landing page that lists the cities for a network.
 
@@ -854,7 +871,7 @@ async def home(request: Request) -> HTMLResponse:
             # WHY: og_image lets base.html emit the og:image tag uniformly — without
             # it, home.html added a second manual tag in head_extra, producing two
             # og:image meta tags on the home page (one blank, one correct).
-            "og_image": city.get("hero_photo_url"),
+            "og_image": _city_og_image(city),
             # WHY: Organization JSON-LD tells Google this is a named entity (a real
             # organization, not just a web page) and is how Google Knowledge Panels
             # are populated. Adding it alongside the existing WebSite block gives
@@ -995,7 +1012,7 @@ async def category_page(request: Request, category_slug: str) -> HTMLResponse:
                     for b in businesses if b.get("photos")
                     for p in [b["photos"][0]]
                 ),
-                city.get("hero_photo_url"),
+                _city_og_image(city),
             ),
             # WHY: ItemList JSON-LD gives Google a machine-readable enumeration
             # of the businesses on this page. Without it Google can only infer
@@ -1064,7 +1081,7 @@ async def neighborhood_page(request: Request, neighborhood_slug: str) -> HTMLRes
                     for b in businesses if b.get("photos")
                     for p in [b["photos"][0]]
                 ),
-                city.get("hero_photo_url"),
+                _city_og_image(city),
             ),
             # WHY: ItemList JSON-LD enumerates the businesses in this neighborhood
             # so Google can surface them as rich results for neighborhood-level
@@ -1145,7 +1162,7 @@ async def neighborhood_category_page(
                     for b in businesses if b.get("photos")
                     for p in [b["photos"][0]]
                 ),
-                city.get("hero_photo_url"),
+                _city_og_image(city),
             ),
             # WHY: most specific ItemList — businesses in both this neighborhood
             # AND this category (e.g. "Hair salons in Wynwood, Miami"). High-intent
@@ -1197,7 +1214,7 @@ async def search_page(request: Request, q: Optional[str] = None) -> HTMLResponse
                     for b in businesses if b.get("photos")
                     for p in [b["photos"][0]]
                 ),
-                city.get("hero_photo_url"),
+                _city_og_image(city),
             ),
         }
     )
@@ -1467,7 +1484,7 @@ async def business_page(
             # for sharing. Fall back to city hero so cards are never blank.
             "og_image": (
                 None if _is_representative_photo_url(_hero_url) else _hero_url
-            ) or city.get("hero_photo_url"),
+            ) or _city_og_image(city),
             "cta_book": await copy.get("business.cta.book", business_id=business["_id"]),
             "cta_call": await copy.get("business.cta.call", business_id=business["_id"]),
             "cta_website": await copy.get("business.cta.website", business_id=business["_id"]),
@@ -1671,7 +1688,7 @@ async def editorial_guide_page(request: Request, slug: str) -> HTMLResponse:
             ),
             None,
         )
-        or city.get("hero_photo_url")
+        or _city_og_image(city)
     )
     ctx.update(
         {
@@ -1770,7 +1787,7 @@ async def owners_page(
     # pastes the link in a conversation with a prospective partner). The city hero
     # is the right image for an owner-acquisition landing page — it sets the Miami
     # beauty scene rather than spotlighting one business.
-    ctx["og_image"] = tenant.city.get("hero_photo_url") if tenant.city else None
+    ctx["og_image"] = _city_og_image(tenant.city)
     return _templates.TemplateResponse("owners.html", ctx)
 
 
@@ -1959,7 +1976,7 @@ async def pricing_page(request: Request) -> HTMLResponse:
     # WHY: og:image controls the preview card when this page is shared with a potential
     # customer or partner. The city hero is the right image for a pricing page — it
     # represents the Miami beauty market we're selling into.
-    ctx["og_image"] = tenant.city.get("hero_photo_url") if tenant.city else None
+    ctx["og_image"] = _city_og_image(tenant.city)
 
     # WHY: if the visiting owner is already logged in, the generic "Claim your listing"
     # CTA is confusing — they already claimed, they want to upgrade. We check the session
@@ -2189,7 +2206,7 @@ async def walkthrough_page(request: Request) -> HTMLResponse:
         f"From finding your listing to managing your Featured profile on "
         f"{city_name} Knows {vertical}. Claim free, upgrade anytime."
     ).strip()
-    ctx["og_image"] = tenant.city.get("hero_photo_url") if tenant.city else None
+    ctx["og_image"] = _city_og_image(tenant.city)
     return _templates.TemplateResponse("walkthrough.html", ctx)
 
 
