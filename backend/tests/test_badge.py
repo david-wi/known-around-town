@@ -53,6 +53,54 @@ class TestBadgeAsset:
         r = client.get("/badge/featured.svg", headers={"host": "miami.knowsbeauty.localhost"})
         assert "public" in r.headers.get("cache-control", "")
 
+    def test_badge_resolves_dynamically_for_miami(self, seeded_db):
+        client = _make_client()
+        r = client.get("/badge/featured.svg", headers={"host": "miami.knowsbeauty.localhost"})
+        body = r.text
+        assert "Miami Knows Beauty" in body
+        assert "miami.knowsbeauty.localhost" in body
+
+    @pytest.mark.asyncio
+    async def test_badge_resolves_dynamically_for_other_cities(self, seeded_db):
+        client = _make_client()
+        
+        db = seeded_db
+        net = await db.networks.find_one({"slug": "beauty"})
+        assert net is not None
+        await db.cities.insert_one({
+            "_id": "test-city-id",
+            "network_id": net["_id"],
+            "slug": "fort-lauderdale",
+            "name": "Fort Lauderdale Beach Gardens",
+        })
+        
+        r = client.get("/badge/featured.svg", headers={"host": "fort-lauderdale.knowsbeauty.localhost"})
+        body = r.text
+        
+        assert "Fort Lauderdale Beach Gardens Knows Beauty" in body
+        assert "fort-lauderdale.knowsbeauty.localhost" in body
+        assert 'viewBox="0 0 340 96"' not in body
+        assert 'viewBox="0 0' in body
+
+    @pytest.mark.asyncio
+    async def test_badge_resolves_dynamically_for_wellness_network(self, seeded_db):
+        client = _make_client()
+        
+        db = seeded_db
+        net = await db.networks.find_one({"slug": "wellness"})
+        assert net is not None
+        await db.cities.insert_one({
+            "_id": "test-well-city-id",
+            "network_id": net["_id"],
+            "slug": "weston",
+            "name": "Weston",
+        })
+        
+        r = client.get("/badge/featured.svg", headers={"host": "weston.knowswellness.localhost"})
+        body = r.text
+        assert "Weston Knows Wellness" in body
+        assert "weston.knowswellness.localhost" in body
+
 
 # ─── Preview-gate exemption (surgical) ───────────────────────────────────────
 
