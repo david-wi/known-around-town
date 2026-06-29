@@ -472,4 +472,13 @@ def test_lightbox_img_has_no_empty_src(client):
     assert 'id="lb-img"' in r.text, "lightbox img element should be present"
     tag = re.search(r'<img\s+id="lb-img"[^>]*>', r.text, re.S)
     assert tag, "lightbox img tag not found"
-    assert 'src=""' not in tag.group(0), f"lightbox img must not carry an empty src: {tag.group(0)}"
+    tagtext = tag.group(0)
+    assert 'src=""' not in tagtext, f"lightbox img must not carry an empty src: {tagtext}"
+    # The placeholder must be an inline data-URI: that makes zero network request
+    # AND loads cleanly, so image-health scans read 0 broken. A missing or empty
+    # src would still register as a broken image in document.images on every
+    # listing (naturalWidth 0), keeping a phantom broken-image flag forever.
+    src = re.search(r'src="([^"]*)"', tagtext)
+    assert src and src.group(1).startswith("data:image/"), (
+        f"lightbox img placeholder must be an inline data-URI, got: {tagtext}"
+    )

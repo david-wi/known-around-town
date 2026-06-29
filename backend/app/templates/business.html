@@ -893,13 +893,17 @@
           class="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl leading-none z-10 p-3 hidden"
           onclick="lightboxNav(1)"
           aria-label="Next photo">›</button>
-  {#- WHY: no initial src attribute. An empty src="" resolves against the page
-      URL, so the browser fires a wasteful failed image request to the listing
-      page itself on every load (the listing renders a broken phantom image in
-      the DOM, invisible only because the lightbox is hidden). The lightbox stays
-      hidden until openLightbox() sets img.src from the photos array, so no source
-      is needed up front — an attribute-less <img> makes zero network request. #}
+  {#- WHY: a transparent 1x1 inline placeholder, NOT src="" and NOT a missing src.
+      An empty src="" resolves against the page URL, so the browser fires a
+      wasteful failed image request to the listing page itself on every load. A
+      missing src avoids the request but still registers as a broken image
+      (naturalWidth 0) in document.images, so every image-health scan keeps
+      flagging a phantom broken image on every listing. The inline data-URI
+      pixel fixes both: it makes zero network request AND loads cleanly (so scans
+      read 0 broken). The lightbox stays hidden until openLightbox() swaps in the
+      real photo from the photos array. #}
   <img id="lb-img"
+       src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
        alt="Salon photo"
        class="max-h-[90vh] max-w-[90vw] object-contain rounded-xl shadow-2xl"
        onclick="event.stopPropagation()">
