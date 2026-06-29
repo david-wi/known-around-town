@@ -366,7 +366,7 @@ class TestMiddlewareRedirection:
                 }
             )
         )
-        r = client.get("/health", cookies={"preview_token": token})
+        r = client.get("/health", headers={"Cookie": f"preview_token={token}"})
         assert r.status_code == 200
 
     def test_expired_session_redirects(self, client, mock_db):
@@ -384,11 +384,11 @@ class TestMiddlewareRedirection:
                 }
             )
         )
-        r = client.get("/", cookies={"preview_token": token}, follow_redirects=False)
+        r = client.get("/", headers={"Cookie": f"preview_token={token}"}, follow_redirects=False)
         assert r.status_code == 302
 
     def test_bogus_token_redirects(self, client):
-        r = client.get("/", cookies={"preview_token": "not-a-real-token"},
+        r = client.get("/", headers={"Cookie": "preview_token=not-a-real-token"},
                        follow_redirects=False)
         assert r.status_code == 302
 
