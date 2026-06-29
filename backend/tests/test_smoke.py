@@ -970,8 +970,10 @@ async def test_pricing_cta_for_logged_in_free_tier_owner(seeded_db):
     client = TestClient(app, raise_server_exceptions=False)
     r = client.get(
         "/pricing",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={sign_session(email)}",
+        },
     )
     assert r.status_code == 200, r.text
     assert "Upgrade to Featured" in r.text, (
@@ -1009,8 +1011,10 @@ async def test_pricing_cta_for_logged_in_subscribed_owner(seeded_db):
     client = TestClient(app, raise_server_exceptions=False)
     r = client.get(
         "/pricing",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={sign_session(email)}",
+        },
     )
     assert r.status_code == 200, r.text
     assert "You're on Featured" in r.text, (
@@ -3543,8 +3547,10 @@ async def test_owner_me_shows_subscribed_banner_on_stripe_return(seeded_db):
     client = TestClient(app, raise_server_exceptions=False)
     r = client.get(
         "/owners/me?subscribed=1",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={sign_session(email)}",
+        },
     )
     assert r.status_code == 200, r.text
     assert 'id="subscribed-banner"' in r.text, (
@@ -3595,8 +3601,10 @@ async def test_owner_me_banner_has_auto_dismiss_js(seeded_db):
     client = TestClient(app, raise_server_exceptions=False)
     r = client.get(
         "/owners/me?subscribed=1",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={sign_session(email)}",
+        },
     )
     assert r.status_code == 200, r.text
     # WHY: The auto-dismiss JS is always included in the template (not conditional on
@@ -3637,8 +3645,10 @@ async def test_owner_me_no_banner_without_subscribed_param(seeded_db):
     client = TestClient(app, raise_server_exceptions=False)
     r = client.get(
         "/owners/me",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={sign_session(email)}",
+        },
     )
     assert r.status_code == 200, r.text
     assert 'id="subscribed-banner"' not in r.text, (
@@ -3672,8 +3682,10 @@ async def test_owner_me_no_banner_when_not_yet_subscribed(seeded_db):
     client = TestClient(app, raise_server_exceptions=False)
     r = client.get(
         "/owners/me?subscribed=1",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={sign_session(email)}",
+        },
     )
     assert r.status_code == 200, r.text
     assert 'id="subscribed-banner"' not in r.text, (
@@ -3705,8 +3717,10 @@ async def test_owner_me_upgrade_cta_hidden_when_subscribed(seeded_db):
     client = TestClient(app, raise_server_exceptions=False)
     r = client.get(
         "/owners/me",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={sign_session(email)}",
+        },
     )
     assert r.status_code == 200, r.text
     assert "Featured listing active" in r.text, (
@@ -3745,8 +3759,10 @@ async def test_owner_me_upgrade_cta_shown_when_not_subscribed(seeded_db):
     client = TestClient(app, raise_server_exceptions=False)
     r = client.get(
         "/owners/me",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: sign_session(email)},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={sign_session(email)}",
+        },
     )
     assert r.status_code == 200, r.text
     # WHY: the re-framed card is labelled "Get Featured" (the founding-partner
@@ -4463,8 +4479,10 @@ def test_free_tier_owner_sees_upgrade_nudge(client, seeded_db):
 
     r = client.get(
         "/b/blow-dry-bar-brickell",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: cookie_value},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={cookie_value}",
+        },
     )
     assert r.status_code == 200, r.text
     # The nudge banner headline must appear.
@@ -4498,8 +4516,10 @@ def test_subscribed_owner_does_not_see_upgrade_nudge(client, seeded_db):
 
     r = client.get(
         "/b/blow-dry-bar-brickell",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={SESSION_COOKIE_NAME: cookie_value},
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            "Cookie": f"{SESSION_COOKIE_NAME}={cookie_value}",
+        },
     )
     assert r.status_code == 200, r.text
     # The nudge banner must NOT appear for a paying owner.
