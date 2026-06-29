@@ -72,8 +72,10 @@ class TestOwnerDashboardVoiceSection:
         cookie = _make_session_cookie(email)
         r = client.get(
             "/owners/me",
-            headers={"host": "miami.knowsbeauty.localhost"},
-            cookies={"kb_owner_session": cookie},
+            headers={
+                "host": "miami.knowsbeauty.localhost",
+                "Cookie": f"kb_owner_session={cookie}",
+            },
         )
         assert r.status_code == 200, r.text
         body = r.text
@@ -122,8 +124,10 @@ class TestOwnerDashboardVoiceSection:
         cookie = _make_session_cookie(email)
         r = client.get(
             "/owners/me",
-            headers={"host": "miami.knowsbeauty.localhost"},
-            cookies={"kb_owner_session": cookie},
+            headers={
+                "host": "miami.knowsbeauty.localhost",
+                "Cookie": f"kb_owner_session={cookie}",
+            },
         )
         assert r.status_code == 200, r.text
         body = r.text

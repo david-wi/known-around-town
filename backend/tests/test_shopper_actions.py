@@ -270,8 +270,10 @@ def test_owner_stats_returns_action_counts(seeded_db, client):
     )
     r = client.get(
         "/api/v1/owner/stats",
-        headers={"host": _HOST},
-        cookies={"kb_owner_session": _signed_cookie(email)},
+        headers={
+            "host": _HOST,
+            "Cookie": f"kb_owner_session={_signed_cookie(email)}",
+        },
     )
     assert r.status_code == 200, r.text
     data = r.json()
@@ -287,8 +289,10 @@ def test_owner_stats_action_counts_default_zero(seeded_db, client):
     asyncio.run(_insert_business(seeded_db, slug="tap-test-salon-2", claimed_email=email))
     r = client.get(
         "/api/v1/owner/stats",
-        headers={"host": _HOST},
-        cookies={"kb_owner_session": _signed_cookie(email)},
+        headers={
+            "host": _HOST,
+            "Cookie": f"kb_owner_session={_signed_cookie(email)}",
+        },
     )
     assert r.status_code == 200, r.text
     data = r.json()
