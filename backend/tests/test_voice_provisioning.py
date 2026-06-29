@@ -456,7 +456,7 @@ class TestOwnerVoiceEndpoint:
         cookie = self._make_session_cookie(email)
         r = client.get(
             "/api/v1/owner/voice",
-            cookies={"kb_owner_session": cookie},
+            headers={"Cookie": f"kb_owner_session={cookie}"},
         )
         assert r.status_code == 200, r.text
         data = r.json()
@@ -485,7 +485,7 @@ class TestOwnerVoiceEndpoint:
         cookie = self._make_session_cookie(email)
         r = client.get(
             "/api/v1/owner/voice",
-            cookies={"kb_owner_session": cookie},
+            headers={"Cookie": f"kb_owner_session={cookie}"},
         )
         assert r.status_code == 200, r.text
         data = r.json()
@@ -502,6 +502,6 @@ class TestOwnerVoiceEndpoint:
         cookie = self._make_session_cookie("nobody@example.com")
         r = client.get(
             "/api/v1/owner/voice",
-            cookies={"kb_owner_session": cookie},
+            headers={"Cookie": f"kb_owner_session={cookie}"},
         )
         assert r.status_code == 404, r.text
