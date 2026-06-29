@@ -127,7 +127,7 @@ class TestCheckout:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/checkout",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
             get_settings.cache_clear()
         assert r.status_code == 503
@@ -145,7 +145,7 @@ class TestCheckout:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/checkout",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
             get_settings.cache_clear()
         assert r.status_code == 404
@@ -164,7 +164,7 @@ class TestCheckout:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/checkout",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
             get_settings.cache_clear()
         assert r.status_code == 409
@@ -188,7 +188,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", return_value=mock_session):
                 r = client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers={"Cookie": f"kb_owner_session={cookie}"},
                 )
             get_settings.cache_clear()
 
@@ -227,7 +227,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", side_effect=fake_create):
                 r = client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers={"Cookie": f"kb_owner_session={cookie}"},
                 )
             get_settings.cache_clear()
 
@@ -269,7 +269,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", side_effect=fake_create):
                 r = client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers={"Cookie": f"kb_owner_session={cookie}"},
                 )
             get_settings.cache_clear()
 
@@ -302,7 +302,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", side_effect=fake_create):
                 client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers={"Cookie": f"kb_owner_session={cookie}"},
                 )
             get_settings.cache_clear()
 
@@ -347,7 +347,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", side_effect=fake_create):
                 r = client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers={"Cookie": f"kb_owner_session={cookie}"},
                 )
             get_settings.cache_clear()
 
@@ -389,7 +389,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", side_effect=fake_create):
                 client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers={"Cookie": f"kb_owner_session={cookie}"},
                 )
             get_settings.cache_clear()
 
@@ -417,7 +417,7 @@ class TestCheckout:
             ):
                 r = client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers={"Cookie": f"kb_owner_session={cookie}"},
                 )
             get_settings.cache_clear()
 
@@ -664,7 +664,7 @@ class TestBillingPortal:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/portal",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
             get_settings.cache_clear()
         assert r.status_code == 503
@@ -679,7 +679,7 @@ class TestBillingPortal:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/portal",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
             get_settings.cache_clear()
         assert r.status_code == 404
@@ -695,7 +695,7 @@ class TestBillingPortal:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/portal",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
             get_settings.cache_clear()
         assert r.status_code == 409
@@ -721,7 +721,7 @@ class TestBillingPortal:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/portal",
-                cookies={"kb_owner_session": cookie},
+                headers={"Cookie": f"kb_owner_session={cookie}"},
             )
             get_settings.cache_clear()
         assert r.status_code == 409
@@ -752,7 +752,7 @@ class TestBillingPortal:
             ):
                 r = client.post(
                     "/api/v1/billing/portal",
-                    cookies={"kb_owner_session": cookie},
+                    headers={"Cookie": f"kb_owner_session={cookie}"},
                 )
             get_settings.cache_clear()
         assert r.status_code == 502
@@ -783,7 +783,7 @@ class TestBillingPortal:
             with patch("stripe.billing_portal.Session.create", return_value=mock_portal):
                 r = client.post(
                     "/api/v1/billing/portal",
-                    cookies={"kb_owner_session": cookie},
+                    headers={"Cookie": f"kb_owner_session={cookie}"},
                 )
             get_settings.cache_clear()
 
@@ -822,7 +822,7 @@ class TestBillingPortal:
             with patch("stripe.billing_portal.Session.create", side_effect=fake_create):
                 client.post(
                     "/api/v1/billing/portal",
-                    cookies={"kb_owner_session": cookie},
+                    headers={"Cookie": f"kb_owner_session={cookie}"},
                 )
             get_settings.cache_clear()
 
