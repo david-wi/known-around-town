@@ -51,6 +51,7 @@ async def login_page(request: Request, error: Optional[str] = None) -> HTMLRespo
     if _templates is None:
         raise HTTPException(500, "Templates not attached")
     return _templates.TemplateResponse(
+        request,
         "admin/login.html",
         {"request": request, "error": error},
     )
@@ -131,6 +132,7 @@ async def pending_claims_page(request: Request) -> HTMLResponse:
             businesses_by_id[b["_id"]] = b
 
     return _templates.TemplateResponse(
+        request,
         "admin/claims.html",
         {
             "request": request,
