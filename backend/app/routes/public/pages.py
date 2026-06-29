@@ -2075,12 +2075,33 @@ async def owners_me_page(request: Request) -> HTMLResponse:
         # is configured (single-domain dev). The badge image itself is served
         # from the same origin so it loads past the preview gate on the salon's
         # site.
+        from app.services.tenant import build_absolute_business_url
         slug = business.get("slug") or ""
         canonical_base = get_settings().canonical_base_url.rstrip("/")
         if canonical_base:
-            origin = canonical_base
+            canonical_base_parsed = urlparse(canonical_base)
+            canonical_base_netloc = canonical_base_parsed.netloc
+            canonical_scheme = canonical_base_parsed.scheme
+            canonical_apex = ".".join(canonical_base_netloc.rsplit(".", 2)[-2:])
+            
+            city_id = business.get("city_id")
+            city_slug = ""
+            if city_id:
+                city = await db.cities.find_one({"_id": city_id}, {"slug": 1})
+                if city:
+                    city_slug = city.get("slug") or ""
+            if city_slug == "wynwood":
+                city_slug = "miami"
+            
+            if city_slug:
+                origin = f"{canonical_scheme}://{city_slug}.{canonical_apex}"
+            else:
+                origin = canonical_base
         else:
-            origin = f"{request.url.scheme}://{request.headers.get('host', '')}"
+            listing_url = await build_absolute_business_url(request, business)
+            parsed = urlparse(listing_url)
+            origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else f"{request.url.scheme}://{request.headers.get('host', '')}"
+            
         ctx["listing_absolute_url"] = f"{origin}/b/{slug}" if slug else ""
         ctx["badge_image_url"] = f"{origin}/badge/featured.svg"
         # WHY: the badge link gets its own URL with the ``?ref=mkb-badge`` marker,

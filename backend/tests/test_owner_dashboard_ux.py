@@ -417,3 +417,58 @@ class TestWebsiteBadgeEmbed:
                 f"{cls} is used in the badge section but has no rule in "
                 f"reference.css — it would render as nothing"
             )
+
+
+class TestWebsiteBadgeEmbedCitySubdomain:
+    """Ensure the absolute listing URL and website badge URL correctly reflect the business's city subdomain."""
+
+    @pytest.mark.asyncio
+    async def test_embed_urls_reflect_business_city_subdomain(self, seeded_db, monkeypatch):
+        db = seeded_db
+        email = "fort-lauderdale-owner@example.com"
+        
+        city = await db.cities.find_one({"slug": "fort-lauderdale"})
+        if not city:
+            network = await db.networks.find_one({"slug": "beauty"})
+            city_id = str(uuid.uuid4())
+            await db.cities.insert_one({
+                "_id": city_id,
+                "network_id": network["_id"],
+                "slug": "fort-lauderdale",
+                "name": "Fort Lauderdale",
+                "status": "live",
+            })
+        else:
+            city_id = city["_id"]
+
+        biz_id = str(uuid.uuid4())
+        await db.businesses.insert_one({
+            "_id": biz_id,
+            "name": "Lauderdale Glam",
+            "slug": "lauderdale-glam",
+            "city_id": city_id,
+            "claimed_email": email,
+            "featured": {"tier": "featured", "enabled": True},
+            "stripe_subscription_id": "sub_lauderdale_123",
+            "photos": [],
+        })
+
+        from app.config import get_settings
+        monkeypatch.setenv("CANONICAL_BASE_URL", "https://miami.knowsbeauty.com")
+        get_settings.cache_clear()
+
+        client = _make_client()
+        r = client.get(
+            "/owners/me",
+            headers={"host": "miami.knowsbeauty.localhost"},
+            cookies={"kb_owner_session": _signed_cookie(email)},
+        )
+        assert r.status_code == 200
+        html = r.text
+
+        assert "https://fort-lauderdale.knowsbeauty.com/b/lauderdale-glam" in html
+        assert "https://fort-lauderdale.knowsbeauty.com/badge/featured.svg" in html
+
+        monkeypatch.delenv("CANONICAL_BASE_URL", raising=False)
+        get_settings.cache_clear()
+
