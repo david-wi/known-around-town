@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import Neighborhood
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import merge_update, now_utc, to_doc
+from app.services.content import clear_nav_cache
 
 router = APIRouter(prefix="/neighborhoods", tags=["neighborhoods"])
 
@@ -29,6 +30,9 @@ async def create_neighborhood(body: Neighborhood) -> Dict[str, Any]:
     ):
         raise HTTPException(409, "Neighborhood already exists")
     await db.neighborhoods.insert_one(doc)
+    # WHY: best-effort local invalidation so this worker reflects the new
+    # neighborhood immediately; other workers self-heal within the nav cache TTL.
+    clear_nav_cache()
     return doc
 
 
@@ -40,6 +44,7 @@ async def update_neighborhood(neighborhood_id: str, patch: Dict[str, Any]) -> Di
         raise HTTPException(404, "Neighborhood not found")
     merged = merge_update(existing, patch)
     await db.neighborhoods.replace_one({"_id": neighborhood_id}, merged)
+    clear_nav_cache()
     return merged
 
 
@@ -51,4 +56,5 @@ async def archive_neighborhood(neighborhood_id: str) -> Dict[str, str]:
     )
     if res.matched_count == 0:
         raise HTTPException(404, "Neighborhood not found")
+    clear_nav_cache()
     return {"status": "archived"}

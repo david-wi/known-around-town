@@ -35,6 +35,23 @@ os.environ.pop("OWNER_EMAIL_FROM_NAME", None)
 os.environ.pop("OWNER_EMAIL_FROM_ADDRESS", None)
 
 
+@pytest.fixture(autouse=True)
+def _clear_nav_cache():
+    """Reset the in-process navigation TTL cache around every test.
+
+    WHY: `app.services.content` caches the category/neighborhood/city lists in a
+    module-level dict that lives for the whole test process. Without this reset,
+    one test's cached lists could be served to a later test that seeded a fresh
+    database, causing order-dependent failures. Clearing before and after keeps
+    each test hermetic, matching the fresh-database isolation the suite assumes.
+    """
+    from app.services import content as _content
+
+    _content.clear_nav_cache()
+    yield
+    _content.clear_nav_cache()
+
+
 @pytest.fixture
 def mock_db(monkeypatch):
     """Patch app.database.get_client to return a mongomock instance."""
