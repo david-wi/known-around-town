@@ -33,7 +33,25 @@ STONE = {
     "950": "#0c0a09",
 }
 WHITE = "#ffffff"
+# Tailwind amber palette (accent text such as the "Editor's Pick" badge).
+AMBER = {"200": "#fde68a", "300": "#fcd34d", "500": "#f59e0b", "600": "#d97706",
+         "700": "#b45309", "800": "#92400e"}
 WCAG_AA = 4.5  # WHY: WCAG 2.1 AA minimum for normal-size body text.
+
+# Page-specific muted metadata that must stay readable on the near-white pages.
+# (template, substring identifying the element). The shade on that line is read
+# live and its real contrast computed, so a regression to a faint shade fails
+# here regardless of which class string is used. Background is treated as pure
+# white; the real page bg (#fbfbfa) is a hair darker, and the live axe audit is
+# the authoritative end-to-end check.
+PAGE_MUTED_ON_WHITE = [
+    ("home.html", "tabular-nums text-stone-"),                    # ranked-list ordinals
+    ("partials/business_card.html", "({{ b.google_review_count"),  # card review count
+    ("partials/business_card.html", "{{ b.price_cues }}"),        # card price cues
+    ("business.html", "({{ business.google_review_count"),         # listing review count
+    ("business.html", ">Closed</span>"),                         # listing closed-day label
+    ("business.html", "(or email above)"),                       # listing phone hint
+]
 
 
 def _lin(c: int) -> float:
@@ -87,6 +105,36 @@ def test_footer_muted_text_passes_aa_on_dark():
         assert ratio >= WCAG_AA, (
             f"footer.html: text-stone-{shade} on stone-950 = {ratio:.2f}:1, "
             f"below WCAG AA {WCAG_AA}:1"
+        )
+
+
+def test_page_specific_muted_text_passes_aa_on_white():
+    """Small grey metadata on the white pages (review counts, hours, ordinals,
+    form hints) must still meet AA — these are real content, not decoration."""
+    for tpl, needle in PAGE_MUTED_ON_WHITE:
+        shades = _shades_for(tpl, needle)
+        assert shades, f"{tpl}: no stone shade found near '{needle}' — test out of date"
+        for shade in shades:
+            ratio = contrast(STONE[shade], WHITE)
+            assert ratio >= WCAG_AA, (
+                f"{tpl}: text near '{needle}' uses stone-{shade} on white "
+                f"= {ratio:.2f}:1, below WCAG AA {WCAG_AA}:1"
+            )
+
+
+def test_editors_pick_amber_text_passes_aa_on_white():
+    """The list-view "Editor's Pick" accent puts amber on the actual words
+    (not just the decorative star), so it must meet AA on the white page."""
+    html = (TEMPLATES / "home.html").read_text()
+    # Match only amber applied to the readable phrase ("...">★ Editor"), not the
+    # amber-500 star icons in the photo-card pills (where the words are stone-900).
+    matches = re.findall(r'text-amber-(\d{3})">★ Editor', html)
+    assert matches, "expected an amber 'Editor's Pick' text accent to check"
+    for shade in matches:
+        ratio = contrast(AMBER[shade], WHITE)
+        assert ratio >= WCAG_AA, (
+            f"home.html: 'Editor's Pick' text uses amber-{shade} on white "
+            f"= {ratio:.2f}:1, below WCAG AA {WCAG_AA}:1"
         )
 
 

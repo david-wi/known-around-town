@@ -72,11 +72,11 @@
         <div class="flex items-center gap-1 mt-1">
           <span class="text-amber-500 text-[11px] leading-none">★</span>
           <span class="text-[11px] font-semibold text-stone-700">{{ "%.1f"|format(b.google_rating) }}</span>
-          {% if b.google_review_count %}<span class="text-[11px] text-stone-400">({{ b.google_review_count }})</span>{% endif %}
+          {% if b.google_review_count %}<span class="text-[11px] text-stone-500">({{ b.google_review_count }})</span>{% endif %}
         </div>
         {% endif %}
       </div>
-      {% if b.price_cues %}<span class="text-xs text-stone-400 font-semibold whitespace-nowrap pt-1">{{ b.price_cues }}</span>{% endif %}
+      {% if b.price_cues %}<span class="text-xs text-stone-500 font-semibold whitespace-nowrap pt-1">{{ b.price_cues }}</span>{% endif %}
     </div>
     {% if b.short_description %}<p class="text-sm text-stone-600 line-clamp-2 mb-4 min-h-[2.5rem]">{{ b.short_description }}</p>{% endif %}
     <div class="flex items-center justify-between">

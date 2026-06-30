@@ -168,7 +168,7 @@
           {% if not c.parent_slug %}
           <li>
             <a class="group flex items-baseline gap-3 py-3 border-b border-stone-200/80 last:border-0 hover:border-stone-900 transition-colors" href="/c/{{ c.slug }}">
-              <span class="text-[10px] tabular-nums text-stone-400 font-medium pt-1.5">{{ '%02d' % loop.index }}</span>
+              <span class="text-[10px] tabular-nums text-stone-500 font-medium pt-1.5">{{ '%02d' % loop.index }}</span>
               <div class="flex-1 min-w-0">
                 <div class="font-serif text-base text-stone-900 group-hover:{{ theme.accent_text_full }} transition-colors leading-tight" style='font-family: Georgia, "Times New Roman", serif;'>{{ c.name }}</div>
                 {% if c.description %}<div class="text-[11px] text-stone-500 mt-0.5 line-clamp-1">{{ c.description }}</div>{% endif %}
@@ -405,7 +405,7 @@
               {% if primary_cat %}<span>{{ category_names.get(primary_cat) or primary_cat|replace('-', ' ')|title }}</span>{% endif %}
               {% if primary_cat and b.price_cues %}<span class="text-stone-300">·</span>{% endif %}
               {% if b.price_cues %}<span class="text-stone-700">{{ b.price_cues }}</span>{% endif %}
-              {% if b.editors_pick %}<span class="text-stone-300">·</span><span class="text-amber-600">★ Editor's Pick</span>{% endif %}
+              {% if b.editors_pick %}<span class="text-stone-300">·</span><span class="text-amber-700">★ Editor's Pick</span>{% endif %}
             </div>
           </div>
         </a>
