@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import Category
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import merge_update, now_utc, to_doc
+from app.services.content import clear_nav_cache
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
@@ -33,6 +34,9 @@ async def create_category(body: Category) -> Dict[str, Any]:
     ):
         raise HTTPException(409, "Category already exists")
     await db.categories.insert_one(doc)
+    # WHY: best-effort local invalidation so this worker reflects the new
+    # category immediately; other workers self-heal within the nav cache TTL.
+    clear_nav_cache()
     return doc
 
 
@@ -44,6 +48,7 @@ async def update_category(category_id: str, patch: Dict[str, Any]) -> Dict[str, 
         raise HTTPException(404, "Category not found")
     merged = merge_update(existing, patch)
     await db.categories.replace_one({"_id": category_id}, merged)
+    clear_nav_cache()
     return merged
 
 
@@ -55,4 +60,5 @@ async def archive_category(category_id: str) -> Dict[str, str]:
     )
     if res.matched_count == 0:
         raise HTTPException(404, "Category not found")
+    clear_nav_cache()
     return {"status": "archived"}

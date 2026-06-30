@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.database import get_db
 from app.services.ai_caption import CaptionGenerationError, call_gateway_text
@@ -12,7 +13,79 @@ from app.services.ai_caption import CaptionGenerationError, call_gateway_text
 log = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# In-process TTL cache for navigation lookups
+# ---------------------------------------------------------------------------
+# The category / neighborhood / city lists drive the header nav and footer on
+# EVERY public page, but they only change on rare admin edits or a re-seed. Yet
+# `_base_context` re-queried all three on every single request (3-5 DB
+# round-trips per page). PR #452 already batched the editable-copy lookups; this
+# is the documented follow-up ("fix #2"): cache the nav lists in-process so they
+# aren't re-fetched on every render.
+#
+# WHY a plain module-level dict of {key: (value, expires_at)} rather than a
+# library: it's dependency-free, fast, and exactly enough. We deliberately do
+# NOT build cross-process invalidation — production runs multiple uvicorn
+# workers, so each worker keeps its own copy and a short TTL bounds how long any
+# one worker can serve stale nav data. The admin write routes also call
+# `clear_nav_cache()` best-effort, which only clears the worker that handled the
+# write; the other workers still self-heal within the TTL. That tradeoff is
+# acceptable because nav data changes rarely and a brief (<=TTL) lag before an
+# admin edit appears on every worker is harmless for navigation links.
+
+# WHY 120s: nav data changes only on infrequent admin edits / re-seeds, so a
+# short TTL is plenty to slash per-request DB load. 120s caps worst-case
+# staleness on workers that didn't handle the write to two minutes — short
+# enough that an admin sees their change propagate quickly without any
+# cross-process invalidation machinery, long enough to absorb the request
+# bursts this cache exists to flatten. Chosen by judgment, not measurement;
+# safe to tune.
+_NAV_CACHE_TTL_SECONDS = 120.0
+
+# Maps a cache key to (cached_value, expires_at_monotonic_seconds).
+_nav_cache: Dict[Tuple[Any, ...], Tuple[List[Dict[str, Any]], float]] = {}
+
+
+def _nav_clock() -> float:
+    # WHY: monotonic, not wall-clock — TTL math must be immune to system clock
+    # adjustments (NTP steps, DST). Tests monkeypatch this single seam to drive
+    # the clock instead of sleeping.
+    return time.monotonic()
+
+
+def _nav_cache_get(key: Tuple[Any, ...]) -> Optional[List[Dict[str, Any]]]:
+    entry = _nav_cache.get(key)
+    if entry is None:
+        return None
+    value, expires_at = entry
+    if _nav_clock() >= expires_at:
+        # Expired — drop it so the caller refetches and we don't leak stale keys.
+        _nav_cache.pop(key, None)
+        return None
+    return value
+
+
+def _nav_cache_set(key: Tuple[Any, ...], value: List[Dict[str, Any]]) -> None:
+    _nav_cache[key] = (value, _nav_clock() + _NAV_CACHE_TTL_SECONDS)
+
+
+def clear_nav_cache() -> None:
+    """Drop all cached navigation lists in THIS process.
+
+    Best-effort, single-worker invalidation: admin write routes call this after
+    creating/updating/archiving a category, neighborhood, or city so the worker
+    that handled the edit reflects it immediately. Other workers (and any future
+    process) self-heal within `_NAV_CACHE_TTL_SECONDS`. There is intentionally
+    no cross-process broadcast — see the module-level note above.
+    """
+    _nav_cache.clear()
+
+
 async def list_neighborhoods(city_id: str) -> List[Dict[str, Any]]:
+    cache_key = ("neighborhoods", city_id)
+    cached = _nav_cache_get(cache_key)
+    if cached is not None:
+        return cached
     db = get_db()
     # WHY: only surface neighborhoods that actually have businesses — a
     # listed_count of 0 (or missing) means the page would be empty, which
@@ -21,7 +94,9 @@ async def list_neighborhoods(city_id: str) -> List[Dict[str, Any]]:
     cur = db.neighborhoods.find(
         {"city_id": city_id, "status": {"$ne": "archived"}, "listed_count": {"$gt": 0}}
     )
-    return await cur.sort([("order", 1), ("name", 1)]).to_list(length=200)
+    result = await cur.sort([("order", 1), ("name", 1)]).to_list(length=200)
+    _nav_cache_set(cache_key, result)
+    return result
 
 
 async def list_cities(network_id: str) -> List[Dict[str, Any]]:
@@ -31,16 +106,29 @@ async def list_cities(network_id: str) -> List[Dict[str, Any]]:
     `knowsbeauty.ai.devintensive.com/`) to show visitors which cities they can
     open.
     """
+    cache_key = ("cities", network_id)
+    cached = _nav_cache_get(cache_key)
+    if cached is not None:
+        return cached
     db = get_db()
     cur = db.cities.find({"network_id": network_id, "status": {"$ne": "archived"}})
     # WHY: alphabetical is the safest default when there's more than one
     # city; it's a stable order that needs no per-city configuration.
-    return await cur.sort([("name", 1)]).to_list(length=200)
+    result = await cur.sort([("name", 1)]).to_list(length=200)
+    _nav_cache_set(cache_key, result)
+    return result
 
 
 async def list_categories(
     city_id: str, parent_slug: Optional[str] = None
 ) -> List[Dict[str, Any]]:
+    # WHY: key on BOTH args — `list_categories(city_id)` (top-level nav) and
+    # `list_categories(city_id, parent_slug=...)` (a category page's
+    # sub-categories) return different result sets and must not share an entry.
+    cache_key = ("categories", city_id, parent_slug)
+    cached = _nav_cache_get(cache_key)
+    if cached is not None:
+        return cached
     db = get_db()
     q: Dict[str, Any] = {"city_id": city_id, "status": {"$ne": "archived"}}
     if parent_slug is None:
@@ -48,7 +136,9 @@ async def list_categories(
     else:
         q["parent_slug"] = parent_slug
     cur = db.categories.find(q)
-    return await cur.sort([("order", 1), ("name", 1)]).to_list(length=500)
+    result = await cur.sort([("order", 1), ("name", 1)]).to_list(length=500)
+    _nav_cache_set(cache_key, result)
+    return result
 
 
 async def get_category(city_id: str, slug: str) -> Optional[Dict[str, Any]]:

@@ -4277,6 +4277,14 @@ async def test_neighborhoods_with_zero_businesses_hidden_from_navigation(seeded_
         {"_id": "ghost-test-slug"},
         {"$set": {"listed_count": 5}},
     )
+    # WHY: the navigation lists are cached in-process with a short TTL. A real
+    # admin edit clears that cache via the categories/neighborhoods/cities write
+    # routes; this test mutates the database directly (bypassing those routes),
+    # so we clear the cache here to assert the change shows up immediately rather
+    # than only after the TTL expires.
+    from app.services.content import clear_nav_cache
+
+    clear_nav_cache()
     r2 = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r2.status_code == 200, r2.text
     assert "Ghost Test Neighborhood" in r2.text, (

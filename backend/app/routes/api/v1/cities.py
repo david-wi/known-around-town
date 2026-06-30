@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import City
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import merge_update, now_utc, to_doc
+from app.services.content import clear_nav_cache
 
 router = APIRouter(prefix="/cities", tags=["cities"])
 
@@ -50,6 +51,9 @@ async def create_city(body: City) -> Dict[str, Any]:
     if existing:
         raise HTTPException(409, "City already exists in this network")
     await db.cities.insert_one(doc)
+    # WHY: best-effort local invalidation so this worker reflects the new city
+    # immediately; other workers self-heal within the nav cache TTL.
+    clear_nav_cache()
     return doc
 
 
@@ -61,6 +65,7 @@ async def update_city(city_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
         raise HTTPException(404, "City not found")
     merged = merge_update(existing, patch)
     await db.cities.replace_one({"_id": city_id}, merged)
+    clear_nav_cache()
     return merged
 
 
@@ -71,4 +76,5 @@ async def archive_city(city_id: str) -> Dict[str, str]:
     )
     if res.matched_count == 0:
         raise HTTPException(404, "City not found")
+    clear_nav_cache()
     return {"status": "archived"}
