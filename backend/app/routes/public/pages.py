@@ -162,12 +162,17 @@ def _directions_url_for_business(business: Dict[str, Any]) -> str:
 async def _build_copy(tenant: TenantContext) -> CopyResolver:
     network = tenant.network
     city = tenant.city
-    return CopyResolver(
+    resolver = CopyResolver(
         network_id=network["_id"],
         city_id=city["_id"] if city else None,
         network_name=network.get("name", ""),
         city_name=city.get("name", "") if city else "",
     )
+    # WHY: the base/footer context resolves dozens of copy snippets at
+    # city/network/global scope. Priming loads them all in one query instead
+    # of one round-trip per snippet — the bulk of the home/listing TTFB win.
+    await resolver.prime()
+    return resolver
 
 
 def _dedup_photos(
@@ -717,6 +722,9 @@ async def home(request: Request) -> HTMLResponse:
         network_name=tenant.network.get("name", ""),
         city_name=city.get("name", ""),
     )
+    # WHY: the home page resolves all its copy at city/network/global scope.
+    # Prime once so the ~dozens of snippets cost a single query, not one each.
+    await copy.prime()
 
     ctx = await _base_context(request, tenant)
 
@@ -953,6 +961,9 @@ async def category_page(request: Request, category_slug: str) -> HTMLResponse:
         network_name=tenant.network.get("name", ""),
         city_name=city.get("name", ""),
     )
+    # WHY: this page resolves copy at category scope as well as city/network/
+    # global. Prime the category dimension so all its lookups hit memory.
+    await copy.prime(category_slug=category_slug)
 
     ctx = await _base_context(request, tenant)
     businesses = _dedup_photos(await content_svc.list_businesses(
@@ -1047,6 +1058,10 @@ async def neighborhood_page(request: Request, neighborhood_slug: str) -> HTMLRes
         network_name=tenant.network.get("name", ""),
         city_name=city.get("name", ""),
     )
+    # WHY: this is the salon-listing page — the slowest one, because every
+    # `business.*` snippet misses through all four scope levels. Priming the
+    # neighborhood dimension collapses those per-snippet misses into one query.
+    await copy.prime(neighborhood_slug=neighborhood_slug)
 
     ctx = await _base_context(request, tenant)
     businesses = _dedup_photos(await content_svc.list_businesses(
@@ -1116,6 +1131,9 @@ async def neighborhood_category_page(
         network_name=tenant.network.get("name", ""),
         city_name=city.get("name", ""),
     )
+    # WHY: this page resolves copy at both neighborhood and category scope.
+    # Prime both dimensions so its lookups resolve from memory.
+    await copy.prime(neighborhood_slug=neighborhood_slug, category_slug=category_slug)
 
     ctx = await _base_context(request, tenant)
     businesses = _dedup_photos([
@@ -1366,6 +1384,10 @@ async def business_page(
         network_name=tenant.network.get("name", ""),
         city_name=city.get("name", ""),
     )
+    # WHY: the business profile resolves its CTA/claim/section snippets at
+    # business scope (with city/network/global fallback). Prime the business
+    # dimension so those lookups hit memory instead of cascading per snippet.
+    await copy.prime(business_id=business["_id"])
 
     nearby: List[Dict[str, Any]] = []
     if business.get("nearby_business_ids"):

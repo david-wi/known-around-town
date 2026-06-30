@@ -1,5 +1,36 @@
 # known-around-town — Lessons Learned
 
+## Copy-block lookups were the home/listing TTFB culprit — batch them with a per-request prime (2026-06-30)
+
+The editable-wording system (`backend/app/services/copy.py`) resolved each snippet with one
+sequential `copy_blocks.find_one` walking the most-specific→least scope cascade
+(business → category → neighborhood → city → network → global). Home renders ~46 snippets; the
+salon-listing page ~72, and its `business.*` keys are never seeded so each missed through all four
+scope levels = 4 round-trips each. At ~10ms per serialized Atlas round-trip that was the ~0.9s gap
+between home/listing (~1.5s) and pricing/owners (~0.57s). **Indexes were fine — the problem was the
+COUNT of sequential round-trips, not their individual cost.**
+
+Fix (PR #452): added `CopyResolver.prime(*, category_slug=, business_id=, neighborhood_slug=)` that
+builds the page's full scope set (reusing `_scope_keys`), runs ONE `find` over the `$or` of those
+scope_refs (+ locale), and caches rows keyed by `(scope_type, frozenset(scope_ref.items()), key)`.
+`.get`/`get_copy` resolve from that cache when primed — same cascade order, same active-window check
+(factored into one shared `_is_active` so the two paths can't drift), same `_format`, same
+DEFAULTS→None fall-through — and fall back to the original per-key `find_one` for any scope dimension
+that wasn't primed (so correctness is never traded for speed). Every public-page resolver primes once.
+
+Gotchas worth remembering:
+- **mongomock strips tzinfo on read; production Motor uses `tz_aware=True`.** The copy code computes
+  a tz-aware `now` and compares it to the stored `active_from`/`active_until`. Under bare mongomock
+  that comparison raises "can't compare offset-naive and offset-aware" in BOTH paths. The test
+  (`backend/tests/test_copy_batching.py`) wraps the mock DB to re-attach UTC on reads so the test
+  environment matches production.
+- **mongomock returns a NEW collection wrapper object on every `db.copy_blocks` access**, so
+  monkeypatching `find`/`find_one` on one access doesn't stick. Count queries at a stable proxy layer
+  the code calls through, not by patching the mongomock collection.
+- The home page builds two resolvers (its own + the shared base/footer context), so it primes the same
+  base scopes twice = 2 queries. Still dozens→2; folding them is a base-context refactor left as a
+  follow-up.
+
 ## WCAG AA color-contrast: nudge shades within the palette + test the *real* ratio (2026-06-30)
 
 `frontend.md` mandates WCAG AA (4.5:1 for normal text). An axe-core audit found contrast was the only
