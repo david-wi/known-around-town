@@ -138,6 +138,42 @@ def test_editors_pick_amber_text_passes_aa_on_white():
         )
 
 
+def _blend(hexs, op, bg=(255, 255, 255)):
+    """Effective color of `hexs` rendered at CSS opacity `op` over `bg`.
+    A parent `opacity-70` dims text toward the page background, lowering its
+    real contrast below what the class alone implies."""
+    f = (int(hexs[1:3], 16), int(hexs[3:5], 16), int(hexs[5:7], 16))
+    e = tuple(round(op * f[i] + (1 - op) * bg[i]) for i in range(3))
+    return "#%02x%02x%02x" % e
+
+
+def test_network_landing_faded_card_passes_aa_through_opacity():
+    """The network landing's "coming soon" city cards are wrapped in opacity-70.
+    Their heading + badge text must be dark enough to still meet AA *through*
+    that fade — otherwise the faded look makes them unreadable (the bug fixed
+    here). We model the opacity-70 blend over white and require >= 4.5:1."""
+    html = (TEMPLATES / "network_landing.html").read_text()
+    assert "opacity-70" in html, "faded-card opacity changed — revisit this test"
+    targets = [
+        ("text-xl font-light text-stone-", "coming-soon card heading"),
+        ("border border-stone-200 text-stone-", "coming-soon card badge"),
+    ]
+    for needle, label in targets:
+        shades = []
+        for line in html.splitlines():
+            if needle in line:
+                for m in re.finditer(r"text-stone-(\d{3})", line):
+                    shades.append(m.group(1))
+        assert shades, f"network_landing.html: no shade found for {label} ('{needle}')"
+        for shade in shades:
+            eff = _blend(STONE[shade], 0.70)
+            ratio = contrast(eff, WHITE)
+            assert ratio >= WCAG_AA, (
+                f"network_landing.html {label}: stone-{shade} at opacity-70 "
+                f"renders as {eff} = {ratio:.2f}:1, below WCAG AA {WCAG_AA}:1"
+            )
+
+
 def test_contrast_helper_matches_known_values():
     """Sanity-check the math against the values that motivated the fix."""
     assert round(contrast(STONE["400"], WHITE), 2) == 2.52  # old bug
