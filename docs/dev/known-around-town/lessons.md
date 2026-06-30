@@ -1,5 +1,42 @@
 # known-around-town — Lessons Learned
 
+## WCAG AA color-contrast: nudge shades within the palette + test the *real* ratio (2026-06-30)
+
+`frontend.md` mandates WCAG AA (4.5:1 for normal text). An axe-core audit found contrast was the only
+violation type, in faint grey/gold text: stone-400 on white (~2.5:1), stone-500 on the dark footer
+(~4.1:1), amber-600 on white (3.1:1), and — on the network landing — text dimmed below AA by a parent
+`opacity-70` "coming soon" card. The fix pattern that worked: **move each shade one step within the
+existing Tailwind palette so it crosses 4.5:1, without changing the design.** On white, darken
+(stone-400→500 ~4.8:1, amber-600→700 ~4.9:1); on the dark footer, *lighten* (stone-500→400 ~7.8:1);
+under an intentional opacity fade, darken enough to pass *through* the fade (stone-700/500→800 ~5.7:1 at
+op-70) so the faded look is preserved. Both shades must already exist elsewhere in the compiled CSS or
+Tailwind purge drops them.
+
+**Test it behaviorally, not by string-match.** `backend/tests/test_a11y_contrast.py` reads each element's
+*actual* shade from the template, maps it to its hex, and computes the real WCAG ratio (and models the
+opacity-70 blend for the faded card). A future edit that re-lightens any of these text bits fails CI.
+PRs #448/#449/#450 took the site from 52 contrast violations to 0 across all 8 page types. Reusable live
+audit script: `Spaces/posey/tools/a11y/axe_contrast.py`. Watch out: a full axe run via CDN injection can
+false-positive on document-title/html-has-lang/landmark — verify those against the curl'd HTML (the pages
+do have `<html lang>`, `<title>`, one `<h1>`, `<main>`).
+
+## Deploy verification: Watchtower can serve stale/reverted content mid-cycle — re-verify AFTER it settles (2026-06-30)
+
+Deploy is GH Actions → push `:latest` to GHCR → **Watchtower** (300s poll, `WATCHTOWER_CLEANUP=true`)
+pulls + restarts the container. There is **no CDN** (`server: uvicorn`). During the poll cycle the live
+site can briefly run the new image, then be observed back on an OLDER image before it stabilizes (same
+class that bit PR #434). Real case: after merging the a11y fix, an early audit read "0 violations", then
+minutes later cache-busted curls consistently returned the OLD content on home+listing, until the
+container restarted (`Up <n>s`) on Watchtower's cycle and stably applied the new image.
+
+**Rule:** don't trust a single early post-merge check. Poll a unique deploy marker until present, then
+re-confirm it's STILL present a minute later (guards a revert). When unsure, check the box:
+`ssh -p 2222 root@174.138.81.31` → `docker ps --filter name=known` (a very recent `Up` = a cycle just
+ran) and confirm live HTML matches `git main`. To force immediately: `ssh ... 'bash
+/opt/known-around-town/scripts/deploy.sh'`. Host: miami.knowsbeauty.com → **174.138.81.31** (per
+docs/deploy.md; the cheatsheet's 152.42.152.243 did not serve the site on 2026-06-30 — prefer .31).
+
+
 ## Features are disabled by HIDING, not deleting — don't "re-add" a deliberately-hidden one (2026-06-30)
 
 This codebase disables an unfinished/not-yet-ready feature by **hiding its HTML while leaving the
