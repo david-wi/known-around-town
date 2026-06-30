@@ -30,7 +30,6 @@ async def _notify_about_inquiry(business: Dict[str, Any], doc: Dict[str, Any]) -
     while the visitor is still engaged.  For unclaimed businesses we alert
     admin — the inquiry is evidence the salon should claim their listing.
     """
-    db = get_db()
     business_id = doc["business_id"]
     business_name = business.get("name", "your business")
     visitor_name = doc.get("name", "A visitor")
@@ -38,23 +37,13 @@ async def _notify_about_inquiry(business: Dict[str, Any], doc: Dict[str, Any]) -
     visitor_phone: Optional[str] = doc.get("phone")
     message = doc.get("message", "")
 
-    # Primary: look up the most-recently-used owner session for this business.
+    # @define KAT-075 "Revenue-path security hardening"
+    # The business document is the ownership source of truth after admin
+    # verification. Do not trust business_claims rows here: public claim
+    # submissions are attacker-controlled until an admin verifies them.
     owner_email: Optional[str] = None
-    session = await db.owner_sessions.find_one(
-        {"business_id": business_id},
-        sort=[("last_used_at", -1)],
-    )
-    if session:
-        owner_email = session.get("email")
-
-    # Fallback: the verified claim record holds the submitter's email.
-    if not owner_email:
-        claim = await db.business_claims.find_one(
-            {"business_id": business_id, "status": "verified"},
-            sort=[("verified_at", -1)],
-        )
-        if claim:
-            owner_email = claim.get("submitter_email")
+    if business.get("claim_status") == "verified":
+        owner_email = (business.get("claimed_email") or "").strip().lower() or None
 
     if owner_email:
         await send_owner_inquiry_email(

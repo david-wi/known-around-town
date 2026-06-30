@@ -10,6 +10,64 @@ from app.routes.api.v1._crud import merge_update, now_utc, to_doc
 
 router = APIRouter(prefix="/businesses", tags=["businesses"])
 
+_PUBLIC_BUSINESS_FIELDS = frozenset(
+    {
+        "_id",
+        "network_id",
+        "city_id",
+        "slug",
+        "name",
+        "legal_name",
+        "category_slugs",
+        "neighborhood_slugs",
+        "address",
+        "service_area_text",
+        "phone",
+        "website",
+        "email",
+        "booking_url",
+        "socials",
+        "hours",
+        "services",
+        "photos",
+        "description",
+        "short_description",
+        "editorial_blurb",
+        "editor_blurb",
+        "known_for",
+        "best_for",
+        "before_booking_notes",
+        "price_cues",
+        "review_themes_summary",
+        "google_rating",
+        "google_review_count",
+        "hide_ratings",
+        "nearby_business_ids",
+        "voice_phone_number",
+        "claim_status",
+        "featured",
+        "editors_pick",
+        "schema_org_type",
+        "meta_title_override",
+        "meta_description_override",
+        "status",
+        "created_at",
+        "updated_at",
+    }
+)
+
+
+def _public_business(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Return only shopper-safe fields from a business document.
+
+    # @define KAT-075 "Revenue-path security hardening"
+    """
+    public = {key: doc[key] for key in _PUBLIC_BUSINESS_FIELDS if key in doc}
+    if public.get("hide_ratings"):
+        public.pop("google_rating", None)
+        public.pop("google_review_count", None)
+    return public
+
 
 async def _city_is_public(city_id: str) -> bool:
     city = await get_db().cities.find_one({"_id": city_id}, {"status": 1})
@@ -51,7 +109,8 @@ async def list_businesses(
         .skip(offset)
         .limit(limit)
     )
-    return MongoSafeJSONResponse(await cur.to_list(length=limit))
+    docs = await cur.to_list(length=limit)
+    return MongoSafeJSONResponse([_public_business(doc) for doc in docs])
 
 
 @router.get("/by-slug/{city_id}/{slug}")
@@ -63,7 +122,7 @@ async def get_business_by_slug(city_id: str, slug: str) -> Dict[str, Any]:
     )
     if not doc:
         raise HTTPException(404, "Business not found")
-    return MongoSafeJSONResponse(doc)
+    return MongoSafeJSONResponse(_public_business(doc))
 
 
 @router.get("/{business_id}")
@@ -73,7 +132,7 @@ async def get_business(business_id: str) -> Dict[str, Any]:
         doc = None
     if not doc:
         raise HTTPException(404, "Business not found")
-    return MongoSafeJSONResponse(doc)
+    return MongoSafeJSONResponse(_public_business(doc))
 
 
 @router.post("", dependencies=[Depends(require_admin)])

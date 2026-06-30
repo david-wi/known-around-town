@@ -195,9 +195,9 @@ class PreviewGateMiddleware(BaseHTTPMiddleware):
         # Admin tools (scripts, internal APIs) run outside a browser and
         # cannot present a preview_token cookie; the admin key is sufficient
         # proof of identity for these callers.
-        from app.config import get_settings as _get_settings
+        from app.routes.api.v1._auth import admin_key_matches
         api_key = request.headers.get("X-API-Key", "")
-        if api_key and api_key == _get_settings().admin_api_key:
+        if admin_key_matches(api_key):
             return await call_next(request)
 
         token = request.cookies.get(PREVIEW_COOKIE_NAME, "")

@@ -8,6 +8,8 @@ to test without any mocking.
 import pytest
 
 from app.services.owner_email import (
+    _claim_confirmation_html,
+    _claim_rejected_html,
     _claim_verified_html,
     _claim_verified_text,
     _subscription_confirmed_html,
@@ -96,6 +98,20 @@ class TestClaimVerifiedHtml:
         assert "appear first" not in lowered
         assert "appears first" not in lowered
 
+    def test_escapes_owner_controlled_html(self):
+        html = _claim_verified_html(
+            '<script>alert("x")</script>',
+            'Salon <img src=x onerror=alert(1)>',
+            'https://example.com/owners/login?email=x&next=<bad>',
+            'https://example.com/pricing?x=1&y=<bad>',
+        )
+        assert "<script>" not in html
+        assert "<img" not in html
+        assert "&lt;script&gt;" in html
+        assert "Salon &lt;img" in html
+        assert "email=x&amp;next=&lt;bad&gt;" in html
+        assert "x=1&amp;y=&lt;bad&gt;" in html
+
 
 DASHBOARD_URL = "https://miami.knowsbeauty.com/owners/me"
 
@@ -143,6 +159,40 @@ class TestSubscriptionConfirmedAdVariationCount:
         assert "Featured Pro" not in combined
         assert "Pro Featured" not in combined
 
+    def test_subscription_html_escapes_owner_controlled_html(self):
+        html = _subscription_confirmed_html(
+            '<script>alert("x")</script>',
+            'Curl <img src=x onerror=alert(1)>',
+            'https://example.com/owners/me?x=1&y=<bad>',
+        )
+        assert "<script>" not in html
+        assert "<img" not in html
+        assert "&lt;script&gt;" in html
+        assert "Curl &lt;img" in html
+        assert "x=1&amp;y=&lt;bad&gt;" in html
+
+
+class TestClaimStatusHtmlEscaping:
+    def test_confirmation_html_escapes_owner_controlled_html(self):
+        html = _claim_confirmation_html(
+            '<script>alert("x")</script>',
+            'Salon <img src=x onerror=alert(1)>',
+        )
+        assert "<script>" not in html
+        assert "<img" not in html
+        assert "&lt;script&gt;" in html
+        assert "Salon &lt;img" in html
+
+    def test_rejected_html_escapes_owner_controlled_html(self):
+        html = _claim_rejected_html(
+            '<script>alert("x")</script>',
+            'Salon <img src=x onerror=alert(1)>',
+        )
+        assert "<script>" not in html
+        assert "<img" not in html
+        assert "&lt;script&gt;" in html
+        assert "Salon &lt;img" in html
+
 
 class TestNoFoundingPartnerInEmails:
     """The Founding Partner concept was removed entirely. The claim-verified
@@ -159,3 +209,49 @@ class TestNoFoundingPartnerInEmails:
         html = _claim_verified_html("Maria", "Salon X", LOGIN_URL, PRICING_URL)
         for phrase in ("founding partner", "founding price", "spots left"):
             assert phrase not in html.lower(), f"html must not mention {phrase!r}"
+
+
+@pytest.mark.asyncio
+async def test_admin_new_claim_email_escapes_submitter_controlled_html(monkeypatch):
+    """# @define-test KAT-075"""
+    import app.services.owner_email as owner_email
+
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def post(self, url, *, headers, json):
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setenv("RESEND_API_KEY", "test-resend-key")
+    monkeypatch.setattr(owner_email.httpx, "AsyncClient", FakeClient)
+
+    ok = await owner_email.send_admin_new_claim_email(
+        submitter_name='<script>alert("x")</script>',
+        submitter_email='owner@example.com" onclick="steal()',
+        business_name='Salon <img src=x onerror=alert(1)>',
+        admin_url='https://miami.knowsbeauty.com/admin/claims?x=1&y=<bad>',
+    )
+
+    assert ok is True
+    html_body = captured["json"]["html"]
+    assert "<script>" not in html_body
+    assert "<img" not in html_body
+    assert 'onclick="steal()' not in html_body
+    assert "&lt;script&gt;" in html_body
+    assert "Salon &lt;img" in html_body
+    assert "x=1&amp;y=&lt;bad&gt;" in html_body
+    assert 'mailto:owner@example.com%22%20onclick%3D%22steal%28%29' in html_body

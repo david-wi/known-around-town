@@ -69,6 +69,12 @@ async def send_admin_new_claim_email(
     """
     recipient = _admin_notify_address()
     subject = f"New claim: {business_name}"
+    # @define KAT-075 "Revenue-path security hardening"
+    safe_business_name = html.escape(business_name)
+    safe_submitter_name = html.escape(submitter_name)
+    safe_submitter_email = html.escape(submitter_email)
+    safe_submitter_email_href = html.escape(urllib.parse.quote(submitter_email, safe="@"))
+    safe_admin_url = html.escape(admin_url)
     text_body = (
         f"A new ownership claim was submitted on Miami Knows Beauty.\n\n"
         f"Business: {business_name}\n"
@@ -91,13 +97,13 @@ async def send_admin_new_claim_email(
       New claim submitted
     </h1>
     <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 8px;">
-      <strong>{business_name}</strong>
+      <strong>{safe_business_name}</strong>
     </p>
     <p style="font-size: 14px; color: #78716c; margin: 0 0 24px;">
-      Submitted by {submitter_name}
-      &lt;<a href="mailto:{submitter_email}" style="color: #be185d;">{submitter_email}</a>&gt;
+      Submitted by {safe_submitter_name}
+      &lt;<a href="mailto:{safe_submitter_email_href}" style="color: #be185d;">{safe_submitter_email}</a>&gt;
     </p>
-    <a href="{admin_url}"
+    <a href="{safe_admin_url}"
        style="display: inline-block; background: #be185d; color: #ffffff; font-size: 14px;
               font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">
       Review claim →
@@ -400,6 +406,11 @@ def _claim_verified_html(
     submitter_name: str, business_name: str, login_url: str, pricing_url: str,
 ) -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
+    safe_first = html.escape(first)
+    safe_business_name = html.escape(business_name)
+    safe_login_url = html.escape(login_url)
+    safe_pricing_url = html.escape(pricing_url)
+    safe_support_email = html.escape(get_settings().support_email)
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
@@ -415,14 +426,14 @@ def _claim_verified_html(
       Your listing is verified
     </h1>
     <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 24px;">
-      Hi {first} — your claim for <strong>{business_name}</strong> has been approved.
+      Hi {safe_first} — your claim for <strong>{safe_business_name}</strong> has been approved.
       Your owner dashboard is ready.
     </p>
     <p style="font-size: 13px; color: #78716c; line-height: 1.5; margin: 0 0 20px;">
       Click the button below — your email is already filled in. Request your 6-digit code,
       enter it, and you're in. No password to set.
     </p>
-    <a href="{login_url}"
+    <a href="{safe_login_url}"
        style="display: inline-block; background: #be185d; color: #ffffff; font-size: 15px;
               font-weight: 600; text-decoration: none; padding: 14px 28px;
               border-radius: 8px; margin: 0 0 24px;">
@@ -453,7 +464,7 @@ def _claim_verified_html(
         Featured visibility across category and neighborhood pages, a Featured listing
         badge on your public page, and AI tools for Instagram captions and ad copy.
       </p>
-      <a href="{pricing_url}"
+      <a href="{safe_pricing_url}"
          style="display: inline-block; background: #f43f5e; color: #ffffff; font-size: 14px;
                 font-weight: 600; text-decoration: none; padding: 11px 22px;
                 border-radius: 7px;">
@@ -461,7 +472,7 @@ def _claim_verified_html(
       </a>
     </div>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
-      Questions? Email <a href="mailto:{get_settings().support_email}" style="color: #be185d;">{get_settings().support_email}</a>.
+      Questions? Email <a href="mailto:{safe_support_email}" style="color: #be185d;">{safe_support_email}</a>.
     </p>
   </div>
 </body></html>"""
@@ -538,6 +549,9 @@ def _claim_rejected_text(submitter_name: str, business_name: str) -> str:
 
 def _claim_rejected_html(submitter_name: str, business_name: str) -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
+    safe_first = html.escape(first)
+    safe_business_name = html.escape(business_name)
+    safe_support_email = html.escape(get_settings().support_email)
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
@@ -553,7 +567,7 @@ def _claim_rejected_html(submitter_name: str, business_name: str) -> str:
       Update on your claim
     </h1>
     <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 16px;">
-      Hi {first} — thank you for submitting a claim for <strong>{business_name}</strong>.
+      Hi {safe_first} — thank you for submitting a claim for <strong>{safe_business_name}</strong>.
     </p>
     <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 16px;">
       After reviewing your submission, we weren't able to verify the claim at this time.
@@ -565,7 +579,7 @@ def _claim_rejected_html(submitter_name: str, business_name: str) -> str:
       take another look.
     </p>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
-      Email us at <a href="mailto:{get_settings().support_email}" style="color: #be185d;">{get_settings().support_email}</a>
+      Email us at <a href="mailto:{safe_support_email}" style="color: #be185d;">{safe_support_email}</a>
       and we'll review it together.
     </p>
   </div>
@@ -574,6 +588,9 @@ def _claim_rejected_html(submitter_name: str, business_name: str) -> str:
 
 def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:
     first = submitter_name.split()[0] if submitter_name else "there"
+    safe_first = html.escape(first)
+    safe_business_name = html.escape(business_name)
+    safe_support_email = html.escape(get_settings().support_email)
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
@@ -589,7 +606,7 @@ def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:
       We received your claim
     </h1>
     <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 24px;">
-      Hi {first} — we'll review your claim for <strong>{business_name}</strong>
+      Hi {safe_first} — we'll review your claim for <strong>{safe_business_name}</strong>
       within one business day.
     </p>
     <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 24px;">
@@ -597,7 +614,7 @@ def _claim_confirmation_html(submitter_name: str, business_name: str) -> str:
     </p>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
       Questions while you wait?
-      Email <a href="mailto:{get_settings().support_email}" style="color: #be185d;">{get_settings().support_email}</a>.
+      Email <a href="mailto:{safe_support_email}" style="color: #be185d;">{safe_support_email}</a>.
     </p>
   </div>
 </body></html>"""
@@ -677,6 +694,10 @@ def _subscription_confirmed_text(first: str, business_name: str, dashboard_url: 
 
 
 def _subscription_confirmed_html(first: str, business_name: str, dashboard_url: str) -> str:
+    safe_first = html.escape(first)
+    safe_business_name = html.escape(business_name)
+    safe_dashboard_url = html.escape(dashboard_url)
+    safe_support_email = html.escape(get_settings().support_email)
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
@@ -692,7 +713,7 @@ def _subscription_confirmed_html(first: str, business_name: str, dashboard_url: 
       You&rsquo;re now Featured
     </h1>
     <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin: 0 0 24px;">
-      Hi {first} — <strong>{business_name}</strong> has been upgraded to a Featured listing.
+      Hi {safe_first} — <strong>{safe_business_name}</strong> has been upgraded to a Featured listing.
       Here&rsquo;s what just unlocked:
     </p>
     <ul style="padding: 0; margin: 0 0 24px; list-style: none;">
@@ -713,7 +734,7 @@ def _subscription_confirmed_html(first: str, business_name: str, dashboard_url: 
         <strong>Google, Facebook, and Instagram ad copy</strong> &mdash; 3 ready-to-run variations per campaign
       </li>
     </ul>
-    <a href="{dashboard_url}"
+    <a href="{safe_dashboard_url}"
        style="display: inline-block; background: #be185d; color: #ffffff; font-size: 15px;
               font-weight: 600; text-decoration: none; padding: 14px 28px; border-radius: 8px;
               margin-bottom: 24px;">
@@ -721,7 +742,7 @@ def _subscription_confirmed_html(first: str, business_name: str, dashboard_url: 
     </a>
     <p style="font-size: 13px; color: #78716c; margin: 0;">
       Questions? Email
-      <a href="mailto:{get_settings().support_email}" style="color: #be185d;">{get_settings().support_email}</a>
+      <a href="mailto:{safe_support_email}" style="color: #be185d;">{safe_support_email}</a>
       &mdash; we reply same day.
     </p>
   </div>

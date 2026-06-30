@@ -16,6 +16,8 @@ from typing import Any, Dict
 import pytest
 from fastapi.testclient import TestClient
 
+ADMIN_HEADERS = {"X-API-Key": "test-admin-key"}
+
 
 @pytest.fixture
 def client(seeded_db):
@@ -34,7 +36,7 @@ def _first_business(seeded_db) -> Dict[str, Any]:
 def test_admin_businesses_page_renders_empty_state(client):
     """Without a search query the page renders the prompt to search,
     not a table of results."""
-    r = client.get("/admin/businesses")
+    r = client.get("/admin/businesses", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert "Find a business" in r.text
     assert "Type a business name above to search" in r.text
@@ -42,7 +44,7 @@ def test_admin_businesses_page_renders_empty_state(client):
 
 def test_admin_businesses_page_shows_no_results_message(client, seeded_db):
     """A query that matches nothing renders the 'no results' message."""
-    r = client.get("/admin/businesses?q=zzznomatchxxx")
+    r = client.get("/admin/businesses?q=zzznomatchxxx", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert "No businesses found matching" in r.text
 
@@ -53,7 +55,7 @@ def test_admin_businesses_page_shows_matching_results(client, seeded_db):
     biz = _first_business(seeded_db)
     # Use just the first word of the name so partial match works.
     first_word = biz["name"].split()[0]
-    r = client.get(f"/admin/businesses?q={first_word}")
+    r = client.get(f"/admin/businesses?q={first_word}", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert biz["name"] in r.text
     # Edit link must point at the correct business ID.
@@ -71,7 +73,7 @@ def test_admin_businesses_page_shows_ratings_column(client, seeded_db):
         )
     )
     first_word = biz["name"].split()[0]
-    r = client.get(f"/admin/businesses?q={first_word}")
+    r = client.get(f"/admin/businesses?q={first_word}", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert "4.8" in r.text
     assert "120" in r.text
@@ -88,7 +90,7 @@ def test_admin_businesses_page_shows_hidden_badge(client, seeded_db):
         )
     )
     first_word = biz["name"].split()[0]
-    r = client.get(f"/admin/businesses?q={first_word}")
+    r = client.get(f"/admin/businesses?q={first_word}", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert "Hidden" in r.text
 
@@ -98,7 +100,10 @@ def test_admin_businesses_page_shows_hidden_badge(client, seeded_db):
 def test_admin_business_edit_page_renders(client, seeded_db):
     """Edit page loads and shows the business name and the hide_ratings toggle."""
     biz = _first_business(seeded_db)
-    r = client.get(f"/admin/businesses/{biz['_id']}/edit", headers={"host": "miami.knowsbeauty.localhost"})
+    r = client.get(
+        f"/admin/businesses/{biz['_id']}/edit",
+        headers={**ADMIN_HEADERS, "host": "miami.knowsbeauty.localhost"},
+    )
     assert r.status_code == 200, r.text
     assert biz["name"] in r.text
     # The toggle input must be present.
@@ -121,7 +126,10 @@ def test_admin_business_edit_page_shows_unchecked_by_default(client, seeded_db):
             {"$set": {"hide_ratings": False}},
         )
     )
-    r = client.get(f"/admin/businesses/{biz['_id']}/edit")
+    r = client.get(
+        f"/admin/businesses/{biz['_id']}/edit",
+        headers=ADMIN_HEADERS,
+    )
     assert r.status_code == 200, r.text
     # The checkbox must not carry the `checked` attribute.
     assert "Ratings are shown" in r.text
@@ -138,13 +146,16 @@ def test_admin_business_edit_page_shows_checked_when_hidden(client, seeded_db):
             {"$set": {"hide_ratings": True}},
         )
     )
-    r = client.get(f"/admin/businesses/{biz['_id']}/edit")
+    r = client.get(
+        f"/admin/businesses/{biz['_id']}/edit",
+        headers=ADMIN_HEADERS,
+    )
     assert r.status_code == 200, r.text
     assert "Ratings are currently hidden" in r.text
 
 
 def test_admin_business_edit_page_404_for_unknown_id(client):
-    r = client.get("/admin/businesses/does-not-exist/edit")
+    r = client.get("/admin/businesses/does-not-exist/edit", headers=ADMIN_HEADERS)
     assert r.status_code == 404
 
 
@@ -163,6 +174,7 @@ def test_admin_business_edit_post_sets_hide_ratings_true(client, seeded_db):
     )
     r = client.post(
         f"/admin/businesses/{biz['_id']}/edit",
+        headers=ADMIN_HEADERS,
         data={"hide_ratings": "on"},
         follow_redirects=False,
     )
@@ -193,6 +205,7 @@ def test_admin_business_edit_post_sets_hide_ratings_false(client, seeded_db):
     # POST without the checkbox field (simulates unchecking it).
     r = client.post(
         f"/admin/businesses/{biz['_id']}/edit",
+        headers=ADMIN_HEADERS,
         data={},
         follow_redirects=False,
     )
@@ -210,6 +223,7 @@ def test_admin_business_edit_post_shows_saved_banner_on_follow(client, seeded_db
     biz = _first_business(seeded_db)
     r = client.post(
         f"/admin/businesses/{biz['_id']}/edit",
+        headers=ADMIN_HEADERS,
         data={"hide_ratings": "on"},
         follow_redirects=True,
     )
@@ -220,6 +234,7 @@ def test_admin_business_edit_post_shows_saved_banner_on_follow(client, seeded_db
 def test_admin_business_edit_post_404_for_unknown_id(client):
     r = client.post(
         "/admin/businesses/does-not-exist/edit",
+        headers=ADMIN_HEADERS,
         data={"hide_ratings": "on"},
         follow_redirects=False,
     )
@@ -231,7 +246,7 @@ def test_admin_business_edit_post_404_for_unknown_id(client):
 def test_admin_layout_has_businesses_nav_link(client):
     """The admin layout nav contains a 'Businesses' link so admins can
     navigate to the search page from anywhere in the admin section."""
-    r = client.get("/admin/claims")
+    r = client.get("/admin/claims", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert 'href="/admin/businesses"' in r.text
     assert "Businesses" in r.text

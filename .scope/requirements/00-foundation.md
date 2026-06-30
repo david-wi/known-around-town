@@ -67,3 +67,25 @@ All secrets, feature flags, and configurable parameters are read from environmen
 variables at startup. No secrets are committed to the repository.
 **Acceptance:** Given a new env var (e.g., `PREVIEW_MODE_ENABLED=false`), when the
 container is restarted, then the new value takes effect without a code deploy.
+
+### KAT-075 — Revenue-path security hardening · V1 · implemented
+**Persona:** David (operator), Salon Owner, Salon Seeker.
+The claim, inquiry, admin, and public business API paths must fail closed and expose
+only the data each caller is allowed to use before David drives real outreach traffic.
+Public claim submissions cannot set verification/admin fields; inquiry notifications
+must route only from authoritative verified business ownership; admin-key checks must
+deny access when the key is missing and compare secrets in constant time; public
+business JSON responses must hide owner, billing, voice-provider identifier, import,
+and internal ranking fields; and admin claim notification HTML must escape
+submitter-controlled content.
+**Acceptance:** Given a public claim submission that includes `status=verified`,
+`verified_at`, `verification_token`, `_id`, or `submitted_at`, when it is stored, then
+the stored claim remains `pending` with server-owned verification fields; given a forged
+verified claim row without verified business ownership, when a visitor sends an inquiry,
+then no owner email is sent to the forged claimant; given a legitimately verified
+business with `claimed_email`, then inquiries notify that email; given `ADMIN_API_KEY`
+is unset or wrong, admin routes and preview-gate admin bypass deny access; given public
+business API list/detail responses, then sensitive owner/billing/voice-provider
+identifier/import/internal fields are absent while shopper-facing contact fields remain;
+given malicious submitter-controlled text in a claim notification, then the outbound HTML
+escapes it safely.

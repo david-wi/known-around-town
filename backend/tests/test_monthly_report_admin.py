@@ -1,9 +1,8 @@
 """Tests for the admin monthly-report preview and test-send routes.
 
 These exercise the FastAPI routes end-to-end against the mocked database.
-The admin gate is open in the test env (no ADMIN_API_KEY configured), matching
-the pattern in test_admin_analytics.py. The AI caption call is patched so the
-thin-views branch runs without touching the live gateway.
+The AI caption call is patched so the thin-views branch runs without touching
+the live gateway.
 """
 
 from __future__ import annotations
@@ -12,6 +11,8 @@ import asyncio
 
 import pytest
 from fastapi.testclient import TestClient
+
+ADMIN_HEADERS = {"X-API-Key": "test-admin-key"}
 
 
 @pytest.fixture
@@ -43,7 +44,11 @@ def _insert_business(mock_db, business_id="biz-preview", name="Glow Salon", view
 class TestPreview:
     def test_preview_renders_email_html(self, client, mock_db):
         _insert_business(mock_db, views=50)
-        r = client.get("/admin/monthly-report/preview", params={"business_id": "biz-preview"})
+        r = client.get(
+            "/admin/monthly-report/preview",
+            params={"business_id": "biz-preview"},
+            headers=ADMIN_HEADERS,
+        )
         assert r.status_code == 200, r.text
         # It returns the rendered email HTML — the salon name and a number show.
         assert "Glow Salon" in r.text
@@ -51,7 +56,11 @@ class TestPreview:
         assert "<!DOCTYPE html>" in r.text
 
     def test_preview_unknown_business_404(self, client, mock_db):
-        r = client.get("/admin/monthly-report/preview", params={"business_id": "nope"})
+        r = client.get(
+            "/admin/monthly-report/preview",
+            params={"business_id": "nope"},
+            headers=ADMIN_HEADERS,
+        )
         assert r.status_code == 404
 
     def test_preview_sends_nothing(self, client, mock_db, monkeypatch):
@@ -63,7 +72,11 @@ class TestPreview:
             raise AssertionError("preview must not send")
 
         monkeypatch.setattr(me, "send_test_monthly_email", _boom)
-        r = client.get("/admin/monthly-report/preview", params={"business_id": "biz-preview"})
+        r = client.get(
+            "/admin/monthly-report/preview",
+            params={"business_id": "biz-preview"},
+            headers=ADMIN_HEADERS,
+        )
         assert r.status_code == 200
 
     def test_preview_thin_views_includes_caption(self, client, mock_db, monkeypatch):
@@ -75,7 +88,11 @@ class TestPreview:
             return "Come unwind with us 🌸\n#MiamiSpa"
 
         monkeypatch.setattr(ai, "generate_caption", _fake_caption)
-        r = client.get("/admin/monthly-report/preview", params={"business_id": "biz-thin"})
+        r = client.get(
+            "/admin/monthly-report/preview",
+            params={"business_id": "biz-thin"},
+            headers=ADMIN_HEADERS,
+        )
         assert r.status_code == 200, r.text
         assert "Come unwind with us" in r.text
         assert "Ready to post" in r.text
@@ -90,6 +107,7 @@ class TestTestSend:
         r = client.post(
             "/admin/monthly-report/test-send",
             json={"business_id": "biz-preview", "to": "qa@example.com"},
+            headers=ADMIN_HEADERS,
         )
         assert r.status_code == 403
         assert "disabled" in r.text.lower()
@@ -103,6 +121,7 @@ class TestTestSend:
         r = client.post(
             "/admin/monthly-report/test-send",
             json={"business_id": "biz-owned", "to": "RealOwner@Salon.com"},
+            headers=ADMIN_HEADERS,
         )
         assert r.status_code == 409
         assert "real claimed owner" in r.text.lower()
@@ -122,6 +141,7 @@ class TestTestSend:
         r = client.post(
             "/admin/monthly-report/test-send",
             json={"business_id": "biz-ok", "to": "qa@example.com"},
+            headers=ADMIN_HEADERS,
         )
         assert r.status_code == 200, r.text
         body = r.json()
@@ -135,6 +155,7 @@ class TestTestSend:
         r = client.post(
             "/admin/monthly-report/test-send",
             json={"business_id": "biz-ok", "to": "not-an-email"},
+            headers=ADMIN_HEADERS,
         )
         # Pydantic EmailStr validation rejects the malformed address (422).
         assert r.status_code == 422

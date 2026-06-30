@@ -15,6 +15,8 @@ from typing import Any, Dict
 import pytest
 from fastapi.testclient import TestClient
 
+ADMIN_HEADERS = {"X-API-Key": "test-admin-key"}
+
 
 @pytest.fixture
 def client(seeded_db):
@@ -46,7 +48,7 @@ def test_admin_claims_page_lists_pending(client, seeded_db):
     business = _first_business(seeded_db)
     claim = _submit_claim(client, business["_id"])
 
-    r = client.get("/admin/claims")
+    r = client.get("/admin/claims", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     # The business name shows in the table.
     assert business["name"] in r.text
@@ -63,14 +65,17 @@ def test_admin_claims_page_lists_pending(client, seeded_db):
     assert f'data-claim-id="{claim["_id"]}"' in r.text
 
     # The link to the listing must be absolute (including the city subdomain)
-    r = client.get("/admin/claims", headers={"host": "miami.knowsbeauty.localhost"})
+    r = client.get(
+        "/admin/claims",
+        headers={**ADMIN_HEADERS, "host": "miami.knowsbeauty.localhost"},
+    )
     assert r.status_code == 200, r.text
     expected_url = f"http://miami.knowsbeauty.localhost/b/{business['slug']}"
     assert expected_url in r.text
 
 
 def test_admin_claims_page_empty_state(client):
-    r = client.get("/admin/claims")
+    r = client.get("/admin/claims", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert "No pending claims" in r.text
     assert "Nothing to review right now" in r.text
@@ -105,7 +110,7 @@ def test_admin_claims_page_hides_verified_and_rejected(client, seeded_db):
         )
     )
 
-    r = client.get("/admin/claims")
+    r = client.get("/admin/claims", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert "Pending Person" in r.text
     assert "Already Verified" not in r.text
@@ -124,6 +129,22 @@ def test_admin_claims_page_blocked_without_key(seeded_db, monkeypatch):
 
         c = TestClient(app)
         r = c.get("/admin/claims")
+        assert r.status_code == 401, r.text
+    finally:
+        get_settings.cache_clear()
+
+
+def test_admin_claims_page_blocked_when_key_unset(seeded_db, monkeypatch):
+    """# @define-test KAT-075"""
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.delenv("ADMIN_API_KEY", raising=False)
+    try:
+        from app.main import app
+
+        c = TestClient(app)
+        r = c.get("/admin/claims", headers={"X-API-Key": "anything"})
         assert r.status_code == 401, r.text
     finally:
         get_settings.cache_clear()
@@ -235,7 +256,7 @@ def test_reject_claim_flips_status_and_unclaims_business(client, seeded_db):
     b_before = asyncio.run(seeded_db.businesses.find_one({"_id": business["_id"]}))
     assert b_before["claim_status"] == "pending"
 
-    r = client.post(f"/api/v1/claims/{claim['_id']}/reject")
+    r = client.post(f"/api/v1/claims/{claim['_id']}/reject", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert r.json() == {"status": "rejected"}
 
@@ -265,7 +286,10 @@ def test_reject_claim_does_not_unverify_already_verified_business(client, seeded
         )
     )
 
-    r = client.post(f"/api/v1/claims/{stale_claim['_id']}/reject")
+    r = client.post(
+        f"/api/v1/claims/{stale_claim['_id']}/reject",
+        headers=ADMIN_HEADERS,
+    )
     assert r.status_code == 200
 
     b_after = asyncio.run(seeded_db.businesses.find_one({"_id": business["_id"]}))
@@ -276,7 +300,7 @@ def test_reject_claim_does_not_unverify_already_verified_business(client, seeded
 
 
 def test_reject_claim_404(client):
-    r = client.post("/api/v1/claims/does-not-exist/reject")
+    r = client.post("/api/v1/claims/does-not-exist/reject", headers=ADMIN_HEADERS)
     assert r.status_code == 404
 
 
@@ -291,7 +315,7 @@ def test_reject_claim_requires_admin_when_key_set(seeded_db, monkeypatch):
         c = TestClient(app)
         # Create a claim with admin auth so we have something to reject.
         business = _first_business(seeded_db)
-        c.post(
+        claim_response = c.post(
             "/api/v1/claims",
             json={
                 "_id": "claim-for-reject-auth",
@@ -300,12 +324,14 @@ def test_reject_claim_requires_admin_when_key_set(seeded_db, monkeypatch):
                 "submitter_email": "x@example.com",
             },
         )
+        assert claim_response.status_code == 200, claim_response.text
+        claim = claim_response.json()
         # Without the key, reject is blocked.
-        r = c.post("/api/v1/claims/claim-for-reject-auth/reject")
+        r = c.post(f"/api/v1/claims/{claim['_id']}/reject")
         assert r.status_code == 401
         # With the key, it works.
         r = c.post(
-            "/api/v1/claims/claim-for-reject-auth/reject",
+            f"/api/v1/claims/{claim['_id']}/reject",
             headers={"X-API-Key": "secret"},
         )
         assert r.status_code == 200
@@ -321,7 +347,7 @@ def test_admin_claims_page_shows_google_search_link(client, seeded_db):
     into a new tab manually."""
     business = _first_business(seeded_db)
     _submit_claim(client, business["_id"])
-    r = client.get("/admin/claims")
+    r = client.get("/admin/claims", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     # The Google search URL must appear in the page.  We don't assert the
     # exact encoded query because encoding details are Jinja internals, but
@@ -336,7 +362,7 @@ def test_admin_claims_page_shows_street_address(client, seeded_db):
     can cross-reference physical location without leaving the page."""
     business = _first_business(seeded_db)
     _submit_claim(client, business["_id"])
-    r = client.get("/admin/claims")
+    r = client.get("/admin/claims", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     # Every seeded business has a street address (from _real_businesses.json
     # address_full).  The template renders it in a <p> below the business name.
@@ -405,12 +431,43 @@ def test_submit_claim_blocked_when_business_claim_pending(client, seeded_db):
     assert "already under review" in r.text
 
 
+def test_submit_claim_forces_server_owned_pending_fields(client, seeded_db):
+    """# @define-test KAT-075"""
+    business = _first_business(seeded_db)
+    payload = {
+        "_id": "attacker-chosen-id",
+        "business_id": business["_id"],
+        "submitter_name": "Forged Owner",
+        "submitter_email": "forged@example.com",
+        "status": "verified",
+        "verified_at": "2026-01-01T00:00:00Z",
+        "verification_token": "attacker-token",
+        "submitted_at": "2026-01-01T00:00:00Z",
+        "notes": "Trying to self-verify.",
+    }
+
+    r = client.post("/api/v1/claims", json=payload)
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["_id"] != "attacker-chosen-id"
+    assert body["status"] == "pending"
+    assert body["submitted_at"] != "2026-01-01T00:00:00Z"
+    assert "verified_at" not in body
+    assert "verification_token" not in body
+    saved = asyncio.run(seeded_db.business_claims.find_one({"_id": body["_id"]}))
+    assert saved["status"] == "pending"
+    assert str(saved["submitted_at"]) != "2026-01-01T00:00:00Z"
+    assert saved.get("verified_at") is None
+    assert "verification_token" not in saved
+
+
 # ---- existing verify still works ---------------------------------------
 
 def test_verify_claim_still_works(client, seeded_db):
     business = _first_business(seeded_db)
     claim = _submit_claim(client, business["_id"])
-    r = client.post(f"/api/v1/claims/{claim['_id']}/verify")
+    r = client.post(f"/api/v1/claims/{claim['_id']}/verify", headers=ADMIN_HEADERS)
     assert r.status_code == 200
     assert r.json() == {"status": "verified"}
     b_after = asyncio.run(seeded_db.businesses.find_one({"_id": business["_id"]}))
@@ -426,7 +483,7 @@ def test_verify_claim_does_not_grant_founding_partner(seeded_db):
     c = TestClient(app)
     business = _first_business(seeded_db)
     claim = _submit_claim(c, business["_id"])
-    r = c.post(f"/api/v1/claims/{claim['_id']}/verify")
+    r = c.post(f"/api/v1/claims/{claim['_id']}/verify", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     b_after = asyncio.run(seeded_db.businesses.find_one({"_id": business["_id"]}))
     assert b_after["claim_status"] == "verified"
