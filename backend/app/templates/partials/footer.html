@@ -13,7 +13,7 @@
         </div>
         <p class="text-stone-400 text-sm leading-relaxed max-w-sm">{{ footer_about_body or network.description or '' }}</p>
         {% if footer_also_in or footer_publication_label %}
-        <p class="text-stone-500 text-xs mt-6 tracking-wide">
+        <p class="text-stone-400 text-xs mt-6 tracking-wide">
           {% if footer_publication_label %}<span class="italic">{{ footer_publication_label }}</span> {% endif %}
           {% if footer_also_in %}{% if footer_also_in_url %}<a href="{{ footer_also_in_url }}" class="hover:text-stone-300 transition-colors">{{ footer_also_in }}</a>{% else %}{{ footer_also_in }}{% endif %}{% endif %}
         </p>
@@ -21,7 +21,7 @@
       </div>
       {% if nav_categories %}
       <div class="md:col-span-3">
-        <h4 class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-500 mb-5">Categories</h4>
+        <h4 class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-400 mb-5">Categories</h4>
         <ul class="space-y-3 text-sm">
           {% for c in nav_categories[:6] %}
             {% if not c.parent_slug %}
@@ -33,7 +33,7 @@
       {% endif %}
       {% if nav_neighborhoods %}
       <div class="md:col-span-3">
-        <h4 class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-500 mb-5">Neighborhoods</h4>
+        <h4 class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-400 mb-5">Neighborhoods</h4>
         <ul class="space-y-3 text-sm">
           {% for n in nav_neighborhoods[:6] %}
             <li><a class="text-stone-300 hover:text-white transition-colors" href="/n/{{ n.slug }}">{{ n.name }}</a></li>
@@ -42,7 +42,7 @@
       </div>
       {% endif %}
       <div class="md:col-span-2">
-        <h4 class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-500 mb-5">{{ footer_owners_label or 'Owners' }}</h4>
+        <h4 class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-400 mb-5">{{ footer_owners_label or 'Owners' }}</h4>
         <ul class="space-y-3 text-sm">
           {# Owner-column links. Items labelled "Pricing" route to the dedicated
              pricing page; everything else goes to the broader /owners landing
@@ -63,7 +63,7 @@
     </div>
     {% if network_cities %}
     <div class="mt-12 pt-8 border-t border-stone-800">
-      <p class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-500 mb-4">More cities</p>
+      <p class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-400 mb-4">More cities</p>
       <div class="flex flex-wrap gap-x-6 gap-y-2">
         {% for nc in network_cities %}
         <a href="{{ nc.url }}" class="text-sm text-stone-400 hover:text-white transition-colors">{{ nc.name }}</a>
@@ -71,7 +71,7 @@
       </div>
     </div>
     {% endif %}
-    <div class="mt-16 pt-8 border-t border-stone-800 flex flex-col md:flex-row justify-between gap-4 text-xs text-stone-500">
+    <div class="mt-16 pt-8 border-t border-stone-800 flex flex-col md:flex-row justify-between gap-4 text-xs text-stone-400">
       <p>{{ footer_legal or ('© ' ~ now.year ~ ' ' ~ (city.name if city else '') ~ ' Knows ' ~ vertical_word ~ ' · A local-first directory.') }}</p>
       <p class="italic">{{ footer_made_in or ('Made in ' ~ (city.name if city else 'South Florida') ~ ' · Powered by Expertly') }}</p>
     </div>
