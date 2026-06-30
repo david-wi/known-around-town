@@ -296,7 +296,7 @@
       </div>
 
       <div>
-        <label for="op-email" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Public email <span class="text-stone-400 normal-case">(optional)</span></label>
+        <label for="op-email" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Public email <span class="text-stone-500 normal-case">(optional)</span></label>
         <input id="op-email" name="email" type="email"
                value="{{ owner_business.email or '' }}"
                placeholder="hello@yoursalon.com"
@@ -305,7 +305,7 @@
 
       <div class="grid sm:grid-cols-2 gap-6">
         <div>
-          <label for="op-instagram" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Instagram <span class="text-stone-400 normal-case">(optional)</span></label>
+          <label for="op-instagram" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Instagram <span class="text-stone-500 normal-case">(optional)</span></label>
           <div class="flex items-center rounded-lg border border-stone-200 bg-stone-50 overflow-hidden focus-within:ring-2 {{ theme.focus_ring }} focus-within:border-transparent transition">
             <span class="px-3 py-2.5 text-sm text-stone-400 border-r border-stone-200 shrink-0 select-none">instagram.com/</span>
             <input id="op-instagram" name="instagram" type="text"
@@ -315,7 +315,7 @@
           </div>
         </div>
         <div>
-          <label for="op-facebook" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Facebook <span class="text-stone-400 normal-case">(optional)</span></label>
+          <label for="op-facebook" class="block text-xs font-medium text-stone-700 mb-1.5 uppercase tracking-wide">Facebook <span class="text-stone-500 normal-case">(optional)</span></label>
           <input id="op-facebook" name="facebook" type="url"
                  value="{{ owner_business.facebook or '' if owner_business else '' }}"
                  placeholder="https://facebook.com/yoursalon"
