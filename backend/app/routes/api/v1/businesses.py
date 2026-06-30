@@ -11,6 +11,11 @@ from app.routes.api.v1._crud import merge_update, now_utc, to_doc
 router = APIRouter(prefix="/businesses", tags=["businesses"])
 
 
+async def _city_is_public(city_id: str) -> bool:
+    city = await get_db().cities.find_one({"_id": city_id}, {"status": 1})
+    return bool(city and city.get("status") != "archived")
+
+
 @router.get("")
 async def list_businesses(
     city_id: str = Query(...),
@@ -21,9 +26,11 @@ async def list_businesses(
     limit: int = Query(default=60, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> List[Dict[str, Any]]:
-    q: Dict[str, Any] = {"city_id": city_id}
-    if status:
-        q["status"] = status
+    if not await _city_is_public(city_id):
+        return MongoSafeJSONResponse([])
+    if status and status != "live":
+        return MongoSafeJSONResponse([])
+    q: Dict[str, Any] = {"city_id": city_id, "status": "live"}
     if category_slug:
         q["category_slugs"] = category_slug
     if neighborhood_slug:
@@ -49,7 +56,11 @@ async def list_businesses(
 
 @router.get("/by-slug/{city_id}/{slug}")
 async def get_business_by_slug(city_id: str, slug: str) -> Dict[str, Any]:
-    doc = await get_db().businesses.find_one({"city_id": city_id, "slug": slug})
+    if not await _city_is_public(city_id):
+        raise HTTPException(404, "Business not found")
+    doc = await get_db().businesses.find_one(
+        {"city_id": city_id, "slug": slug, "status": "live"}
+    )
     if not doc:
         raise HTTPException(404, "Business not found")
     return MongoSafeJSONResponse(doc)
@@ -57,7 +68,9 @@ async def get_business_by_slug(city_id: str, slug: str) -> Dict[str, Any]:
 
 @router.get("/{business_id}")
 async def get_business(business_id: str) -> Dict[str, Any]:
-    doc = await get_db().businesses.find_one({"_id": business_id})
+    doc = await get_db().businesses.find_one({"_id": business_id, "status": "live"})
+    if doc and not await _city_is_public(doc.get("city_id", "")):
+        doc = None
     if not doc:
         raise HTTPException(404, "Business not found")
     return MongoSafeJSONResponse(doc)
