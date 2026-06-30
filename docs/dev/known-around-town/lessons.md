@@ -1,5 +1,35 @@
 # known-around-town — Lessons Learned
 
+## Features are disabled by HIDING, not deleting — don't "re-add" a deliberately-hidden one (2026-06-30)
+
+This codebase disables an unfinished/not-yet-ready feature by **hiding its HTML while leaving the
+supporting JavaScript in place (guarded with `if (element) {...}` so it's a safe no-op)**, marked with a
+Jinja comment like `{# Listing performance is deliberately hidden pre-launch. #}`. The guarded JS is
+NOT dead code to clean up — it's scaffolding kept ready so the feature can be cleanly re-enabled later.
+
+Concrete case: the owner dashboard's "Listing performance" panel (page views + taps to call / website /
+directions — the `/api/v1/owner/stats` data) LOOKS like a wiring gap: the endpoint is registered and
+returns real counters, but `owner_me.html` doesn't render them, and the inquiries JS references
+now-absent `stat-inquiries` elements. It is NOT a gap — commit `0343193` ("Fix owner QA copy and listing
+trust gaps") **deliberately hid the panel pre-launch** because a freshly-upgraded owner would see 0 views
+/ 0 messages, which looks bad. The preview dashboard (`owner_dashboard.html`, route `/owner/dashboard`)
+still shows the panel with SAMPLE numbers; the real authed dashboard (`owner_me.html`) hides it.
+
+**Rule: before "fixing" an apparently-unwired UI feature here, check git history (`git log -S` on the
+element/marker).** If it was deliberately hidden, do NOT re-add it — you'd revert an intentional product
+decision. POST-LAUNCH follow-up (gated on real traffic + David): un-hide the performance panel so paying
+owners see their ROI — the data pipeline + endpoint already exist; it's the strongest renewal argument.
+
+## Step markers for the stop-compliance hook must be EXACTLY `PREFIX-N/TOTAL:` (2026-06-30)
+
+The `stop-compliance-check.py` hook matches procedure step markers with the regex `PREFIX-N/TOTAL:` —
+the colon must come **immediately after the total number**. Writing the step NAME before the colon
+(`CHANGE-3/16 (Plan):`) does NOT match, so the hook can't see your progress and re-fires
+"in the middle of CHANGE workflow" indefinitely — even when you've finished or correctly abandoned the
+procedure. A CHANGE correctly abandoned at the investigation gate is closed by emitting the remaining
+markers in exact format (`CHANGE-3/16:` … `CHANGE-16/16:`, each N/A with brief evidence). Verify with the
+hook's own `find_incomplete_procedure()` if stuck.
+
 ## Public business API must hide archived cities and archived listings (2026-06-30)
 
 The public JSON endpoints under `/api/v1/businesses` are unauthenticated shopper
