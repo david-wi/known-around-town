@@ -340,6 +340,7 @@ async def sync_page(
     without_rating = total - with_rating
 
     return _templates.TemplateResponse(
+        request,
         "admin/sync.html",
         {
             "request": request,

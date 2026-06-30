@@ -32,6 +32,10 @@ def _signed_cookie(email: str) -> str:
     return sign_session(email)
 
 
+def _owner_session_headers(cookie: str) -> dict[str, str]:
+    return {"host": "miami.knowsbeauty.localhost", "Cookie": f"kb_owner_session={cookie}"}
+
+
 async def _insert_business(
     db,
     *,
@@ -71,8 +75,7 @@ def _render_dashboard(
     # one the smoke tests use for Miami Beauty.
     r = client.get(
         "/owners/me",
-        headers={"host": "miami.knowsbeauty.localhost"},
-        cookies={"kb_owner_session": _signed_cookie(email)},
+        headers=_owner_session_headers(_signed_cookie(email)),
     )
     assert r.status_code == 200, r.text
     return r.text

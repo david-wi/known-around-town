@@ -253,6 +253,10 @@ def _signed_cookie(email: str) -> str:
     return sign_session(email)
 
 
+def _owner_session_headers(email: str) -> Dict[str, str]:
+    return {"host": _HOST, "Cookie": f"kb_owner_session={_signed_cookie(email)}"}
+
+
 def test_owner_stats_returns_mkb_referred_count(seeded_db, client):
     email = "referer-owner@example.com"
     biz_id = asyncio.run(_insert_business(seeded_db, claimed_email=email))
@@ -264,8 +268,7 @@ def test_owner_stats_returns_mkb_referred_count(seeded_db, client):
     )
     r = client.get(
         "/api/v1/owner/stats",
-        headers={"host": _HOST},
-        cookies={"kb_owner_session": _signed_cookie(email)},
+        headers=_owner_session_headers(email),
     )
     assert r.status_code == 200, r.text
     data = r.json()
@@ -279,8 +282,7 @@ def test_owner_stats_mkb_referred_defaults_zero(seeded_db, client):
     asyncio.run(_insert_business(seeded_db, slug="referer-test-salon-2", claimed_email=email))
     r = client.get(
         "/api/v1/owner/stats",
-        headers={"host": _HOST},
-        cookies={"kb_owner_session": _signed_cookie(email)},
+        headers=_owner_session_headers(email),
     )
     assert r.status_code == 200, r.text
     assert r.json()["mkb_referred_view_count"] == 0

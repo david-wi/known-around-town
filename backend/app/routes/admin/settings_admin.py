@@ -54,6 +54,7 @@ async def settings_page(
     ratings_min_review_count = await get_ratings_min_review_count()
 
     return _templates.TemplateResponse(
+        request,
         "admin/settings.html",
         {
             "request": request,

@@ -32,6 +32,10 @@ def _signed_cookie(email: str) -> str:
     return sign_session(email)
 
 
+def _owner_session_headers(cookie: str) -> dict[str, str]:
+    return {"Cookie": f"kb_owner_session={cookie}"}
+
+
 async def _insert_business(
     db,
     *,
@@ -127,7 +131,7 @@ class TestCheckout:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/checkout",
-                cookies={"kb_owner_session": cookie},
+                headers=_owner_session_headers(cookie),
             )
             get_settings.cache_clear()
         assert r.status_code == 503
@@ -145,7 +149,7 @@ class TestCheckout:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/checkout",
-                cookies={"kb_owner_session": cookie},
+                headers=_owner_session_headers(cookie),
             )
             get_settings.cache_clear()
         assert r.status_code == 404
@@ -164,7 +168,7 @@ class TestCheckout:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/checkout",
-                cookies={"kb_owner_session": cookie},
+                headers=_owner_session_headers(cookie),
             )
             get_settings.cache_clear()
         assert r.status_code == 409
@@ -188,7 +192,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", return_value=mock_session):
                 r = client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers=_owner_session_headers(cookie),
                 )
             get_settings.cache_clear()
 
@@ -227,7 +231,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", side_effect=fake_create):
                 r = client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers=_owner_session_headers(cookie),
                 )
             get_settings.cache_clear()
 
@@ -269,7 +273,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", side_effect=fake_create):
                 r = client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers=_owner_session_headers(cookie),
                 )
             get_settings.cache_clear()
 
@@ -302,7 +306,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", side_effect=fake_create):
                 client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers=_owner_session_headers(cookie),
                 )
             get_settings.cache_clear()
 
@@ -347,7 +351,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", side_effect=fake_create):
                 r = client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers=_owner_session_headers(cookie),
                 )
             get_settings.cache_clear()
 
@@ -389,7 +393,7 @@ class TestCheckout:
             with patch("stripe.checkout.Session.create", side_effect=fake_create):
                 client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers=_owner_session_headers(cookie),
                 )
             get_settings.cache_clear()
 
@@ -399,7 +403,7 @@ class TestCheckout:
     @pytest.mark.asyncio
     async def test_checkout_502_on_stripe_error(self, client, seeded_db):
         """Stripe SDK raises → 502."""
-        import stripe.error as se
+        import stripe
 
         email = "stripeerr@test.com"
         await _insert_business(seeded_db, email=email)
@@ -413,11 +417,11 @@ class TestCheckout:
             get_settings.cache_clear()
             with patch(
                 "stripe.checkout.Session.create",
-                side_effect=se.StripeError("card declined"),
+                side_effect=stripe.StripeError("card declined"),
             ):
                 r = client.post(
                     "/api/v1/billing/checkout",
-                    cookies={"kb_owner_session": cookie},
+                    headers=_owner_session_headers(cookie),
                 )
             get_settings.cache_clear()
 
@@ -446,14 +450,14 @@ class TestWebhook:
 
     def test_webhook_400_on_invalid_signature(self, client, seeded_db):
         """Bad signature → 400."""
-        import stripe.error as se
+        import stripe
 
         with patch.dict(os.environ, {"STRIPE_WEBHOOK_SECRET": "whsec_test"}):
             from app.config import get_settings
             get_settings.cache_clear()
             with patch(
                 "stripe.Webhook.construct_event",
-                side_effect=se.SignatureVerificationError("bad", "sig"),
+                side_effect=stripe.SignatureVerificationError("bad", "sig"),
             ):
                 r = client.post(
                     "/api/v1/billing/webhook",
@@ -664,7 +668,7 @@ class TestBillingPortal:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/portal",
-                cookies={"kb_owner_session": cookie},
+                headers=_owner_session_headers(cookie),
             )
             get_settings.cache_clear()
         assert r.status_code == 503
@@ -679,7 +683,7 @@ class TestBillingPortal:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/portal",
-                cookies={"kb_owner_session": cookie},
+                headers=_owner_session_headers(cookie),
             )
             get_settings.cache_clear()
         assert r.status_code == 404
@@ -695,7 +699,7 @@ class TestBillingPortal:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/portal",
-                cookies={"kb_owner_session": cookie},
+                headers=_owner_session_headers(cookie),
             )
             get_settings.cache_clear()
         assert r.status_code == 409
@@ -721,7 +725,7 @@ class TestBillingPortal:
             get_settings.cache_clear()
             r = client.post(
                 "/api/v1/billing/portal",
-                cookies={"kb_owner_session": cookie},
+                headers=_owner_session_headers(cookie),
             )
             get_settings.cache_clear()
         assert r.status_code == 409
@@ -729,7 +733,7 @@ class TestBillingPortal:
     @pytest.mark.asyncio
     async def test_portal_502_on_stripe_error(self, client, seeded_db):
         """Stripe API failure → 502."""
-        import stripe.error
+        import stripe
         email = "stripe-err@portal.com"
         import uuid
         biz_id = str(uuid.uuid4())
@@ -748,11 +752,11 @@ class TestBillingPortal:
             get_settings.cache_clear()
             with patch(
                 "stripe.billing_portal.Session.create",
-                side_effect=stripe.error.StripeError("Stripe is down"),
+                side_effect=stripe.StripeError("Stripe is down"),
             ):
                 r = client.post(
                     "/api/v1/billing/portal",
-                    cookies={"kb_owner_session": cookie},
+                    headers=_owner_session_headers(cookie),
                 )
             get_settings.cache_clear()
         assert r.status_code == 502
@@ -783,7 +787,7 @@ class TestBillingPortal:
             with patch("stripe.billing_portal.Session.create", return_value=mock_portal):
                 r = client.post(
                     "/api/v1/billing/portal",
-                    cookies={"kb_owner_session": cookie},
+                    headers=_owner_session_headers(cookie),
                 )
             get_settings.cache_clear()
 
@@ -822,7 +826,7 @@ class TestBillingPortal:
             with patch("stripe.billing_portal.Session.create", side_effect=fake_create):
                 client.post(
                     "/api/v1/billing/portal",
-                    cookies={"kb_owner_session": cookie},
+                    headers=_owner_session_headers(cookie),
                 )
             get_settings.cache_clear()
 

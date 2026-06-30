@@ -42,6 +42,10 @@ def _make_session_cookie(email: str) -> str:
     return sign_session(email)
 
 
+def _owner_session_headers(cookie: str) -> dict[str, str]:
+    return {"host": "miami.knowsbeauty.localhost", "Cookie": f"kb_owner_session={cookie}"}
+
+
 # ── Owner dashboard tests ────────────────────────────────────────────────────
 
 class TestOwnerDashboardVoiceSection:
@@ -72,8 +76,7 @@ class TestOwnerDashboardVoiceSection:
         cookie = _make_session_cookie(email)
         r = client.get(
             "/owners/me",
-            headers={"host": "miami.knowsbeauty.localhost"},
-            cookies={"kb_owner_session": cookie},
+            headers=_owner_session_headers(cookie),
         )
         assert r.status_code == 200, r.text
         body = r.text
@@ -122,8 +125,7 @@ class TestOwnerDashboardVoiceSection:
         cookie = _make_session_cookie(email)
         r = client.get(
             "/owners/me",
-            headers={"host": "miami.knowsbeauty.localhost"},
-            cookies={"kb_owner_session": cookie},
+            headers=_owner_session_headers(cookie),
         )
         assert r.status_code == 200, r.text
         body = r.text

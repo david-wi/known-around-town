@@ -437,6 +437,9 @@ class TestOwnerVoiceEndpoint:
         from app.services.owner_auth import sign_session
         return sign_session(email)
 
+    def _owner_session_headers(self, cookie: str) -> dict[str, str]:
+        return {"Cookie": f"kb_owner_session={cookie}"}
+
     def test_owner_voice_returns_active_when_provisioned(self, client, seeded_db):
         """When the owner's business has a voice_phone_number, returns active=true."""
         biz = _first_business(seeded_db)
@@ -456,7 +459,7 @@ class TestOwnerVoiceEndpoint:
         cookie = self._make_session_cookie(email)
         r = client.get(
             "/api/v1/owner/voice",
-            cookies={"kb_owner_session": cookie},
+            headers=self._owner_session_headers(cookie),
         )
         assert r.status_code == 200, r.text
         data = r.json()
@@ -485,7 +488,7 @@ class TestOwnerVoiceEndpoint:
         cookie = self._make_session_cookie(email)
         r = client.get(
             "/api/v1/owner/voice",
-            cookies={"kb_owner_session": cookie},
+            headers=self._owner_session_headers(cookie),
         )
         assert r.status_code == 200, r.text
         data = r.json()
@@ -502,6 +505,6 @@ class TestOwnerVoiceEndpoint:
         cookie = self._make_session_cookie("nobody@example.com")
         r = client.get(
             "/api/v1/owner/voice",
-            cookies={"kb_owner_session": cookie},
+            headers=self._owner_session_headers(cookie),
         )
         assert r.status_code == 404, r.text
