@@ -528,6 +528,10 @@ def _make_pro_business(seeded_db, biz):
     return sign_session(_TEST_OWNER_EMAIL)
 
 
+def _owner_session_headers(cookie: str) -> Dict[str, str]:
+    return {"Cookie": f"kb_owner_session={cookie}"}
+
+
 def test_endpoint_returns_caption_on_success(client, seeded_db, monkeypatch):
     biz = _pick_seeded_business(seeded_db)
     assert biz is not None
@@ -537,7 +541,7 @@ def test_endpoint_returns_caption_on_success(client, seeded_db, monkeypatch):
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "grand opening"},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()
@@ -572,7 +576,7 @@ def test_endpoint_builds_context_with_state_and_market(client, seeded_db, monkey
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "grand opening"},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 200, resp.text
     ctx = captured["ctx"]
@@ -612,7 +616,7 @@ def test_endpoint_passes_owned_photo_url_to_caption_context(client, seeded_db, m
             "prompt": "new color room",
             "photo_url": "/media/owned-photo",
         },
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 200, resp.text
     assert captured["ctx"].photo_url == "/media/owned-photo"
@@ -636,7 +640,7 @@ def test_endpoint_400_when_photo_url_is_not_on_listing(client, seeded_db, monkey
             "prompt": "new color room",
             "photo_url": "/media/not-this-listing",
         },
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 400
     assert "not attached" in resp.json()["detail"]
@@ -664,7 +668,7 @@ def test_endpoint_403_when_wrong_owner(client, seeded_db, monkeypatch):
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "x"},
-        cookies={"kb_owner_session": other_cookie},
+        headers=_owner_session_headers(other_cookie),
     )
     assert resp.status_code == 403
 
@@ -686,7 +690,7 @@ def test_endpoint_402_when_not_subscribed(client, seeded_db, monkeypatch):
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "x"},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 402
 
@@ -698,7 +702,7 @@ def test_endpoint_404_when_feature_disabled(client, seeded_db, monkeypatch):
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "x"},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 404
 
@@ -711,7 +715,7 @@ def test_endpoint_404_when_business_not_found(client, seeded_db, monkeypatch):
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": "does-not-exist", "prompt": "x"},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 404
 
@@ -722,7 +726,7 @@ def test_endpoint_422_on_empty_prompt(client, seeded_db):
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": ""},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 422
 
@@ -733,7 +737,7 @@ def test_endpoint_422_on_overlong_prompt(client, seeded_db):
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "x" * 601},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 422
 
@@ -747,7 +751,7 @@ def test_endpoint_502_on_gateway_error(client, seeded_db, monkeypatch):
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "x"},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 502
     assert "try again" in resp.json()["detail"].lower()
@@ -984,7 +988,7 @@ def test_ad_copy_endpoint_returns_copy_on_success(client, seeded_db, monkeypatch
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": "summer specials"},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()
@@ -1020,7 +1024,7 @@ def test_ad_copy_endpoint_402_when_not_subscribed(client, seeded_db, monkeypatch
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": "x"},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 402
 
@@ -1035,7 +1039,7 @@ def test_ad_copy_endpoint_403_when_wrong_owner(client, seeded_db, monkeypatch):
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": "x"},
-        cookies={"kb_owner_session": other_cookie},
+        headers=_owner_session_headers(other_cookie),
     )
     assert resp.status_code == 403
 
@@ -1047,7 +1051,7 @@ def test_ad_copy_endpoint_404_when_feature_disabled(client, seeded_db, monkeypat
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": "x"},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 404
 
@@ -1060,7 +1064,7 @@ def test_ad_copy_endpoint_404_when_business_not_found(client, seeded_db, monkeyp
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": "does-not-exist", "prompt": "x"},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 404
 
@@ -1071,7 +1075,7 @@ def test_ad_copy_endpoint_422_on_empty_prompt(client, seeded_db):
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": ""},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 422
 
@@ -1082,7 +1086,7 @@ def test_ad_copy_endpoint_422_on_overlong_prompt(client, seeded_db):
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": "x" * 601},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 422
 
@@ -1096,7 +1100,7 @@ def test_ad_copy_endpoint_502_on_gateway_error(client, seeded_db, monkeypatch):
     resp = client.post(
         "/api/v1/marketing-ai/ad-copy",
         json={"business_id": biz["_id"], "prompt": "x"},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 502
     assert "try again" in resp.json()["detail"].lower()
@@ -1205,7 +1209,7 @@ def test_profile_description_endpoint_allows_claimed_free_owner(
             "business_id": biz["_id"],
             "prompt": "calm salon, lived-in color, low-maintenance clients",
         },
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()
@@ -1224,7 +1228,7 @@ def test_profile_description_endpoint_rejects_wrong_owner(
     resp = client.post(
         "/api/v1/marketing-ai/profile-description",
         json={"business_id": biz["_id"], "prompt": "nice wording"},
-        cookies={"kb_owner_session": sign_session("other@example.com")},
+        headers=_owner_session_headers(sign_session("other@example.com")),
     )
     assert resp.status_code == 403
 
@@ -1235,7 +1239,7 @@ def test_profile_description_endpoint_422_on_overlong_prompt(client, seeded_db):
     resp = client.post(
         "/api/v1/marketing-ai/profile-description",
         json={"business_id": biz["_id"], "prompt": "x" * 801},
-        cookies={"kb_owner_session": cookie},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 422
 
@@ -1267,9 +1271,11 @@ def test_live_caption_generation_against_real_gateway(seeded_db, monkeypatch):
 
     client = TestClient(app)
     biz = _pick_seeded_business(seeded_db)
+    cookie = _make_pro_business(seeded_db, biz)
     resp = client.post(
         "/api/v1/marketing-ai/instagram-caption",
         json={"business_id": biz["_id"], "prompt": "weekend balayage promo"},
+        headers=_owner_session_headers(cookie),
     )
     assert resp.status_code == 200, resp.text
     caption = resp.json()["caption"]

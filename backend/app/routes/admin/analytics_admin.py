@@ -119,6 +119,7 @@ async def analytics_page(request: Request) -> HTMLResponse:
             recent_businesses[b["_id"]] = b
 
     return _templates.TemplateResponse(
+        request,
         "admin/analytics.html",
         {
             "request": request,

@@ -76,6 +76,7 @@ async def businesses_search_page(
         businesses = await cursor.to_list(length=50)
 
     return _templates.TemplateResponse(
+        request,
         "admin/businesses.html",
         {
             "request": request,
@@ -111,6 +112,7 @@ async def business_edit_page(
     business["public_url"] = await build_absolute_business_url(request, business)
 
     return _templates.TemplateResponse(
+        request,
         "admin/business_edit.html",
         {
             "request": request,

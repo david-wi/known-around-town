@@ -617,7 +617,7 @@ async def _render_network_landing(request: Request, tenant: TenantContext) -> HT
             "meta_description": network.get("description"),
         }
     )
-    return _templates.TemplateResponse("network_landing.html", ctx)
+    return _templates.TemplateResponse(request, "network_landing.html", ctx)
 
 
 def _build_hero_headline_html(text: str) -> str:
@@ -896,7 +896,7 @@ async def home(request: Request) -> HTMLResponse:
             "recent_guides": recent_guides,
         }
     )
-    return _templates.TemplateResponse("home.html", ctx)
+    return _templates.TemplateResponse(request, "home.html", ctx)
 
 
 # WHY: /categories is a natural URL visitors and links use to browse by service
@@ -1028,7 +1028,7 @@ async def category_page(request: Request, category_slug: str) -> HTMLResponse:
             ),
         }
     )
-    return _templates.TemplateResponse("category.html", ctx)
+    return _templates.TemplateResponse(request, "category.html", ctx)
 
 
 @router.get("/n/{neighborhood_slug}", response_class=HTMLResponse)
@@ -1094,7 +1094,7 @@ async def neighborhood_page(request: Request, neighborhood_slug: str) -> HTMLRes
             ),
         }
     )
-    return _templates.TemplateResponse("neighborhood.html", ctx)
+    return _templates.TemplateResponse(request, "neighborhood.html", ctx)
 
 
 @router.get("/n/{neighborhood_slug}/c/{category_slug}", response_class=HTMLResponse)
@@ -1176,7 +1176,7 @@ async def neighborhood_category_page(
             ),
         }
     )
-    return _templates.TemplateResponse("category.html", ctx)
+    return _templates.TemplateResponse(request, "category.html", ctx)
 
 
 @router.get("/search", response_class=HTMLResponse)
@@ -1218,7 +1218,7 @@ async def search_page(request: Request, q: Optional[str] = None) -> HTMLResponse
             ),
         }
     )
-    return _templates.TemplateResponse("search.html", ctx)
+    return _templates.TemplateResponse(request, "search.html", ctx)
 
 
 _BOT_UA_FRAGMENTS = (
@@ -1530,7 +1530,7 @@ async def business_page(
         background_tasks.add_task(
             _increment_business_view, str(business["_id"]), mkb_referred
         )
-    return _templates.TemplateResponse("business.html", ctx)
+    return _templates.TemplateResponse(request, "business.html", ctx)
 
 
 def _action_target_url(action: str, business: Dict[str, Any]) -> str:
@@ -1644,7 +1644,7 @@ async def editorial_guides_index(request: Request) -> HTMLResponse:
             ),
         }
     )
-    return _templates.TemplateResponse("editorial_guides_index.html", ctx)
+    return _templates.TemplateResponse(request, "editorial_guides_index.html", ctx)
 
 
 @router.get("/guides/{slug}", response_class=HTMLResponse)
@@ -1708,7 +1708,7 @@ async def editorial_guide_page(request: Request, slug: str) -> HTMLResponse:
             ) if featured else None,
         }
     )
-    return _templates.TemplateResponse("editorial_guide.html", ctx)
+    return _templates.TemplateResponse(request, "editorial_guide.html", ctx)
 
 
 @router.get("/expertly-voice.html", response_class=HTMLResponse)
@@ -1721,7 +1721,7 @@ async def expertly_voice_page(request: Request) -> HTMLResponse:
         "or closed, then guides booking requests through the workflow we "
         "configure with you."
     )
-    return _templates.TemplateResponse("expertly_voice.html", ctx)
+    return _templates.TemplateResponse(request, "expertly_voice.html", ctx)
 
 
 # WHY: Any link to /owners/claim (marketing emails, social posts, ads) would
@@ -1788,7 +1788,7 @@ async def owners_page(
     # is the right image for an owner-acquisition landing page — it sets the Miami
     # beauty scene rather than spotlighting one business.
     ctx["og_image"] = _city_og_image(tenant.city)
-    return _templates.TemplateResponse("owners.html", ctx)
+    return _templates.TemplateResponse(request, "owners.html", ctx)
 
 
 # Preferred sample salons for the preview dashboard. The first one that
@@ -1879,7 +1879,7 @@ async def owner_dashboard_preview(request: Request) -> HTMLResponse:
             "robots": "noindex, nofollow",
         }
     )
-    return _templates.TemplateResponse("owner_dashboard.html", ctx)
+    return _templates.TemplateResponse(request, "owner_dashboard.html", ctx)
 
 @router.get("/owners/preview/caption", response_class=HTMLResponse)
 async def owners_caption_preview(request: Request) -> HTMLResponse:
@@ -1958,7 +1958,7 @@ async def owners_caption_preview(request: Request) -> HTMLResponse:
             },
         }
     )
-    return _templates.TemplateResponse("owners_caption_preview.html", ctx)
+    return _templates.TemplateResponse(request, "owners_caption_preview.html", ctx)
 
 
 @router.get("/pricing", response_class=HTMLResponse)
@@ -2008,7 +2008,7 @@ async def pricing_page(request: Request) -> HTMLResponse:
     ctx["owner_logged_in"] = owner_logged_in
     ctx["owner_is_subscribed"] = owner_is_subscribed
     ctx["owner_business_name"] = owner_business_name
-    return _templates.TemplateResponse("pricing.html", ctx)
+    return _templates.TemplateResponse(request, "pricing.html", ctx)
 
 
 @router.get("/owners/login", response_class=HTMLResponse)
@@ -2031,7 +2031,7 @@ async def owners_login_page(request: Request) -> HTMLResponse:
     cookie = request.cookies.get(SESSION_COOKIE_NAME)
     if cookie and verify_session(cookie):
         return RedirectResponse(url="/owners/me", status_code=303)
-    return _templates.TemplateResponse("owner_login.html", ctx)
+    return _templates.TemplateResponse(request, "owner_login.html", ctx)
 
 
 @router.get("/owners/me", response_class=HTMLResponse)
@@ -2168,7 +2168,7 @@ async def owners_me_page(request: Request) -> HTMLResponse:
         request.query_params.get("subscribed") == "1"
         and ctx["is_subscribed"]
     )
-    response = _templates.TemplateResponse("owner_me.html", ctx)
+    response = _templates.TemplateResponse(request, "owner_me.html", ctx)
     # WHY: rolling 30-day expiry. Reissue the cookie on every successful
     # visit so an active owner never has to sign in again. The freshly
     # signed cookie carries a new issued_at, so the 30-day clock starts
@@ -2207,7 +2207,7 @@ async def walkthrough_page(request: Request) -> HTMLResponse:
         f"{city_name} Knows {vertical}. Claim free, upgrade anytime."
     ).strip()
     ctx["og_image"] = _city_og_image(tenant.city)
-    return _templates.TemplateResponse("walkthrough.html", ctx)
+    return _templates.TemplateResponse(request, "walkthrough.html", ctx)
 
 
 def _lastmod_str(raw: Any, fallback: str) -> str:
@@ -2487,7 +2487,7 @@ async def render_not_found(request: Request, templates: Jinja2Templates) -> HTML
     if tenant:
         ctx = await _base_context(request, tenant)
         ctx["seo_title"] = "Not found"
-        return templates.TemplateResponse("not_found.html", ctx, status_code=404)
+        return templates.TemplateResponse(request, "not_found.html", ctx, status_code=404)
     return HTMLResponse(
         f"<h1>404</h1><p>Unknown site: {host}</p>", status_code=404
     )

@@ -20,7 +20,7 @@ import logging
 from datetime import datetime, timezone
 
 import stripe
-import stripe.error
+from stripe import SignatureVerificationError, StripeError
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
@@ -120,7 +120,7 @@ async def create_checkout_session(request: Request) -> JSONResponse:
 
     try:
         checkout = stripe.checkout.Session.create(**params)
-    except stripe.error.StripeError as exc:
+    except StripeError as exc:
         log.error("Stripe checkout creation failed: %s", exc)
         raise HTTPException(502, "Could not create checkout session — please try again")
 
@@ -174,7 +174,7 @@ async def create_portal_session(request: Request) -> JSONResponse:
             # rather than ending up on Stripe's generic exit page.
             return_url=f"{base_url}/owners/me",
         )
-    except stripe.error.StripeError as exc:
+    except StripeError as exc:
         log.error("Stripe billing portal creation failed: %s", exc)
         raise HTTPException(502, "Could not open billing portal — please try again")
 
@@ -206,7 +206,7 @@ async def stripe_webhook(request: Request) -> JSONResponse:
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.stripe_webhook_secret
         )
-    except (ValueError, stripe.error.SignatureVerificationError):
+    except (ValueError, SignatureVerificationError):
         raise HTTPException(400, "Invalid webhook payload or signature")
 
     db = get_db()

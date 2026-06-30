@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from bson import ObjectId
@@ -155,19 +156,7 @@ def _img_sized(url: Optional[str], width: int) -> str:
 # that determines the correct width.
 templates.env.filters["img_sized"] = _img_sized
 
-app = FastAPI(title="Known Around Town", version="0.1.0", default_response_class=MongoSafeJSONResponse)
 
-# WHY: the preview gate must be added as middleware BEFORE any routes are
-# registered. FastAPI/Starlette applies middleware in reverse-registration
-# order; adding it here, at the top, means it wraps the entire application
-# and intercepts every request before it reaches any route handler.
-app.add_middleware(
-    PreviewGateMiddleware,
-    enabled=settings.preview_mode_enabled,
-)
-
-
-@app.on_event("startup")
 async def on_startup() -> None:
     await ensure_indexes()
     await run_startup_migrations()
@@ -183,6 +172,29 @@ async def on_startup() -> None:
     # touch the env var. Falls back to the module-load default of 20.
     templates.env.globals["ratings_min_review_count"] = await get_ratings_min_review_count()
     log.info("Indexes ensured. Tenant domains: %s", settings.parse_network_domains())
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    await on_startup()
+    yield
+
+
+app = FastAPI(
+    title="Known Around Town",
+    version="0.1.0",
+    default_response_class=MongoSafeJSONResponse,
+    lifespan=lifespan,
+)
+
+# WHY: the preview gate must be added as middleware BEFORE any routes are
+# registered. FastAPI/Starlette applies middleware in reverse-registration
+# order; adding it here, at the top, means it wraps the entire application
+# and intercepts every request before it reaches any route handler.
+app.add_middleware(
+    PreviewGateMiddleware,
+    enabled=settings.preview_mode_enabled,
+)
 
 
 @app.get("/health")
