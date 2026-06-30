@@ -1,5 +1,24 @@
 # known-around-town — Lessons Learned
 
+## Public business API must hide archived cities and archived listings (2026-06-30)
+
+The public JSON endpoints under `/api/v1/businesses` are unauthenticated shopper
+surfaces, not admin export endpoints. They must follow the same visibility rule
+as public pages: only live businesses in non-archived cities are visible.
+
+Bug found during the Hollywood duplicate cleanup: after archiving the duplicate
+`hollywood-fl` city, `hollywood-fl.knowsbeauty.com` no longer rendered pages, but
+`GET /api/v1/businesses?city_id=hollywood-fl&status=live` still returned 17 live
+duplicate businesses and `GET /api/v1/businesses/by-slug/hollywood-fl/<slug>`
+returned those rows by JSON. Root cause: the API read directly by `city_id` /
+`slug` / `_id` without checking the parent city status and without forcing
+`status: live` on public reads.
+
+Fix: public list/detail/by-slug business API reads now require a non-archived
+city and a live business. Requests for archived cities return an empty list for
+collection reads and 404 for detail reads. Regression coverage:
+`tests/test_businesses_api_visibility.py`.
+
 ## Business claim status uses `verified`, even when admin UI says approved (2026-06-28)
 
 The claim verification endpoint writes successful reviews as `business_claims.status = "verified"` and
