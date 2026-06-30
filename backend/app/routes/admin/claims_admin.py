@@ -22,9 +22,8 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from app.config import get_settings
 from app.database import get_db
-from app.routes.api.v1._auth import ADMIN_COOKIE_NAME, require_admin
+from app.routes.api.v1._auth import ADMIN_COOKIE_NAME, admin_key_matches, require_admin
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -61,12 +60,10 @@ async def login_page(request: Request, error: Optional[str] = None) -> HTMLRespo
 async def login_submit(api_key: str = Form(...)) -> RedirectResponse:
     """Validate the submitted key against ADMIN_API_KEY, then set the cookie.
 
-    Wrong key -> redirect back to the login form with an error flag.
-    Right key (or no key configured, i.e. local dev) -> set cookie and
-    redirect to the claims page.
+    Wrong key or missing server-side key -> redirect back to the login form with
+    an error flag. Right key -> set cookie and redirect to the claims page.
     """
-    expected = get_settings().admin_api_key
-    if expected and api_key != expected:
+    if not admin_key_matches(api_key):
         # WHY: 303 makes the browser issue a GET for /admin/login?error=1
         # so a refresh doesn't re-POST. Standard PRG (post/redirect/get).
         return RedirectResponse(

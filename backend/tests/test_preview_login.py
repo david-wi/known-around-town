@@ -423,6 +423,19 @@ class TestMiddlewareRedirection:
         finally:
             get_settings.cache_clear()
 
+    def test_admin_key_bypass_fails_closed_when_unset(self, client, monkeypatch):
+        """# @define-test KAT-075"""
+        from app.config import get_settings
+
+        monkeypatch.delenv("ADMIN_API_KEY", raising=False)
+        get_settings.cache_clear()
+        try:
+            r = client.get("/", headers={"X-API-Key": "anything"}, follow_redirects=False)
+            assert r.status_code == 302
+            assert r.headers["location"].startswith("/preview-login")
+        finally:
+            get_settings.cache_clear()
+
     def test_robots_txt_reachable_during_preview(self, client):
         """robots.txt must be reachable by Googlebot during preview mode.
 

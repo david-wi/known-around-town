@@ -6,6 +6,8 @@ import httpx
 
 from unittest.mock import AsyncMock, patch, MagicMock
 
+ADMIN_HEADERS = {"X-API-Key": "test-admin-key"}
+
 
 # ── google_places service unit tests ────────────────────────────────────────
 
@@ -754,12 +756,8 @@ class TestSyncPage:
     def test_sync_page_loads_with_auth(self, seeded_db, monkeypatch):
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
-
         client = TestClient(app)
-        r = client.get("/admin/sync")
+        r = client.get("/admin/sync", headers=ADMIN_HEADERS)
         assert r.status_code == 200
         assert "Google Ratings Sync" in r.text
         assert "Coverage" in r.text
@@ -773,13 +771,10 @@ class TestSyncPage:
         """
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         import re
 
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
-
         client = TestClient(app)
-        r = client.get("/admin/sync")
+        r = client.get("/admin/sync", headers=ADMIN_HEADERS)
         assert r.status_code == 200
         match = re.search(r">(\d+)<[^>]+>[^<]*TOTAL SALONS", r.text, re.IGNORECASE)
         if match:
@@ -791,14 +786,11 @@ class TestSyncPage:
     def test_sync_page_shows_no_key_warning_when_not_configured(self, seeded_db, monkeypatch):
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: False)
 
         client = TestClient(app)
-        r = client.get("/admin/sync")
+        r = client.get("/admin/sync", headers=ADMIN_HEADERS)
         assert "GOOGLE_PLACES_API_KEY" in r.text or "API key required" in r.text
 
 
@@ -836,11 +828,8 @@ class TestNeighborhoodFallback:
         """
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
         from app.services.google_places import PlaceRating
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: True)
 
         call_log = []
@@ -855,7 +844,7 @@ class TestNeighborhoodFallback:
         monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
 
         client = TestClient(app, follow_redirects=False)
-        r = client.post("/admin/sync/ratings")
+        r = client.post("/admin/sync/ratings", headers=ADMIN_HEADERS)
         assert r.status_code == 303
 
         cities_tried = [c["city"] for c in call_log]
@@ -871,11 +860,8 @@ class TestNeighborhoodFallback:
         """
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
         from app.services.google_places import PlaceRating
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: True)
 
         import asyncio
@@ -907,7 +893,7 @@ class TestNeighborhoodFallback:
         monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
 
         client = TestClient(app, follow_redirects=False)
-        r = client.post("/admin/sync/ratings")
+        r = client.post("/admin/sync/ratings", headers=ADMIN_HEADERS)
         assert r.status_code == 303
 
         # Only one call: the place_id details fetch. Fallback slug calls must not appear.
@@ -925,10 +911,7 @@ class TestNeighborhoodFallback:
         """
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: True)
 
         import asyncio
@@ -957,7 +940,7 @@ class TestNeighborhoodFallback:
         monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
 
         client = TestClient(app, follow_redirects=False)
-        r = client.post("/admin/sync/ratings")
+        r = client.post("/admin/sync/ratings", headers=ADMIN_HEADERS)
         assert r.status_code == 303
 
         # 1 primary city + at most 3 neighborhood fallbacks = at most 4 total calls
@@ -974,11 +957,8 @@ class TestNeighborhoodFallback:
         """
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
         from app.services.google_places import PlaceRating
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: True)
 
         import asyncio
@@ -1009,7 +989,7 @@ class TestNeighborhoodFallback:
         monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
 
         client = TestClient(app, follow_redirects=False)
-        r = client.post("/admin/sync/ratings")
+        r = client.post("/admin/sync/ratings", headers=ADMIN_HEADERS)
         assert r.status_code == 303
 
         # Calls: "Fort Lauderdale" (miss) + "Wilton Manors" (hit) → stop
@@ -1024,14 +1004,11 @@ class TestSyncRatingsPost:
         """Without an API key, POST redirects back to the sync page with an error flag."""
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: False)
 
         client = TestClient(app, follow_redirects=False)
-        r = client.post("/admin/sync/ratings")
+        r = client.post("/admin/sync/ratings", headers=ADMIN_HEADERS)
         assert r.status_code == 303
         assert "error:no-key" in r.headers["location"]
 
@@ -1046,11 +1023,8 @@ class TestSyncRatingsPost:
         from app.main import app
         from fastapi.testclient import TestClient
         import app.routes.admin.sync_admin as sync_mod
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
         from app.services.google_places import PlaceRating
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: True)
         # Ensure the running-flag is clear before the test (module-level state)
         monkeypatch.setattr(sync_mod, "_sync_running", False)
@@ -1065,7 +1039,7 @@ class TestSyncRatingsPost:
         monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
 
         client = TestClient(app, follow_redirects=False)
-        r = client.post("/admin/sync/ratings")
+        r = client.post("/admin/sync/ratings", headers=ADMIN_HEADERS)
 
         # Route redirects immediately with result=started (sync runs in background)
         assert r.status_code == 303
@@ -1091,11 +1065,8 @@ class TestSyncRatingsPost:
         from app.main import app
         from fastapi.testclient import TestClient
         import app.routes.admin.sync_admin as sync_mod
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
         from app.services.google_places import PlaceRating
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: True)
         monkeypatch.setattr(sync_mod, "_sync_running", False)
 
@@ -1124,7 +1095,11 @@ class TestSyncRatingsPost:
         monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
 
         client = TestClient(app, follow_redirects=False)
-        r = client.post("/admin/sync/ratings", data={"unrated_only": "1"})
+        r = client.post(
+            "/admin/sync/ratings",
+            data={"unrated_only": "1"},
+            headers=ADMIN_HEADERS,
+        )
 
         assert r.status_code == 303
         assert "unrated_only=1" in r.headers["location"], "redirect should include unrated_only flag"
@@ -1151,11 +1126,8 @@ class TestSyncRatingsPost:
         from app.main import app
         from fastapi.testclient import TestClient
         import app.routes.admin.sync_admin as sync_mod
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
         from app.services.google_places import PlaceRating
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: True)
         monkeypatch.setattr(sync_mod, "_sync_running", False)
 
@@ -1185,7 +1157,10 @@ class TestSyncRatingsPost:
 
         client = TestClient(app, follow_redirects=False)
         # Flag sent ONLY as a query-string param — no form body, mimicking a curl/script caller.
-        r = client.post("/admin/sync/ratings?unrated_only=true")
+        r = client.post(
+            "/admin/sync/ratings?unrated_only=true",
+            headers=ADMIN_HEADERS,
+        )
 
         assert r.status_code == 303
         assert "unrated_only=1" in r.headers["location"], (
@@ -1210,11 +1185,8 @@ class TestSyncRatingsPost:
         from app.main import app
         from fastapi.testclient import TestClient
         import app.routes.admin.sync_admin as sync_mod
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
         from app.services.google_places import PlaceRating
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: True)
         monkeypatch.setattr(sync_mod, "_sync_running", False)
 
@@ -1251,7 +1223,7 @@ class TestSyncRatingsPost:
         try:
             client = TestClient(app, follow_redirects=False)
             # No unrated_only anywhere → full sync.
-            r = client.post("/admin/sync/ratings")
+            r = client.post("/admin/sync/ratings", headers=ADMIN_HEADERS)
         finally:
             sync_logger.removeHandler(handler)
             sync_logger.setLevel(orig_level)
@@ -1719,11 +1691,8 @@ class TestNameStrippingFallback:
         """
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
         from app.services.google_places import PlaceRating
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: True)
 
         call_log = []
@@ -1738,7 +1707,7 @@ class TestNameStrippingFallback:
         monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
 
         client = TestClient(app, follow_redirects=False)
-        r = client.post("/admin/sync/ratings")
+        r = client.post("/admin/sync/ratings", headers=ADMIN_HEADERS)
         assert r.status_code == 303
 
         names_tried = [c["name"] for c in call_log]
@@ -1752,11 +1721,8 @@ class TestNameStrippingFallback:
         """
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         import app.services.google_places as gp
         from app.services.google_places import PlaceRating
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
         monkeypatch.setattr(gp, "is_configured", lambda: True)
 
         call_log = []
@@ -1769,7 +1735,7 @@ class TestNameStrippingFallback:
         monkeypatch.setattr(gp, "lookup_rating", mock_lookup)
 
         client = TestClient(app, follow_redirects=False)
-        r = client.post("/admin/sync/ratings")
+        r = client.post("/admin/sync/ratings", headers=ADMIN_HEADERS)
         assert r.status_code == 303
 
         # Only one call — the primary. Stripping fallback must not add an extra call.
@@ -1828,12 +1794,8 @@ class TestAdminSettingsRatingsThreshold:
         """The admin settings page renders the ratings minimum review count field."""
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
-
         client = TestClient(app)
-        r = client.get("/admin/settings")
+        r = client.get("/admin/settings", headers=ADMIN_HEADERS)
         assert r.status_code == 200
         assert "ratings_min_review_count" in r.text
         assert "Minimum reviews" in r.text
@@ -1842,10 +1804,7 @@ class TestAdminSettingsRatingsThreshold:
         """POSTing a new threshold saves it and redirects with saved=1."""
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         from unittest.mock import AsyncMock, patch
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
 
         client = TestClient(app, follow_redirects=False)
         with patch(
@@ -1858,6 +1817,7 @@ class TestAdminSettingsRatingsThreshold:
                     "ratings_min_review_count": "35",
                     "marketing_ai_enabled": "on",
                 },
+                headers=ADMIN_HEADERS,
             )
 
         assert r.status_code == 303
@@ -1870,10 +1830,7 @@ class TestAdminSettingsRatingsThreshold:
         """Clearing the field (empty string) sends None so the DB $unsets it and the default of 20 kicks in."""
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         from unittest.mock import AsyncMock, patch
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
 
         client = TestClient(app, follow_redirects=False)
         with patch(
@@ -1883,6 +1840,7 @@ class TestAdminSettingsRatingsThreshold:
             r = client.post(
                 "/admin/settings",
                 data={"ratings_min_review_count": ""},
+                headers=ADMIN_HEADERS,
             )
 
         assert r.status_code == 303
@@ -1894,10 +1852,7 @@ class TestAdminSettingsRatingsThreshold:
         """A threshold outside the valid 1–10000 range is treated as None (no change)."""
         from app.main import app
         from fastapi.testclient import TestClient
-        import app.routes.api.v1._auth as _auth_module
         from unittest.mock import AsyncMock, patch
-
-        monkeypatch.setattr(_auth_module, "require_admin", lambda request: True)
 
         client = TestClient(app, follow_redirects=False)
         with patch(
@@ -1907,6 +1862,7 @@ class TestAdminSettingsRatingsThreshold:
             r = client.post(
                 "/admin/settings",
                 data={"ratings_min_review_count": "0"},
+                headers=ADMIN_HEADERS,
             )
 
         assert r.status_code == 303

@@ -14,6 +14,8 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
+ADMIN_HEADERS = {"X-API-Key": "test-admin-key"}
+
 
 @pytest.fixture
 def client(seeded_db):
@@ -21,11 +23,11 @@ def client(seeded_db):
     return TestClient(app)
 
 
-# ── Analytics page renders (no auth in test env, admin key not configured) ──
+# ── Analytics page renders with explicit admin auth ──
 
 def test_analytics_page_loads(client):
     """The page returns 200 and renders the stat headings."""
-    r = client.get("/admin/analytics")
+    r = client.get("/admin/analytics", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert "Total page views" in r.text
     assert "Claims submitted" in r.text
@@ -35,7 +37,7 @@ def test_analytics_page_loads(client):
 
 def test_analytics_page_zero_state(client):
     """With no data, the page should show 0s and the empty-state message."""
-    r = client.get("/admin/analytics")
+    r = client.get("/admin/analytics", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     # Zeros should appear for all counters
     assert "0" in r.text
@@ -59,7 +61,7 @@ def test_analytics_page_with_claims(client, seeded_db):
     assert r.status_code == 200, r.text
 
     # Analytics page should now show 1 claim
-    r = client.get("/admin/analytics")
+    r = client.get("/admin/analytics", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert "Claims submitted" in r.text
     # The recent claims section should show the business name
@@ -81,10 +83,10 @@ def test_analytics_counts_verified_claims_as_approved(client, seeded_db):
     assert r.status_code == 200, r.text
     claim = r.json()
 
-    r = client.post(f"/api/v1/claims/{claim['_id']}/verify")
+    r = client.post(f"/api/v1/claims/{claim['_id']}/verify", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
 
-    r = client.get("/admin/analytics")
+    r = client.get("/admin/analytics", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert "0 pending · 1 approved" in r.text
 
@@ -102,7 +104,7 @@ def test_analytics_page_with_page_views(client, seeded_db):
         )
     )
 
-    r = client.get("/admin/analytics")
+    r = client.get("/admin/analytics", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert "42" in r.text
     assert biz["name"] in r.text
@@ -132,12 +134,18 @@ def test_analytics_top_listing_links_use_listing_city_host(client, seeded_db):
     asyncio.run(seeded_db.cities.insert_one(city))
     asyncio.run(seeded_db.businesses.insert_one(biz))
 
-    r = client.get("/admin/analytics", headers={"host": "miami.knowsbeauty.localhost"})
+    r = client.get(
+        "/admin/analytics",
+        headers={**ADMIN_HEADERS, "host": "miami.knowsbeauty.localhost"},
+    )
     assert r.status_code == 200, r.text
     assert 'href="http://hollywood.knowsbeauty.localhost/b/hollywood-test-salon"' in r.text
     assert 'href="/b/hollywood-test-salon"' not in r.text
 
-    r = client.get("/admin/analytics", headers={"host": "knowsbeauty.localhost"})
+    r = client.get(
+        "/admin/analytics",
+        headers={**ADMIN_HEADERS, "host": "knowsbeauty.localhost"},
+    )
     assert r.status_code == 200, r.text
     assert 'href="http://hollywood.knowsbeauty.localhost/b/hollywood-test-salon"' in r.text
 
@@ -155,7 +163,10 @@ def test_analytics_page_listing_link_is_absolute(client, seeded_db):
         )
     )
 
-    r = client.get("/admin/analytics", headers={"host": "miami.knowsbeauty.localhost"})
+    r = client.get(
+        "/admin/analytics",
+        headers={**ADMIN_HEADERS, "host": "miami.knowsbeauty.localhost"},
+    )
     assert r.status_code == 200, r.text
     # Should contain the absolute URL including miami subdomain
     expected_url = f"http://miami.knowsbeauty.localhost/b/{biz['slug']}"

@@ -2314,8 +2314,10 @@ async def _seo_show_live(request: Request) -> bool:
     """
     override = request.query_params.get("preview_state", "")
     if override in ("live", "gated"):
+        from app.routes.api.v1._auth import admin_key_matches
+
         api_key = request.headers.get("X-API-Key", "")
-        if api_key and api_key == get_settings().admin_api_key:
+        if admin_key_matches(api_key):
             return override == "live"
     # No (valid) override: the live form shows exactly when the launch gate is
     # off. Use the DB-backed helper so the admin toggle is reflected instantly.

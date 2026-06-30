@@ -7,6 +7,8 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
+ADMIN_HEADERS = {"X-API-Key": "test-admin-key"}
+
 
 @pytest.fixture
 def client(seeded_db):
@@ -663,6 +665,7 @@ def test_copy_block_override(client, seeded_db):
 
     r = client.post(
         "/api/v1/copy-blocks",
+        headers=ADMIN_HEADERS,
         json={
             "scope_type": "city",
             "scope_ref": {"city_id": city["_id"]},

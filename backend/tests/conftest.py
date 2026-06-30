@@ -22,6 +22,9 @@ os.environ["NETWORK_DOMAINS"] = (
 )
 os.environ["MONGODB_URL"] = "mongodb://test"
 os.environ["MONGODB_DATABASE"] = "wkl_test"
+# WHY: admin gates fail closed when ADMIN_API_KEY is missing. Tests that exercise
+# admin routes use this explicit key instead of relying on unset-secret dev mode.
+os.environ["ADMIN_API_KEY"] = "test-admin-key"
 # WHY: disable the preview gate for all tests. Pre-gate tests don't supply a
 # preview_token cookie, so they'd all get 302 → /preview-login → 200 instead
 # of the responses they assert. Tests that specifically exercise the gate

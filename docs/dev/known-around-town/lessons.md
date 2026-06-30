@@ -1379,3 +1379,22 @@ flagship; a guide for an outer city goes on that city's subdomain.
 names (markdown headers) but no linked cards and an empty ItemList when placed on the flagship;
 moving its `city_id` to `north-miami-beach` (where the salons live) made all 5 cards, links, and the
 ItemList render correctly.
+
+## Revenue-path security hardening — allowlist public fields without breaking shopper data (2026-06-30)
+
+The public business API should use an explicit allowlist, but that allowlist is not
+"only identifiers and names." Shopper-facing profile fields such as public phone,
+website, booking URL, descriptions, SEO overrides, `voice_phone_number`, ratings,
+and social/contact data are part of the public contract. The sensitive side is
+owner/billing/vendor/internal data: `claimed_email`, Stripe ids, VAPI ids, import
+payloads, scoring/counters, and dead revenue flags like `is_founding_partner`.
+
+Two gotchas from KAT-075:
+
+- When `ADMIN_API_KEY` fails closed, admin-page tests that previously relied on
+  an unset-key dev bypass must send explicit `ADMIN_HEADERS`; otherwise unrelated
+  admin tests fail with 401 even though their behavior is otherwise unchanged.
+- Claim rows are not an ownership source of truth until admin verification writes
+  the business document. Owner inquiry routing should trust only
+  `business.claim_status == "verified"` plus `business.claimed_email`, never a
+  forged or stale `business_claims` row or owner-session artifact.

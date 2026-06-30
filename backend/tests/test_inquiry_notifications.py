@@ -42,10 +42,11 @@ def _submit(client: TestClient, business_id: str, **overrides) -> Any:
 
 
 # ---------------------------------------------------------------------------
-# 1. Claimed business — owner email sent
+# 1. Stale owner-session rows are not ownership authority
 # ---------------------------------------------------------------------------
 
-def test_inquiry_sends_owner_email_when_session_exists(client, seeded_db):
+def test_inquiry_ignores_stale_owner_session_without_verified_business(client, seeded_db):
+    """# @define-test KAT-075"""
     business = _first_business(seeded_db)
     biz_id = business["_id"]
 
@@ -71,13 +72,8 @@ def test_inquiry_sends_owner_email_when_session_exists(client, seeded_db):
         r = _submit(client, biz_id)
 
     assert r.status_code == 200, r.text
-    mock_owner_email.assert_awaited_once()
-    call_kwargs = mock_owner_email.call_args.kwargs
-    assert call_kwargs["owner_email"] == "owner@salon.com"
-    assert call_kwargs["visitor_name"] == "Test Visitor"
-    assert call_kwargs["visitor_email"] == "visitor@example.com"
-    assert "blow-out" in call_kwargs["message"]
-    mock_admin_email.assert_not_awaited()
+    mock_owner_email.assert_not_awaited()
+    mock_admin_email.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------
@@ -205,14 +201,41 @@ def test_xss_in_visitor_name_escaped():
 
 
 # ---------------------------------------------------------------------------
-# 5. Verified claim fallback (no session, but verified claim exists)
+# 5. Verified business ownership sends owner email
 # ---------------------------------------------------------------------------
 
-def test_inquiry_falls_back_to_claim_email(client, seeded_db):
+def test_inquiry_sends_owner_email_when_business_is_verified(client, seeded_db):
     business = _first_business(seeded_db)
     biz_id = business["_id"]
 
-    # No owner session, but a verified claim exists.
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"_id": biz_id},
+            {"$set": {"claim_status": "verified", "claimed_email": "owner@salon.com"}},
+        )
+    )
+
+    with patch(
+        "app.routes.api.v1.inquiries.send_owner_inquiry_email",
+        new_callable=AsyncMock,
+    ) as mock_owner_email, patch(
+        "app.routes.api.v1.inquiries.send_admin_inquiry_email",
+        new_callable=AsyncMock,
+    ) as mock_admin_email:
+        r = _submit(client, biz_id)
+
+    assert r.status_code == 200, r.text
+    mock_owner_email.assert_awaited_once()
+    assert mock_owner_email.call_args.kwargs["owner_email"] == "owner@salon.com"
+    mock_admin_email.assert_not_awaited()
+
+
+def test_inquiry_ignores_forged_verified_claim_without_business_ownership(client, seeded_db):
+    """# @define-test KAT-075"""
+    business = _first_business(seeded_db)
+    biz_id = business["_id"]
+
+    # No verified business owner, but an attacker-controlled verified claim row exists.
     asyncio.run(
         seeded_db.business_claims.insert_one(
             {
@@ -235,6 +258,5 @@ def test_inquiry_falls_back_to_claim_email(client, seeded_db):
         r = _submit(client, biz_id)
 
     assert r.status_code == 200, r.text
-    mock_owner_email.assert_awaited_once()
-    assert mock_owner_email.call_args.kwargs["owner_email"] == "claimant@salon.com"
-    mock_admin_email.assert_not_awaited()
+    mock_owner_email.assert_not_awaited()
+    mock_admin_email.assert_awaited_once()

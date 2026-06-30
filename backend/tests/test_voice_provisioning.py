@@ -28,6 +28,8 @@ from fastapi.testclient import TestClient
 # Make VAPI_API_KEY available so the service module doesn't raise at import
 os.environ.setdefault("VAPI_API_KEY", "test-vapi-key")
 
+ADMIN_HEADERS = {"X-API-Key": "test-admin-key"}
+
 
 # ===== Service-layer tests (no HTTP server) =================================
 
@@ -367,7 +369,10 @@ class TestAdminProvisionEndpoint:
             "app.routes.api.v1.admin_voice.provision_salon_receptionist",
             new=AsyncMock(return_value=mock_result),
         ):
-            r = client.post(f"/api/v1/admin/businesses/{biz['_id']}/provision-voice")
+            r = client.post(
+                f"/api/v1/admin/businesses/{biz['_id']}/provision-voice",
+                headers=ADMIN_HEADERS,
+            )
 
         assert r.status_code == 200, r.text
         data = r.json()
@@ -383,7 +388,10 @@ class TestAdminProvisionEndpoint:
             "app.routes.api.v1.admin_voice.provision_salon_receptionist",
             new=AsyncMock(side_effect=ValueError("Business 'nonexistent' not found")),
         ):
-            r = client.post("/api/v1/admin/businesses/nonexistent/provision-voice")
+            r = client.post(
+                "/api/v1/admin/businesses/nonexistent/provision-voice",
+                headers=ADMIN_HEADERS,
+            )
 
         assert r.status_code == 404, r.text
 
@@ -395,7 +403,10 @@ class TestAdminProvisionEndpoint:
             "app.routes.api.v1.admin_voice.provision_salon_receptionist",
             new=AsyncMock(side_effect=RuntimeError("VAPI connection failed")),
         ):
-            r = client.post(f"/api/v1/admin/businesses/{biz['_id']}/provision-voice")
+            r = client.post(
+                f"/api/v1/admin/businesses/{biz['_id']}/provision-voice",
+                headers=ADMIN_HEADERS,
+            )
 
         assert r.status_code == 502, r.text
 
@@ -411,7 +422,10 @@ class TestAdminDeprovisionEndpoint:
             "app.routes.api.v1.admin_voice.deprovision_salon_receptionist",
             new=AsyncMock(return_value=None),
         ):
-            r = client.post(f"/api/v1/admin/businesses/{biz['_id']}/deprovision-voice")
+            r = client.post(
+                f"/api/v1/admin/businesses/{biz['_id']}/deprovision-voice",
+                headers=ADMIN_HEADERS,
+            )
 
         assert r.status_code == 200, r.text
         assert r.json()["ok"] is True
@@ -422,7 +436,10 @@ class TestAdminDeprovisionEndpoint:
             "app.routes.api.v1.admin_voice.deprovision_salon_receptionist",
             new=AsyncMock(side_effect=ValueError("Business 'nonexistent' not found")),
         ):
-            r = client.post("/api/v1/admin/businesses/nonexistent/deprovision-voice")
+            r = client.post(
+                "/api/v1/admin/businesses/nonexistent/deprovision-voice",
+                headers=ADMIN_HEADERS,
+            )
 
         assert r.status_code == 404, r.text
 

@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import quote as _url_quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import get_settings
 from app.database import get_db
@@ -19,10 +20,26 @@ from app.services.owner_email import (
 router = APIRouter(prefix="/claims", tags=["claims"])
 
 
+class PublicClaimSubmission(BaseModel):
+    """Public claim payload. Server owns review/verification fields."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    business_id: str
+    submitter_name: str = Field(max_length=200)
+    submitter_email: str = Field(max_length=320)
+    submitter_phone: Optional[str] = Field(default=None, max_length=80)
+    relationship: Optional[str] = Field(default=None, max_length=200)
+    verification_method: Optional[str] = Field(default=None, max_length=200)
+    notes: Optional[str] = Field(default=None, max_length=2000)
+
+
 @router.post("")
-async def submit_claim(body: BusinessClaim, request: Request) -> Dict[str, Any]:
+async def submit_claim(body: PublicClaimSubmission, request: Request) -> Dict[str, Any]:
     """Public endpoint — anyone can submit a claim. Verification is manual."""
-    doc = to_doc(body)
+    # @define KAT-075 "Revenue-path security hardening"
+    claim = BusinessClaim(**body.model_dump(), status="pending", verified_at=None)
+    doc = to_doc(claim)
     db = get_db()
     business = await db.businesses.find_one({"_id": doc["business_id"]})
     if not business:
