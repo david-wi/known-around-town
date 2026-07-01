@@ -804,3 +804,78 @@ class TestCookieDomain:
         assert r.status_code == 200
         domain = self._extract_cookie_domain(r.headers.get("set-cookie", ""))
         assert domain is None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6.  Brute-force protection (H-3)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestBruteForceProtection:
+    """The preview code flow must resist brute-force, mirroring owner_auth:
+    a code locks after too many wrong guesses, and code requests are
+    rate-limited per email so an attacker can't reset the guess budget or
+    flood an allow-listed user with codes.
+    """
+
+    def test_code_locks_after_max_wrong_attempts(self, client, caplog, mock_db):
+        """After PREVIEW_MAX_VERIFY_ATTEMPTS wrong guesses the code is locked —
+        even the CORRECT code is then rejected. Without the cap this final
+        request would succeed (200); that is exactly the brute-force hole."""
+        from app.services.preview_auth import PREVIEW_MAX_VERIFY_ATTEMPTS
+
+        code = _request_and_extract_code(client, caplog, "alice@expertly.com")
+        # A definitely-wrong code that isn't the (random) real one.
+        wrong = "000000" if code != "000000" else "111111"
+        for _ in range(PREVIEW_MAX_VERIFY_ATTEMPTS):
+            r = client.post(
+                "/api/v1/preview/login/verify",
+                json={"email": "alice@expertly.com", "code": wrong},
+            )
+            assert r.status_code == 401
+        # Budget exhausted — the correct code is now locked out.
+        r = client.post(
+            "/api/v1/preview/login/verify",
+            json={"email": "alice@expertly.com", "code": code},
+        )
+        assert r.status_code == 401
+
+    def test_code_requests_are_rate_limited_per_email(self, client, mock_db):
+        """After PREVIEW_RATE_LIMIT_MAX_CODES requests in the window, further
+        requests return 200 (no allow-list leak) but issue NO new code."""
+        from app.services.preview_auth import PREVIEW_RATE_LIMIT_MAX_CODES
+
+        email = "alice@expertly.com"
+        for _ in range(PREVIEW_RATE_LIMIT_MAX_CODES):
+            r = client.post("/api/v1/preview/login/request", json={"email": email})
+            assert r.status_code == 200
+        # One over the cap — still 200, but no new code stored.
+        r = client.post("/api/v1/preview/login/request", json={"email": email})
+        assert r.status_code == 200
+        docs = asyncio.run(
+            mock_db.preview_codes.find({"email": email}).to_list(20)
+        )
+        assert len(docs) == PREVIEW_RATE_LIMIT_MAX_CODES
+
+    def test_correct_code_within_attempt_budget_still_works(
+        self, client, caplog, mock_db
+    ):
+        """A couple of wrong guesses must NOT lock out a legitimate user who
+        then enters the right code within the budget."""
+        from app.services.preview_auth import PREVIEW_MAX_VERIFY_ATTEMPTS
+
+        assert PREVIEW_MAX_VERIFY_ATTEMPTS >= 2
+        code = _request_and_extract_code(client, caplog, "alice@expertly.com")
+        wrong = "000000" if code != "000000" else "111111"
+        # Two wrong guesses (under the cap)...
+        for _ in range(2):
+            r = client.post(
+                "/api/v1/preview/login/verify",
+                json={"email": "alice@expertly.com", "code": wrong},
+            )
+            assert r.status_code == 401
+        # ...then the correct code still succeeds.
+        r = client.post(
+            "/api/v1/preview/login/verify",
+            json={"email": "alice@expertly.com", "code": code},
+        )
+        assert r.status_code == 200

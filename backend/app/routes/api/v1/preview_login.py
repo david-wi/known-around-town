@@ -28,6 +28,9 @@ from pydantic import BaseModel, Field
 from app.database import get_db
 from app.services.preview_auth import (
     PREVIEW_COOKIE_NAME,
+    PREVIEW_MAX_VERIFY_ATTEMPTS,
+    PREVIEW_RATE_LIMIT_MAX_CODES,
+    PREVIEW_RATE_LIMIT_WINDOW,
     SESSION_TTL_SECONDS,
     code_expires_at,
     constant_equal,
@@ -156,21 +159,37 @@ async def request_preview_code(payload: LoginRequest) -> OkResponse:
     # behaviour either way.
     if is_allowed_email(email):
         db = get_db()
-        code = generate_code()
-        doc = {
-            "_id": str(uuid.uuid4()),
-            "email": email,
-            "code_hash": hash_value(code),
-            "created_at": datetime.now(timezone.utc),
-            "expires_at": code_expires_at(),
-            "used_at": None,
-        }
-        await db.preview_codes.insert_one(doc)
-        await send_preview_code_email(email=email, code=code)
-        # WHY: log the code at INFO so an admin can retrieve it from
-        # container logs when Resend delivery is delayed or filtered.
-        # Safe for this internal preview gate — logs are server-admin only.
-        logger.info("Preview code for %s: %s", email, code)
+        now = datetime.now(timezone.utc)
+        # WHY: rate-limit how many codes one email can request in the window so
+        # an attacker who knows an allow-listed address cannot flood that user
+        # with code emails or stack up many simultaneously-valid codes (each of
+        # which carries its own guess budget). When over the cap we silently
+        # skip issuing and still return 200 — the caller cannot tell the
+        # difference, so this leaks nothing about allow-list membership.
+        recent_codes = await db.preview_codes.count_documents(
+            {
+                "email": email,
+                "created_at": {"$gte": now - PREVIEW_RATE_LIMIT_WINDOW},
+            }
+        )
+        if recent_codes < PREVIEW_RATE_LIMIT_MAX_CODES:
+            code = generate_code()
+            doc = {
+                "_id": str(uuid.uuid4()),
+                "email": email,
+                "code_hash": hash_value(code),
+                "created_at": now,
+                "expires_at": code_expires_at(),
+                "used_at": None,
+                # WHY: per-code wrong-guess counter enforced at verify time.
+                "attempts": 0,
+            }
+            await db.preview_codes.insert_one(doc)
+            await send_preview_code_email(email=email, code=code)
+            # WHY: log the code at INFO so an admin can retrieve it from
+            # container logs when Resend delivery is delayed or filtered.
+            # Safe for this internal preview gate — logs are server-admin only.
+            logger.info("Preview code for %s: %s", email, code)
 
     return OkResponse(ok=True)
 
@@ -206,9 +225,22 @@ async def verify_preview_code(
     if not doc:
         raise HTTPException(status_code=401, detail="Invalid or expired code.")
 
+    # WHY: once a code has been guessed wrong too many times, lock it — treat
+    # it as invalid so an attacker cannot keep hammering the same code toward
+    # the 1-in-1,000,000 space. Same 401 as a missing code so the response
+    # shape reveals nothing about whether a valid code exists.
+    if doc.get("attempts", 0) >= PREVIEW_MAX_VERIFY_ATTEMPTS:
+        raise HTTPException(status_code=401, detail="Invalid or expired code.")
+
     submitted_hash = hash_value(code)
     stored_hash = doc.get("code_hash", "")
     if not constant_equal(submitted_hash, stored_hash):
+        # WHY: record the wrong guess so the code locks after
+        # PREVIEW_MAX_VERIFY_ATTEMPTS, making brute-force infeasible within the
+        # 15-minute code lifetime.
+        await db.preview_codes.update_one(
+            {"_id": doc["_id"]}, {"$inc": {"attempts": 1}}
+        )
         raise HTTPException(status_code=401, detail="That code did not match. Please try again.")
 
     # Mark the code as used so it cannot be replayed.
