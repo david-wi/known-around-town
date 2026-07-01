@@ -1,13 +1,18 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.config import get_settings
 from app.database import get_db
 from app.models import BusinessInquiry
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import to_doc
+from app.services.rate_limit import (
+    INQUIRY_MAX_PER_WINDOW,
+    client_ip,
+    enforce_ip_rate_limit,
+)
 from app.services.owner_email import send_admin_inquiry_email, send_owner_inquiry_email
 
 logger = logging.getLogger(__name__)
@@ -67,10 +72,18 @@ async def _notify_about_inquiry(business: Dict[str, Any], doc: Dict[str, Any]) -
 
 
 @router.post("")
-async def submit_inquiry(body: BusinessInquiry) -> Dict[str, Any]:
+async def submit_inquiry(body: BusinessInquiry, request: Request) -> Dict[str, Any]:
     """Public endpoint — visitors send a lead/contact message to a business."""
     doc = to_doc(body)
     db = get_db()
+    # WHY: cap inquiries per client IP in the recent window so a script can't
+    # blast fake contact messages that email real salon owners (and admin) over
+    # and over. submit_ip on the saved inquiry is what the next request counts.
+    ip = client_ip(request)
+    await enforce_ip_rate_limit(
+        db=db, collection="business_inquiries", ip=ip, max_events=INQUIRY_MAX_PER_WINDOW
+    )
+    doc["submit_ip"] = ip
     business = await db.businesses.find_one({"_id": doc["business_id"]})
     if not business:
         raise HTTPException(404, "Business not found")

@@ -1,5 +1,21 @@
 # known-around-town — Lessons Learned
 
+## Public form rate limits must reserve atomically before side effects (2026-07-01)
+
+For unauthenticated forms that create records or send email, do not rate-limit by
+`count_documents(...)` on accepted rows and then insert. Parallel requests can all
+observe the same pre-insert count and proceed, creating exactly the flood the
+limit is meant to stop. Use an atomic reservation bucket before any route side
+effect, and regression-test it with concurrent calls plus assertions that blocked
+requests do not insert rows or send notifications.
+
+Proxy IP handling matters here. Production runs behind Traefik while Uvicorn is
+configured to trust forwarded headers; an attacker-controlled leftmost
+`X-Forwarded-For` value can bypass an IP bucket if the limiter trusts it blindly.
+For this app's current proxy shape, the limiter reads the rightmost forwarded IP
+that Traefik appends and falls back to `request.client.host` only when the header
+is absent.
+
 ## Copy-block lookups were the home/listing TTFB culprit — batch them with a per-request prime (2026-06-30)
 
 The editable-wording system (`backend/app/services/copy.py`) resolved each snippet with one

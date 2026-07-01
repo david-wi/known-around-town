@@ -10,6 +10,11 @@ from app.database import get_db
 from app.models import BusinessClaim
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import now_utc, to_doc
+from app.services.rate_limit import (
+    CLAIM_MAX_PER_WINDOW,
+    client_ip,
+    enforce_ip_rate_limit,
+)
 from app.services.owner_email import (
     send_admin_new_claim_email,
     send_claim_confirmation_email,
@@ -41,6 +46,15 @@ async def submit_claim(body: PublicClaimSubmission, request: Request) -> Dict[st
     claim = BusinessClaim(**body.model_dump(), status="pending", verified_at=None)
     doc = to_doc(claim)
     db = get_db()
+    # WHY: cap how many claims one client IP can submit in the recent window.
+    # Without it a script can flood admin + owner inboxes with confirmation and
+    # "new claim" emails and repeatedly flip listings into "pending". Recording
+    # submit_ip on the saved claim is what lets the next request be counted.
+    ip = client_ip(request)
+    await enforce_ip_rate_limit(
+        db=db, collection="business_claims", ip=ip, max_events=CLAIM_MAX_PER_WINDOW
+    )
+    doc["submit_ip"] = ip
     business = await db.businesses.find_one({"_id": doc["business_id"]})
     if not business:
         raise HTTPException(404, "Business not found")
