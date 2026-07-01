@@ -7,23 +7,19 @@ no limit, a script can flood owner inboxes, spam admin, or churn listing state.
 We cap how many times one client IP can hit a given endpoint within a short
 window, mirroring the owner-login code rate limit already in owner_auth.
 
-The real visitor IP is trustworthy here: the app runs uvicorn with
-``--proxy-headers --forwarded-allow-ips *`` (see backend/Dockerfile), so
-``request.client.host`` resolves the X-Forwarded-For client address rather than
-the nginx/proxy hop in front of it.
-
-The limiter counts the endpoint's own collection on its natural timestamp
-field, so it needs no separate bookkeeping store. Callers must (a) call
-``enforce_ip_rate_limit`` before doing the work, and (b) record ``submit_ip`` on
-the document they insert, so later requests from the same IP are counted.
+The limiter reserves a slot in a dedicated MongoDB bucket before the endpoint
+does its side effects. Callers should still record ``submit_ip`` on the document
+they insert so admins can audit where accepted submissions came from.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 from typing import Optional
 
 from fastapi import HTTPException, Request
+from pymongo import ReturnDocument
 
 # WHY: a 10-minute window matches owner_auth.RATE_LIMIT_WINDOW. It is short
 # enough that a blocked genuine user only waits a few minutes, and long enough
@@ -45,13 +41,24 @@ OWNER_LEAD_MAX_PER_WINDOW = 5
 def client_ip(request: Request) -> str:
     """Return the requesting client's IP, or a shared bucket if unavailable.
 
-    WHY: ``request.client`` can be ``None`` for some ASGI transports and test
-    clients. Falling back to a constant string keeps those callers sharing one
-    limit bucket rather than raising an AttributeError mid-request.
+    WHY: production is behind Traefik, which appends the socket peer to
+    X-Forwarded-For. Uvicorn is currently configured to trust forwarded headers,
+    and its ``*`` trust mode reads the leftmost value, which can be attacker-
+    supplied if a browser sends its own X-Forwarded-For. Reading the rightmost
+    forwarded value here ties the limiter to the IP Traefik appended. If the
+    header is absent, fall back to ``request.client``; if that is unavailable,
+    use one shared bucket rather than raising mid-request.
     """
+    forwarded_for = (request.headers.get("x-forwarded-for") or "").strip()
+    if forwarded_for:
+        for part in reversed(forwarded_for.split(",")):
+            candidate = part.strip()
+            if candidate:
+                return candidate
     return request.client.host if request.client else "unknown"
 
 
+# @define KAT-075 "Public side-effecting form endpoints are rate limited per client IP"
 async def enforce_ip_rate_limit(
     *,
     db,
@@ -59,27 +66,45 @@ async def enforce_ip_rate_limit(
     ip: str,
     max_events: int,
     window: timedelta = PUBLIC_FORM_RATE_LIMIT_WINDOW,
-    ip_field: str = "submit_ip",
-    timestamp_field: str = "submitted_at",
     now: Optional[datetime] = None,
 ) -> None:
-    """Raise HTTP 429 if ``ip`` created >= ``max_events`` docs in ``window``.
+    """Raise HTTP 429 if ``ip`` has reserved >= ``max_events`` slots in ``window``.
 
-    Counts documents in ``collection`` whose ``ip_field`` equals ``ip`` and
-    whose ``timestamp_field`` falls inside the recent window. Callers must
-    record ``ip_field`` on the documents they insert for the count to see them.
+    The reservation is atomic: concurrent requests for the same endpoint/IP hit
+    one MongoDB document and increment one counter, so only the first
+    ``max_events`` callers can proceed to route side effects.
     """
     now = now or datetime.now(timezone.utc)
-    window_start = now - window
-    recent = await db[collection].count_documents(
-        {ip_field: ip, timestamp_field: {"$gte": window_start}}
+    window_seconds = int(window.total_seconds())
+    bucket_epoch = int(now.timestamp()) // window_seconds * window_seconds
+    bucket_start = datetime.fromtimestamp(bucket_epoch, tz=timezone.utc)
+    reset_at = bucket_start + window
+    # WHY: keep the raw IP on accepted submissions for audit, but hash it in the
+    # limiter bucket. Operators can still reason about one bucket per client
+    # without creating a second raw-IP store that lives until TTL cleanup.
+    ip_hash = sha256(ip.encode("utf-8")).hexdigest()
+    bucket_id = f"public-form:{collection}:{ip_hash}:{bucket_epoch}"
+    bucket = await db.public_form_rate_limits.find_one_and_update(
+        {"_id": bucket_id},
+        {
+            "$inc": {"count": 1},
+            "$setOnInsert": {
+                "collection": collection,
+                "ip_hash": ip_hash,
+                "bucket_start": bucket_start,
+                "expires_at": reset_at + window,
+            },
+        },
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
     )
-    if recent >= max_events:
+    if (bucket or {}).get("count", 0) > max_events:
         # WHY: 429 + Retry-After lets a polite client back off automatically.
-        # The value is the window length — the longest a blocked client would
-        # wait for its oldest counted request to age out of the window.
+        # The value is the remaining fixed-window time, rounded up to avoid
+        # telling clients to retry before the bucket actually resets.
+        retry_after = max(1, int((reset_at - now).total_seconds()) + 1)
         raise HTTPException(
             status_code=429,
             detail="Too many requests. Please wait a few minutes and try again.",
-            headers={"Retry-After": str(int(window.total_seconds()))},
+            headers={"Retry-After": str(retry_after)},
         )

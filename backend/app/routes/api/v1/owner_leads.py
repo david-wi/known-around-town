@@ -34,23 +34,22 @@ async def capture_owner_lead(body: OwnerLeadCreate, request: Request) -> Dict[st
     caller distinguish a fresh capture from a repeat without an error.
     """
     db = get_db()
+    existing = await db.owner_leads.find_one({"email": body.email})
+    if existing:
+        return {"ok": True, "already_captured": True}
+
     # WHY: cap how many distinct owner-lead emails one client IP can drop in the
     # recent window so a script can't pack the nurture list with junk addresses.
-    # Counts on created_at (this collection's timestamp) and on submit_ip, which
-    # we record below. Enforced before the idempotency check so a flood of
-    # distinct addresses is capped, while a harmless repeat of the same address
-    # still short-circuits without consuming budget.
+    # The idempotent repeat check above stays first because a repeat creates no
+    # new side effect and should not block a genuine owner who refreshes or
+    # retries after their address was already captured.
     ip = client_ip(request)
     await enforce_ip_rate_limit(
         db=db,
         collection="owner_leads",
         ip=ip,
         max_events=OWNER_LEAD_MAX_PER_WINDOW,
-        timestamp_field="created_at",
     )
-    existing = await db.owner_leads.find_one({"email": body.email})
-    if existing:
-        return {"ok": True, "already_captured": True}
     await db.owner_leads.insert_one(
         {
             "email": body.email,

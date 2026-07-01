@@ -86,7 +86,20 @@ async def ensure_indexes() -> None:
     )
 
     await db.business_claims.create_index([("business_id", 1), ("status", 1)])
+    # WHY: public form rate limiting stores submit_ip on accepted claims and
+    # may need to audit accepted submissions by source IP and recent timestamp.
+    await db.business_claims.create_index([("submit_ip", 1), ("submitted_at", -1)])
     await db.business_inquiries.create_index([("business_id", 1), ("submitted_at", -1)])
+    # WHY: same accepted-submission audit shape as business_claims, scoped to
+    # inquiry spam investigation and future operational review.
+    await db.business_inquiries.create_index([("submit_ip", 1), ("submitted_at", -1)])
+    # WHY: owner-lead capture is idempotent by email and rate-limited/audited by
+    # submit_ip + created_at; these indexes keep both public-write checks cheap.
+    await db.owner_leads.create_index("email")
+    await db.owner_leads.create_index([("submit_ip", 1), ("created_at", -1)])
+    # WHY: atomic public-form rate limiting writes one bucket per endpoint/IP
+    # window. TTL removes old buckets after the next full window has elapsed.
+    await db.public_form_rate_limits.create_index("expires_at", expireAfterSeconds=0)
 
     # WHY: the monthly listing-report email derives "views THIS month" by diffing
     # the lifetime view counter against a per-month snapshot. The unique index on

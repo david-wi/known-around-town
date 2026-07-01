@@ -77,7 +77,9 @@ must route only from authoritative verified business ownership; admin-key checks
 deny access when the key is missing and compare secrets in constant time; public
 business JSON responses must hide owner, billing, voice-provider identifier, import,
 and internal ranking fields; and admin claim notification HTML must escape
-submitter-controlled content.
+submitter-controlled content. Public unauthenticated form endpoints that create
+operator or owner side effects must also be rate limited per client IP before
+accepting new submissions.
 **Acceptance:** Given a public claim submission that includes `status=verified`,
 `verified_at`, `verification_token`, `_id`, or `submitted_at`, when it is stored, then
 the stored claim remains `pending` with server-owned verification fields; given a forged
@@ -88,4 +90,6 @@ is unset or wrong, admin routes and preview-gate admin bypass deny access; given
 business API list/detail responses, then sensitive owner/billing/voice-provider
 identifier/import/internal fields are absent while shopper-facing contact fields remain;
 given malicious submitter-controlled text in a claim notification, then the outbound HTML
-escapes it safely.
+escapes it safely; given one client IP floods public claim, inquiry, or new owner-lead
+submissions inside the rate-limit window, then the endpoint returns HTTP 429 with
+`Retry-After` before creating another record or sending another notification.
