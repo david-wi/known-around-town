@@ -8,10 +8,15 @@ and follow up with tips for getting their Miami salon found online.
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, EmailStr
 
 from app.database import get_db
+from app.services.rate_limit import (
+    OWNER_LEAD_MAX_PER_WINDOW,
+    client_ip,
+    enforce_ip_rate_limit,
+)
 
 router = APIRouter(prefix="/owner-leads", tags=["owner-leads"])
 
@@ -21,7 +26,7 @@ class OwnerLeadCreate(BaseModel):
 
 
 @router.post("")
-async def capture_owner_lead(body: OwnerLeadCreate) -> Dict[str, Any]:
+async def capture_owner_lead(body: OwnerLeadCreate, request: Request) -> Dict[str, Any]:
     """Public endpoint — store an owner's email for follow-up nurture.
 
     Idempotent: submitting the same address twice returns ok without
@@ -29,6 +34,20 @@ async def capture_owner_lead(body: OwnerLeadCreate) -> Dict[str, Any]:
     caller distinguish a fresh capture from a repeat without an error.
     """
     db = get_db()
+    # WHY: cap how many distinct owner-lead emails one client IP can drop in the
+    # recent window so a script can't pack the nurture list with junk addresses.
+    # Counts on created_at (this collection's timestamp) and on submit_ip, which
+    # we record below. Enforced before the idempotency check so a flood of
+    # distinct addresses is capped, while a harmless repeat of the same address
+    # still short-circuits without consuming budget.
+    ip = client_ip(request)
+    await enforce_ip_rate_limit(
+        db=db,
+        collection="owner_leads",
+        ip=ip,
+        max_events=OWNER_LEAD_MAX_PER_WINDOW,
+        timestamp_field="created_at",
+    )
     existing = await db.owner_leads.find_one({"email": body.email})
     if existing:
         return {"ok": True, "already_captured": True}
@@ -36,6 +55,7 @@ async def capture_owner_lead(body: OwnerLeadCreate) -> Dict[str, Any]:
         {
             "email": body.email,
             "source": "owners_page",
+            "submit_ip": ip,
             # WHY: UTC timestamp so admin exports and future email tools
             # can sort / filter leads without timezone ambiguity.
             "created_at": datetime.now(timezone.utc),
