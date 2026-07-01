@@ -44,6 +44,22 @@ CODE_LENGTH = 6
 # switch browser tabs, short enough to limit replay on intercepted email.
 CODE_TTL_SECONDS = 60 * 15  # 900 seconds
 
+# WHY: cap wrong guesses per issued code, mirroring owner_auth.MAX_VERIFY_ATTEMPTS.
+# Without this cap the verify endpoint accepts unlimited guesses against a
+# 6-digit code inside its 15-minute window, which is brute-forceable. Five
+# attempts is far more than a real user needs to type a code correctly while
+# leaving an attacker a vanishing chance of guessing 1-in-1,000,000 in five
+# tries. Once exceeded, the code is treated as invalid (locked).
+PREVIEW_MAX_VERIFY_ATTEMPTS = 5
+
+# WHY: cap how many codes a single email can request in a short window,
+# mirroring owner_auth.RATE_LIMIT_MAX_CODES. Without it, an attacker who knows
+# an allow-listed address can flood that user with code emails and pile up many
+# simultaneously-valid codes (each its own guess budget). Three per 10 minutes
+# is plenty for a real user retrying delivery.
+PREVIEW_RATE_LIMIT_MAX_CODES = 3
+PREVIEW_RATE_LIMIT_WINDOW = timedelta(minutes=10)
+
 # WHY: 30 days matches the owner session lifetime. An active internal user
 # should not have to re-authenticate daily.
 SESSION_TTL_SECONDS = 60 * 60 * 24 * 30  # 2,592,000 seconds
