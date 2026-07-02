@@ -25,6 +25,13 @@ from app.services.owner_auth import SESSION_COOKIE_NAME, verify_session
 from app.services.site_settings import get_google_site_verification, get_preview_mode_enabled
 from app.services.tenant import TenantContext, resolve_tenant
 
+# WHY: the runtime reuses the seed's curated per-category photo pool so a home-page
+# card whose stock photo collides with another card can be handed a *different*
+# real photo from the same category, instead of being blanked to a grey placeholder
+# tile (which reads as "unfinished"). Safe import — seed._helpers only depends on
+# app.config/app.database (no cycle) and this pulls in pure image data.
+from seed._helpers import _CATEGORY_PHOTOS, _PHOTO_BASE
+
 
 router = APIRouter()
 
@@ -182,10 +189,12 @@ def _dedup_photos(
     """Remove duplicate photo URLs so no image appears twice on one page.
 
     WHY: When multiple businesses share the same stock photo URL (common in
-    seeded data with a small image pool), the listing grid looks like the
-    same photo was copy-pasted. Showing a neutral gray placeholder is better
-    than visual repetition — the card still renders correctly, just without
-    a hero image.
+    seeded data with a small image pool), the listing grid looks like the same
+    photo was copy-pasted. On a collision we first try to hand the card a
+    *different* real photo from its own category pool; only if that pool is
+    exhausted or unknown do we blank it to a neutral placeholder. This keeps
+    every card showing a real, on-topic image (no jarring placeholder tiles)
+    while still avoiding the same photo appearing twice on one page.
 
     Pass a shared `seen` set to deduplicate across multiple sections of the
     same page (e.g. Editor's Picks + Trending on the home page). When omitted
@@ -200,11 +209,33 @@ def _dedup_photos(
             first = photos[0]
             url = first.get("url", "") if isinstance(first, dict) else (first or "")
             if url and url in seen:
-                b = {**b, "photos": []}
+                alt = _reassign_category_photo(b, seen)
+                if alt:
+                    b = {**b, "photos": [{"url": alt}]}
+                    seen.add(alt)
+                else:
+                    b = {**b, "photos": []}
             elif url:
                 seen.add(url)
         result.append(b)
     return result
+
+
+def _reassign_category_photo(b: Dict[str, Any], seen: set[str]) -> Optional[str]:
+    """Return a category-appropriate photo URL for business ``b`` that is not yet
+    in ``seen`` — used to give a colliding home-page card a distinct real photo
+    instead of a placeholder. Returns None when the business has no known category
+    pool or every photo in that pool is already used on the page.
+    """
+    for cat in (b.get("category_slugs") or []):
+        pool = _CATEGORY_PHOTOS.get(cat)
+        if not pool:
+            continue
+        for pid in pool:
+            candidate = _PHOTO_BASE.format(pid)
+            if candidate not in seen:
+                return candidate
+    return None
 
 
 def _vertical_word(network: Dict[str, Any]) -> str:
