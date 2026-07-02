@@ -15,7 +15,8 @@
   <div id="claim-form__wrapper"
        class="rounded-2xl bg-white border border-stone-200 shadow-sm p-6 lg:p-8">
 
-    {#- WHY: Benefit strip is inside the card so visitors who deep-link directly
+    {#- @define KAT-034 "Claim form shows the Featured value before owners submit"
+        WHY: Benefit strip is inside the card so visitors who deep-link directly
         to #claim-form (e.g., from the "Available with Featured →" buttons on
         the preview dashboard or individual listing pages) always see what they're
         claiming — they may have skipped the hero section's social proof entirely.
@@ -37,7 +38,7 @@
         </p>
         <p class="flex items-start gap-1.5 text-xs text-stone-600 leading-snug">
           <span class="{{ theme.accent_text_full }}" aria-hidden="true">✦</span>
-          $29/month &middot; cancel anytime
+          $29/month flat &middot; no booking commission
         </p>
       </div>
     </div>
