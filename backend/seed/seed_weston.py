@@ -868,6 +868,18 @@ async def seed_weston() -> None:
         "name": CITY_NAME,
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
+        # WHY tagline + hero_description: the home route builds the hero
+        # headline from city["tagline"] and the hero paragraph from
+        # city["hero_description"] (see routes/public/pages.py). Without both,
+        # Weston fell through to a generic platform line instead of a local,
+        # city-specific hero. Setting them here makes the homepage read like the
+        # neighborhood it serves.
+        "tagline": "Weston's most trusted beauty addresses.",
+        "hero_description": (
+            "An index of the stylists, colorists, estheticians, barbers, and "
+            "nail studios that Weston locals actually book — from Weston Town "
+            "Center to the Bonaventure and Savanna neighborhoods."
+        ),
         "meta_description": (
             "The curated beauty directory for Weston, FL — salons, spas, lash studios, "
             "and nail bars discovered by locals. Covering Weston Town Center, Emerald Estates, "

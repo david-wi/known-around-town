@@ -179,6 +179,18 @@ async def seed_downtown_miami() -> None:
         "state": "FL",
         "country": "US",
         "metro": "miami",
+        # WHY tagline + hero_description: the home route builds the hero
+        # headline from city["tagline"] and the hero paragraph from
+        # city["hero_description"] (see routes/public/pages.py). Without both,
+        # Downtown Miami fell through to a generic platform line instead of a
+        # local, city-specific hero. Setting them here makes the homepage read
+        # like the neighborhood it serves.
+        "tagline": "Downtown Miami's most trusted beauty addresses.",
+        "hero_description": (
+            "An index of the stylists, colorists, estheticians, barbers, and "
+            "nail studios that Downtown Miami locals actually book — from the "
+            "Biscayne Boulevard high-rises and Miami Worldcenter to the Bayfront."
+        ),
         "status": "live",
         "created_at": now,
         "updated_at": now,

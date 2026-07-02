@@ -727,7 +727,7 @@ async def seed_fort_lauderdale() -> None:
         "timezone": "America/New_York",
         "tagline": "Fort Lauderdale's best-kept beauty addresses.",
         "hero_description": (
-            "An index of the stylists, colorists, esthetes, and nail artists "
+            "An index of the stylists, colorists, estheticians, and nail artists "
             "Fort Lauderdale locals actually book — from Las Olas to Wilton Manors."
         ),
         "seo_title": "Fort Lauderdale Knows Beauty",

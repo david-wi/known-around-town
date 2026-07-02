@@ -88,8 +88,8 @@ NETWORK_DEFS = [
     {
         "slug": "beauty",
         "name": "Knows Beauty",
-        "tagline": "Miami's curated beauty directory.",
-        "description": "The curated directory of Miami's best salons, spas, and beauty professionals. Discovered by locals, loved by visitors.",
+        "tagline": "The curated beauty directory, city by city.",
+        "description": "The curated directory of the best salons, spas, and beauty professionals in every city we cover. Discovered by locals, loved by visitors.",
         "domains": [
             "knowsbeauty.ai.devintensive.com",
             "knowsbeauty.localhost",

@@ -185,7 +185,7 @@ NETWORK_CITY_CONFIG = {
         "tagline": "Miami's best-kept beauty addresses.",
         "headline_html": "Miami's<br><em class=\"italic font-normal text-amber-100/95\">best-kept</em><br>beauty addresses.",
         "hero_eyebrow": "ISSUE NO. 01 · MIAMI · MAY 2026",
-        "hero_subhead": "An index of the stylists, colorists, esthetes, and barbers locals actually book — neighborhood by neighborhood.",
+        "hero_subhead": "An index of the stylists, colorists, estheticians, and barbers locals actually book — neighborhood by neighborhood.",
         "search_placeholder": "Balayage in Wynwood. Gel manicure in Brickell. Quiet barbershop near Coral Gables.",
         "stat_count_listings": "29",
         "stat_label_listings": "SALONS INDEXED",
@@ -225,7 +225,7 @@ NETWORK_CITY_CONFIG = {
         "spotlight_lead_b": "happening in",
         "spotlight_description": "Street-art murals meet experimental beauty studios.",
         "spotlight_business_slugs": ["wynwood-hair-co", "nue-studio-wynwood", "the-spot-barbershop-wynwood"],
-        "footer_blurb": "The curated directory of Miami's best salons, spas, and beauty professionals. Discovered by locals, loved by visitors.",
+        "footer_blurb": "The curated directory of the best salons, spas, and beauty professionals in every city we cover. Discovered by locals, loved by visitors.",
         "footer_also_in": "Also in Boca Raton",
         # WHY: the live Boca edition is served at boca-raton.knowsbeauty.com.
         # The bare boca.knowsbeauty.com host has no valid certificate and dead-ends
