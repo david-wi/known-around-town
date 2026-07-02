@@ -1,5 +1,55 @@
 # known-around-town — Lessons Learned
 
+## Seed photo IDs must be liveness-checked AND eyeballed — the two failure modes are different (2026-07-02, PR #461)
+
+The category photo pool (`seed/_helpers.py::_CATEGORY_PHOTOS`) and per-business
+overrides (`seed/_photos_by_slug.json`) had accumulated two separate kinds of
+bad Unsplash IDs, and they fail differently on the live site:
+
+1. **Dead IDs (HTTP 404).** The stock photo was deleted at Unsplash, so the URL
+   404s and the card renders the broken-image/placeholder fallback. Caught by a
+   simple `curl -o /dev/null -w '%{http_code}'` liveness check.
+2. **Wrong-content IDs (HTTP 200 but off-topic).** The URL still loads fine, so a
+   liveness check passes — but the image is a brain model on a nail salon, a
+   stethoscope on a spa, a flower shop on a lash/makeup studio, a gym/yoga/coffee
+   shot, etc. A liveness check CANNOT catch these; only *viewing* the image does.
+
+So the rule for adding any seed image ID: **liveness-check it (200) AND actually
+view it (Read the downloaded file) to confirm it depicts that category** before
+adding. An unverified ID is exactly how both classes crept in. The `_helpers.py`
+comment now says this and each ID carries a one-word content note.
+
+**Finding fresh Unsplash IDs when headless scraping is blocked:** Unsplash's
+search pages are now behind Anubis bot protection (headless Chrome gets an "Oh
+noes!" challenge, and the `napi/search` JSON endpoint requires auth). The
+`WebFetch` tool bypassed both and returned the `images.unsplash.com/photo-<id>`
+IDs from a search page — but WebFetch is an LLM extraction and can hallucinate
+IDs, so every returned ID still MUST be liveness-checked before you trust it
+(one of ~55 candidates 404'd). Download at `?w=900` (well under the 2000px
+screenshot-safety cap) and view 2-3 per turn.
+
+**Scope trap:** the same "wrong" ID can be correct in another vertical. The brain
+(`1559757148`) and stethoscope (`1576091160550`) IDs live in BOTH the beauty and
+health sections of `_photos_by_slug.json`; they're wrong for beauty but genuinely
+on-topic for a longevity-medicine clinic. Grep-and-replace blindly and you'll
+break the health site. Only the beauty section's flower-shop entries were changed.
+
+**Copy fixes take effect at re-seed time, not image-build time.** The homepage
+hero/tagline/footer copy and the network description are DB values written by the
+seed. `scripts/deploy.sh` re-seeds production on every deploy, so a copy change is
+live as soon as the re-seed runs — even before/independent of Watchtower swapping
+the container image (the image only matters for code, e.g. the `_helpers.py` photo
+pool, which the seed reads while running). During verification the container
+showed "Up 22 minutes" (old image) yet already served the new copy, because the
+re-seed had run against the DB.
+
+**Three cities had no local hero.** Downtown Miami, Miramar, and Weston set no
+`tagline`/`hero_description` on their city record, so the home route
+(`routes/public/pages.py`: headline ← `city.tagline`, subhead ←
+`city.hero_description`) fell through to a generic platform line. Adding both keys
+to each city's `city_doc` in its seed file fixed it. All three ARE run by
+`deploy.sh`, so the seed fix reaches production.
+
 ## Public form rate limits must reserve atomically before side effects (2026-07-01)
 
 For unauthenticated forms that create records or send email, do not rate-limit by
