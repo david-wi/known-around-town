@@ -417,6 +417,35 @@
 </section>
 {% endif %}
 
+{# ============= SEE ALL / FULL DIRECTORY LINK ============= #}
+{#- WHY: everything above is a CURATED sample (editor's picks, trending, a
+    neighborhood spotlight, a couple of mini-lists). Without this band a first-time
+    visitor could assume the handful of cards above is the whole site. This makes
+    the full directory reachable in one click and signals the true breadth via the
+    live count. A real <a href> (not a button+JS) so open-in-new-tab / middle-click
+    work. The count is the same dynamic stat_count_listings used in the hero strip —
+    never hardcoded. Rendered unconditionally so it shows even on city editions that
+    haven't configured the two-column mini-lists above. #}
+<section class="pb-20 max-w-7xl mx-auto px-6 lg:px-10">
+  {#- WHY specific class choices: reference.css is precompiled, so only class
+      names already present in it take effect. bg-stone-50/60 (not /70) and
+      hover:bg-stone-800 (not group-hover:) are the compiled variants used
+      elsewhere on the site; the /70 and group-hover: variants aren't in the
+      stylesheet and would be silent no-ops. The wrapper uses pb-20 (compiled)
+      rather than lg:pb-20 (not compiled) for the section's bottom spacing. #}
+  <a href="/all"
+     class="group flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-stone-200 bg-stone-50/60 hover:border-stone-300 hover:shadow-lg hover:shadow-stone-900/5 transition px-8 py-8">
+    <div>
+      <div class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text_full }} font-semibold mb-2">The full directory</div>
+      <p class="font-serif text-2xl md:text-3xl font-light text-stone-900" style='font-family: Georgia, "Times New Roman", serif;'>Looking for more than our picks?</p>
+      <p class="text-stone-600 text-sm mt-1">Browse every {{ listing_word_singular }} we cover in {{ city.name }}, not just the curated sample above.</p>
+    </div>
+    <span class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-800 text-white font-semibold px-7 py-3.5 rounded-full transition whitespace-nowrap">
+      See all {{ stat_count_listings }} {{ listing_word_plural|lower }} <span class="transition-transform group-hover:translate-x-0.5">→</span>
+    </span>
+  </a>
+</section>
+
 {# ============= OWNERS CTA ============= #}
 {% if owners_card %}
 <section class="py-20 lg:py-28">

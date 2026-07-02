@@ -741,6 +741,14 @@ async def home(request: Request) -> HTMLResponse:
 
     all_live = await content_svc.list_businesses(city["_id"], limit=200)
 
+    # WHY: the hero stat and the "See all N →" link advertise the TOTAL size of
+    # the city's live directory, so they must use a true count — not len(all_live),
+    # which is capped at the 200 records loaded above for the curated sections. A
+    # dedicated count_documents avoids that cap and stays exact even once a city
+    # grows past 200 live listings, keeping the home stat, the "See all N" link,
+    # and the /all page (which uses the same count) all in agreement.
+    live_count = await content_svc.count_businesses(city["_id"])
+
     # Editor's Picks + trending list — both pulled from the city doc when
     # configured, falling back to derived order when not.
     editor_picks = [b for b in all_live if b.get("editors_pick")][:8]
@@ -824,7 +832,10 @@ async def home(request: Request) -> HTMLResponse:
             # WHY: always count live businesses dynamically so the stat stays
             # accurate as businesses are added — the copy override was seeded
             # with an early-launch hardcoded value ("29") that drifted stale.
-            "stat_count_listings": str(len(all_live)),
+            # WHY live_count (not len(all_live)): len(all_live) is capped at the
+            # 200 loaded above; live_count is the true count_documents total, so
+            # this stat and the "See all N →" link never under-report the catalog.
+            "stat_count_listings": str(live_count),
             "stat_label_listings": (
                 await copy.get("home.stat.listings.label") or "LISTINGS"
             ),
@@ -1237,6 +1248,87 @@ async def search_page(request: Request, q: Optional[str] = None) -> HTMLResponse
         }
     )
     return _templates.TemplateResponse(request, "search.html", ctx)
+
+
+# WHY: the home page only shows a curated SAMPLE of the city's listings (Editor's
+# Picks, Trending, a neighborhood spotlight, and a couple of two-column
+# mini-lists). Visitors had no single place to see EVERY live listing for the
+# city — the closest options were category pages (filtered to one service) or the
+# search page (which shows nothing until you type a query and is deliberately kept
+# out of Google's index). This route is the full directory: it lists every live
+# business for the tenant city, so the "See all N →" link on the home page has a
+# real destination that proves the site is more than the handful of curated cards.
+# WHY limit=1000: comfortably above any single city's current live count (Miami is
+# ~113) so the page shows the complete directory rather than a truncated slice,
+# while still bounding the query so a future runaway catalog can't fetch unbounded.
+_ALL_LISTINGS_LIMIT = 1000
+
+
+@router.get("/all", response_class=HTMLResponse)
+async def all_listings_page(request: Request) -> HTMLResponse:
+    """Full directory: every live listing for the tenant city, one grid.
+
+    Reuses the standard business-card partial and the category-page banner/grid
+    styling. The count shown is the live count of businesses returned — the same
+    dynamic value the home page's stat strip uses — never a hardcoded number.
+    """
+    tenant = await _require_tenant(request)
+    if not tenant.city:
+        raise HTTPException(404, "City required")
+    city = tenant.city
+
+    businesses = _dedup_photos(
+        await content_svc.list_businesses(city["_id"], limit=_ALL_LISTINGS_LIMIT)
+    )
+    # WHY: the true live count from count_documents — matches the home page's
+    # "See all N →" number exactly, and stays correct even in the (currently
+    # impossible) case that a city has more live listings than _ALL_LISTINGS_LIMIT
+    # renders, so the banner never claims fewer than actually exist.
+    total_count = await content_svc.count_businesses(city["_id"])
+
+    ctx = await _base_context(request, tenant)
+    category_names = {c["slug"]: c["name"] for c in ctx["nav_categories"]}
+    neighborhood_names = {n["slug"]: n["name"] for n in ctx["nav_neighborhoods"]}
+    ctx.update(
+        {
+            "businesses": businesses,
+            "total_count": total_count,
+            "category_names": category_names,
+            "neighborhood_names": neighborhood_names,
+            "seo_title": (
+                f"All {city.get('name', '')} {tenant.network.get('name', '')} "
+                f"{ctx.get('listing_word_plural', 'listings')}"
+            ),
+            "meta_description": (
+                f"Browse every {ctx.get('listing_word_singular', 'listing')} in "
+                f"{city.get('name', '')} — the full {city.get('name', '')} "
+                f"{tenant.network.get('name', '')} directory."
+            ),
+            # WHY: same social-share pattern as the category/neighborhood pages —
+            # first real business photo, falling back to the city hero — so the
+            # link preview card is never blank when someone shares the directory.
+            "og_image": next(
+                (
+                    p["url"] if isinstance(p, dict) else p
+                    for b in businesses if b.get("photos")
+                    for p in [b["photos"][0]]
+                ),
+                _city_og_image(city),
+            ),
+            # WHY: ItemList JSON-LD enumerates every listing for Google, the same
+            # way category and neighborhood pages do, so the full directory can
+            # surface individual businesses as rich results.
+            "item_list_jsonld": _build_item_list_jsonld(
+                businesses,
+                list_name=(
+                    f"All {tenant.network.get('name', '')} in {city.get('name', '')}"
+                ),
+                list_url=str(request.url).split("?")[0],
+                base_url=str(request.base_url).rstrip("/"),
+            ),
+        }
+    )
+    return _templates.TemplateResponse(request, "all_salons.html", ctx)
 
 
 _BOT_UA_FRAGMENTS = (
@@ -2435,6 +2527,15 @@ async def sitemap(request: Request) -> HTMLResponse:
 
     if tenant.city:
         city_id = tenant.city["_id"]
+        # WHY: /all is the full-directory page (every live listing for the city).
+        # It's an indexable landing page that links to every business, so include
+        # it in the sitemap so Google discovers and crawls it like /c and /n pages.
+        # WHY gated on a non-zero live count: an empty directory is noindex'd (see
+        # all_salons.html), so listing an empty /all in the sitemap would point
+        # Google at a page we're telling it not to index — a contradiction. Only
+        # advertise /all once the city actually has listings to show.
+        if await content_svc.count_businesses(city_id) > 0:
+            entries.append((base + "/all", today_str))
         for cat in await content_svc.list_categories(city_id):
             entries.append((f"{base}/c/{cat['slug']}", today_str))
         for nb in await content_svc.list_neighborhoods(city_id):
