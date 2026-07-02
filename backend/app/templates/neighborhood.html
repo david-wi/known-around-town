@@ -14,6 +14,9 @@
     pages like "Wynwood beauty salons", reducing visibility and click-through
     on the exact search queries that bring the most local traffic. #}
 {% block head_extra %}
+{#- WHY: preload the CSS-background hero photo so it doesn't flash dark on first
+    paint. Same url + width (img_sized(800)) the hero background below uses. -#}
+{% if neighborhood.photo_url %}<link rel="preload" as="image" href="{{ neighborhood.photo_url | img_sized(800) }}" fetchpriority="high">{% endif %}
 {% if canonical_url %}
 <script type="application/ld+json">
 {
