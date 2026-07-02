@@ -40,7 +40,9 @@ a business detail page. The submission creates a `business_claim` document with
 name, email, phone, and message. David reviews and approves claims in the admin panel.
 **Acceptance:** Given an unclaimed business, when a visitor submits a claim form,
 then a `business_claim` document is created, David sees it in `/admin/claims`, and
-the visitor sees a confirmation message.
+the visitor sees a confirmation message; given an owner lands directly on the claim
+form, then the Featured benefit strip explains the $29/month flat price and that
+Featured takes no booking commission.
 
 ### KAT-035 — Inquiry notifications and stats · V1 · implemented
 **Persona:** Salon Owner.

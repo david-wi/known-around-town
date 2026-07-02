@@ -272,6 +272,23 @@ def test_owners_page_has_claim_form_not_mailto(client):
         assert field_id in r.text
 
 
+def test_claim_form_featured_strip_includes_no_commission_value(client):
+    """Deep-linked owners must see the no-commission Featured value before the form.
+
+    @define-test KAT-034
+    """
+    r = client.get(
+        "/owners?slug=blow-dry-bar-brickell#claim-form",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.text
+    assert "What&rsquo;s included with Featured" in body
+    assert "$29/month flat &middot; no booking commission" in body
+    assert "Claiming" in body
+    assert "Blow Dry Bar" in body
+
+
 def test_pricing_page_leads_with_ai_tools_and_omits_false_claims(client):
     """The /pricing page repositions Featured around the AI marketing tools
     (the day-one value) and must NOT carry copy the product can't honor.
