@@ -1414,3 +1414,37 @@ Two gotchas from KAT-075:
   the business document. Owner inquiry routing should trust only
   `business.claim_status == "verified"` plus `business.claimed_email`, never a
   forged or stale `business_claims` row or owner-session artifact.
+
+## 2026-07-02 — Full-directory page (/all) and the home "See all N" count cap
+
+**The home page is a curated sample, not the catalog.** `home()` loads
+`list_businesses(city_id, limit=200)` and shows only Editor's Picks, Trending, a
+neighborhood spotlight, and two-column mini-lists. Before PR #458 there was no
+single page listing every live salon for a city — `/search` shows nothing until
+you type and is `noindex`, and `/c/<slug>` is filtered to one service. Added
+`GET /all` (`all_listings_page` → `all_salons.html`) as the full directory: it
+lists every live business for the tenant city, reusing `partials/business_card.html`
+and the category-page banner styling (no new card markup). It carries ItemList +
+BreadcrumbList JSON-LD and is `noindex`'d ONLY when empty (matches category/
+neighborhood thin-content guarding). The home page links to it with a real
+`<a href="/all">` "See all N →" band placed after the mini-lists (rendered
+unconditionally so it shows even on cities without mini-lists configured).
+
+**Count cap gotcha:** `stat_count_listings` used to be `str(len(all_live))`, but
+`all_live` is capped at `limit=200`. That was fine as a hero stat while every
+city is under 200, but the moment a page advertises it as "See all N" (the whole
+directory), a >200-listing city would under-report. Fixed by using
+`content_svc.count_businesses(city_id)` (a `count_documents({city_id, status:
+"live"})`) for BOTH the home stat/link and the `/all` banner, so all three agree
+and stay exact past 200. `_ALL_LISTINGS_LIMIT = 1000` bounds the actual card
+render; the displayed total comes from the uncapped count, not the rendered slice.
+
+**reference.css is precompiled — verify every literal class exists.** Several
+plausible Tailwind classes are NOT in `backend/app/static/css/reference.css`
+and are silent no-ops if used: `bg-stone-50/70` (use `/60`),
+`group-hover:bg-stone-800` (use `hover:bg-stone-800`), `bg-white/80` (use
+`bg-white`), `lg:pb-20` (use `pb-20`). Reliable check (grep mis-handles the
+backslash-escaped `[ ] / : .` in compiled selectors): a tiny Python that
+backslash-escapes those chars and does a literal substring search for
+`"." + escaped_class` in the CSS. A class already used in a shipping template is
+proof enough it's compiled.
