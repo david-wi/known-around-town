@@ -885,6 +885,18 @@ async def seed_miramar() -> None:
         "name": CITY_NAME,
         "state": CITY_STATE,
         "description": CITY_DESCRIPTION,
+        # WHY tagline + hero_description: the home route builds the hero
+        # headline from city["tagline"] and the hero paragraph from
+        # city["hero_description"] (see routes/public/pages.py). Without both,
+        # Miramar fell through to a generic platform line instead of a local,
+        # city-specific hero. Setting them here makes the homepage read like the
+        # neighborhood it serves.
+        "tagline": "Miramar's best-kept beauty addresses.",
+        "hero_description": (
+            "An index of the stylists, colorists, estheticians, barbers, and "
+            "nail studios that Miramar locals actually book — from Miramar Town "
+            "Center to the Monarch Lakes and Silver Lakes neighborhoods."
+        ),
         "meta_description": (
             "The curated beauty directory for Miramar, FL — salons, spas, lash studios, "
             "and nail bars discovered by locals. Covering Miramar Parkway, Silver Lakes, "

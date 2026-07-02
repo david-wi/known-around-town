@@ -17,38 +17,65 @@ from app.database import ensure_indexes, get_db
 # image — visually confusing to visitors. MD5 of the slug gives deterministic
 # variety: re-seeding a business always picks the same photo, but adjacent
 # businesses in the same category differ.
+#
+# WHY these exact IDs: every ID below was individually checked in two ways on
+# 2026-07-02 before being kept/added — (a) an HTTP request to the live Unsplash
+# URL returned 200 (not a 404, which renders as a broken image), and (b) the
+# image was actually viewed to confirm it depicts that category's service (or
+# clearly on-brand beauty). The parenthetical after each ID is a one-word note
+# of what the photo shows. Dead IDs (404s) and off-topic images that used to be
+# here (a brain model under "nails", a stethoscope/laptop under "spa", a flower
+# shop under "lash-brow"/"makeup", a construction site under "makeup", gym/yoga
+# shots, etc.) were removed in the same pass. Do NOT add an ID here without
+# both liveness-checking it AND viewing it — an unverified ID is how the broken
+# and wrong-content images crept in originally.
 _CATEGORY_PHOTOS: Dict[str, List[str]] = {
     "hair": [
-        "1522337360788-8b13dee7a37e", "1560066984-138dadb4c035", "1562322140-8baeececf3df",
-        "1595476108010-b4d1f102b1b1", "1605497788044-5a32c7078486", "1521590832167-7bcbfaa6381f",
+        "1595476108010-b4d1f102b1b1",  # hair wash
+        "1522337360788-8b13dee7a37e",  # styled long hair
+        "1560066984-138dadb4c035",     # hair salon interior
+        "1562322140-8baeececf3df",     # blowout in progress
+        "1521590832167-7bcbfaa6381f",  # hair salon interior
     ],
     "nails": [
-        "1604654894610-df63bc536371", "1604654894517-85b5bb6ef18d", "1604654894468-a4c600c60c6b",
-        "1559757148-5c350d0d3c56", "1571019613454-1cb2f99b2d8b",
+        "1604654894610-df63bc536371",  # manicure
+        "1632345031435-8727f6897d53",  # manicure in progress
+        "1610992015762-45dca7fa3a85",  # manicured nails
+        "1619607146034-5a05296c8f9a",  # nail-polish wall
     ],
     "spa": [
-        "1540555700478-4be289fbecef", "1544161515-4c0d0de6e43a", "1545205597-3d9d02c29597",
-        "1576091160550-2173dba999ef", "1606811971618-4486d14f3f99",
+        "1540555700478-4be289fbecef",  # spa towel/product
+        "1639162906614-0603b0ae95fd",  # back massage
+        "1519824145371-296894a0daa9",  # neck/shoulder massage
+        "1598556146869-aeb261893c35",  # steam facial
     ],
     "barber": [
-        "1599351431202-1e0f0137899a", "1585747860715-2ba37e788b70",
-        "1503951914875-452162b0f3f1", "1521119989659-3bd22a06cba8",
+        "1585747860715-2ba37e788b70",  # barbershop
+        "1599351431202-1e0f0137899a",  # fade/razor
+        "1503951914875-452162b0f3f1",  # beard trim
     ],
     "lash-brow": [
-        "1583241800698-e8ab01830a07", "1577527843344-8e51c4da1cce",
-        "1487070183336-b863922373d4", "1533236898036-2d4b83a3c8a9",
+        "1583241800698-e8ab01830a07",  # makeup palette
+        "1548902378-2ec44c906391",     # lash/brow eye closeup
+        "1492618269284-653dce58fd6d",  # lash/brow eye closeup
+        "1567629307995-b9f33097bd30",  # lash/brow eye closeup
     ],
     "med-spa": [
-        "1570172619644-dfd03ed5d881", "1576091160400-aa43de2d1fce",
-        "1527613788048-8a20a56e7a07", "1588776814546-1ffedbe47ada",
+        "1570172619644-dfd03ed5d881",  # facial
+        "1552693673-1bf958298935",     # clinical aesthetics treatment
+        "1512290923902-8a9f81dc236c",  # facial treatment
+        "1616394584738-fc6e612e71b9",  # clay-mask facial
     ],
     "waxing": [
-        "1556228852-80b6e5eeff06", "1560750588-73207b1ef5b8",
-        "1509042239860-f550ce710b93", "1571019614242-c5c5dee9f50b",
+        "1587179790059-5f5d937fb87d",  # smooth legs (hair removal)
+        "1631125911107-0afc98f06edb",  # leg hair removal
+        "1609840533741-62c180d0be79",  # waxing strip on arm
     ],
     "makeup": [
-        "1487070183336-b863922373d4", "1512207736890-6ffed8a84e8d",
-        "1522338242992-e1d3aedef060", "1583241475307-44a34c96a4e5",
+        "1583241800698-e8ab01830a07",  # makeup palette
+        "1596462502278-27bfdc403348",  # makeup flat-lay
+        "1516975080664-ed2fc6a32937",  # makeup brushes
+        "1583784561105-a674080f391e",  # makeup flat-lay
     ],
 }
 
