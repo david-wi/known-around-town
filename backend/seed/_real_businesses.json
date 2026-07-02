@@ -196,7 +196,7 @@
     {
       "slug": "avant-garde-salon-and-spa-sunny-isles",
       "name": "Avant-Garde Salon and Spa",
-      "neighborhood_slug": "sunny-isles",
+      "neighborhood_slug": "sunny-isles-beach",
       "category_slug": "hair",
       "price_cues": "$$$",
       "short_description": "Full-service salon and spa offering cuts, color, and beauty treatments under one roof. A convenient go-to for Sunny Isles locals.",
@@ -707,7 +707,7 @@
     {
       "slug": "beauty-bar-by-alina-sunny-isles",
       "name": "Beauty Bar by Alina",
-      "neighborhood_slug": "sunny-isles",
+      "neighborhood_slug": "sunny-isles-beach",
       "category_slug": "lash-brow",
       "price_cues": "$$",
       "short_description": "A neighborhood studio focused on tidy brows and lashes with an emphasis on natural-looking definition.",
@@ -721,7 +721,7 @@
     {
       "slug": "european-wax-center-sunny-isles",
       "name": "European Wax Center",
-      "neighborhood_slug": "sunny-isles",
+      "neighborhood_slug": "sunny-isles-beach",
       "category_slug": "waxing",
       "price_cues": "$$",
       "short_description": "A convenient stop for waxing services serving Sunny Isles and nearby oceanfront towers.",
@@ -735,7 +735,7 @@
     {
       "slug": "kosmos-hair-salon-sunny-isles",
       "name": "KÓSMOS Hair Salon",
-      "neighborhood_slug": "sunny-isles",
+      "neighborhood_slug": "sunny-isles-beach",
       "category_slug": "hair",
       "price_cues": "$$$",
       "short_description": "A polished salon popular for color work and smooth blowouts in Sunny Isles.",
