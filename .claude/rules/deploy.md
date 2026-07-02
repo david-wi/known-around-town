@@ -23,6 +23,35 @@ SSHing to the server. Running bare `docker compose up -d` without the `-f` flag 
 the dev file, start a local image build, and likely take the backend down. This mistake
 caused a ~3-minute outage on 2026-06-11.
 
+## Seeding on deploy — DIRECT DATABASE EDITS TO SEEDED CONTENT GET REVERTED
+
+**A production deploy RE-SEEDS the database.** Any change you make directly to the
+live DB — a `PATCH /api/v1/...`, a `mongosh` write, an admin edit — to a field the
+seed scripts own is **wiped on the next deploy**. `scripts/deploy.sh` sets
+`SEED_AFTER_DEPLOY="true"` for the production (`latest`) target and runs the seed
+scripts, which **`delete_many` + re-insert businesses** and **`upsert` city/network
+content** from the repo's seed data. So the seed data — not the database — is the
+source of truth for seeded content.
+
+Verified the hard way on 2026-07-02: a batch of live-DB fixes (a copy typo, the
+network tagline/description, three city hero taglines, and ~24 salon photos) all
+reverted within a single deploy window.
+
+**Rule: to change seeded content or photos durably, edit the SEED DATA and merge it.
+Do NOT PATCH the live DB — that is only a temporary preview the next deploy erases.**
+- **Salon photos:** `backend/seed/_helpers.py::_CATEGORY_PHOTOS` (per-category Unsplash
+  IDs, picked by slug hash) + `backend/seed/_photos_by_slug.json` (per-business
+  overrides). Every ID must be liveness-checked (loads, HTTP 200) AND content-checked
+  (actually viewed) — ~1/3 of the set was dead 404s or wrong-content (a florist on lash
+  salons, a brain model on nail salons, a stethoscope on spas) as of 2026-07-02.
+- **City copy** (hero_description, tagline, footer_blurb): `backend/seed/seed_<city>.py`.
+- **Network copy** (tagline, description): `backend/seed/seed_networks.py`.
+
+**Code changes (routes, templates, Python logic) ARE durable** — only seeded *data* is
+re-applied on deploy. Example from 2026-07-02: the claim-flow ObjectId lookup fix
+(PR #459) is code, so it stuck; the same-day salon-photo and copy edits made directly
+in the DB did not.
+
 ## Stage
 
 The `:stage` image is built from the `stage` branch and served at
