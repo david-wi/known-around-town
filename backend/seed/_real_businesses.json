@@ -1257,6 +1257,36 @@
       "editors_pick": false,
       "premium": false,
       "services": []
+    },
+    {
+      "slug": "gio-moros-miami-edgewater",
+      "name": "Gio Moros Miami",
+      "neighborhood_slug": "edgewater",
+      "category_slug": "makeup",
+      "price_cues": "$$$",
+      "short_description": "An Edgewater beauty studio with a dedicated makeup and styling line — event glam and tailored bridal beauty packages, from soft daytime looks to full bridal artistry.",
+      "address": "181 NE 22nd St, Miami, FL 33137",
+      "phone": "(786) 908-6118",
+      "website": "https://giomoros.com/",
+      "instagram": "@giomorosmiami",
+      "editors_pick": false,
+      "premium": false,
+      "services": []
+    },
+    {
+      "slug": "mariely-resende-makeup-edgewater",
+      "name": "Mariely Resende Makeup",
+      "neighborhood_slug": "edgewater",
+      "category_slug": "makeup",
+      "price_cues": "$$$",
+      "short_description": "A makeup-first Edgewater studio specializing in bridal and event glam, led by an artist with over a decade behind the chair. Soft-glam and luxury looks for weddings, quinces, and photo shoots.",
+      "address": "425 NE 22nd St, Miami, FL 33137",
+      "phone": "(786) 505-8117",
+      "website": null,
+      "instagram": "@marielyresende",
+      "editors_pick": false,
+      "premium": false,
+      "services": []
     }
   ],
   "wellness": [
