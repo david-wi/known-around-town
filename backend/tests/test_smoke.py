@@ -4040,9 +4040,10 @@ def test_representative_photo_detector_flags_unsplash_only():
     assert not _is_representative_photo_url("")
 
 
-def test_dedup_photos_removes_duplicate_url():
-    """When two businesses share the same photo URL, the second one's photos
-    should be cleared so the same image does not appear twice on a listing page."""
+def test_dedup_photos_no_category_keeps_photo_on_collision():
+    """When two businesses share a photo URL and there's no category pool to
+    reassign from, the second keeps its real photo (a subtle repeat) rather than
+    being blanked to a placeholder tile — a repeat reads better than a blank."""
     from app.routes.public.pages import _dedup_photos
 
     url = "https://cdn.example.com/photo.jpg"
@@ -4052,7 +4053,7 @@ def test_dedup_photos_removes_duplicate_url():
     result = _dedup_photos([biz_a, biz_b])
 
     assert result[0]["photos"] == [{"url": url}], "First business should keep its photo"
-    assert result[1]["photos"] == [], "Second business (no category pool) should have photos cleared"
+    assert result[1]["photos"] == [{"url": url}], "No-category collision keeps its photo (never blanks)"
 
 
 def test_dedup_photos_reassigns_from_category_pool():
@@ -4074,16 +4075,18 @@ def test_dedup_photos_reassigns_from_category_pool():
     assert new_url == _PHOTO_BASE.format(hair[1]), "should pick the next unused hair photo"
 
 
-def test_dedup_photos_blanks_when_category_pool_exhausted():
+def test_dedup_photos_keeps_photo_when_category_pool_exhausted():
     """If every photo in the category pool is already used on the page, the
-    colliding card falls back to a placeholder (never repeats an image)."""
+    colliding card keeps its own real photo (a repeat) rather than blanking to a
+    placeholder — no card is ever left without a real image."""
     from app.routes.public.pages import _dedup_photos, _CATEGORY_PHOTOS, _PHOTO_BASE
 
     hair = _CATEGORY_PHOTOS["hair"]
     seen = {_PHOTO_BASE.format(pid) for pid in hair}  # whole pool already used
-    biz = {"name": "Hair X", "category_slugs": ["hair"], "photos": [{"url": _PHOTO_BASE.format(hair[0])}]}
+    own = _PHOTO_BASE.format(hair[0])
+    biz = {"name": "Hair X", "category_slugs": ["hair"], "photos": [{"url": own}]}
     result = _dedup_photos([biz], seen=seen)
-    assert result[0]["photos"] == [], "exhausted pool -> placeholder, not a repeat"
+    assert result[0]["photos"] == [{"url": own}], "exhausted pool -> keep real photo (repeat), never blank"
 
 
 def test_dedup_photos_keeps_distinct_urls():

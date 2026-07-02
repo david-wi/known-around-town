@@ -191,10 +191,11 @@ def _dedup_photos(
     WHY: When multiple businesses share the same stock photo URL (common in
     seeded data with a small image pool), the listing grid looks like the same
     photo was copy-pasted. On a collision we first try to hand the card a
-    *different* real photo from its own category pool; only if that pool is
-    exhausted or unknown do we blank it to a neutral placeholder. This keeps
-    every card showing a real, on-topic image (no jarring placeholder tiles)
-    while still avoiding the same photo appearing twice on one page.
+    *different* real photo from its own category pool. If that pool is exhausted
+    (more same-category cards on the page than we have photos for) we KEEP the
+    card's real photo — a subtle repeat reads far better than a blank placeholder
+    tile, which looks unfinished. So every card with a photo always shows a real,
+    on-topic image; we just avoid repeats wherever the pool is large enough.
 
     Pass a shared `seen` set to deduplicate across multiple sections of the
     same page (e.g. Editor's Picks + Trending on the home page). When omitted
@@ -213,8 +214,8 @@ def _dedup_photos(
                 if alt:
                     b = {**b, "photos": [{"url": alt}]}
                     seen.add(alt)
-                else:
-                    b = {**b, "photos": []}
+                # else: category pool exhausted/unknown — keep the card's real
+                # photo (a subtle repeat) rather than blanking it to a placeholder.
             elif url:
                 seen.add(url)
         result.append(b)
