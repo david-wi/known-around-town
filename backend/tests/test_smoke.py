@@ -4052,7 +4052,38 @@ def test_dedup_photos_removes_duplicate_url():
     result = _dedup_photos([biz_a, biz_b])
 
     assert result[0]["photos"] == [{"url": url}], "First business should keep its photo"
-    assert result[1]["photos"] == [], "Second business with same URL should have photos cleared"
+    assert result[1]["photos"] == [], "Second business (no category pool) should have photos cleared"
+
+
+def test_dedup_photos_reassigns_from_category_pool():
+    """On a collision, a card WITH a known category gets a different real photo
+    from its category pool rather than a grey placeholder tile."""
+    from app.routes.public.pages import _dedup_photos, _CATEGORY_PHOTOS, _PHOTO_BASE
+
+    hair = _CATEGORY_PHOTOS["hair"]
+    shared = _PHOTO_BASE.format(hair[0])
+    biz_a = {"name": "Hair A", "category_slugs": ["hair"], "photos": [{"url": shared}]}
+    biz_b = {"name": "Hair B", "category_slugs": ["hair"], "photos": [{"url": shared}]}
+
+    result = _dedup_photos([biz_a, biz_b])
+
+    assert result[0]["photos"] == [{"url": shared}]
+    assert result[1]["photos"], "colliding card must NOT be blanked when a category pool exists"
+    new_url = result[1]["photos"][0]["url"]
+    assert new_url != shared, "reassigned photo must differ from the collided one"
+    assert new_url == _PHOTO_BASE.format(hair[1]), "should pick the next unused hair photo"
+
+
+def test_dedup_photos_blanks_when_category_pool_exhausted():
+    """If every photo in the category pool is already used on the page, the
+    colliding card falls back to a placeholder (never repeats an image)."""
+    from app.routes.public.pages import _dedup_photos, _CATEGORY_PHOTOS, _PHOTO_BASE
+
+    hair = _CATEGORY_PHOTOS["hair"]
+    seen = {_PHOTO_BASE.format(pid) for pid in hair}  # whole pool already used
+    biz = {"name": "Hair X", "category_slugs": ["hair"], "photos": [{"url": _PHOTO_BASE.format(hair[0])}]}
+    result = _dedup_photos([biz], seen=seen)
+    assert result[0]["photos"] == [], "exhausted pool -> placeholder, not a repeat"
 
 
 def test_dedup_photos_keeps_distinct_urls():
