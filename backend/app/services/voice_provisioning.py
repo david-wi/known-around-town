@@ -25,6 +25,7 @@ from typing import Any, Dict, Optional
 import httpx
 
 from app.config import get_settings
+from app.mongo_ids import business_id_value
 
 log = logging.getLogger(__name__)
 
@@ -252,7 +253,7 @@ async def provision_salon_receptionist(db: Any, business_id: str) -> Dict[str, A
       ValueError: if the business does not exist.
       httpx.HTTPStatusError: if any VAPI API call fails.
     """
-    business = await db.businesses.find_one({"_id": business_id})
+    business = await db.businesses.find_one({"_id": business_id_value(business_id)})
     if not business:
         raise ValueError(f"Business {business_id!r} not found")
 
@@ -395,7 +396,7 @@ async def deprovision_salon_receptionist(db: Any, business_id: str) -> None:
     Raises:
       ValueError: if the business does not exist.
     """
-    business = await db.businesses.find_one({"_id": business_id})
+    business = await db.businesses.find_one({"_id": business_id_value(business_id)})
     if not business:
         raise ValueError(f"Business {business_id!r} not found")
 

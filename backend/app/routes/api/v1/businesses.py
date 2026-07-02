@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.database import get_db
 from app.models import Business
+from app.mongo_ids import business_id_value
 from app.responses import MongoSafeJSONResponse
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import merge_update, now_utc, to_doc
@@ -127,7 +128,9 @@ async def get_business_by_slug(city_id: str, slug: str) -> Dict[str, Any]:
 
 @router.get("/{business_id}")
 async def get_business(business_id: str) -> Dict[str, Any]:
-    doc = await get_db().businesses.find_one({"_id": business_id, "status": "live"})
+    doc = await get_db().businesses.find_one(
+        {"_id": business_id_value(business_id), "status": "live"}
+    )
     if doc and not await _city_is_public(doc.get("city_id", "")):
         doc = None
     if not doc:
@@ -152,11 +155,13 @@ async def create_business(body: Business) -> Dict[str, Any]:
 @router.patch("/{business_id}", dependencies=[Depends(require_admin)])
 async def update_business(business_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
     db = get_db()
-    existing = await db.businesses.find_one({"_id": business_id})
+    existing = await db.businesses.find_one({"_id": business_id_value(business_id)})
     if not existing:
         raise HTTPException(404, "Business not found")
     merged = merge_update(existing, patch)
-    await db.businesses.replace_one({"_id": business_id}, merged)
+    # WHY: match on the record's real stored _id (ObjectId or string) rather than
+    # the request string, so legacy ObjectId-keyed businesses are updated in place.
+    await db.businesses.replace_one({"_id": existing["_id"]}, merged)
     return MongoSafeJSONResponse(merged)
 
 

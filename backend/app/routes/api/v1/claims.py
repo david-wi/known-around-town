@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.config import get_settings
 from app.database import get_db
 from app.models import BusinessClaim
+from app.mongo_ids import business_id_value
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import now_utc, to_doc
 from app.services.rate_limit import (
@@ -55,7 +56,7 @@ async def submit_claim(body: PublicClaimSubmission, request: Request) -> Dict[st
         db=db, collection="business_claims", ip=ip, max_events=CLAIM_MAX_PER_WINDOW
     )
     doc["submit_ip"] = ip
-    business = await db.businesses.find_one({"_id": doc["business_id"]})
+    business = await db.businesses.find_one({"_id": business_id_value(doc["business_id"])})
     if not business:
         raise HTTPException(404, "Business not found")
     # WHY: guard against overwriting a verified (paying subscriber) or
@@ -76,7 +77,7 @@ async def submit_claim(body: PublicClaimSubmission, request: Request) -> Dict[st
         )
     await db.business_claims.insert_one(doc)
     await db.businesses.update_one(
-        {"_id": doc["business_id"]},
+        {"_id": business_id_value(doc["business_id"])},
         {"$set": {"claim_status": "pending", "updated_at": now_utc()}},
     )
     # WHY: use canonical_base_url so the admin link in the notification email
@@ -131,7 +132,7 @@ async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
 
     settings = get_settings()
     await db.businesses.update_one(
-        {"_id": claim["business_id"]},
+        {"_id": business_id_value(claim["business_id"])},
         {
             "$set": {
                 "claim_status": "verified",
@@ -150,7 +151,7 @@ async def verify_claim(claim_id: str, request: Request) -> Dict[str, Any]:
     # WHY: without this the owner has no way to know they've been verified —
     # they submitted, got a confirmation, and then heard nothing.  Fire-and-
     # forget so a slow email never blocks the admin verification response.
-    business = await db.businesses.find_one({"_id": claim["business_id"]})
+    business = await db.businesses.find_one({"_id": business_id_value(claim["business_id"])})
     # WHY: use canonical_base_url so the login link in the verification email
     # points at the public hostname.  request.base_url is the Docker-internal
     # address when running behind nginx, producing a broken link for the owner.
@@ -197,10 +198,10 @@ async def reject_claim(claim_id: str) -> Dict[str, Any]:
     # (e.g. a different claim landed and was verified first), leave it
     # alone so we don't accidentally un-verify a legitimately-claimed
     # business.
-    business = await db.businesses.find_one({"_id": claim["business_id"]})
+    business = await db.businesses.find_one({"_id": business_id_value(claim["business_id"])})
     if business and business.get("claim_status") == "pending":
         await db.businesses.update_one(
-            {"_id": claim["business_id"]},
+            {"_id": business_id_value(claim["business_id"])},
             {"$set": {"claim_status": "unclaimed", "updated_at": now}},
         )
     # Notify the submitter that their claim wasn't approved.
