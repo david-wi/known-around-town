@@ -32,6 +32,13 @@
     plain URL strings or {"url":"..."} dicts — resolve once here. #}
 {% set _og_hero = (business.photos|selectattr('is_hero')|list|first) or (business.photos|first if business.photos else None) %}
 {% set _og_hero_url = _og_hero.url if (_og_hero and _og_hero is mapping) else _og_hero %}
+{#- WHY: the listing hero photo is a CSS background image (see the hero grid
+    below). Browsers discover CSS background images late, so the hero flashes
+    dark for a beat before it paints. Preload it so it's ready at first paint.
+    _og_hero_url resolves to the same hero photo the CSS uses, at the same
+    img_sized(1000) width — the exact same file, so no double download and no
+    "preloaded but unused" warning. -#}
+{% if _og_hero_url %}<link rel="preload" as="image" href="{{ _og_hero_url | img_sized(1000) }}" fetchpriority="high">{% endif %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",

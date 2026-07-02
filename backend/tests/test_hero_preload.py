@@ -29,18 +29,35 @@ def client(seeded_db):
     return TestClient(app)
 
 
+def _assert_hero_preloaded_and_matches(body: str, where: str) -> None:
+    """The page must emit a hero image preload whose href is the EXACT url the
+    hero CSS background uses. Exact match matters: a mismatch means the browser
+    warns "preloaded but unused" AND the hero still flashes dark."""
+    m = re.search(r'<link rel="preload" as="image" href="([^"]+)"', body)
+    assert m, f"{where}: missing the hero image preload link"
+    hero_url = m.group(1)
+    assert f'background-image: url("{hero_url}")' in body, (
+        f"{where}: preload href does not match any hero background-image url"
+    )
+
+
 def test_city_home_preloads_the_hero_background_image(client):
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200
-    body = r.text
+    _assert_hero_preloaded_and_matches(r.text, "city home")
 
-    m = re.search(r'<link rel="preload" as="image" href="([^"]+)"', body)
-    assert m, "city home is missing the hero image preload link"
-    hero_url = m.group(1)
 
-    # The preloaded URL must be the exact URL the hero CSS background uses. If it
-    # doesn't match, the browser warns the preload went unused and the hero still
-    # flashes dark — so matching is the whole point of the fix.
-    assert f'background-image: url("{hero_url}")' in body, (
-        "preload href does not match the hero background-image url"
+def test_listing_page_preloads_the_hero_background_image(client):
+    # The listing hero photo is the page a salon owner looks at — it must not
+    # flash dark on first paint.
+    r = client.get(
+        "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
     )
+    assert r.status_code == 200
+    _assert_hero_preloaded_and_matches(r.text, "listing page")
+
+
+def test_neighborhood_page_preloads_the_hero_background_image(client):
+    r = client.get("/n/brickell", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r.status_code == 200
+    _assert_hero_preloaded_and_matches(r.text, "neighborhood page")

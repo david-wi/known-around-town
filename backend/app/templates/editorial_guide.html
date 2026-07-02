@@ -13,6 +13,9 @@
     like "best med spas Miami", increasing click-through from search. Without these,
     Google can only infer structure from the page HTML, which is less reliable. -#}
 {% block head_extra %}
+{#- WHY: preload the CSS-background hero photo so it doesn't flash dark on first
+    paint. Same url + width (img_sized(800)) the hero background below uses. -#}
+{% if guide.hero_image_url %}<link rel="preload" as="image" href="{{ guide.hero_image_url | img_sized(800) }}" fetchpriority="high">{% endif %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
