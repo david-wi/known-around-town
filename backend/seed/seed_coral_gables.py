@@ -616,6 +616,22 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$$",
         "editors_pick": False,
     },
+    {
+        "name": "NOVA Makeup & Hair",
+        "slug": "nova-makeup-and-hair-coral-gables",
+        "category_slugs": ["makeup", "hair"],
+        "neighborhood_slugs": ["miracle-mile"],
+        "address": {"street": "147 Alhambra Circle", "city": "Coral Gables", "state": "FL", "postal_code": "33134", "country": "US"},
+        "phone": "(786) 219-9333",
+        "website": "https://www.novamakeupandhair.com",
+        "short_description": (
+            "A Coral Gables studio specializing in luxury soft-glam bridal makeup "
+            "and hair — more than fifteen years of photo-ready, heat-proof "
+            "application for weddings and special occasions."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": False,
+    },
 ]
 
 

@@ -553,6 +553,22 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$$",
         "editors_pick": False,
     },
+    {
+        "name": "Miami Beach Glam",
+        "slug": "miami-beach-glam-alton-road",
+        "category_slugs": ["makeup"],
+        "neighborhood_slugs": ["lincoln-road-alton"],
+        "address": {"street": "1036 Alton Road", "city": "Miami Beach", "state": "FL", "postal_code": "33139", "country": "US"},
+        "phone": "(786) 355-5468",
+        "website": "https://miamibeachglam.com",
+        "short_description": (
+            "Bridal, special-occasion, editorial, and TV or film makeup — plus "
+            "one-on-one makeup lessons — from a Miami Beach studio on Alton Road "
+            "with more than a decade of glam experience."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": False,
+    },
 ]
 
 
