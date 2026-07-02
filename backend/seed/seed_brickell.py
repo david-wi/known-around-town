@@ -510,6 +510,21 @@ BUSINESSES: List[Dict[str, Any]] = [
         "price_cues": "$$",
         "editors_pick": False,
     },
+    {
+        "name": "Mari D. MUA Beauty Studio",
+        "slug": "mari-d-mua-beauty-studio-brickell",
+        "category_slugs": ["makeup"],
+        "neighborhood_slugs": ["brickell-ave-mary-brickell-village"],
+        "address": {"street": "350 S Miami Ave, Ste A", "city": "Miami", "state": "FL", "postal_code": "33130", "country": "US"},
+        "website": "https://www.maridmua.com",
+        "short_description": (
+            "A Brickell makeup and hair studio known for bridal, quinceañera, and "
+            "special-occasion glam — on-location work across Miami plus makeup "
+            "masterclasses for aspiring artists."
+        ),
+        "price_cues": "$$$",
+        "editors_pick": False,
+    },
 ]
 
 
