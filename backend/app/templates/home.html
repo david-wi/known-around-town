@@ -23,6 +23,16 @@
 {% block title %}{{ seo_title }} — {{ vertical_word }} Directory · Claim Your Listing{% endblock %}
 
 {% block head_extra %}
+{# WHY: the hero is a CSS background-image (see the hero section below). Browsers
+   discover a CSS background image late — only after the stylesheet is parsed and
+   the element is matched — so the above-the-fold hero photo starts downloading
+   late and the hero flashes dark for a beat before it paints. Preloading it
+   starts the fetch during HTML parse, so the hero is ready when the page paints.
+   The href MUST match the CSS url() exactly (same img_sized width) or the browser
+   warns the preload went unused. #}
+{% if hero_photo_url %}
+<link rel="preload" as="image" href="{{ hero_photo_url | img_sized(1200) }}" fetchpriority="high">
+{% endif %}
 {# WHY: WebSite JSON-LD tells Google this is a directory site and registers the
    sitelinks search box — the SearchAction points at our /search endpoint so
    Google can offer direct on-SERP searching into this directory. #}
