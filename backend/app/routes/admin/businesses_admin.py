@@ -22,6 +22,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.database import get_db
+from app.mongo_ids import business_id_value
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import now_utc
 
@@ -104,7 +105,7 @@ async def business_edit_page(
     if _templates is None:
         raise HTTPException(500, "Templates not attached")
     db = get_db()
-    business = await db.businesses.find_one({"_id": business_id})
+    business = await db.businesses.find_one({"_id": business_id_value(business_id)})
     if not business:
         raise HTTPException(404, "Business not found")
 
@@ -139,7 +140,7 @@ async def business_edit_submit(
     correct way to distinguish checked (value="on") from unchecked (absent).
     """
     db = get_db()
-    existing = await db.businesses.find_one({"_id": business_id})
+    existing = await db.businesses.find_one({"_id": business_id_value(business_id)})
     if not existing:
         raise HTTPException(404, "Business not found")
 
@@ -150,7 +151,7 @@ async def business_edit_submit(
     hide_ratings = form.get("hide_ratings") == "on"
 
     await db.businesses.update_one(
-        {"_id": business_id},
+        {"_id": business_id_value(business_id)},
         {"$set": {
             "hide_ratings": hide_ratings,
             "updated_at": now_utc(),

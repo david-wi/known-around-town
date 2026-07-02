@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.config import get_settings
 from app.database import get_db
 from app.models import BusinessInquiry
+from app.mongo_ids import business_id_value
 from app.routes.api.v1._auth import require_admin
 from app.routes.api.v1._crud import to_doc
 from app.services.rate_limit import (
@@ -84,7 +85,7 @@ async def submit_inquiry(body: BusinessInquiry, request: Request) -> Dict[str, A
         db=db, collection="business_inquiries", ip=ip, max_events=INQUIRY_MAX_PER_WINDOW
     )
     doc["submit_ip"] = ip
-    business = await db.businesses.find_one({"_id": doc["business_id"]})
+    business = await db.businesses.find_one({"_id": business_id_value(doc["business_id"])})
     if not business:
         raise HTTPException(404, "Business not found")
     await db.business_inquiries.insert_one(doc)
