@@ -395,8 +395,9 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
     footer_owners_items_raw = await copy.get("footer.owners.items") or ""
     footer_owners_items = [s.strip() for s in footer_owners_items_raw.split("|") if s.strip()]
 
-    # The header nav is a per-network short list of pinned links
-    # (e.g. Beauty shows "Lashes" instead of "Lash & Brow"). The route stores
+    # The header nav is a per-network short list of pinned links whose labels
+    # may differ from the canonical category name (e.g. Hallandale pins the
+    # verbose "Hair Salons" instead of the canonical "Hair"). The route stores
     # it on the city doc; fall back to the first 6 categories when not set.
     header_nav = (city or {}).get("header_nav") if city else None
     if not header_nav and nav_categories:
@@ -492,7 +493,12 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "footer_owners_items": footer_owners_items,
         "network_cities": network_cities,
         "page_featured_disclosure": await copy.get("page.featured_disclosure"),
-        "owners_header_cta": await copy.get("header.owners_cta") or "For Owners",
+        # WHY: default standardized to "For Salon Owners" to match the flagship
+        # Miami beauty nav and the /owners page eyebrow. Beauty city subdomains
+        # that don't override this copy key (brickell, boca, delray, etc.) all
+        # fall through here; the non-beauty networks (wellness/health) set their
+        # own "For Owners" explicitly in seed_miami.py so they are unaffected.
+        "owners_header_cta": await copy.get("header.owners_cta") or "For Salon Owners",
         # WHY: GA4 is injected here (the shared base context) so every page
         # gets the tracking script without duplicating the env-var read in
         # each individual route handler.  An empty or absent var means the

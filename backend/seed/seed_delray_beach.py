@@ -38,7 +38,7 @@ CATEGORIES = [
 ]
 
 CITY_SLUG        = "delray-beach"
-CITY_NAME        = "Delray Beach, FL"
+CITY_NAME        = "Delray Beach"
 CITY_DESCRIPTION = (
     "Delray Beach wears its 'Village by the Sea' nickname well. Atlantic Avenue "
     "stretches two miles from Swinton Avenue to the ocean, lined with locally owned "

@@ -197,7 +197,7 @@ NETWORK_CITY_CONFIG = {
             ("hair",      "Hair"),
             ("nails",     "Nails"),
             ("spa",       "Spa"),
-            ("lash-brow", "Lashes"),
+            ("lash-brow", "Lash & Brow"),
             ("med-spa",   "Med Spa"),
             ("barber",    "Barber"),
         ],
