@@ -138,6 +138,31 @@ def test_editors_pick_amber_text_passes_aa_on_white():
         )
 
 
+def test_google_rating_amber_text_passes_aa_on_white():
+    """# @define-test KAT-063
+    # @define-test KAT-064
+
+    The Google rating star/value are real trust text on directory cards and
+    listing detail pages, so the amber accent must be dark enough on white."""
+    targets = [
+        ("business.html", "{{ \"%.1f\"|format(business.google_rating) }} ★", "listing rating value"),
+        ("partials/business_card.html", 'text-[11px] leading-none">★', "directory card rating star"),
+    ]
+    for tpl, needle, label in targets:
+        shades = []
+        html = (TEMPLATES / tpl).read_text()
+        for line in html.splitlines():
+            if needle in line and ("google_rating" in line or "★" in line):
+                shades.extend(re.findall(r"text-amber-(\d{3})", line))
+        assert shades, f"{tpl}: no amber shade found for {label}"
+        for shade in shades:
+            ratio = contrast(AMBER[shade], WHITE)
+            assert ratio >= WCAG_AA, (
+                f"{tpl}: {label} uses amber-{shade} on white "
+                f"= {ratio:.2f}:1, below WCAG AA {WCAG_AA}:1"
+            )
+
+
 def _blend(hexs, op, bg=(255, 255, 255)):
     """Effective color of `hexs` rendered at CSS opacity `op` over `bg`.
     A parent `opacity-70` dims text toward the page background, lowering its

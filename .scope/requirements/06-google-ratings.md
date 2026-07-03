@@ -64,6 +64,7 @@ The `Business` model stores `google_place_id`, `google_rating` (float), `google_
 - Rating badge appears below the salon name on category/neighborhood/home cards
 - Badge is not shown when `google_rating` is null
 - Format: `★ 4.7 (312)` (star, decimal rating, review count in parens)
+- Badge text meets WCAG AA contrast on the page background.
 
 ---
 
@@ -76,6 +77,7 @@ The `Business` model stores `google_place_id`, `google_rating` (float), `google_
 **Acceptance criteria:**
 - Rating row appears in the sidebar card on the salon detail page
 - Row is not shown when `google_rating` is null
+- Rating value and star text meet WCAG AA contrast on the sidebar background.
 
 ---
 
