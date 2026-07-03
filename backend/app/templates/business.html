@@ -630,7 +630,8 @@
       {% endif %}
     </div>
 
-    <aside class="lg:col-span-4 space-y-6 lg:sticky lg:top-32 self-start">
+    {# @define KAT-076 "Business detail sidebar does not create a nested complementary landmark" #}
+    <div class="lg:col-span-4 space-y-6 lg:sticky lg:top-32 self-start">
       {% if business.address or business.phone or business.website or business.instagram %}
       <div class="bg-white border border-stone-200 rounded-2xl overflow-hidden">
         {% if hero_photo %}
@@ -727,7 +728,7 @@
         </div>
       </div>
       {% endif %}
-    </aside>
+    </div>
   </div>
 </section>
 
@@ -982,7 +983,7 @@
 {% if business.claim_status not in ('verified', 'claimed', 'pending') %}
 <div id="claim-sticky-bar"
      class="fixed bottom-0 left-0 right-0 z-50 transform translate-y-full transition-transform duration-300 ease-in-out"
-     role="complementary"
+     role="region"
      aria-label="Claim this business">
   <div style="background-color: #b45309; border-top: 1px solid #92400e;">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">

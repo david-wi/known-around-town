@@ -171,7 +171,8 @@
           style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.25rem, 4.5vw, 3.75rem);'>Every {{ city.name }} neighborhood<br><em class="italic text-stone-500">has its own {{ map_culture_word }} culture.</em></h2>
     </div>
     <div class="grid lg:grid-cols-12 gap-10 lg:gap-14">
-      <aside class="lg:col-span-3">
+      {# @define KAT-076 "Home browse rail does not create a nested complementary landmark" #}
+      <div class="lg:col-span-3">
         <div class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text }} font-semibold mb-5">{{ browse_axis_label }}</div>
         <ul>
           {% for c in nav_categories %}
@@ -189,7 +190,7 @@
           {% endif %}
           {% endfor %}
         </ul>
-      </aside>
+      </div>
       <div class="lg:col-span-9">
         <div class="text-[10px] uppercase tracking-[0.25em] {{ theme.accent_text }} font-semibold mb-5">By neighborhood</div>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">

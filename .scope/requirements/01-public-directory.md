@@ -99,3 +99,13 @@ crawl told Google that every guide was modified daily, wasting crawl budget and 
 the trustworthiness of our lastmod signals for guides that haven't changed.
 **Acceptance:** Given a published editorial guide, when `/sitemap.xml` is fetched, then
 the guide's `<lastmod>` value matches the guide's publish date, not the current date.
+
+### KAT-076 — Public page landmark and heading structure · V1 · implemented
+**Persona:** Salon Seeker, Salon Owner using assistive technology.
+Public directory pages expose a clean semantic structure so screen readers and
+automated accessibility tools do not encounter skipped footer headings or nested
+complementary landmarks in the main content.
+**Acceptance:** Given the city home page or a business detail page, when the
+rendered HTML is inspected, then footer column labels do not create skipped heading
+levels and page sidebars/banners inside `<main>` do not expose nested
+`complementary` landmarks.
