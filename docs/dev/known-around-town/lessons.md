@@ -1,5 +1,14 @@
 # known-around-town — Lessons Learned
 
+## Neighborhood 404s: Seed files must list all active neighborhoods to prevent wipe on deploy (2026-07-03, PR #481)
+
+Miami beauty salons in `backend/seed/_real_businesses.json` pointed to `key-biscayne` and `midtown`, but because these slugs were missing from the `NEIGHBORHOODS["beauty"]` list in `seed_miami.py`, they were wiped from the database on every deploy. This rendered their `/n/` pages 404 and broke directory links.
+
+To fix this:
+1. Every active neighborhood that listings point to must be explicitly added to the `NEIGHBORHOODS[network]` list in `seed_miami.py` so they are featured and preserved.
+2. Provide descriptions for new featured neighborhoods in `NEIGHBORHOOD_DESCRIPTIONS` to prevent blank spaces.
+3. Ensure to update test lists (`_RESOLVING_NEIGHBORHOODS` or `_RESOLVING` in makeup/medspa depth tests) and `KNOWN_UNFEATURED_PENDING` sets.
+
 ## Seed photo IDs must be liveness-checked AND eyeballed — the two failure modes are different (2026-07-02, PR #461)
 
 The category photo pool (`seed/_helpers.py::_CATEGORY_PHOTOS`) and per-business
