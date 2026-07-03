@@ -18,7 +18,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from app.config import get_settings
 from app.database import get_db
 from app.routes.api.v1._auth import require_admin
 
@@ -26,7 +25,41 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 _templates: Optional[Jinja2Templates] = None
 
+# @define KAT-051 "Analytics dashboard"
+# WHY: these are the four current first-send outreach targets Posey prepared
+# for David. Keeping the list explicit makes the revenue monitor stable even
+# while the broader top-listings table changes as public traffic arrives.
+FIRST_SEND_TARGETS = (
+    {
+        "name": "Trini Salon & Spa",
+        "city_slug": "brickell",
+        "slug": "trini-salon-and-spa-brickell-ave",
+    },
+    {
+        "name": "Sana Skin Studio",
+        "city_slug": "coconut-grove",
+        "slug": "sana-skin-studio-coconut-grove",
+    },
+    {
+        "name": "Lux MedSpa Brickell",
+        "city_slug": "brickell",
+        "slug": "lux-medspa-brickell",
+    },
+    {
+        "name": "McAllister Spa",
+        "city_slug": "south-beach",
+        "slug": "mcallister-spa-south-beach",
+    },
+)
 
+
+def _counter(value: Any) -> int:
+    if value is None:
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def attach_templates(t: Jinja2Templates) -> None:
@@ -71,39 +104,62 @@ async def analytics_page(request: Request) -> HTMLResponse:
     # Top 20 most-visited listings
     top_listings: List[Dict[str, Any]] = await db.businesses.find(
         {**city_filter, "page_view_count": {"$gt": 0}},
-        {"name": 1, "slug": 1, "neighborhood": 1, "page_view_count": 1, "featured": 1, "city_id": 1},
+        {
+            "name": 1,
+            "slug": 1,
+            "neighborhood": 1,
+            "page_view_count": 1,
+            "featured": 1,
+            "city_id": 1,
+        },
     ).sort("page_view_count", -1).limit(20).to_list(20)
 
     from app.services.tenant import build_absolute_business_url
     for biz in top_listings:
         biz["public_url"] = await build_absolute_business_url(request, biz)
-
+        featured = biz.get("featured") or {}
+        biz["featured_enabled"] = bool(
+            featured.get("enabled") if isinstance(featured, dict) else False
+        )
 
     # Businesses with zero or no page_view_count field (not yet visited)
     total_biz: int = await db.businesses.count_documents(city_filter)
 
     # WHY: $or handles documents where the field is explicitly 0 AND documents
     # where the field has never been set (created before the counter was added).
-    unvisited: int = await db.businesses.count_documents(
-        {**city_filter, "$or": [{"page_view_count": {"$lte": 0}}, {"page_view_count": {"$exists": False}}]}
-    )
+    unvisited: int = await db.businesses.count_documents({
+        **city_filter,
+        "$or": [
+            {"page_view_count": {"$lte": 0}},
+            {"page_view_count": None},
+            {"page_view_count": {"$exists": False}},
+        ],
+    })
     visited: int = total_biz - unvisited
 
     # ── Claim funnel ─────────────────────────────────────────────────────────
     # WHY: uses business_claims collection (same as claims_admin.py uses).
     total_claims: int = await db.business_claims.count_documents({})
-    pending_claims: int = await db.business_claims.count_documents({"status": "pending"})
+    pending_claims: int = await db.business_claims.count_documents(
+        {"status": "pending"}
+    )
     # WHY: the claim verification endpoint stores the successful review state
     # as "verified"; the admin dashboard labels that business-facing outcome as
     # "approved" so David sees plain-language funnel counts.
-    approved_claims: int = await db.business_claims.count_documents({"status": "verified"})
-    rejected_claims: int = await db.business_claims.count_documents({"status": "rejected"})
+    approved_claims: int = await db.business_claims.count_documents(
+        {"status": "verified"}
+    )
+    rejected_claims: int = await db.business_claims.count_documents(
+        {"status": "rejected"}
+    )
 
     # ── Owner accounts ───────────────────────────────────────────────────────
     total_owners: int = await db.owner_accounts.count_documents({})
 
     # ── Subscriptions ────────────────────────────────────────────────────────
-    pro_count: int = await db.businesses.count_documents({**city_filter, "featured.enabled": True})
+    pro_count: int = await db.businesses.count_documents(
+        {**city_filter, "featured.enabled": True}
+    )
 
     # ── Recent claims (last 10) ──────────────────────────────────────────────
     recent_claims: List[Dict[str, Any]] = await (
@@ -131,8 +187,113 @@ async def analytics_page(request: Request) -> HTMLResponse:
     recent_biz_ids = [c["business_id"] for c in recent_claims if c.get("business_id")]
     recent_businesses: Dict[str, Dict[str, Any]] = {}
     if recent_biz_ids:
-        async for b in db.businesses.find({"_id": {"$in": recent_biz_ids}}, {"name": 1, "slug": 1}):
+        async for b in db.businesses.find(
+            {"_id": {"$in": recent_biz_ids}},
+            {"name": 1, "slug": 1},
+        ):
             recent_businesses[b["_id"]] = b
+
+    first_send_city_slugs = list({target["city_slug"] for target in FIRST_SEND_TARGETS})
+    first_send_city_ids_by_slug: Dict[str, str] = {}
+    if beauty_network:
+        first_send_cities = await db.cities.find(
+            {
+                "network_id": beauty_network["_id"],
+                "slug": {"$in": first_send_city_slugs},
+                "status": "live",
+            },
+            {"slug": 1},
+        ).to_list(len(first_send_city_slugs))
+        first_send_city_ids_by_slug = {
+            city["slug"]: city["_id"] for city in first_send_cities
+        }
+
+    first_send_pairs = [
+        {
+            "city_id": first_send_city_ids_by_slug[target["city_slug"]],
+            "slug": target["slug"],
+        }
+        for target in FIRST_SEND_TARGETS
+        if target["city_slug"] in first_send_city_ids_by_slug
+    ]
+    first_send_businesses: List[Dict[str, Any]] = []
+    if first_send_pairs:
+        first_send_businesses = await db.businesses.find(
+            {**city_filter, "status": "live", "$or": first_send_pairs},
+            {
+                "name": 1,
+                "slug": 1,
+                "city_id": 1,
+                "page_view_count": 1,
+                "mkb_referred_view_count": 1,
+                "call_click_count": 1,
+                "directions_click_count": 1,
+                "website_click_count": 1,
+                "claim_status": 1,
+                "claimed_email": 1,
+                "stripe_subscription_id": 1,
+                "featured": 1,
+            },
+        ).to_list(len(first_send_pairs))
+    first_send_by_key = {
+        (biz.get("city_id"), biz["slug"]): biz for biz in first_send_businesses
+    }
+    first_send_ids = [biz["_id"] for biz in first_send_businesses]
+    first_send_claim_counts: Dict[str, int] = {}
+    if first_send_ids:
+        claim_count_rows = await db.business_claims.aggregate(
+            [
+                {"$match": {"business_id": {"$in": first_send_ids}}},
+                {"$group": {"_id": "$business_id", "count": {"$sum": 1}}},
+            ]
+        ).to_list(len(first_send_ids))
+        first_send_claim_counts = {
+            row["_id"]: row["count"] for row in claim_count_rows
+        }
+
+    first_send_targets: List[Dict[str, Any]] = []
+    for target in FIRST_SEND_TARGETS:
+        target_city_id = first_send_city_ids_by_slug.get(target["city_slug"])
+        biz = first_send_by_key.get((target_city_id, target["slug"]))
+        if not biz:
+            first_send_targets.append(
+                {
+                    "name": target["name"],
+                    "slug": target["slug"],
+                    "city_slug": target["city_slug"],
+                    "missing": True,
+                }
+            )
+            continue
+        action_clicks = sum(
+            _counter(biz.get(field))
+            for field in (
+                "call_click_count",
+                "directions_click_count",
+                "website_click_count",
+            )
+        )
+        featured = biz.get("featured") or {}
+        featured_enabled = bool(
+            featured.get("enabled") if isinstance(featured, dict) else False
+        )
+        first_send_targets.append(
+            {
+                "name": biz.get("name", target["name"]),
+                "slug": biz["slug"],
+                "public_url": await build_absolute_business_url(request, biz),
+                "page_view_count": _counter(biz.get("page_view_count")),
+                "mkb_referred_view_count": _counter(
+                    biz.get("mkb_referred_view_count")
+                ),
+                "action_click_count": action_clicks,
+                "claim_status": biz.get("claim_status") or "unclaimed",
+                "claim_count": first_send_claim_counts.get(biz["_id"], 0),
+                "claimed_email": bool(biz.get("claimed_email")),
+                "stripe_subscription_id": bool(biz.get("stripe_subscription_id")),
+                "featured": featured_enabled,
+            }
+        )
 
     return _templates.TemplateResponse(
         request,
@@ -152,5 +313,6 @@ async def analytics_page(request: Request) -> HTMLResponse:
             "pro_count": pro_count,
             "recent_claims": recent_claims,
             "recent_businesses": recent_businesses,
+            "first_send_targets": first_send_targets,
         },
     )
