@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 _BACKEND = Path(__file__).resolve().parents[1]
 if str(_BACKEND) not in sys.path:
@@ -42,6 +43,22 @@ STALE_LOCATION_URLS = {
 }
 
 
+def _normalized_url(url: str) -> str:
+    parts = urlsplit(url)
+    return urlunsplit(
+        (
+            parts.scheme.lower(),
+            parts.netloc.lower(),
+            parts.path.rstrip("/"),
+            parts.query,
+            "",
+        )
+    )
+
+
+NORMALIZED_STALE_LOCATION_URLS = {_normalized_url(url) for url in STALE_LOCATION_URLS}
+
+
 def _seed_businesses():
     data = json.loads((_BACKEND / "seed" / "_real_businesses.json").read_text())
     for network_slug, businesses in data.items():
@@ -62,7 +79,7 @@ def test_no_seeded_listing_links_to_stale_location_urls():
     offenders = {
         f"{network_slug}/{b['slug']}": b["website"]
         for network_slug, b in _seed_businesses()
-        if b.get("website") in STALE_LOCATION_URLS
+        if b.get("website") and _normalized_url(b["website"]) in NORMALIZED_STALE_LOCATION_URLS
     }
     assert not offenders, f"these listings link to known-stale location URLs: {offenders}"
 
@@ -73,7 +90,7 @@ def test_no_seed_files_contain_stale_location_urls():
     for path in seed_dir.glob("seed_*.py"):
         text = path.read_text()
         for stale_url in STALE_LOCATION_URLS:
-            if stale_url in text:
+            if stale_url in text or _normalized_url(stale_url) in text:
                 key = f"{path.relative_to(seed_dir)}::{stale_url}"
                 offenders[key] = stale_url
     assert not offenders, f"these seed files contain known-stale location URLs: {offenders}"
