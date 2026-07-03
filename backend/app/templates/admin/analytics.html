@@ -124,6 +124,18 @@
               {{ biz.get("name", "Unknown listing") }}
             </p>
             <p class="text-xs text-stone-400 truncate">{{ c.get("submitter_email", "—") }}</p>
+            {% set source_parts = [
+              c.get("claim_source"),
+              c.get("claim_ref"),
+              c.get("utm_source"),
+              c.get("utm_medium"),
+              c.get("utm_campaign")
+            ] | select | list %}
+            {% if source_parts %}
+            <p class="text-[10px] uppercase tracking-wider text-stone-400 truncate mt-1">
+              Source: {{ source_parts | join(" · ") }}
+            </p>
+            {% endif %}
           </div>
           <div class="text-right flex-shrink-0">
             {% set s = c.get("status", "") %}

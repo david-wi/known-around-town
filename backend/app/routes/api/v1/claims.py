@@ -25,6 +25,11 @@ from app.services.owner_email import (
 
 router = APIRouter(prefix="/claims", tags=["claims"])
 
+# WHY: source/ref/UTM markers only need short campaign labels. This matches the
+# owners-page hidden-field truncation and prevents public claim payloads from
+# storing arbitrary long query strings.
+CLAIM_ATTRIBUTION_MAX_LENGTH = 120
+
 
 class PublicClaimSubmission(BaseModel):
     """Public claim payload. Server owns review/verification fields."""
@@ -38,6 +43,11 @@ class PublicClaimSubmission(BaseModel):
     relationship: Optional[str] = Field(default=None, max_length=200)
     verification_method: Optional[str] = Field(default=None, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=2000)
+    claim_source: Optional[str] = Field(default=None, max_length=CLAIM_ATTRIBUTION_MAX_LENGTH)
+    claim_ref: Optional[str] = Field(default=None, max_length=CLAIM_ATTRIBUTION_MAX_LENGTH)
+    utm_source: Optional[str] = Field(default=None, max_length=CLAIM_ATTRIBUTION_MAX_LENGTH)
+    utm_medium: Optional[str] = Field(default=None, max_length=CLAIM_ATTRIBUTION_MAX_LENGTH)
+    utm_campaign: Optional[str] = Field(default=None, max_length=CLAIM_ATTRIBUTION_MAX_LENGTH)
 
 
 @router.post("")

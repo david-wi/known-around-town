@@ -61,6 +61,16 @@
       <input type="hidden"
              id="claim-form__business-id"
              value="{{ claim_prefill.id if claim_prefill else '' }}">
+      {#- @define KAT-034 "Claim listing"
+          WHY: First-send outreach links can include bounded source/ref/UTM
+          markers. Keep them hidden from the owner-facing form, then submit them
+          with the claim so David can measure which approved send produced it. #}
+      {% set _claim_tracking = claim_tracking or {} %}
+      <input type="hidden" id="claim-form__claim-source" value="{{ _claim_tracking.get('claim_source', '') }}">
+      <input type="hidden" id="claim-form__claim-ref" value="{{ _claim_tracking.get('ref', '') }}">
+      <input type="hidden" id="claim-form__utm-source" value="{{ _claim_tracking.get('utm_source', '') }}">
+      <input type="hidden" id="claim-form__utm-medium" value="{{ _claim_tracking.get('utm_medium', '') }}">
+      <input type="hidden" id="claim-form__utm-campaign" value="{{ _claim_tracking.get('utm_campaign', '') }}">
 
       <div>
         <label for="claim-form__business-name"
@@ -261,6 +271,11 @@
     var yourPhone    = document.getElementById('claim-form__your-phone');
     var notes        = document.getElementById('claim-form__notes');
     var notesCount   = document.getElementById('claim-form__notes-count');
+    var claimSource  = document.getElementById('claim-form__claim-source');
+    var claimRef     = document.getElementById('claim-form__claim-ref');
+    var utmSource    = document.getElementById('claim-form__utm-source');
+    var utmMedium    = document.getElementById('claim-form__utm-medium');
+    var utmCampaign  = document.getElementById('claim-form__utm-campaign');
     var errorEl      = document.getElementById('claim-form__error');
     var browseHintEl = document.getElementById('claim-form__browse-hint');
     var submitBtn    = document.getElementById('claim-form__submit');
@@ -532,6 +547,16 @@
         submitter_phone: phoneVal || null,
         notes: notesVal || null,
       };
+      [
+        ['claim_source', claimSource],
+        ['claim_ref', claimRef],
+        ['utm_source', utmSource],
+        ['utm_medium', utmMedium],
+        ['utm_campaign', utmCampaign],
+      ].forEach(function (item) {
+        var value = item[1] ? (item[1].value || '').trim() : '';
+        if (value) payload[item[0]] = value;
+      });
 
       fetch('/api/v1/claims', {
         method: 'POST',

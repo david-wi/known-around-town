@@ -1385,6 +1385,11 @@ _BOT_UA_FRAGMENTS = (
 # so the link builder and the view detector can't drift apart.
 MKB_BADGE_REF_MARKER = "mkb-badge"
 
+# WHY: matches the public claim API's max_length=120 for source/ref/UTM fields.
+# Long enough for campaign names, short enough to avoid rendering arbitrary long
+# query strings into hidden form fields or admin analytics rows.
+CLAIM_TRACKING_MAX_LENGTH = 120
+
 
 def _is_mkb_referred(
     referer: Optional[str], request_host: str, ref_marker: Optional[str] = None
@@ -1935,6 +1940,14 @@ async def owners_page(
 
     ctx["claim_prefill"] = prefill
     ctx["claim_directory"] = directory
+    # @define KAT-034 "Claim listing"
+    # WHY: David's first-send outreach can tag links with source/ref/UTM markers.
+    # Preserve only a small allowlist of bounded strings so a submitted claim can
+    # be tied back to the approved send batch without storing raw landing URLs.
+    ctx["claim_tracking"] = {
+        key: (request.query_params.get(key, "") or "")[:CLAIM_TRACKING_MAX_LENGTH]
+        for key in ("claim_source", "ref", "utm_source", "utm_medium", "utm_campaign")
+    }
     # WHY: og:image controls the preview card when this page is shared (e.g. David
     # pastes the link in a conversation with a prospective partner). The city hero
     # is the right image for an owner-acquisition landing page — it sets the Miami

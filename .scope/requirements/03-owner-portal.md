@@ -45,7 +45,9 @@ form, then the Featured benefit strip explains the $29/month flat price and that
 Featured takes no booking commission; given an active first-send outreach target,
 then its business detail page links to a slugged owner claim entry and that owner
 entry pre-fills the correct business while preserving the claim form and Featured
-value copy.
+value copy; given an outreach link includes a bounded source/ref/UTM marker, then
+the claim submission stores those markers on the `business_claim` document so David
+can tell which approved send produced the claim.
 
 ### KAT-035 — Inquiry notifications and stats · V1 · implemented
 **Persona:** Salon Owner.
