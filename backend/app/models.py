@@ -397,6 +397,14 @@ class BusinessClaim(BaseModel):
     submitted_at: datetime = Field(default_factory=_now)
     verified_at: Optional[datetime] = None
     notes: Optional[str] = None
+    # WHY: Preserve bounded outreach attribution from the public claim form so
+    # David can connect a specific owner-send batch to the resulting claim without
+    # storing the raw landing URL or browser referrer.
+    claim_source: Optional[str] = None
+    claim_ref: Optional[str] = None
+    utm_source: Optional[str] = None
+    utm_medium: Optional[str] = None
+    utm_campaign: Optional[str] = None
 
     model_config = {"populate_by_name": True}
 

@@ -68,6 +68,38 @@ def test_analytics_page_with_claims(client, seeded_db):
     assert biz["name"] in r.text
 
 
+def test_analytics_recent_claims_show_outreach_source(client, seeded_db):
+    """Outreach-tagged claims should expose their source in the admin funnel."""
+    biz = asyncio.run(seeded_db.businesses.find_one({}))
+    assert biz is not None
+
+    r = client.post("/api/v1/claims", json={
+        "business_id": biz["_id"],
+        "submitter_name": "Source Owner",
+        "submitter_email": "source@example.com",
+        "claim_source": "first-send-v3",
+        "claim_ref": "trini-direct",
+        "utm_source": "david-email",
+        "utm_medium": "email",
+        "utm_campaign": "first-send",
+    })
+    assert r.status_code == 200, r.text
+
+    saved = asyncio.run(seeded_db.business_claims.find_one({"_id": r.json()["_id"]}))
+    assert saved["claim_source"] == "first-send-v3"
+    assert saved["claim_ref"] == "trini-direct"
+    assert saved["utm_source"] == "david-email"
+    assert saved["utm_medium"] == "email"
+    assert saved["utm_campaign"] == "first-send"
+
+    r = client.get("/admin/analytics", headers=ADMIN_HEADERS)
+    assert r.status_code == 200, r.text
+    assert "Source:" in r.text
+    assert "first-send-v3" in r.text
+    assert "trini-direct" in r.text
+    assert "david-email" in r.text
+
+
 def test_analytics_counts_verified_claims_as_approved(client, seeded_db):
     """A verified claim should move from pending to the approved funnel count."""
     biz = asyncio.run(seeded_db.businesses.find_one({}))

@@ -107,7 +107,23 @@ async def analytics_page(request: Request) -> HTMLResponse:
 
     # ── Recent claims (last 10) ──────────────────────────────────────────────
     recent_claims: List[Dict[str, Any]] = await (
-        db.business_claims.find({}, {"business_id": 1, "submitter_email": 1, "status": 1, "submitted_at": 1})
+        # @define KAT-051 "Analytics dashboard"
+        # WHY: include attribution fields so the admin dashboard can answer the
+        # launch question: which approved outreach send produced this claim?
+        db.business_claims.find(
+            {},
+            {
+                "business_id": 1,
+                "submitter_email": 1,
+                "status": 1,
+                "submitted_at": 1,
+                "claim_source": 1,
+                "claim_ref": 1,
+                "utm_source": 1,
+                "utm_medium": 1,
+                "utm_campaign": 1,
+            },
+        )
         .sort("submitted_at", -1)
         .to_list(10)
     )

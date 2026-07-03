@@ -289,6 +289,29 @@ def test_claim_form_featured_strip_includes_no_commission_value(client):
     assert "Blow Dry Bar" in body
 
 
+def test_owners_page_preserves_outreach_tracking_for_claim_form(client):
+    """Tagged outreach links should carry attribution into the claim submit payload."""
+    long_source = "x" * 140
+    r = client.get(
+        "/owners?slug=blow-dry-bar-brickell"
+        f"&claim_source={long_source}"
+        "&ref=trini-direct"
+        "&utm_source=david-email"
+        "&utm_medium=email"
+        "&utm_campaign=first-send",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert f'id="claim-form__claim-source" value="{"x" * 120}"' in r.text
+    assert long_source not in r.text
+    assert 'id="claim-form__claim-ref" value="trini-direct"' in r.text
+    assert 'id="claim-form__utm-source" value="david-email"' in r.text
+    assert 'id="claim-form__utm-medium" value="email"' in r.text
+    assert 'id="claim-form__utm-campaign" value="first-send"' in r.text
+    assert "claim_source" in r.text
+    assert "utm_campaign" in r.text
+
+
 def test_pricing_page_leads_with_ai_tools_and_omits_false_claims(client):
     """The /pricing page repositions Featured around the AI marketing tools
     (the day-one value) and must NOT carry copy the product can't honor.
