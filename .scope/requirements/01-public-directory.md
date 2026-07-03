@@ -26,9 +26,9 @@ then only businesses in Brickell AND in the Nail Salons category are shown.
 Each business has a detail page at `/<slug>/` with name, description, photo gallery,
 hours, neighborhood, categories, contact links, and inquiry form.
 **Acceptance:** Given a visitor at `/<slug>/`, when the page loads, then all
-business fields are displayed, the listed official website link points at a
-current reachable destination when the business has one, and the inquiry form is
-functional.
+business fields are displayed, website/contact links render when provided, known
+dead or stale seeded website destinations covered by regression guards are absent,
+and the inquiry form is functional.
 
 ### KAT-014 — JSON-LD structured data · V1 · implemented
 **Persona:** Google (search indexer).
@@ -73,8 +73,8 @@ then it returns valid XML with `<loc>` entries for all live businesses and landi
 
 ### KAT-019 — Canonical URLs and GA4 analytics · V1 · implemented
 **Persona:** David (operator).
-All pages use canonical `<link rel="canonical">` tags pointing to
-`https://miami.knowsbeauty.com/...`. Google Analytics 4 is injected via
+All pages use canonical `<link rel="canonical">` tags pointing to the current
+request host for the resolved city/network. Google Analytics 4 is injected via
 `GA_MEASUREMENT_ID` env var.
 **Acceptance:** Given a business detail page, when the HTML source is inspected,
 then a canonical URL tag is present and the GA4 snippet is included when
