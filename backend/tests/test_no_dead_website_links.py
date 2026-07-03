@@ -28,6 +28,16 @@ DEAD_DOMAINS = {
     "ugodiromas.com",
 }
 
+# Exact location URLs confirmed stale on 2026-07-03. Each old URL returned
+# 404/403 while an official replacement URL for the same business returned 200.
+STALE_LOCATION_URLS = {
+    "https://www.thedrybar.com/locations/florida/miami-beach",
+    "https://www.loewshotels.com/miami-beach/spa",
+    "https://www.nuestudio.co/",
+    "https://www.marriott.com/en-us/hotels/miabs-the-st-regis-bal-harbour-resort/spa/",
+    "https://www.thesetaihotel.com/miami-beach/spa",
+}
+
 
 def test_no_beauty_listing_links_to_a_dead_domain():
     beauty = json.loads((_BACKEND / "seed" / "_real_businesses.json").read_text())["beauty"]
@@ -37,3 +47,13 @@ def test_no_beauty_listing_links_to_a_dead_domain():
         if b.get("website") and any(dead in b["website"] for dead in DEAD_DOMAINS)
     }
     assert not offenders, f"these listings link to a known-dead domain: {offenders}"
+
+
+def test_no_beauty_listing_links_to_stale_location_urls():
+    beauty = json.loads((_BACKEND / "seed" / "_real_businesses.json").read_text())["beauty"]
+    offenders = {
+        b["slug"]: b["website"]
+        for b in beauty
+        if b.get("website") in STALE_LOCATION_URLS
+    }
+    assert not offenders, f"these listings link to known-stale location URLs: {offenders}"

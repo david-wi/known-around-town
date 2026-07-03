@@ -26,7 +26,9 @@ then only businesses in Brickell AND in the Nail Salons category are shown.
 Each business has a detail page at `/<slug>/` with name, description, photo gallery,
 hours, neighborhood, categories, contact links, and inquiry form.
 **Acceptance:** Given a visitor at `/<slug>/`, when the page loads, then all
-business fields are displayed and the inquiry form is functional.
+business fields are displayed, the listed official website link points at a
+current reachable destination when the business has one, and the inquiry form is
+functional.
 
 ### KAT-014 — JSON-LD structured data · V1 · implemented
 **Persona:** Google (search indexer).
