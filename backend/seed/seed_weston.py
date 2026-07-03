@@ -16,7 +16,7 @@ Run (production):
 from datetime import datetime, timezone
 
 from app.database import ensure_indexes, get_db
-from seed._helpers import assert_seed_target_allowed, run, upsert, pick_category_photo
+from seed._helpers import assert_seed_target_allowed, run, upsert
 
 CITY_SLUG = "weston"
 CITY_NAME = "Weston"
@@ -762,7 +762,11 @@ BUSINESSES = [
         "status": "live",
     },
     {
-        "slug": "patrick-taleb-salon-spa-weston",
+        # @define KAT-013 "Keep seed slugs aligned with canonical live business pages"
+        # WHY: production search already resolves this business at /b/patrick-taleb-salon-spa.
+        # Reintroducing the older weston suffix slug would insert a duplicate on the next reseed
+        # because this script upserts by city_id + slug.
+        "slug": "patrick-taleb-salon-spa",
         "name": "Patrick Taleb Salon & Spa",
         "neighborhood_slug": "weston-town-center",
         "categories": ["hair", "spa"],

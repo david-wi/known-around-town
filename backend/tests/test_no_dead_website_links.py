@@ -1,4 +1,4 @@
-"""Guard against re-adding website links to domains known to be dead.
+"""Guard against re-adding seeded listing data known to be stale.
 
 A "Visit website" button that lands on a dead domain makes a real listing look
 abandoned and hurts trust in the directory. On 2026-07-02 these six business
@@ -8,6 +8,7 @@ domains from silently creeping back into the seed.
 """
 from __future__ import annotations
 
+import ast
 import json
 import sys
 from pathlib import Path
@@ -58,12 +59,46 @@ def _normalized_url(url: str) -> str:
 
 NORMALIZED_STALE_LOCATION_URLS = {_normalized_url(url) for url in STALE_LOCATION_URLS}
 
+# Source slugs found stale against production search on 2026-07-03. If either old
+# slug returns, a future reseed can insert a duplicate instead of updating the
+# existing live record because the city seed scripts upsert by city_id + slug.
+CANONICAL_SOURCE_SLUGS = {
+    "seed_plantation.py": {
+        "old": "bella-donna-hair-salon-sunrise-blvd",
+        "new": "bella-donna-hair-salon",
+    },
+    "seed_weston.py": {
+        "old": "patrick-taleb-salon-spa-weston",
+        "new": "patrick-taleb-salon-spa",
+    },
+}
+
 
 def _seed_businesses():
     data = json.loads((_BACKEND / "seed" / "_real_businesses.json").read_text())
     for network_slug, businesses in data.items():
         for business in businesses:
             yield network_slug, business
+
+
+def _businesses_from_seed_file(path: Path):
+    tree = ast.parse(path.read_text())
+    for node in tree.body:
+        value_node = None
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "BUSINESSES"
+            for target in node.targets
+        ):
+            value_node = node.value
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "BUSINESSES"
+        ):
+            value_node = node.value
+        if value_node is not None:
+            return ast.literal_eval(value_node)
+    return []
 
 
 def test_no_seeded_listing_links_to_a_dead_domain():
@@ -94,3 +129,17 @@ def test_no_seed_files_contain_stale_location_urls():
                 key = f"{path.relative_to(seed_dir)}::{stale_url}"
                 offenders[key] = stale_url
     assert not offenders, f"these seed files contain known-stale location URLs: {offenders}"
+
+
+def test_seed_source_slugs_match_checked_live_canonical_pages():
+    # @define-test KAT-013
+    seed_dir = _BACKEND / "seed"
+    offenders = {}
+    for filename, expected in CANONICAL_SOURCE_SLUGS.items():
+        slugs = {b.get("slug") for b in _businesses_from_seed_file(seed_dir / filename)}
+        if expected["old"] in slugs or expected["new"] not in slugs:
+            offenders[filename] = {
+                "old_slug_present": expected["old"] in slugs,
+                "canonical_slug_present": expected["new"] in slugs,
+            }
+    assert not offenders, f"seed files contain source/live slug drift: {offenders}"
