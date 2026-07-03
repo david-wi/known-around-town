@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from html import escape
+from html.parser import HTMLParser
 
 import pytest
 from fastapi.testclient import TestClient
@@ -37,6 +38,25 @@ FIRST_SEND_TARGETS = (
         "mcallister-spa-south-beach",
     ),
 )
+
+
+class _HrefCollector(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.hrefs: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "a":
+            return
+        for name, value in attrs:
+            if name == "href" and value:
+                self.hrefs.append(value)
+
+
+def _hrefs_from(html: str) -> list[str]:
+    parser = _HrefCollector()
+    parser.feed(html)
+    return parser.hrefs
 
 
 @pytest.fixture
@@ -94,3 +114,42 @@ def test_first_send_listing_and_owner_entry_paths_stay_claim_ready(
         assert "$29/month flat &middot; no booking commission" in owner_body, (
             f"{name} owner entry missing Featured value copy"
         )
+
+
+def test_first_send_listing_claim_links_preserve_tracking(
+    client: TestClient,
+):
+    """Tracked listing URLs must not lose attribution before the owner claim form.
+
+    @define-test KAT-034
+    """
+    name, host, listing_path, slug = FIRST_SEND_TARGETS[0]
+    long_source = "x" * 140
+    listing = client.get(
+        f"{listing_path}?claim_source={long_source}"
+        "&ref=trini-direct"
+        "&utm_source=david-email"
+        "&utm_medium=email"
+        "&utm_campaign=first-send-v3"
+        "&next=https://bad.example/ignore-me",
+        headers={"host": host},
+    )
+    assert listing.status_code == 200, f"{name} listing returned {listing.status_code}"
+
+    claim_hrefs = [
+        href
+        for href in _hrefs_from(listing.text)
+        if href.startswith(f"/owners?slug={slug}")
+    ]
+    expected_href = (
+        f"/owners?slug={slug}"
+        f"&claim_source={'x' * 120}"
+        "&ref=trini-direct"
+        "&utm_source=david-email"
+        "&utm_medium=email"
+        "&utm_campaign=first-send-v3"
+        "#claim-form"
+    )
+    assert claim_hrefs == [expected_href, expected_href]
+    assert long_source not in "".join(claim_hrefs)
+    assert "next=" not in "".join(claim_hrefs)

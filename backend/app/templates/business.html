@@ -539,7 +539,7 @@
          city.name from template context so the city is always correct. #}
       <p class="text-sm text-amber-800 mt-0.5">{{ claim_body or 'Claim free to add photos, respond to inquiries, and get found by people searching for salons in ' ~ (city.name if city else 'your city') ~ '.' }}</p>
     </div>
-    <a href="/owners?slug={{ business.slug }}#claim-form"
+    <a href="{{ owner_claim_url }}"
        style="background-color: #b45309;"
        class="inline-flex items-center gap-2 hover:opacity-90 text-white font-semibold px-6 py-3 rounded-full text-base shadow-sm transition whitespace-nowrap shrink-0">
       {{ claim_cta or 'Claim this listing' }} <span aria-hidden="true">→</span>
@@ -993,7 +993,7 @@
         Claim your listing free.
       </p>
       <div class="flex items-center gap-3 shrink-0">
-        <a href="/owners?slug={{ business.slug }}#claim-form"
+        <a href="{{ owner_claim_url }}"
            class="inline-flex items-center gap-1.5 bg-white text-amber-800 font-semibold px-4 py-1.5 rounded-full text-sm hover:bg-stone-50 transition whitespace-nowrap">
           Claim free <span aria-hidden="true">→</span>
         </a>

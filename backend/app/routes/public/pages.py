@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus, urlencode, urlparse
 
 import markdown2
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
@@ -1390,6 +1390,32 @@ MKB_BADGE_REF_MARKER = "mkb-badge"
 # query strings into hidden form fields or admin analytics rows.
 CLAIM_TRACKING_MAX_LENGTH = 120
 
+# WHY: only these marketing attribution fields are intentionally preserved from
+# outreach URLs. Keeping the allowlist tight prevents arbitrary public query
+# params from being reflected into claim links, hidden fields, or admin rows.
+CLAIM_TRACKING_PARAMS = (
+    "claim_source",
+    "ref",
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+)
+
+
+def _claim_tracking_from_query(query_params: Any) -> Dict[str, str]:
+    """Return bounded owner-claim attribution markers from a request query."""
+    return {
+        key: value[:CLAIM_TRACKING_MAX_LENGTH]
+        for key in CLAIM_TRACKING_PARAMS
+        if (value := (query_params.get(key, "") or ""))
+    }
+
+
+def _owner_claim_url(slug: str, claim_tracking: Dict[str, str]) -> str:
+    """Build the owner claim deep link for a business listing."""
+    query = urlencode({"slug": slug, **claim_tracking})
+    return f"/owners?{query}#claim-form"
+
 
 def _is_mkb_referred(
     referer: Optional[str], request_host: str, ref_marker: Optional[str] = None
@@ -1629,12 +1655,20 @@ async def business_page(
     except Exception:
         pass  # WHY: any DB or decoding error falls back to the anonymous visitor path
 
+    # @define KAT-034 "Claim listing"
+    # WHY: a first-send owner may land on the public listing first, then click
+    # "Claim this listing". Preserve bounded source/ref/UTM markers across that
+    # natural path so the eventual claim still tells David which send produced it.
+    claim_tracking = _claim_tracking_from_query(request.query_params)
+    owner_claim_url = _owner_claim_url(business["slug"], claim_tracking)
+
     ctx.update(
         {
             "business": business,
             "nearby_businesses": nearby,
             "related_guides": related_guides,
             "directions_url": directions_url,
+            "owner_claim_url": owner_claim_url,
             "is_own_listing": is_own_listing,
             "owner_is_subscribed": owner_is_subscribed,
             # WHY: prefer the salon's own photo over the city hero — it's more accurate
@@ -1944,10 +1978,7 @@ async def owners_page(
     # WHY: David's first-send outreach can tag links with source/ref/UTM markers.
     # Preserve only a small allowlist of bounded strings so a submitted claim can
     # be tied back to the approved send batch without storing raw landing URLs.
-    ctx["claim_tracking"] = {
-        key: (request.query_params.get(key, "") or "")[:CLAIM_TRACKING_MAX_LENGTH]
-        for key in ("claim_source", "ref", "utm_source", "utm_medium", "utm_campaign")
-    }
+    ctx["claim_tracking"] = _claim_tracking_from_query(request.query_params)
     # WHY: og:image controls the preview card when this page is shared (e.g. David
     # pastes the link in a conversation with a prospective partner). The city hero
     # is the right image for an owner-acquisition landing page — it sets the Miami
