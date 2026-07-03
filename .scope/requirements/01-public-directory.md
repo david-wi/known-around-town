@@ -28,7 +28,8 @@ hours, neighborhood, categories, contact links, and inquiry form.
 **Acceptance:** Given a visitor at `/<slug>/`, when the page loads, then all
 business fields are displayed, website/contact links render when provided, known
 dead or stale seeded website destinations covered by regression guards are absent,
-and the inquiry form is functional.
+seed source slugs for checked live listings continue to resolve to canonical
+business detail pages, and the inquiry form is functional.
 
 ### KAT-014 — JSON-LD structured data · V1 · implemented
 **Persona:** Google (search indexer).

@@ -796,7 +796,11 @@ BUSINESSES = [
         "status": "live",
     },
     {
-        "slug": "bella-donna-hair-salon-sunrise-blvd",
+        # @define KAT-013 "Keep seed slugs aligned with canonical live business pages"
+        # WHY: production search already resolves this business at /b/bella-donna-hair-salon.
+        # Reintroducing the older sunrise-blvd slug would insert a duplicate on the next reseed
+        # because this script upserts by city_id + slug.
+        "slug": "bella-donna-hair-salon",
         "name": "Bella Donna Hair Salon",
         "neighborhood_slug": "sunrise-blvd",
         "categories": ["hair"],
