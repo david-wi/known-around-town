@@ -8,10 +8,7 @@ bit the four Sunny Isles salons, which were tagged "sunny-isles" while the page
 lives at "sunny-isles-beach" (same place, two spellings), so none of them showed
 up on the Sunny Isles page.
 
-This test locks the fix in and stops a new mismatch from creeping in. Two
-neighborhoods (Key Biscayne, Midtown) genuinely have no page yet — that's a
-pending product decision, not a typo — so they're listed explicitly here rather
-than silently allowed.
+This test locks the fix in and stops a new mismatch from creeping in.
 """
 from __future__ import annotations
 
@@ -38,7 +35,7 @@ def _real_beauty():
 # them is a product/curation call (they'd become featured on the city home), so
 # they're surfaced to the team rather than silently tolerated. Remove a slug from
 # here once its page is created — the test will then require it to resolve.
-KNOWN_UNFEATURED_PENDING = {"key-biscayne", "midtown"}
+KNOWN_UNFEATURED_PENDING: set[str] = set()
 
 
 def test_sunny_isles_salons_use_the_slug_that_has_a_page():
