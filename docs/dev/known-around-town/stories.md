@@ -73,7 +73,7 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Claims management | ✅ Live | `/admin/claims` |
-| Analytics dashboard | ✅ Live | `/admin/analytics` |
+| Analytics dashboard | ✅ Live | `/admin/analytics` — includes first-send target views, action clicks, claim state, and subscription state |
 | Settings / feature flags | ✅ Live | `/admin/settings` — toggle Marketing AI, preview mode, etc. |
 | Google ratings sync | ✅ Live | `/admin/sync` — one-click pull from Google Places API (requires `GOOGLE_PLACES_API_KEY`) |
 

@@ -16,7 +16,11 @@ inquiries, subscription metrics, and inquiry volume over time.
 **Acceptance:** Given David at `/admin/analytics`, when the page loads, then
 key metrics are displayed including total businesses, subscription metrics, and
 inquiry counts; given a recent claim was submitted from an outreach-tagged link,
-then the recent-claims list displays the saved claim source marker.
+then the recent-claims list displays the saved claim source marker; given David
+has prepared first-send outreach targets, then the dashboard displays their
+current listing views, Miami Knows Beauty-referred views, action clicks, claim
+state, and subscription state so David can spot the first conversion without a
+database query.
 
 ### KAT-052 — Database seeding (production-guarded) · V1 · implemented
 **Persona:** David (operator).

@@ -10,6 +10,7 @@ Exercises:
 from __future__ import annotations
 
 import asyncio
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,6 +34,15 @@ def test_analytics_page_loads(client):
     assert "Claims submitted" in r.text
     assert "Owner accounts" in r.text
     assert "Listings visited" in r.text
+
+
+def test_analytics_page_requires_admin_auth(client):
+    """The admin dashboard must not expose metrics without admin auth."""
+    r = client.get("/admin/analytics")
+    assert r.status_code == 401
+
+    r = client.get("/admin/analytics", headers={"X-API-Key": "wrong"})
+    assert r.status_code == 401
 
 
 def test_analytics_page_zero_state(client):
@@ -121,6 +131,7 @@ def test_analytics_counts_verified_claims_as_approved(client, seeded_db):
     r = client.get("/admin/analytics", headers=ADMIN_HEADERS)
     assert r.status_code == 200, r.text
     assert "0 pending · 1 approved" in r.text
+    assert "bg-emerald-100 text-emerald-800" in r.text
 
 
 def test_analytics_page_with_page_views(client, seeded_db):
@@ -162,6 +173,7 @@ def test_analytics_top_listing_links_use_listing_city_host(client, seeded_db):
         "neighborhood": "Hollywood",
         "status": "live",
         "page_view_count": 99,
+        "featured": "malformed",
     }
     asyncio.run(seeded_db.cities.insert_one(city))
     asyncio.run(seeded_db.businesses.insert_one(biz))
@@ -203,3 +215,164 @@ def test_analytics_page_listing_link_is_absolute(client, seeded_db):
     # Should contain the absolute URL including miami subdomain
     expected_url = f"http://miami.knowsbeauty.localhost/b/{biz['slug']}"
     assert expected_url in r.text
+
+
+def test_analytics_first_send_targets_panel_shows_outreach_status(client, seeded_db):
+    """@define-test KAT-051: David can monitor prepared outreach targets."""
+    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
+    assert network is not None
+    asyncio.run(
+        seeded_db.cities.insert_many([
+            {
+                "_id": "city-brickell-first-send",
+                "network_id": network["_id"],
+                "slug": "brickell",
+                "name": "Brickell",
+                "status": "live",
+            },
+            {
+                "_id": "city-coconut-grove-first-send",
+                "network_id": network["_id"],
+                "slug": "coconut-grove",
+                "name": "Coconut Grove",
+                "status": "live",
+            },
+            {
+                "_id": "city-south-beach-first-send",
+                "network_id": network["_id"],
+                "slug": "south-beach",
+                "name": "South Beach",
+                "status": "live",
+            },
+        ])
+    )
+    asyncio.run(
+        seeded_db.businesses.insert_many([
+            {
+                "_id": "biz-trini-first-send",
+                "network_id": network["_id"],
+                "city_id": "city-brickell-first-send",
+                "name": "Trini Salon & Spa",
+                "slug": "trini-salon-and-spa-brickell-ave",
+                "status": "live",
+                "claim_status": "unclaimed",
+            },
+            {
+                "_id": "biz-sana-first-send",
+                "network_id": network["_id"],
+                "city_id": "city-coconut-grove-first-send",
+                "name": "Sana Skin Studio",
+                "slug": "sana-skin-studio-coconut-grove",
+                "status": "live",
+                "claim_status": None,
+                "page_view_count": None,
+                "mkb_referred_view_count": None,
+                "call_click_count": None,
+                "directions_click_count": None,
+                "website_click_count": None,
+            },
+            {
+                "_id": "biz-lux-first-send",
+                "network_id": network["_id"],
+                "city_id": "city-brickell-first-send",
+                "name": "Lux MedSpa Brickell",
+                "slug": "lux-medspa-brickell",
+                "status": "live",
+                "claim_status": "unclaimed",
+            },
+            {
+                "_id": "biz-mcallister-first-send",
+                "network_id": network["_id"],
+                "city_id": "city-south-beach-first-send",
+                "name": "McAllister Spa",
+                "slug": "mcallister-spa-south-beach",
+                "status": "live",
+                "claim_status": "unclaimed",
+            },
+            {
+                "_id": "biz-trini-wrong-city-first-send",
+                "network_id": network["_id"],
+                "city_id": "city-coconut-grove-first-send",
+                "name": "Wrong City Trini",
+                "slug": "trini-salon-and-spa-brickell-ave",
+                "status": "live",
+                "page_view_count": 0,
+            },
+        ])
+    )
+    trini = asyncio.run(
+        seeded_db.businesses.find_one({"_id": "biz-trini-first-send"})
+    )
+    assert trini is not None
+    asyncio.run(
+        seeded_db.businesses.update_one(
+            {"_id": trini["_id"]},
+            {
+                "$set": {
+                    "page_view_count": 7,
+                    "mkb_referred_view_count": 2,
+                    "call_click_count": 1,
+                    "directions_click_count": 3,
+                    "website_click_count": 4,
+                    "claim_status": "pending",
+                    "claimed_email": "owner@trini.example",
+                    "stripe_subscription_id": "sub_test_trini",
+                    "featured": {"enabled": True},
+                }
+            },
+        )
+    )
+    asyncio.run(
+        seeded_db.business_claims.insert_one(
+            {
+                "_id": "claim-first-send-trini",
+                "business_id": trini["_id"],
+                "status": "pending",
+                "claim_source": "first-send-v3",
+                "claim_ref": "trini-listing",
+            }
+        )
+    )
+
+    r = client.get(
+        "/admin/analytics",
+        headers={**ADMIN_HEADERS, "host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    total_biz = asyncio.run(
+        seeded_db.businesses.count_documents({"network_id": network["_id"]})
+    )
+    unvisited = asyncio.run(
+        seeded_db.businesses.count_documents({
+            "network_id": network["_id"],
+            "$or": [
+                {"page_view_count": {"$lte": 0}},
+                {"page_view_count": None},
+                {"page_view_count": {"$exists": False}},
+            ],
+        })
+    )
+    visited = total_biz - unvisited
+    assert (
+        f'<p class="text-3xl font-semibold text-stone-900">{visited}</p>'
+        in r.text
+    )
+    assert f"{unvisited} not yet visited" in r.text
+    assert "First-send targets" in r.text
+    assert 'target="_blank" rel="noopener noreferrer"' in r.text
+    assert "Trini Salon &amp; Spa" in r.text
+    assert "Sana Skin Studio" in r.text
+    assert "Lux MedSpa Brickell" in r.text
+    assert "McAllister Spa" in r.text
+    assert "Wrong City Trini" not in r.text
+    assert "None" not in r.text
+    assert "Miami Knows Beauty views" in r.text
+    assert "Active subscription" in r.text
+    assert "1 claim" in r.text
+    assert re.search(r">\s*7\s*<", r.text)
+    assert re.search(r">\s*2\s*<", r.text)
+    assert re.search(r">\s*8\s*<", r.text)
+    assert (
+        'href="http://brickell.knowsbeauty.localhost/b/'
+        'trini-salon-and-spa-brickell-ave"'
+    ) in r.text

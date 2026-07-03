@@ -37,6 +37,83 @@
 
   </div>
 
+  {# ── First-send targets ───────────────────────────────────────────────── #}
+  <div class="bg-white rounded-xl border border-stone-200 mb-8">
+    <div class="px-6 py-4 border-b border-stone-100">
+      <h2 class="font-semibold text-stone-900">First-send targets</h2>
+      <p class="text-xs text-stone-500 mt-0.5">
+        Prepared outreach targets — watch these rows for the first claim or paid Featured upgrade.
+      </p>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-stone-50 text-stone-500">
+          <tr>
+            <th scope="col" class="px-6 py-3 text-left font-medium">Listing</th>
+            <th scope="col" class="px-4 py-3 text-right font-medium">Views</th>
+            <th scope="col" class="px-4 py-3 text-right font-medium">Miami Knows Beauty views</th>
+            <th scope="col" class="px-4 py-3 text-right font-medium">Action clicks</th>
+            <th scope="col" class="px-4 py-3 text-left font-medium">Claim state</th>
+            <th scope="col" class="px-6 py-3 text-left font-medium">Subscription</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {% for target in first_send_targets %}
+          <tr>
+            <td class="px-6 py-3 min-w-56">
+              {% if target.get("missing") %}
+              <p class="font-medium text-stone-900">{{ target.name }}</p>
+              <p class="text-xs text-red-700">Listing missing: {{ target.slug }}</p>
+              {% else %}
+              <a href="{{ target.public_url }}" target="_blank" rel="noopener noreferrer"
+                 class="font-medium text-stone-900 hover:text-rose-700">
+                {{ target.name }}
+              </a>
+              <p class="text-xs text-stone-500">{{ target.slug }}</p>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-right tabular-nums text-stone-900">
+              {{ "{:,}".format(target.get("page_view_count", 0)) }}
+            </td>
+            <td class="px-4 py-3 text-right tabular-nums text-stone-900">
+              {{ "{:,}".format(target.get("mkb_referred_view_count", 0)) }}
+            </td>
+            <td class="px-4 py-3 text-right tabular-nums text-stone-900">
+              {{ "{:,}".format(target.get("action_click_count", 0)) }}
+            </td>
+            <td class="px-4 py-3">
+              {% set claim_count = target.get("claim_count", 0) %}
+              {% if target.get("missing") %}
+              <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Missing</span>
+              {% elif claim_count > 0 %}
+              <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                {{ claim_count }} claim{{ "" if claim_count == 1 else "s" }}
+              </span>
+              {% else %}
+              <span class="inline-flex rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-700">
+                {{ target.get("claim_status", "unclaimed") }}
+              </span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-3 text-stone-700">
+              {% if target.get("stripe_subscription_id") %}
+              Active subscription
+              {% elif target.get("featured") %}
+              Featured without subscription
+              {% elif target.get("claimed_email") %}
+              Claimed, not paid
+              {% else %}
+              Not paid
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   {# ── Top listings by page views ───────────────────────────────────────── #}
   <div class="bg-white rounded-xl border border-stone-200 mb-8">
     <div class="px-6 py-4 border-b border-stone-100">
@@ -52,13 +129,13 @@
           {{ "{:,}".format(biz.get("page_view_count", 0)) }}
         </span>
         <div class="flex-1 min-w-0">
-          <a href="{{ biz.public_url }}" target="_blank"
+          <a href="{{ biz.public_url }}" target="_blank" rel="noopener noreferrer"
              class="text-sm font-medium text-stone-900 hover:text-rose-700 truncate block">
             {{ biz.name }}
           </a>
           <span class="text-xs text-stone-400">{{ biz.neighborhood or "—" }}</span>
         </div>
-        {% if biz.get("featured") and biz.featured.get("enabled") %}
+        {% if biz.get("featured_enabled") %}
         <span class="text-[10px] uppercase tracking-wider bg-amber-100 text-amber-800 rounded-full px-2 py-0.5 font-semibold">
           Featured
         </span>
@@ -141,7 +218,7 @@
             {% set s = c.get("status", "") %}
             <span class="inline-block text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 font-semibold
               {% if s == 'pending' %}bg-amber-100 text-amber-800
-              {% elif s == 'approved' %}bg-emerald-100 text-emerald-800
+              {% elif s in ['approved', 'verified'] %}bg-emerald-100 text-emerald-800
               {% else %}bg-red-100 text-red-800{% endif %}">
               {{ s }}
             </span>
