@@ -232,7 +232,7 @@ BUSINESSES: List[Dict[str, Any]] = [
         "neighborhood_slugs": ["bal-harbour-shops-collins"],
         "address": {"street": "9703 Collins Ave", "city": "Bal Harbour", "state": "FL", "postal_code": "33154", "country": "US"},
         "phone": "(305) 993-3300",
-        "website": "https://www.marriott.com/hotels/hotel-information/spa/miabr-the-st-regis-bal-harbour-resort/",
+        "website": "https://www.marriott.com/en-us/hotels/miaxr-the-st-regis-bal-harbour-resort/spa/",
         "instagram": "@stregisbalharbour",
         "short_description": (
             "The benchmark of resort spa luxury on the Bal Harbour oceanfront — a "

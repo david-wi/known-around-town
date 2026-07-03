@@ -482,7 +482,7 @@ BUSINESSES: List[Dict[str, Any]] = [
         "neighborhood_slugs": ["ocean-drive-collins"],
         "address": {"street": "2001 Collins Ave", "city": "Miami Beach", "state": "FL", "postal_code": "33139", "country": "US"},
         "phone": "(305) 520-6900",
-        "website": "https://thesetaihotel.com/spa-and-wellness/spa",
+        "website": "https://www.thesetaihotel.com/spa-miami-beach",
         "instagram": "@thesetaihotel",
         "short_description": (
             "The nail and spa services at The Setai's award-winning spa offer some of "
