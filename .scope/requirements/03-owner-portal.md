@@ -47,7 +47,9 @@ then its business detail page links to a slugged owner claim entry and that owne
 entry pre-fills the correct business while preserving the claim form and Featured
 value copy; given an outreach link includes a bounded source/ref/UTM marker, then
 the claim submission stores those markers on the `business_claim` document so David
-can tell which approved send produced the claim.
+can tell which approved send produced the claim; given a tracked outreach link lands
+on the public business detail page first, then both "Claim this listing" links carry
+the same bounded source/ref/UTM markers into the slugged owner claim entry.
 
 ### KAT-035 — Inquiry notifications and stats · V1 · implemented
 **Persona:** Salon Owner.
