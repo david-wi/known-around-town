@@ -21,7 +21,8 @@
       </div>
       {% if nav_categories %}
       <div class="md:col-span-3">
-        <h4 class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-400 mb-5">Categories</h4>
+        {# @define KAT-076 "Footer labels stay out of the page heading outline" #}
+        <div class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-400 mb-5">Categories</div>
         <ul class="space-y-3 text-sm">
           {% for c in nav_categories[:6] %}
             {% if not c.parent_slug %}
@@ -33,7 +34,8 @@
       {% endif %}
       {% if nav_neighborhoods %}
       <div class="md:col-span-3">
-        <h4 class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-400 mb-5">Neighborhoods</h4>
+        {# @define KAT-076 "Footer labels stay out of the page heading outline" #}
+        <div class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-400 mb-5">Neighborhoods</div>
         <ul class="space-y-3 text-sm">
           {% for n in nav_neighborhoods[:6] %}
             <li><a class="text-stone-300 hover:text-white transition-colors" href="/n/{{ n.slug }}">{{ n.name }}</a></li>
@@ -42,7 +44,8 @@
       </div>
       {% endif %}
       <div class="md:col-span-2">
-        <h4 class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-400 mb-5">{{ footer_owners_label or 'Owners' }}</h4>
+        {# @define KAT-076 "Footer labels stay out of the page heading outline" #}
+        <div class="text-xs uppercase tracking-[0.2em] font-semibold text-stone-400 mb-5">{{ footer_owners_label or 'Owners' }}</div>
         <ul class="space-y-3 text-sm">
           {# Owner-column links. Items labelled "Pricing" route to the dedicated
              pricing page; everything else goes to the broader /owners landing
