@@ -345,7 +345,8 @@
               same data as AggregateRating JSON-LD above — surfaces it visually
               for visitors while the JSON-LD surfaces it for Google. Stars are
               rendered as Unicode ★ characters (filled) and ☆ (empty) computed
-              from the rounded rating so the visual is immediately scannable. #}
+              from the rounded rating so the visual is immediately scannable.
+              @define KAT-064 "Readable Google rating on salon detail pages" #}
           {#- WHY: three conditions must all be true before we show the rating:
               1. google_rating must exist (sync has run for this business)
               2. google_review_count must meet the site-configurable minimum so
@@ -356,7 +357,7 @@
           <div class="flex items-baseline justify-between">
             <span class="text-xs text-stone-500">Google rating</span>
             <span class="flex items-center gap-1">
-              <span class="text-amber-500 text-sm font-semibold">{{ "%.1f"|format(business.google_rating) }} ★</span>
+              <span class="text-amber-700 text-sm font-semibold">{{ "%.1f"|format(business.google_rating) }} ★</span>
               {% if business.google_review_count %}<span class="text-xs text-stone-500">({{ business.google_review_count }})</span>{% endif %}
             </span>
           </div>
