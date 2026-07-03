@@ -42,7 +42,10 @@ name, email, phone, and message. David reviews and approves claims in the admin 
 then a `business_claim` document is created, David sees it in `/admin/claims`, and
 the visitor sees a confirmation message; given an owner lands directly on the claim
 form, then the Featured benefit strip explains the $29/month flat price and that
-Featured takes no booking commission.
+Featured takes no booking commission; given an active first-send outreach target,
+then its business detail page links to a slugged owner claim entry and that owner
+entry pre-fills the correct business while preserving the claim form and Featured
+value copy.
 
 ### KAT-035 — Inquiry notifications and stats · V1 · implemented
 **Persona:** Salon Owner.
