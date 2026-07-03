@@ -60,6 +60,8 @@ NEIGHBORHOODS = {
         ("sunny-isles-beach", "Sunny Isles Beach", "Tower luxury & multilingual", 14),
         ("aventura",          "Aventura",          "Polished & busy",             1),
         ("bal-harbour",       "Bal Harbour",       "Ultra-luxury",                1),
+        ("key-biscayne",      "Key Biscayne",      "Island residential",          5),
+        ("midtown",           "Midtown",           "Trendy & walkable",           4),
     ],
     "wellness": [
         ("wynwood",           "Wynwood",           "Creative & experimental", 2),
@@ -146,6 +148,11 @@ NEIGHBORHOOD_DESCRIPTIONS: Dict[str, Dict[str, str]] = {
             "its own unhurried pace. The handful of salons here serve a tight-knit "
             "residential community — expect personalized attention, familiar faces, "
             "and a clientele that has been coming back for years."
+        ),
+        "midtown": (
+            "Anchored by the Shops at Midtown Miami, this area is a walkable, bustling "
+            "hub for urban professionals. The beauty spots here serve a fast-paced community, "
+            "offering trendy nail bars, hair salons, and specialty brow studios open late."
         ),
         "sunny-isles-beach": (
             "With one of the most multilingual client bases in Miami, Sunny Isles salons are "

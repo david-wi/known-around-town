@@ -30,13 +30,13 @@ NEW_MAKEUP = [
 ]
 
 # WHY: only neighborhoods that render a real /n/ page — edgewater resolves 200,
-# whereas midtown/downtown are allowed by the validator but have no page, so a
+# whereas downtown is allowed by the validator but have no page, so a
 # listing placed there gets a broken neighborhood link. Keep new makeup studios
 # on neighborhoods that resolve.
 _RESOLVING_NEIGHBORHOODS = {
     "wynwood", "edgewater", "design-district", "brickell", "south-beach",
     "coral-gables", "coconut-grove", "little-havana", "aventura",
-    "bal-harbour", "sunny-isles", "key-biscayne",
+    "bal-harbour", "sunny-isles-beach", "key-biscayne", "midtown",
 }
 
 

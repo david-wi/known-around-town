@@ -37,7 +37,7 @@ NEW_MEDSPAS = [
 _RESOLVING = {
     "wynwood", "edgewater", "design-district", "brickell", "south-beach",
     "coral-gables", "coconut-grove", "little-havana", "aventura",
-    "bal-harbour", "sunny-isles-beach", "key-biscayne",
+    "bal-harbour", "sunny-isles-beach", "key-biscayne", "midtown",
 }
 
 
