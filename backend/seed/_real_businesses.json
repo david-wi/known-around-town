@@ -1289,36 +1289,6 @@
       "services": []
     },
     {
-      "slug": "miami-skin-spa-brickell",
-      "name": "Miami Skin Spa",
-      "neighborhood_slug": "brickell",
-      "category_slug": "med-spa",
-      "price_cues": "$$$",
-      "short_description": "Brickell medical spa for injectables, Morpheus8 skin tightening, Emsculpt Neo, and IPL/laser — a full menu of medical-grade treatments just off South Miami Avenue.",
-      "address": "1501 S Miami Ave, Ste 201, Miami, FL 33129",
-      "phone": "(305) 557-1615",
-      "website": "https://www.miamiskinspa.com/",
-      "instagram": "@miaskinspa",
-      "editors_pick": false,
-      "premium": false,
-      "services": []
-    },
-    {
-      "slug": "brickell-cosmetic-center-brickell",
-      "name": "Brickell Cosmetic Center",
-      "neighborhood_slug": "brickell",
-      "category_slug": "med-spa",
-      "price_cues": "$$$",
-      "short_description": "A physician-led Brickell center pairing cosmetic dermatology with CO2 and Clear+Brilliant laser, Botox and fillers, and Morpheus8 skin remodeling.",
-      "address": "2730 SW 3rd Ave, Ste 100, Miami, FL 33129",
-      "phone": "(305) 456-6001",
-      "website": "https://brickellcosmetic.com/",
-      "instagram": "@bcc_miami",
-      "editors_pick": false,
-      "premium": false,
-      "services": []
-    },
-    {
       "slug": "zeugma-medspa-edgewater",
       "name": "Zeugma MedSpa",
       "neighborhood_slug": "edgewater",
@@ -1344,21 +1314,6 @@
       "phone": "(786) 590-0209",
       "website": "https://theplumproommiami.com/",
       "instagram": "@theplumproom",
-      "editors_pick": false,
-      "premium": false,
-      "services": []
-    },
-    {
-      "slug": "lavish-laser-medspa-coconut-grove",
-      "name": "Lavish Laser Medspa",
-      "neighborhood_slug": "coconut-grove",
-      "category_slug": "med-spa",
-      "price_cues": "$$$",
-      "short_description": "Coconut Grove medical spa for injectables, Laser Genesis, HydraFacial, truSculpt body sculpting, and laser hair removal.",
-      "address": "3160 Florida Ave, Miami, FL 33133",
-      "phone": "(305) 204-6288",
-      "website": "https://lavishlasermedspa.com/",
-      "instagram": "@lavishlasermedspa",
       "editors_pick": false,
       "premium": false,
       "services": []
