@@ -596,7 +596,7 @@ def test_stage_hostname_resolves_to_underlying_city(client):
 
 
 def test_home_promotes_voice_page(client):
-    """The home page Owners CTA and footer should link to /expertly-voice.html."""
+    """The home page footer should keep the Voice for Salons entry point."""
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
     assert "/expertly-voice.html" in r.text
