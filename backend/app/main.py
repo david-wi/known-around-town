@@ -216,9 +216,9 @@ async def favicon() -> RedirectResponse:
 # returns its index.html automatically, without a separate route handler.
 # IMPORTANT: this folder is PUBLICLY servable, so it must only ever contain
 # public assets (CSS, favicons, placeholder images). Do NOT place private or
-# internal documents here — the owner walkthrough PDFs/previews were removed
-# from static/walkthrough/ for exactly this reason (they are private docs and
-# are shared directly, never via a public URL).
+# internal documents here. Only public-safe walkthrough assets may live under
+# static/walkthrough/; internal review PDFs/previews were removed because they
+# include PM notes and are shared directly, never via a public URL.
 app.mount("/assets", StaticFiles(directory=str(BASE_DIR / "static"), html=True), name="assets")
 
 # JSON management API (tenant-agnostic — admins manage every network/city from

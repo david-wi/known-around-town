@@ -144,3 +144,15 @@ whose listing has at least one referred view, then a line stating how many of th
 views came from Miami Knows Beauty is shown under page views; given the monthly report is
 computed for a business, then it carries this month's referred-view count without
 enabling any email send.
+
+### KAT-040 — Public owner walkthrough PDF · V1 · implemented
+**Persona:** Salon Owner (reviewing the offer before claiming).
+The shareable owner journey is available both as the public `/walkthrough` page
+and as a public-safe PDF at `/assets/walkthrough/mkb-owner-journey.pdf`. The PDF
+contains only marketing/product overview copy already safe for prospective salon
+owners: claim free, sign in, dashboard, Featured upgrade, and AI caption/ad-copy
+tools. Internal review PDFs and PM notes must never live under `/assets/`.
+**Acceptance:** Given a request to `/assets/walkthrough/mkb-owner-journey.pdf`,
+when the response is received, then it returns a PDF with status 200; given the
+public static asset tree is inspected, then internal review PDFs such as
+`mkb-walkthrough-david-review.pdf` are absent.
