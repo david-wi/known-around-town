@@ -1,0 +1,9 @@
+# Tooling/test-only dependencies. Production Docker installs requirements.txt.
+
+# WHY: scripts/build_owner_walkthrough_pdf.py regenerates the committed public
+# owner walkthrough PDF from source copy in clean checkouts.
+reportlab==4.2.5
+
+# WHY: test_walkthrough_pdf_asset.py extracts text from the committed public
+# PDF so CI fails if internal review copy is accidentally published.
+pypdf==6.10.0
