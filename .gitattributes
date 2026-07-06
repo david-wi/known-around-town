@@ -1,0 +1,2 @@
+# WHY: ReportLab-generated PDFs contain whitespace that is valid PDF syntax but noisy in text diffs.
+*.pdf binary

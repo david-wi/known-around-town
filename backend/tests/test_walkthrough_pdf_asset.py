@@ -39,6 +39,7 @@ EXPECTED_PUBLIC_PHRASES = {
     "Claim it free",
     "Upgrade to Featured",
     "Use Marketing AI",
+    "gallery of up to 12 owner photos",
     "takes no booking commission",
     "https://miami.knowsbeauty.com/walkthrough",
 }
@@ -159,7 +160,7 @@ def test_public_owner_walkthrough_pdf_uses_public_safe_copy() -> None:
         assert _normalized_text(line) in normalized_pdf_text
 
     for phrase in EXPECTED_PUBLIC_PHRASES:
-        assert phrase in pdf_text
+        assert _normalized_text(phrase) in normalized_pdf_text
 
     for term in INTERNAL_ONLY_TERMS:
         assert term.lower() not in pdf_text.lower()
