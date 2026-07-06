@@ -404,6 +404,8 @@ def test_walkthrough_page_omits_top_placement_promise(client):
     assert "top of category" not in body
     assert "appear first" not in body
     assert "premium visibility" in body
+    assert "full gallery of your own unique photos" in body
+    assert "stand out (up to 12 photos)" in body
 
 
 def test_owners_page_prefills_from_slug(client, seeded_db):
