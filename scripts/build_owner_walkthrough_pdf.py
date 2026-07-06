@@ -43,7 +43,8 @@ SECTIONS = [
     (
         "4. Manage the profile",
         "The owner dashboard gives the salon a place to review its listing, update "
-        "profile details, manage photos, see inquiries, and keep the page current.",
+        "profile details, manage a gallery of up to 12 owner photos, see inquiries, "
+        "and keep the page current.",
     ),
     (
         "5. Upgrade to Featured",
