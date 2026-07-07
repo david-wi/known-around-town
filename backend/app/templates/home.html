@@ -367,7 +367,7 @@
   {% endif %}
   <div class="absolute inset-0 bg-gradient-to-r from-stone-950 via-stone-950/95 to-transparent"></div>
   <div class="relative max-w-7xl mx-auto px-6 lg:px-10">
-    <div class="grid md:grid-cols-12 gap-12 items-center">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
       <div class="md:col-span-5">
         <div class="text-[10px] uppercase tracking-[0.3em] {{ theme.accent_text_light }} font-semibold mb-4">{{ spotlight_eyebrow }}</div>
         <h2 class="font-serif text-5xl md:text-6xl font-light mb-6 leading-[0.95]" style="font-family: Georgia, serif;">{{ spotlight_lead_a }}<br>{{ spotlight_lead_b }}<br><em class="italic {{ theme.accent_text_light }}">{{ spotlight_neighborhood.name }}</em></h2>
@@ -399,7 +399,7 @@
 {# ============= TWO-COLUMN MINI-LISTS ============= #}
 {% if neighborhood_columns %}
 <section class="py-16 lg:py-20 max-w-7xl mx-auto px-6 lg:px-10">
-  <div class="grid lg:grid-cols-2 gap-10">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
     {% for col in neighborhood_columns %}
     <div>
       <h3 class="font-serif text-3xl font-light text-stone-900 mb-6" style="font-family: Georgia, serif;">{{ col.name }}</h3>
