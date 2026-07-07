@@ -12,6 +12,20 @@ automatic via GitHub Actions + Watchtower:
 Check status after a merge:
   `ssh -p 2222 root@152.42.152.243 "docker ps --format '{{.Names}}\t{{.Status}}' | grep known"`
 
+Do not trust a container restart alone as proof that the new image is serving.
+After the GitHub build/push job completes, verify a unique marker from the merged
+change on the live URL. If the site is still serving old content, check the
+server-local `latest` image digest:
+  `ssh -p 2222 root@152.42.152.243 "docker image inspect ghcr.io/david-wi/known-around-town:latest --format '{{.Id}} {{json .RepoDigests}}'"`
+
+If the registry has a newer digest but the server still has the old local
+`latest`, pull and recreate with the production compose file:
+  `ssh -p 2222 root@152.42.152.243 "docker pull ghcr.io/david-wi/known-around-town:latest && cd /opt/known-around-town && docker compose -f docker-compose.prod.yml up -d backend"`
+
+This happened on 2026-07-07 after PR #492: CI built/pushed the new digest, but
+the live PDF stayed stale until the server pulled `latest` and the backend was
+recreated from that pulled image.
+
 **Compose-file-only changes** (e.g. adding Traefik routing labels, changing env vars in
 `docker-compose.prod.yml`) do NOT push a new image, so Watchtower won't pick them up.
 After such a PR merges, SSH and apply manually:
