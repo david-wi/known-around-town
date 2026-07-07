@@ -75,6 +75,13 @@ def test_miami_beauty_home(client):
     assert "Directory" in body          # title block includes "Directory"
     assert "Claim Your Listing" in body  # title block includes owner-facing phrase
 
+    # Owners CTA section is removed/demoted from consumer homepage
+    assert "Profile views this week" not in body
+    assert "Suggested action" not in body
+    assert "Claim your salon" not in body
+    # Small owner nudge remains
+    assert "claim your listing free" in body.lower()
+
 
 def test_known_bad_nail_lab_source_is_not_seeded(client):
     """The Nail Lab source conflicted across official site, address, and Place ID.
@@ -614,7 +621,7 @@ def test_stage_hostname_resolves_to_underlying_city(client):
 
 
 def test_home_promotes_voice_page(client):
-    """The home page Owners CTA and footer should link to /expertly-voice.html."""
+    """The home page footer should keep the Voice for Salons entry point."""
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
     assert "/expertly-voice.html" in r.text

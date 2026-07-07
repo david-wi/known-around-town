@@ -8,7 +8,6 @@
     4. Trending — grid of up to 8 cards
     5. Neighborhood Spotlight — dark feature with 2 listed businesses
     6. Two-column neighborhood mini-lists (where the city has them configured)
-    7. Owners CTA — rounded gradient card with an example owner dashboard
 
   All HTML class strings come from the reference's compiled Tailwind stylesheet
   (loaded as /assets/css/reference.css). Per-network theming (accent color words
@@ -456,66 +455,4 @@
     </span>
   </a>
 </section>
-
-{# ============= OWNERS CTA ============= #}
-{% if owners_card %}
-<section class="py-20 lg:py-28">
-  <div class="max-w-7xl mx-auto px-6 lg:px-10">
-    <div class="relative bg-gradient-to-br {{ theme.owners_gradient }} rounded-3xl overflow-hidden">
-      <div class="absolute inset-0 opacity-30">
-        <div class="absolute top-0 right-0 w-96 h-96 {{ theme.owners_blob_a }} rounded-full blur-3xl -translate-y-1/4 translate-x-1/4"></div>
-        <div class="absolute bottom-0 left-0 w-96 h-96 {{ theme.owners_blob_b }} rounded-full blur-3xl translate-y-1/4 -translate-x-1/4"></div>
-      </div>
-      <div class="relative grid md:grid-cols-2 gap-10 p-10 lg:p-16 items-center">
-        <div>
-          <div class="text-[10px] uppercase tracking-[0.25em] {{ theme.owners_eyebrow_color }} font-semibold mb-4">{{ owners_eyebrow }}</div>
-          <h2 class="font-serif text-4xl md:text-5xl font-light text-stone-900 mb-5 leading-[1.05]" style="font-family: Georgia, serif;">{{ owners_headline }}<br><em class="italic {{ theme.owners_eyebrow_color }}">{{ owners_italic }}</em></h2>
-          {% if owners_body %}<p class="text-stone-700 text-lg mb-8 max-w-md leading-relaxed">{{ owners_body }}</p>{% endif %}
-          <div class="flex flex-wrap gap-3">
-            <a class="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-800 text-white font-semibold px-7 py-3.5 rounded-full transition" href="/owners">{{ owners_cta }}</a>
-            <a class="inline-flex items-center gap-2 text-stone-900 font-medium px-7 py-3.5 rounded-full border border-stone-900/30 hover:border-stone-900 transition" href="/owners#pricing">See pricing</a>
-            <a class="inline-flex items-center gap-2 text-stone-900 font-medium px-7 py-3.5 rounded-full border border-stone-900/30 hover:border-stone-900 transition" href="/expertly-voice.html">Hear Voice for Salons →</a>
-          </div>
-          <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-stone-700">
-            <div class="flex items-center gap-2"><span class="text-emerald-700">✓</span> Free basic listing</div>
-            <div class="flex items-center gap-2"><span class="text-emerald-700">✓</span> <a href="/expertly-voice.html" class="underline decoration-stone-300 hover:decoration-stone-900 transition">Voice-driven setup</a></div>
-            <div class="flex items-center gap-2"><span class="text-emerald-700">✓</span> Cancel anytime</div>
-          </div>
-        </div>
-        <div class="relative">
-          <div class="bg-white rounded-2xl shadow-xl p-6 max-w-sm mx-auto">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center text-white font-bold">{{ owners_card.name[0] }}</div>
-              <div>
-                <div class="font-semibold text-stone-900">{{ owners_card.name }}</div>
-                <div class="text-xs text-stone-500">{% if owners_card.neighborhood_slugs %}{{ neighborhood_names.get(owners_card.neighborhood_slugs[0]) or owners_card.neighborhood_slugs[0] }}{% endif %}{% if owners_card.featured and owners_card.featured.enabled %} · {{ owners_card.featured.tier or 'Premium' }}{% endif %}</div>
-              </div>
-            </div>
-            <div class="space-y-2 mb-4">
-              <div class="flex justify-between text-sm">
-                <span class="text-stone-600">Profile views this week</span>
-                <span class="font-semibold text-stone-900">{{ owners_card_views }}</span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-stone-600">Phone clicks</span>
-                <span class="font-semibold text-stone-900">{{ owners_card_calls }}</span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-stone-600">{{ owners_card_bookings_label }}</span>
-                <span class="font-semibold text-emerald-600">{{ owners_card_bookings }}</span>
-              </div>
-            </div>
-            {% if owners_card_action %}
-            <div class="border-t border-stone-100 pt-4">
-              <div class="text-xs text-stone-500 mb-1">Suggested action</div>
-              <div class="text-sm text-stone-900">{{ owners_card_action|safe }}</div>
-            </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-{% endif %}
 {% endblock %}

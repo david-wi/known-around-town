@@ -275,9 +275,6 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "button_bg_hover":          "hover:bg-rose-700",
         "category_banner_gradient": "from-rose-50 via-orange-50/40 to-amber-50",
         "owners_gradient":          "from-rose-100 via-orange-50 to-amber-50",
-        "owners_blob_a":            "bg-rose-300",
-        "owners_blob_b":            "bg-amber-300",
-        "owners_eyebrow_color":     "text-rose-700",
         "highlight_border":         "border-rose-300",
         # WHY: neighbourhood cards without a photo fall back to this diagonal gradient
         # instead of a plain black rectangle. The deep rose start colour matches the
@@ -301,9 +298,6 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "button_bg_hover":          "hover:bg-emerald-700",
         "category_banner_gradient": "from-emerald-50 via-teal-50/40 to-amber-50",
         "owners_gradient":          "from-emerald-100 via-teal-50 to-amber-50",
-        "owners_blob_a":            "bg-emerald-300",
-        "owners_blob_b":            "bg-teal-300",
-        "owners_eyebrow_color":     "text-emerald-700",
         "highlight_border":         "border-emerald-300",
         # WHY: neighbourhood cards without a photo fall back to a deep emerald gradient
         # matching the wellness network's brand colour. Hex (not Tailwind) for same
@@ -325,9 +319,6 @@ _NETWORK_THEMES: Dict[str, Dict[str, str]] = {
         "button_bg_hover":          "hover:bg-sky-800",
         "category_banner_gradient": "from-sky-50 via-blue-50/40 to-amber-50",
         "owners_gradient":          "from-sky-100 via-blue-50 to-amber-50",
-        "owners_blob_a":            "bg-sky-300",
-        "owners_blob_b":            "bg-amber-300",
-        "owners_eyebrow_color":     "text-sky-800",
         "highlight_border":         "border-sky-300",
         # WHY: neighbourhood cards without a photo fall back to a deep sky-blue gradient
         # matching the health network's brand colour. Hex (not Tailwind) for same
@@ -830,19 +821,6 @@ async def home(request: Request) -> HTMLResponse:
 
     search_chips = city.get("search_chips") or []
 
-    # Owner CTA mini-card sample
-    owner_card_slug = city.get("owners_card_business_slug")
-    owners_card: Optional[Dict[str, Any]] = None
-    if owner_card_slug:
-        owners_card = next(
-            (b for b in all_live if b.get("slug") == owner_card_slug), None
-        )
-    if not owners_card:
-        owners_card_list = (
-            [b for b in all_live if (b.get("featured") or {}).get("enabled")] or all_live
-        )
-        owners_card = owners_card_list[0] if owners_card_list else None
-
     hero_featured = editor_picks[0] if editor_picks else (all_live[0] if all_live else None)
 
     category_names = {c["slug"]: c["name"] for c in ctx["nav_categories"]}
@@ -904,24 +882,6 @@ async def home(request: Request) -> HTMLResponse:
             "neighborhood_columns": columns,
             "category_names": category_names,
             "neighborhood_names": neighborhood_names,
-            # Owner CTA
-            "owners_eyebrow": await copy.get("home.owners.eyebrow") or "FOR OWNERS",
-            "owners_headline": (
-                await copy.get("home.owners.headline") or "Own a business in this city?"
-            ),
-            "owners_italic": (
-                await copy.get("home.owners.italic") or "Your listing's already here."
-            ),
-            "owners_body": await copy.get("home.owners.body") or "",
-            "owners_cta": await copy.get("home.owners.cta") or "Claim your listing · Free",
-            "owners_card": owners_card,
-            "owners_card_action": await copy.get("home.owners.card_action") or "",
-            "owners_card_views":    await copy.get("home.owners.card_stats.views")    or "—",
-            "owners_card_calls":    await copy.get("home.owners.card_stats.calls")    or "—",
-            "owners_card_bookings": await copy.get("home.owners.card_stats.bookings") or "—",
-            "owners_card_bookings_label": (
-                await copy.get("home.owners.card_stats.bookings_label") or "New bookings"
-            ),
             # SEO
             "seo_title": city.get("seo_title") or f"{tenant.network.get('name')} {city.get('name')}",
             "meta_description": city.get("meta_description") or city.get("hero_description"),
