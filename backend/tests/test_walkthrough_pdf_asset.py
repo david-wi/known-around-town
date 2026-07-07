@@ -39,7 +39,7 @@ EXPECTED_PUBLIC_PHRASES = {
     "Claim it free",
     "Upgrade to Featured",
     "Use Marketing AI",
-    "gallery of up to 12 owner photos",
+    "full gallery of up to 12 unique owner photos that help the salon stand out",
     "takes no booking commission",
     "https://miami.knowsbeauty.com/walkthrough",
 }
