@@ -156,7 +156,9 @@
    "hair salons wynwood". Only shown when we're on the plain /c/<slug> page (not
    already on a cross-page) and when there are enough neighborhoods to be worth showing. #}
 {% if not neighborhood and nav_neighborhoods|length > 1 %}
-<section class="border-t border-stone-200/40 bg-stone-50/40">
+{#- border-stone-200/60: /40 was never compiled (silent no-op → full-opacity
+    border); /60 is the nearest compiled step and what sibling sections use. -#}
+<section class="border-t border-stone-200/60 bg-stone-50/40">
   <div class="max-w-7xl mx-auto px-6 lg:px-10 py-8">
     <p class="text-xs uppercase tracking-widest text-stone-500 font-semibold mb-4">{{ category.name }} by Neighborhood</p>
     <div class="flex flex-wrap gap-2">

@@ -127,7 +127,11 @@
           the primary consumer search. #}
       <p class="mt-5 text-xs text-white/70">
         Own a {{ listing_word_singular or 'salon' }} in {{ city.name if city else 'Miami' }}?
-        <a class="underline decoration-white/40 hover:text-white hover:decoration-white/70 transition font-medium"
+        {#- decoration-white/25 is the only compiled decoration-white step, and
+            no hover:decoration-white/NN is compiled at all — hover brightening
+            uses hover:decoration-amber-200 (compiled), the same hover underline
+            as the sample-conversation link above. -#}
+        <a class="underline decoration-white/25 hover:text-white hover:decoration-amber-200 transition font-medium"
            href="/owners">Claim your listing free →</a>
       </p>
     </div>
@@ -206,7 +210,13 @@
                data, and the reference.css is pre-compiled without those specific gradient shades. #}
             <div class="absolute inset-0" style="background: linear-gradient(135deg, {{ theme.card_gradient_color_from | default('#1c1917') }} 0%, #0c0a09 100%);"></div>
             {% endif %}
-            <div class="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/5 to-transparent group-hover:from-stone-950/95 transition-colors"></div>
+            {#- Scrim classes must exist in the precompiled reference.css: the
+                original from-stone-950/90 + via-stone-950/5 were never compiled,
+                so the scrim was background-image:none and the white labels sat
+                illegibly on light photos. /70 and /20 are the nearest compiled
+                steps; group-hover:from-stone-950/95 (compiled) still darkens on
+                hover. -#}
+            <div class="absolute inset-0 bg-gradient-to-t from-stone-950/70 via-stone-950/20 to-transparent group-hover:from-stone-950/95 transition-colors"></div>
             <div class="absolute inset-0 p-4 flex flex-col justify-between">
               {% if n.listed_count %}<span class="text-[9px] uppercase tracking-[0.2em] text-white/75 font-medium">{{ n.listed_count }} listed</span>{% else %}<span></span>{% endif %}
               <div>
@@ -299,7 +309,8 @@
 
 {# ============= EDITORIAL GUIDES ============= #}
 {% if recent_guides %}
-<section class="py-20 lg:py-28 bg-gradient-to-br from-stone-50 to-amber-50/40">
+{#- to-amber-50 (plain) is compiled; to-amber-50/40 never was. -#}
+<section class="py-20 lg:py-28 bg-gradient-to-br from-stone-50 to-amber-50">
   <div class="max-w-7xl mx-auto px-6 lg:px-10">
     <div class="flex items-end justify-between mb-12">
       <div>

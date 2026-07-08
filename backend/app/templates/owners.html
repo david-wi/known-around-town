@@ -181,7 +181,7 @@
         </a>
         <p class="text-sm text-white/70 leading-relaxed mt-4">
           Interested in Concierge? Claim your listing below and write "Concierge" in the message, or email
-          <a href="mailto:{{ support_email }}?subject=Concierge for my listing" class="text-amber-300 hover:text-amber-200 underline decoration-amber-300/40">{{ support_email }}</a> — we'll set it up with you.
+          <a href="mailto:{{ support_email }}?subject=Concierge for my listing" class="text-amber-300 hover:text-amber-200 underline decoration-amber-400/60">{{ support_email }}</a> — we'll set it up with you.
         </p>
       </div>
 
@@ -293,7 +293,8 @@
         style='font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.5rem, 2.5vw, 2rem); font-weight: 300;'>
       Frequently asked
     </h2>
-    <dl class="divide-y divide-stone-200/60" id="faq-list">
+    {#- divide-stone-200 (plain): no divide-stone-200/NN opacity is compiled. -#}
+    <dl class="divide-y divide-stone-200" id="faq-list">
 
       <div class="faq-item py-5">
         <dt>

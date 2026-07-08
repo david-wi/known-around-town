@@ -2,7 +2,10 @@
 {% set header_variant = 'sticky' %}
 {% block content %}
 <section class="relative bg-stone-950 overflow-hidden">
-  <div class="absolute inset-0 bg-gradient-to-br from-stone-950 via-stone-900 to-amber-950/40"></div>
+  {#- to-stone-950: no amber-950 shade is compiled in reference.css at any
+      opacity, so to-amber-950/40 no-opped and the corner faded to transparent.
+      to-stone-950 (compiled) keeps the dark corner vignette. -#}
+  <div class="absolute inset-0 bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950"></div>
   <div class="relative max-w-7xl mx-auto px-6 lg:px-10 pt-20 pb-16">
     <div class="text-sm text-white/70 mb-8">
       <a class="hover:text-white" href="/">{{ city.name }}</a> · <span class="text-white">Guides</span>
