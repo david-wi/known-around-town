@@ -54,7 +54,7 @@
             count rather than a hardcoded number so the figure stays accurate as
             the directory grows. #}
         <p class="text-sm text-stone-500 mb-10">
-          Join {{ claim_directory|length }}+ {{ city.name if city else '' }} {{ listing_word_plural }} already in the directory.
+          Join {{ claim_directory|length }}+ {{ city.name if city else '' }} {{ listing_word_plural|lower }} already in the directory.
         </p>
 
         {#- WHY: Three concise trust signals in a visual grid break the reading
@@ -216,7 +216,7 @@
       <div class="text-center">
         <div class="w-10 h-10 rounded-full bg-stone-100 text-stone-700 font-semibold text-lg flex items-center justify-center mx-auto mb-4">2</div>
         <h3 class="font-semibold text-stone-900 mb-2">You get an email</h3>
-        <p class="text-sm text-stone-600 leading-relaxed">With a link to your owner login page — your email is already filled in. Click to request a one-time 6-digit code, enter it, and you're in. No password to set.</p>
+        <p class="text-sm text-stone-600 leading-relaxed">With a link to your owner login page — your email is already filled in. Click to request a one-time 6-character code, enter it, and you're in. No password to set.</p>
       </div>
 
       <div class="text-center">
@@ -336,7 +336,7 @@
           </button>
         </dt>
         <dd class="faq-answer hidden mt-3 text-stone-600 text-sm leading-relaxed">
-          Usually within one business day. We confirm the business is in our directory and that your contact details look correct. You'll get an email with a link to your owner login — click it, request a 6-digit code, enter it, and you're in. No password to set. Questions in the meantime? Email <a href="mailto:{{ support_email }}" class="underline decoration-stone-400 hover:decoration-stone-700">{{ support_email }}</a>.
+          Usually within one business day. We confirm the business is in our directory and that your contact details look correct. You'll get an email with a link to your owner login — click it, request a 6-character code, enter it, and you're in. No password to set. Questions in the meantime? Email <a href="mailto:{{ support_email }}" class="underline decoration-stone-400 hover:decoration-stone-700">{{ support_email }}</a>.
         </dd>
       </div>
 
@@ -381,7 +381,7 @@
           </button>
         </dt>
         <dd class="faq-answer hidden mt-3 text-stone-600 text-sm leading-relaxed">
-          No. Just submit the form with your business name and contact details. After we verify the claim, you'll get an email with a login link — click it, request a 6-digit code, enter it, and you're in. No separate account creation needed.
+          No. Just submit the form with your business name and contact details. After we verify the claim, you'll get an email with a login link — click it, request a 6-character code, enter it, and you're in. No separate account creation needed.
         </dd>
       </div>
 
@@ -458,7 +458,7 @@
       "name": "How long does the claim review take?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Usually within one business day. You'll receive an email with a link to your owner login — click it, request your one-time 6-digit code, enter it, and you're in. No password to set."
+        "text": "Usually within one business day. You'll receive an email with a link to your owner login — click it, request your one-time 6-character code, enter it, and you're in. No password to set."
       }
     },
     {
@@ -482,7 +482,7 @@
       "name": "Do I need to create an account before claiming?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No. Just submit the form with your business name and contact details. After we verify the claim, you'll get an email with a login link — click it, request your one-time 6-digit code, enter it, and you're in. No separate account needed."
+        "text": "No. Just submit the form with your business name and contact details. After we verify the claim, you'll get an email with a login link — click it, request your one-time 6-character code, enter it, and you're in. No separate account needed."
       }
     }
   ]
