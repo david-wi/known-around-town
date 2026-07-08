@@ -52,7 +52,9 @@
       <div class="lg:col-span-5 hidden lg:block" id="sample">
         <div class="relative mx-auto" style="max-width: 320px;">
           <div class="absolute -inset-6 bg-amber-300/40 rounded-[44px] blur-2xl"></div>
-          <div class="relative bg-stone-900 ring-1 ring-white/10 rounded-[36px] p-3 shadow-2xl shadow-stone-950/60">
+          {#- shadow-stone-950/40 is the nearest compiled shadow color step
+              (/60 was never compiled — silent no-op). -#}
+          <div class="relative bg-stone-900 ring-1 ring-white/10 rounded-[36px] p-3 shadow-2xl shadow-stone-950/40">
             <div class="bg-stone-50 rounded-[28px] overflow-hidden">
               {# iOS-ish status bar #}
               <div class="flex items-center justify-between px-5 py-2.5 text-[11px] text-stone-900 font-medium tracking-wide">
@@ -87,7 +89,7 @@
             </div>
           </div>
           {# Floating booking-request card #}
-          <div class="absolute -bottom-6 -left-6 bg-white rounded-2xl shadow-xl ring-1 ring-stone-200/60 px-4 py-3 max-w-[240px]">
+          <div class="absolute -bottom-6 -left-6 bg-white rounded-2xl shadow-xl ring-1 ring-stone-200 px-4 py-3 max-w-[240px]">
             <div class="flex items-start gap-3">
               <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -121,7 +123,10 @@
 
     <div class="grid lg:grid-cols-2 gap-12 items-center">
       {# The transcript itself, large and readable — editorial print column. #}
-      <div class="bg-white rounded-3xl ring-1 ring-stone-200/70 p-8 md:p-10 shadow-xl shadow-stone-200/40">
+      {#- ring-stone-200 (plain, compiled) — no /NN ring-stone-200 steps exist;
+          shadow-stone-900/10 is the softest compiled shadow color (no
+          shadow-stone-200 at any opacity). -#}
+      <div class="bg-white rounded-3xl ring-1 ring-stone-200 p-8 md:p-10 shadow-xl shadow-stone-900/10">
         <div class="flex items-center gap-3 pb-5 mb-5 border-b border-stone-200/60">
           <div class="w-11 h-11 rounded-full bg-amber-300 flex items-center justify-center text-stone-900 font-medium" style="font-family: Georgia, serif;">V</div>
           <div>
@@ -162,7 +167,11 @@
 
 {# ============= DARK PROOF BAND ============= #}
 <section class="py-24 lg:py-32 bg-gradient-to-br from-stone-900 via-stone-900 to-stone-950 text-white relative overflow-hidden">
-  <div class="absolute top-0 right-0 w-1/2 h-full opacity-20 bg-gradient-to-l from-amber-500/30 to-transparent"></div>
+  {#- from-amber-500 (plain, compiled): no from-amber-500/NN steps exist; the
+      opacity-20 wrapper keeps the glow decorative. NOTE bg-gradient-to-l is
+      itself not compiled (only -to-b/-to-br/-to-r/-to-t are), so this glow
+      needs that class compiled before it renders at all — out of scope here. -#}
+  <div class="absolute top-0 right-0 w-1/2 h-full opacity-20 bg-gradient-to-l from-amber-500 to-transparent"></div>
   <div class="relative max-w-7xl mx-auto px-6 lg:px-10">
     <div class="grid lg:grid-cols-12 gap-16 items-center">
       <div class="lg:col-span-6">
@@ -203,7 +212,7 @@
     <div class="grid md:grid-cols-2 gap-6">
       {# Feature 1 — Sounds like a real person #}
       <div class="group bg-stone-50/60 border border-stone-200/70 hover:border-amber-300 rounded-3xl p-8 md:p-10 transition">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200/60 flex items-center justify-center mb-6 text-stone-900">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-50 flex items-center justify-center mb-6 text-stone-900">
           <svg width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <circle cx="16" cy="11" r="6" fill="currentColor" opacity="0.15"></circle>
             <circle cx="16" cy="11" r="5" fill="none" stroke="currentColor" stroke-width="1.5"></circle>
@@ -219,7 +228,7 @@
 
       {# Feature 2 — Captures the request #}
       <div class="group bg-stone-50/60 border border-stone-200/70 hover:border-amber-300 rounded-3xl p-8 md:p-10 transition">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200/60 flex items-center justify-center mb-6 text-stone-900">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-50 flex items-center justify-center mb-6 text-stone-900">
           <svg width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <rect x="5" y="7" width="22" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
             <line x1="5" y1="12" x2="27" y2="12" stroke="currentColor" stroke-width="1.5"></line>
@@ -234,7 +243,7 @@
 
       {# Feature 3 — Speaks your salon #}
       <div class="group bg-stone-50/60 border border-stone-200/70 hover:border-amber-300 rounded-3xl p-8 md:p-10 transition">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200/60 flex items-center justify-center mb-6 text-stone-900">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-50 flex items-center justify-center mb-6 text-stone-900">
           <svg width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M6 11a5 5 0 0 1 5-5h10a5 5 0 0 1 5 5v6a5 5 0 0 1-5 5h-7l-5 4v-4a5 5 0 0 1-3-5v-6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
             <line x1="11" y1="13" x2="21" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></line>
@@ -247,7 +256,7 @@
 
       {# Feature 4 — Suggests add-ons #}
       <div class="group bg-stone-50/60 border border-stone-200/70 hover:border-amber-300 rounded-3xl p-8 md:p-10 transition">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200/60 flex items-center justify-center mb-6 text-stone-900">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-50 flex items-center justify-center mb-6 text-stone-900">
           <svg width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M16 4l2.6 6.4 6.9.5-5.3 4.4 1.8 6.7L16 18.5l-6 3.5 1.8-6.7-5.3-4.4 6.9-.5L16 4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
             <circle cx="25" cy="24" r="3" fill="currentColor"></circle>
@@ -279,7 +288,12 @@
 <section class="py-24 lg:py-32" id="start">
   <div class="max-w-7xl mx-auto px-6 lg:px-10">
     <div class="relative bg-gradient-to-br from-stone-900 via-stone-900 to-stone-950 rounded-3xl overflow-hidden">
-      <div class="absolute inset-0 opacity-40 bg-gradient-to-br from-amber-500/20 via-transparent to-stone-950"></div>
+      {#- from-amber-500 (plain, compiled): no from-amber-500/NN steps exist and
+          the uncompiled /20 killed the whole gradient (no from stop = invalid
+          background-image). The opacity-40 wrapper keeps the corner glow muted.
+          NOTE via-transparent is also uncompiled (no via-transparent rule), so
+          the gradient runs from → to directly — out of scope here. -#}
+      <div class="absolute inset-0 opacity-40 bg-gradient-to-br from-amber-500 via-transparent to-stone-950"></div>
       <div class="relative px-10 py-16 lg:px-20 lg:py-24 text-center">
         <div class="flex items-center justify-center gap-4 mb-8">
           <div class="h-px w-12 bg-amber-300/70"></div>

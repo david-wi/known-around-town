@@ -129,7 +129,9 @@
    Without these, the cross-pages have no inbound internal links from neighborhood pages —
    only the sitemap, which is weaker than anchor-tag link equity. #}
 {% if nav_categories and businesses %}
-<section class="border-t border-stone-200/40 bg-stone-50/40">
+{#- border-stone-200/60: /40 was never compiled (silent no-op → full-opacity
+    border); /60 is the nearest compiled step and what sibling sections use. -#}
+<section class="border-t border-stone-200/60 bg-stone-50/40">
   <div class="max-w-7xl mx-auto px-6 lg:px-10 py-8">
     <p class="text-xs uppercase tracking-widest text-stone-500 font-semibold mb-4">Browse by Service in {{ neighborhood.name }}</p>
     <div class="flex flex-wrap gap-2">

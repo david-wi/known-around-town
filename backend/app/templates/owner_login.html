@@ -54,7 +54,8 @@
 
     {# ---- Step 2: code ---- #}
     <form id="owner-code-form" class="space-y-4 hidden" novalidate>
-      <div class="rounded-xl bg-stone-100/80 border border-stone-200 p-4 text-sm text-stone-700">
+      {#- bg-stone-100 (plain): no bg-stone-100/NN opacity is compiled. -#}
+      <div class="rounded-xl bg-stone-100 border border-stone-200 p-4 text-sm text-stone-700">
         We sent a 6-character code to <strong id="owner-code-email-echo" class="text-stone-900"></strong>.
         Check your inbox (and spam, just in case). It expires in 15 minutes.
       </div>

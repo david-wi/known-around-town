@@ -886,7 +886,11 @@
     WHY: placed here (after the inquiry form script) so it renders after all
     main content and the fixed overlay sits on top of everything via z-50. #}
 <div id="photo-lightbox"
-     class="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center hidden"
+     {#- bg-stone-900/80 not bg-black/90: reference.css is precompiled and has
+         no bg-black opacity at all — bg-black/90 was a silent no-op that left
+         the backdrop transparent. /80 keeps it translucent so backdrop-blur-sm
+         still reads. -#}
+     class="fixed inset-0 z-50 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center hidden"
      onclick="closeLightbox(event)"
      role="dialog"
      aria-modal="true"
