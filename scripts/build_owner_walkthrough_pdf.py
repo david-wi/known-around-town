@@ -37,7 +37,7 @@ SECTIONS = [
     ),
     (
         "3. Sign in to the dashboard",
-        "After approval, owners sign in with an emailed six-digit code. No password "
+        "After approval, owners sign in with an emailed six-character code. No password "
         "is required.",
     ),
     (
