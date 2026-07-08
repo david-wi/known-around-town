@@ -24,6 +24,13 @@
 set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-/opt/known-around-town}"
+# WHY: Docker cleanup checks this host-global lock before pruning images, so
+# every KAT deploy path must hold the same file while git, build, compose, and
+# seed work are in flight.
+DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/opt/deploy-locks/known-around-town.lock}"
+# WHY: 900 seconds gives a normal image rebuild plus production seed run enough
+# time to finish while still surfacing a stuck deploy promptly to the caller.
+DEPLOY_LOCK_WAIT_SECONDS="${DEPLOY_LOCK_WAIT_SECONDS:-900}"
 # WHY: Default to 'latest' so existing callers (including the original
 # auto-deploy webhook before stage support landed) keep working unchanged.
 DEPLOY_TARGET="${DEPLOY_TARGET:-latest}"
@@ -63,6 +70,13 @@ case "$DEPLOY_TARGET" in
     exit 2
     ;;
 esac
+
+mkdir -p "$(dirname "$DEPLOY_LOCK_FILE")"
+exec 9>"$DEPLOY_LOCK_FILE"
+if ! flock -w "$DEPLOY_LOCK_WAIT_SECONDS" 9; then
+  echo "Another KAT deploy is still running after ${DEPLOY_LOCK_WAIT_SECONDS}s; refusing deploy." >&2
+  exit 6
+fi
 
 cd "$REPO_DIR"
 
