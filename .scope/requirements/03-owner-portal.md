@@ -156,3 +156,19 @@ tools. Internal review PDFs and PM notes must never live under `/assets/`.
 when the response is received, then it returns a PDF with status 200; given the
 public static asset tree is inspected, then internal review PDFs such as
 `mkb-walkthrough-david-review.pdf` are absent.
+
+### KAT-066 — Expertly Voice main-page CTA · V1 · implemented
+**Persona:** Salon Owner (reviewing Expertly Voice).
+The public Expertly Voice page keeps its primary trial request action on
+`/expertly-voice.html` itself rather than sending visitors to the obsolete
+`/expertly-voice.html#start` anchor. The page may use an interim email request
+path while the final enrollment and fulfillment flow is awaiting David's
+decision, but it must not imply that the AI receptionist itself enrolls the
+salon.
+**Acceptance:** Given a visitor loads `/expertly-voice.html`, when they inspect
+or click the primary "Start a 1-week free trial" CTA, then it starts the interim
+request path from the main page and does not link to `#start`; given the page
+HTML is inspected, then there is no `id="start"`, `href="#start"`, or
+`/expertly-voice.html#start` reference; given the final enrollment path is still
+unconfirmed, then the copy frames setup as an Expertly follow-up/configuration
+step rather than an AI-led self-enrollment.
