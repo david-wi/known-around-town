@@ -1226,7 +1226,15 @@
       "instagram": null,
       "editors_pick": false,
       "premium": false,
-      "services": []
+      "services": [],
+      "category_slugs": [
+        "nails",
+        "hair"
+      ],
+      "category_blurbs": {
+        "nails": "Nail services lead the listing for manicures and pedicures in a relaxed Key Biscayne neighborhood salon.",
+        "hair": "Hair shoppers see the salon side first: B. Care offers styling alongside its nail services on Crandon Boulevard."
+      }
     },
     {
       "slug": "the-spot-barbershop-key-biscayne",

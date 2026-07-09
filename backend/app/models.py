@@ -111,6 +111,7 @@ class Photo(BaseModel):
     alt: Optional[str] = None
     caption: Optional[str] = None
     credit: Optional[str] = None
+    category_slug: Optional[str] = None
     order: int = 0
     is_hero: bool = False
 
@@ -257,6 +258,7 @@ class Business(BaseModel):
     services: List[ServiceItem] = Field(default_factory=list)
     photos: List[Photo] = Field(default_factory=list)
     short_description: Optional[str] = None
+    category_blurbs: Dict[str, str] = Field(default_factory=dict)
     known_for: Optional[str] = None
     best_for: Optional[str] = None
     before_booking_notes: Optional[str] = None

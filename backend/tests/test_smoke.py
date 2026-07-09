@@ -912,7 +912,7 @@ def test_photos_render_as_plain_string_urls(client, seeded_db):
         "String-format photo URL missing from detail page — template rendered "
         "a grey placeholder instead of the actual photo"
     )
-    assert "Representative image until the owner adds photos" in r.text
+    assert "Representative image until the owner adds photos" not in r.text
     assert f'content="{PHOTO_URL}"' not in r.text, (
         "Unsplash representative photo was emitted as og:image instead of being "
         "kept out of business metadata"
@@ -935,7 +935,7 @@ def test_photos_render_as_plain_string_urls(client, seeded_db):
         "String-format photo URL missing from the category-page card — "
         "business_card.html rendered a grey placeholder instead of the actual photo"
     )
-    assert "Representative image" in r2.text
+    assert "Representative image" not in r2.text
 
 
 def test_photos_render_as_dict_url_format(client, seeded_db):

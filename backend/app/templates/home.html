@@ -251,7 +251,6 @@
         {% set b = big %}
         {% set photo = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
         {% set photo_url = photo.url if (photo and photo is mapping) else photo %}
-        {% set is_representative_photo = photo_url and ('images.unsplash.com' in photo_url or '.unsplash.com' in photo_url) %}
         {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
         {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
         <a class="group block relative overflow-hidden rounded-3xl bg-stone-100 h-[480px] md:h-[560px]" href="/b/{{ b.slug }}">
@@ -259,7 +258,6 @@
           <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-900/40 to-transparent"></div>
           {% if b.editors_pick %}<div class="absolute top-6 left-6 inline-flex items-center gap-2 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
           {% if b.featured and b.featured.enabled %}<div class="absolute top-6 right-6 bg-gradient-to-br from-amber-400 to-yellow-500 text-stone-900 text-[10px] font-bold tracking-[0.15em] uppercase px-3 py-1.5 rounded-full">{{ b.featured.tier or 'Premium' }}</div>{% endif %}
-          {% if is_representative_photo %}<div class="absolute bg-white/95 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide text-stone-700" style="top: {% if b.featured and b.featured.enabled %}4.25rem{% else %}1.5rem{% endif %}; right: 1.5rem;">Representative image</div>{% endif %}
           <div class="absolute bottom-0 left-0 right-0 p-8 text-white">
             <div class="text-[10px] uppercase tracking-[0.2em] text-white/70 mb-3 font-medium">{% if primary_cat %}{{ category_names.get(primary_cat) or primary_cat|replace('-', ' ')|title }}{% endif %}{% if primary_cat and primary_nb %} · {% endif %}{% if primary_nb %}{{ neighborhood_names.get(primary_nb) or primary_nb|replace('-', ' ')|title }}{% endif %}</div>
             <h3 class="text-3xl md:text-4xl font-serif leading-tight mb-3" style='font-family: Georgia, "Times New Roman", serif;'>{{ b.name }}</h3>
@@ -275,7 +273,6 @@
         {% for b in editor_picks[1:3] %}
         {% set photo = (b.photos|selectattr('is_hero')|list|first) or (b.photos|first if b.photos else none) %}
         {% set photo_url = photo.url if (photo and photo is mapping) else photo %}
-        {% set is_representative_photo = photo_url and ('images.unsplash.com' in photo_url or '.unsplash.com' in photo_url) %}
         {% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
         {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
         <a class="group block relative overflow-hidden rounded-3xl bg-stone-100 h-[228px] md:h-[268px]" href="/b/{{ b.slug }}">
@@ -283,7 +280,6 @@
           <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-900/40 to-transparent"></div>
           {% if b.editors_pick %}<div class="absolute top-6 left-6 inline-flex items-center gap-2 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
           {% if b.featured and b.featured.enabled %}<div class="absolute top-6 right-6 bg-gradient-to-br from-amber-400 to-yellow-500 text-stone-900 text-[10px] font-bold tracking-[0.15em] uppercase px-3 py-1.5 rounded-full">{{ b.featured.tier or 'Premium' }}</div>{% endif %}
-          {% if is_representative_photo %}<div class="absolute bg-white/95 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide text-stone-700" style="top: {% if b.featured and b.featured.enabled %}4.25rem{% else %}1.5rem{% endif %}; right: 1.5rem;">Representative image</div>{% endif %}
           <div class="absolute bottom-0 left-0 right-0 p-6 text-white">
             <div class="text-[10px] uppercase tracking-[0.2em] text-white/70 mb-2 font-medium">{% if primary_cat %}{{ category_names.get(primary_cat) or primary_cat|replace('-', ' ')|title }}{% endif %}{% if primary_cat and primary_nb %} · {% endif %}{% if primary_nb %}{{ neighborhood_names.get(primary_nb) or primary_nb|replace('-', ' ')|title }}{% endif %}</div>
             <h3 class="text-2xl md:text-3xl font-serif leading-tight mb-2" style='font-family: Georgia, "Times New Roman", serif;'>{{ b.name }}</h3>

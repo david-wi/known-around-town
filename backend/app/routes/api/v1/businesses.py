@@ -31,6 +31,7 @@ _PUBLIC_BUSINESS_FIELDS = frozenset(
         "hours",
         "services",
         "photos",
+        "category_blurbs",
         "description",
         "short_description",
         "editorial_blurb",

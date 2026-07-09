@@ -80,6 +80,29 @@ def test_seed_miami_honors_source_status():
     )
 
 
+def test_seed_load_preserves_plural_categories_and_category_blurbs():
+    """A source row with multiple real categories must survive seed normalization."""
+    from seed import seed_miami
+
+    loaded = seed_miami._load_real_businesses()["beauty"]
+    b_care = next(
+        b for b in loaded if b["slug"] == "b-care-salon-and-nails-spa-key-biscayne"
+    )
+
+    assert b_care["category_slugs"] == ["nails", "hair"]
+    assert b_care["category_blurbs"]["nails"]
+    assert b_care["category_blurbs"]["hair"]
+
+
+def test_seed_photo_preservation_recognizes_owner_uploads():
+    """Owner-uploaded GridFS photos must be distinguishable from seed photos."""
+    from seed import seed_miami
+
+    assert seed_miami._is_owner_uploaded_photo({"url": "/media/abc123"})
+    assert not seed_miami._is_owner_uploaded_photo({"url": "https://cdn.example.com/x.jpg"})
+    assert not seed_miami._is_owner_uploaded_photo("https://images.unsplash.com/photo")
+
+
 # ── New businesses must have all required fields ──────────────────────────────
 
 REQUIRED_FIELDS = ["name", "slug", "neighborhood_slug", "category_slug", "address", "phone"]
