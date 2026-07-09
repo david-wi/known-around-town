@@ -185,6 +185,13 @@ def test_expertly_voice_page(client):
     # Trust: the "sample" link scrolls to a written mockup, not real audio —
     # it must not promise something to "Listen to".
     assert "Listen to a sample call" not in r.text
+    # @define-test KAT-066
+    assert 'href="#start"' not in r.text
+    assert 'id="start"' not in r.text
+    assert "/expertly-voice.html#start" not in r.text
+    assert "mailto:hello@expertly.ai?subject=Voice%20for%20Salons%20trial" in r.text
+    assert "mailto:hello@expertly.ai?subject=Voice%20for%20Salons%20question" in r.text
+    assert 'href="#sample"' in r.text
 
 
 def test_owners_page(client):
