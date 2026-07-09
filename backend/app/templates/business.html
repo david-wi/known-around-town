@@ -452,7 +452,6 @@
     </div>
     {% endif %}
   </div>
-  {% if hero_is_representative_photo %}<div class="mt-3 inline-flex items-center rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600">Representative image until the owner adds photos</div>{% endif %}
   {% if photos|length > 1 %}<div class="text-center mt-3 text-xs text-stone-500">Click any photo to view all {{ photos|length }} photos</div>{% endif %}
 {#- Serialise all photo URLs into a data attribute so the lightbox JS can read
     them at runtime without an extra network request. WHY: Jinja2 builds the

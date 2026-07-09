@@ -109,3 +109,19 @@ complementary landmarks in the main content.
 rendered HTML is inspected, then footer column labels do not create skipped heading
 levels and page sidebars/banners inside `<main>` do not expose nested
 `complementary` landmarks.
+
+### KAT-077 — Category-context listing cards · V1 · implemented
+**Persona:** Salon Seeker.
+Businesses can belong to every service category they truly offer, and listing
+cards on category-aware surfaces lead with the visitor's active category instead
+of always falling back to the business's default category.
+**Acceptance:** Given a business tagged with both Nails and Hair, when a visitor
+views `/c/hair`, `/n/<neighborhood>/c/hair`, or searches for the exact Hair
+category, then that business's card shows Hair as the category label and uses the
+Hair-specific first sentence and category-tagged photo when those values exist.
+Given the same business on `/all` or a non-category page, then the card falls
+back to the business's default category, default short description, and hero/first
+photo. Given seeded source data includes `category_slugs`, then the Miami seed
+preserves the complete category list instead of reducing it to one category.
+Direct production database edits and public photo-provenance notes are out of
+scope for this requirement.

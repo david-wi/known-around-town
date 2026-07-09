@@ -412,10 +412,17 @@ def _load_real_businesses() -> Dict[str, List[Dict[str, Any]]]:
     for net, items in raw.items():
         rows: List[Dict[str, Any]] = []
         for it in items:
+            raw_category_slugs = it.get("category_slugs") or [it["category_slug"]]
+            category_slugs = list(dict.fromkeys(
+                slug for slug in raw_category_slugs if slug
+            ))
+            if not category_slugs:
+                category_slugs = [it["category_slug"]]
+            primary_category_slug = category_slugs[0]
             rows.append({
                 "slug": it["slug"],
                 "name": it["name"],
-                "category_slugs":     [it["category_slug"]],
+                "category_slugs":     category_slugs,
                 "neighborhood_slugs": [it["neighborhood_slug"]],
                 "price_cues":         it.get("price_cues"),
                 "editors_pick":       bool(it.get("editors_pick")),
@@ -425,13 +432,15 @@ def _load_real_businesses() -> Dict[str, List[Dict[str, Any]]]:
                 # opts a business in.
                 "is_founding_partner": bool(it.get("is_founding_partner")),
                 "short_description":  it.get("short_description"),
+                "category_blurbs":    it.get("category_blurbs", {}),
                 "phone":              it.get("phone"),
                 "website":            it.get("website"),
                 "instagram":          it.get("instagram"),
                 "address_full":       it.get("address"),
                 "status":             it.get("status", "live"),
                 # No specific photo from the LLM — fall back to a category photo
-                "photo_url":          pick_category_photo(it["slug"], it["category_slug"]),
+                "photo_url":          pick_category_photo(it["slug"], primary_category_slug),
+                "photos":             it.get("photos", []),
                 # WHY: seed-time services let us pre-populate curated menus for
                 # outreach-target businesses before any owner claims the listing.
                 # On re-seed the existing DB services are preserved (see upsert
@@ -440,6 +449,15 @@ def _load_real_businesses() -> Dict[str, List[Dict[str, Any]]]:
             })
         out[net] = rows
     return out
+
+
+def _is_owner_uploaded_photo(photo: Any) -> bool:
+    """True for photos uploaded through the owner photo flow and served by GridFS."""
+    if isinstance(photo, dict):
+        url = photo.get("url")
+    else:
+        url = photo
+    return isinstance(url, str) and url.startswith("/media/")
 
 
 def _merged_businesses() -> Dict[str, List[Dict[str, Any]]]:
@@ -608,7 +626,9 @@ async def seed_network(network_slug: str) -> None:
             {"enabled": True, "tier": "premium"} if biz.get("premium") else
             {"enabled": False, "tier": "free"}
         )
-        photos = [{"url": biz["photo_url"]}] if biz.get("photo_url") else []
+        photos = biz.get("photos") or (
+            [{"url": biz["photo_url"]}] if biz.get("photo_url") else []
+        )
         # Use the LLM-supplied street address if we have one; otherwise fall back
         # to the bare city stub. The frontend formats it as "{street}, {city}".
         address: Dict[str, Any] = {"city": "Miami", "state": "FL", "country": "US"}
@@ -627,6 +647,7 @@ async def seed_network(network_slug: str) -> None:
             "category_slugs": biz["category_slugs"],
             "neighborhood_slugs": biz.get("neighborhood_slugs", []),
             "short_description": biz.get("short_description"),
+            "category_blurbs": biz.get("category_blurbs", {}),
             "known_for": biz.get("short_description"),
             "price_cues": biz.get("price_cues"),
             "featured": featured,
@@ -694,6 +715,13 @@ async def seed_network(network_slug: str) -> None:
                 ):
                 if _preserve in existing_biz:
                     biz_doc[_preserve] = existing_biz[_preserve]
+            existing_photos = existing_biz.get("photos") or []
+            # WHY: owner-uploaded GridFS photos are paid/claimed-listing data,
+            # not seed decoration. A re-seed may refresh the representative seed
+            # photo for unclaimed businesses, but it must never wipe a real
+            # owner's uploaded gallery.
+            if any(_is_owner_uploaded_photo(p) for p in existing_photos):
+                biz_doc["photos"] = existing_photos
             # WHY: services are a special case — only preserve the DB copy when it is
             # non-empty (meaning an owner or admin actually set them). An empty list
             # means "not yet populated" OR "was wiped by the deploy bug". In either

@@ -9,16 +9,17 @@
     photo is mapping checks whether the value is a dict; if not, treat it as
     the URL directly. All downstream uses go through photo_url, never photo.url,
     so both formats render correctly without a data migration. #}
-{% set photo_url = photo.url if (photo and photo is mapping) else photo %}
-{% set is_representative_photo = photo_url and ('images.unsplash.com' in photo_url or '.unsplash.com' in photo_url) %}
+{% set display_photo_url = b.get('display_photo_url') if b is mapping else none %}
+{% set photo_url = display_photo_url or (photo.url if (photo and photo is mapping) else photo) %}
 {#- WHY: a branded fallback tile shown when a salon has no photo, or when its
     photo URL 404s. Stock photos are being replaced and some now fail to load;
     without this the card showed an empty grey box (or the browser's broken-image
     icon), which reads as a broken directory to a first-time shopper. The static
     SVG is cached once by the browser and reused across every card. #}
 {% set placeholder_url = '/assets/placeholder-salon.svg' %}
-{% set primary_cat = b.category_slugs[0] if b.category_slugs else '' %}
+{% set primary_cat = (b.get('display_category_slug') if b is mapping else none) or (b.category_slugs[0] if b.category_slugs else '') %}
 {% set primary_nb  = b.neighborhood_slugs[0] if b.neighborhood_slugs else '' %}
+{% set display_short_description = (b.get('display_short_description') if b is mapping else none) or b.short_description %}
 {#- WHY: a paid "Featured" card must look visibly elevated in a browse grid so
     premium placement is obvious at a glance — not just a small badge on an
     otherwise-identical tile. A Featured card gets a soft gold edge (amber border
@@ -43,7 +44,6 @@
         utilities (object-cover/object-contain are absent), so the Tailwind class
         names have no effect — set object-fit via inline style instead. #}
     {% if photo_url %}<img src="{{ photo_url | img_sized(500) }}" alt="{{ b.name }}" loading="lazy" style="object-fit:cover;object-position:center;" onerror="this.onerror=null;this.src='{{ placeholder_url }}';this.style.objectFit='contain';" class="absolute inset-0 w-full h-full transition-transform duration-500 group-hover:scale-105">{% else %}<img src="{{ placeholder_url }}" alt="{{ b.name }}" loading="lazy" style="object-fit:contain;object-position:center;" class="absolute inset-0 w-full h-full">{% endif %}
-    {% if is_representative_photo %}<div class="absolute bottom-3 left-3 bg-white/95 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide text-stone-700">Representative image</div>{% endif %}
     {% if b.editors_pick %}<div class="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/95 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-semibold text-stone-900"><span class="text-amber-500">★</span> Editor's Pick</div>{% endif %}
     {#- WHY: the paid Featured badge is rendered as a richer champagne-gold gradient
         pill (amber-400 → amber-600) with a soft white ring, so it reads as a
@@ -79,7 +79,7 @@
       </div>
       {% if b.price_cues %}<span class="text-xs text-stone-500 font-semibold whitespace-nowrap pt-1">{{ b.price_cues }}</span>{% endif %}
     </div>
-    {% if b.short_description %}<p class="text-sm text-stone-600 line-clamp-2 mb-4 min-h-[2.5rem]">{{ b.short_description }}</p>{% endif %}
+    {% if display_short_description %}<p class="text-sm text-stone-600 line-clamp-2 mb-4 min-h-[2.5rem]">{{ display_short_description }}</p>{% endif %}
     <div class="flex items-center justify-between">
       <span class="text-[10px] uppercase tracking-[0.18em] text-stone-500 font-medium">{% if b.claim_status == 'verified' %}Verified by editors{% elif b.claim_status == 'claimed' %}Claimed by owner{% else %}Editorial selection{% endif %}</span>
       <span class="{{ theme.accent_text_full }} font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity">View →</span>

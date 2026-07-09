@@ -239,6 +239,114 @@ def _reassign_category_photo(b: Dict[str, Any], seen: set[str]) -> Optional[str]
     return None
 
 
+def _photo_url(photo: Any) -> str:
+    """Return a usable URL from either stored photo shape, or "".
+
+    The database has both legacy plain-string photos and newer photo dicts.
+    Keeping this tiny normalizer in Python avoids repeating type checks in each
+    route and keeps category-card photo selection tolerant of both shapes.
+    """
+    if isinstance(photo, dict):
+        url = photo.get("url")
+        return url if isinstance(url, str) else ""
+    return photo if isinstance(photo, str) else ""
+
+
+def _category_context_photo_url(
+    business: Dict[str, Any], active_category_slug: str
+) -> str:
+    """Pick the card photo for an active category context.
+
+    @define KAT-077 "Category-context listing cards"
+    """
+    photos = business.get("photos") or []
+    for photo in photos:
+        if not isinstance(photo, dict):
+            continue
+        if photo.get("category_slug") == active_category_slug:
+            url = _photo_url(photo)
+            if url:
+                return url
+    for photo in photos:
+        if not isinstance(photo, dict) or not photo.get("is_hero"):
+            continue
+        url = _photo_url(photo)
+        if url:
+            return url
+    for photo in photos:
+        url = _photo_url(photo)
+        if url:
+            return url
+    return ""
+
+
+def _with_category_card_context(
+    businesses: List[Dict[str, Any]], active_category_slug: Optional[str]
+) -> List[Dict[str, Any]]:
+    """Return listing rows with display fields for category-aware card surfaces."""
+    if not active_category_slug:
+        return businesses
+
+    contextualized: List[Dict[str, Any]] = []
+    for business in businesses:
+        if active_category_slug not in (business.get("category_slugs") or []):
+            contextualized.append(business)
+            continue
+
+        card_business = {**business, "display_category_slug": active_category_slug}
+        category_blurbs = business.get("category_blurbs") or {}
+        blurb = category_blurbs.get(active_category_slug)
+        if isinstance(blurb, str) and blurb.strip():
+            card_business["display_short_description"] = blurb.strip()
+        photo_url = _category_context_photo_url(business, active_category_slug)
+        if photo_url:
+            card_business["display_photo_url"] = photo_url
+        contextualized.append(card_business)
+    return contextualized
+
+
+def _category_slug_for_exact_search(
+    query: str, categories: List[Dict[str, Any]]
+) -> Optional[str]:
+    """Return a category slug when a search query clearly names one category."""
+    normalized = " ".join((query or "").lower().replace("&", " and ").split())
+    if not normalized:
+        return None
+
+    aliases: Dict[str, set[str]] = {
+        "barber": {"barber", "barbers", "barbershop", "barber shop"},
+        "hair": {"hair", "hair salon", "hair salons"},
+        "lash-brow": {
+            "lash brow",
+            "lash and brow",
+            "lashes",
+            "brows",
+            "lash",
+            "brow",
+        },
+        "makeup": {"makeup", "make up", "makeup artist", "makeup artists"},
+        "med-spa": {"med spa", "med spas", "medical spa", "medical spas"},
+        "nails": {"nails", "nail", "nail salon", "nail salons"},
+        "spa": {"spa", "spas"},
+        "waxing": {"waxing", "wax"},
+    }
+
+    for category in categories:
+        slug = category.get("slug")
+        if not slug:
+            continue
+        name = str(category.get("name") or "")
+        candidates = {
+            slug,
+            slug.replace("-", " "),
+            " ".join(name.lower().replace("&", " and ").split()),
+            *aliases.get(slug, set()),
+        }
+        if normalized in candidates:
+            return slug
+    return None
+
+
 def _vertical_word(network: Dict[str, Any]) -> str:
     """Pull the trailing word from the network name ("Knows Beauty" -> "Beauty")."""
     name = network.get("name", "")
@@ -469,6 +577,8 @@ async def _base_context(request: Request, tenant: TenantContext) -> Dict[str, An
         "hero_issue_label": _issue_label(now),
         "nav_categories": nav_categories,
         "nav_neighborhoods": nav_neighborhoods,
+        "category_names": {c["slug"]: c["name"] for c in nav_categories},
+        "neighborhood_names": {n["slug"]: n["name"] for n in nav_neighborhoods},
         "header_nav": header_nav or [],
         "now": now,
         "footer_legal": await copy.get("footer.legal"),
@@ -975,9 +1085,12 @@ async def category_page(request: Request, category_slug: str) -> HTMLResponse:
     await copy.prime(category_slug=category_slug)
 
     ctx = await _base_context(request, tenant)
-    businesses = _dedup_photos(await content_svc.list_businesses(
-        city["_id"], category_slug=category_slug, limit=120
-    ))
+    businesses = _with_category_card_context(
+        _dedup_photos(await content_svc.list_businesses(
+            city["_id"], category_slug=category_slug, limit=120
+        )),
+        category_slug,
+    )
     ctx.update(
         {
             "category": category,
@@ -1145,17 +1258,20 @@ async def neighborhood_category_page(
     await copy.prime(neighborhood_slug=neighborhood_slug, category_slug=category_slug)
 
     ctx = await _base_context(request, tenant)
-    businesses = _dedup_photos([
-        b
-        for b in await content_svc.list_businesses(
-            city["_id"], category_slug=category_slug, limit=200
-        )
-        if neighborhood_slug in (b.get("neighborhood_slugs") or [])
-    ])
+    businesses = _with_category_card_context(
+        _dedup_photos(await content_svc.list_businesses(
+            city["_id"],
+            category_slug=category_slug,
+            neighborhood_slug=neighborhood_slug,
+            limit=120,
+        )),
+        category_slug,
+    )
     ctx.update(
         {
             "neighborhood": nb,
             "category": category,
+            "active_category_slug": category_slug,
             "hero_eyebrow": f"{category.get('name')} in {nb.get('name')}",
             "hero_headline": f"{category.get('name')} in {nb.get('name')}, {city.get('name')}",
             "hero_subhead": category.get("editorial_blurb") or "",
@@ -1219,10 +1335,15 @@ async def search_page(request: Request, q: Optional[str] = None) -> HTMLResponse
         businesses = await content_svc.search_businesses(city["_id"], query)
 
     ctx = await _base_context(request, tenant)
+    active_category_slug = _category_slug_for_exact_search(
+        query, ctx["nav_categories"]
+    ) if query else None
+    businesses = _with_category_card_context(businesses, active_category_slug)
     ctx.update(
         {
             "query": query,
             "businesses": businesses,
+            "active_category_slug": active_category_slug,
             "result_count": len(businesses),
             "seo_title": f"Search {city.get('name')}{': ' + query if query else ''} — {tenant.network.get('name')}",
             "meta_description": (
