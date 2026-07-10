@@ -43,20 +43,6 @@
     </nav>
     {% endif %}
     <div class="flex shrink-0 items-center gap-3">
-      {# Language toggle — visual only for now (no language switcher wired up).
-         Present so the header matches the reference design exactly. #}
-      <div class="relative hidden md:block">
-        <button type="button" class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-full border transition {{ cta_border }} {{ cta_text }} {{ cta_hover }}" aria-label="Language: English">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-          </svg>
-          <span>English</span>
-          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-            <path d="M3 4.5l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"></path>
-          </svg>
-        </button>
-      </div>
       <a class="hidden md:flex text-sm tracking-wide transition-colors {{ nav_link_color }} {{ nav_link_hover }}" href="/pricing">Pricing</a>
       <a class="hidden sm:inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-full border transition {{ cta_border }} {{ cta_text }} {{ cta_hover }}" href="/owners">{{ owners_header_cta }}</a>
       <button id="mobile-nav-btn" class="md:hidden p-2 rounded-lg {{ brand_text_color }}" aria-label="Toggle navigation" aria-expanded="false" aria-controls="mobile-nav-drawer">
