@@ -34,11 +34,12 @@ def test_sticky_active_category_link_keeps_network_accent():
     assert 'class="text-sm tracking-wide transition-colors text-rose-700 font-semibold"' in html
 
 
-def test_visual_language_toggle_is_desktop_only():
+def test_visual_language_toggle_is_absent():
     html = _render_header("sticky")
 
-    assert '<div class="relative hidden md:block">' in html
-    assert 'aria-label="Language: English"' in html
+    assert '<div class="relative hidden md:block">' not in html
+    assert 'aria-label="Language: English"' not in html
+    assert ">English<" not in html
 
 
 def test_mobile_brand_can_shrink_without_pushing_hamburger():

@@ -1,5 +1,9 @@
 # known-around-town — Lessons Learned
 
+## Hide unfinished language controls until another locale is actually available (2026-07-10)
+
+The shared header contained an English-only language pill with no working language choices. It looked interactive but could not change the page language, so it read as unfinished UI. The control was removed from the header until a real locale menu is implemented; the focused template test now prevents the old markup from returning while preserving desktop and mobile navigation.
+
 ## Neighborhood 404s: Seed files must list all active neighborhoods to prevent wipe on deploy (2026-07-03, PR #481)
 
 Miami beauty salons in `backend/seed/_real_businesses.json` pointed to `key-biscayne` and `midtown`, but because these slugs were missing from the `NEIGHBORHOODS["beauty"]` list in `seed_miami.py`, they were wiped from the database on every deploy. This rendered their `/n/` pages 404 and broke directory links.
