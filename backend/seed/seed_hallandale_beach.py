@@ -12,7 +12,13 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from app.database import ensure_indexes, get_db
-from seed._helpers import assert_seed_target_allowed, run, upsert, pick_category_photo
+from seed._helpers import (
+    assert_seed_target_allowed,
+    pick_category_photo,
+    preserve_existing_business_state,
+    run,
+    upsert,
+)
 
 
 CITY_SLUG = "hallandale-beach"
@@ -539,22 +545,13 @@ async def seed_hallandale_beach() -> None:
 
         existing = await db.businesses.find_one({"city_id": city_id, "slug": slug})
         if existing:
-            # Preserve claim/billing state — only update content fields
+            # Keep the established closed-listing behavior: archived records
+            # are intentionally left untouched by source refreshes.
             if existing.get("status") == "archived":
                 continue
-            preserve = {k: existing[k] for k in (
-                "claim_status", "is_founding_partner", "featured",
-                "stripe_customer_id", "stripe_subscription_id",
-                "photos", "hours",
-                # WHY: preserve Google sync data — these fields are expensive to
-                # re-fetch (~$0.017/call) and the seed file has no way to know
-                # the correct values. A re-seed must not wipe cached Google ratings.
-                "google_place_id", "google_rating", "google_review_count",
-                "google_rating_synced_at",
-            ) if k in existing}
-            biz_doc.update(preserve)
+            preserve_existing_business_state(existing, biz_doc)
             biz_doc["_id"] = existing["_id"]
-            biz_doc["created_at"] = existing.get("created_at", now)
+            biz_doc["created_at"] = existing.get("created_at", biz_doc.get("created_at", now))
             await db.businesses.replace_one({"_id": existing["_id"]}, biz_doc)
             updated += 1
         else:

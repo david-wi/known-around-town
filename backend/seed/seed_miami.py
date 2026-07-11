@@ -30,7 +30,17 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from app.database import ensure_indexes, get_db
-from seed._helpers import assert_seed_target_allowed, run, upsert, pick_category_photo
+from seed._helpers import (
+    assert_seed_target_allowed,
+    pick_category_photo,
+    preserve_existing_business_state,
+    run,
+    upsert,
+)
+
+# WHY: Keep the old private import name available to focused seed tests and
+# callers while the implementation lives in the shared boundary used by satellites.
+_preserve_existing_business_state = preserve_existing_business_state
 
 
 # Photo URLs scraped from the reference pages (one hero photo per network,
@@ -451,134 +461,6 @@ def _load_real_businesses() -> Dict[str, List[Dict[str, Any]]]:
     return out
 
 
-def _is_owner_uploaded_photo(photo: Any) -> bool:
-    """True for photos uploaded through the owner photo flow and served by GridFS."""
-    if isinstance(photo, dict):
-        url = photo.get("url")
-    else:
-        url = photo
-    return isinstance(url, str) and url.startswith("/media/")
-
-
-_PRESERVE_ON_RESEED_FIELDS = (
-    # Ownership and billing state are written by claim approval and Stripe,
-    # not by the editorial source snapshot.
-    "claim_status",
-    "claimed_email",
-    "claimed_by_user_id",
-    "claimed_at",
-    "verified_at",
-    "stripe_customer_id",
-    "stripe_subscription_id",
-    "is_founding_partner",
-    # Owner/editor/admin fields absent from the Miami source must not disappear
-    # when the replacement document is written.
-    "legal_name",
-    "service_area_text",
-    "email",
-    "facebook",
-    "booking_url",
-    "description",
-    "best_for",
-    "before_booking_notes",
-    "review_themes_summary",
-    "nearby_business_ids",
-    "import_source",
-    "import_data",
-    "meta_title_override",
-    "meta_description_override",
-    "hide_ratings",
-    "index_status",
-    "index_override",
-    # Cached ratings and negative lookup markers avoid paid re-fetches after a
-    # deploy reseed.
-    "google_place_id",
-    "google_rating",
-    "google_review_count",
-    "google_rating_synced_at",
-    "google_lookup_attempted_at",
-    # Concierge and measurement state is produced after the seed source is
-    # loaded and must remain attached to the same listing.
-    "voice_phone_number",
-    "vapi_phone_number_id",
-    "vapi_assistant_id",
-    "page_view_count",
-    "mkb_referred_view_count",
-    "call_click_count",
-    "directions_click_count",
-    "website_click_count",
-    "hours",
-)
-
-
-def _preserve_existing_business_state(
-    existing: Dict[str, Any],
-    seed_doc: Dict[str, Any],
-) -> None:
-    """Keep live operational state while refreshing source-owned fields.
-
-    The Miami source snapshot owns editorial identity and presentation fields.
-    This helper is the explicit boundary for fields that are written later by
-    owners, admins, Stripe, voice provisioning, Google sync, or analytics.
-    It mutates ``seed_doc`` so the caller can retain the existing document ID
-    while replacing the source-owned portion.
-    """
-    # @define KAT-052 "Miami re-seeding preserves live operational business state"
-    for field in _PRESERVE_ON_RESEED_FIELDS:
-        if field in existing:
-            seed_doc[field] = existing[field]
-
-    # An admin-confirmed archive is a lifecycle decision, not source decoration.
-    # Re-seeding must not make a known-closed listing public again.
-    if existing.get("status") == "archived":
-        seed_doc["status"] = "archived"
-
-    # Featured is source-owned for an editorial premium seed, but a live paid or
-    # Concierge state must win over the source's default free value.
-    existing_featured = existing.get("featured")
-    if (
-        isinstance(existing_featured, dict)
-        and (
-            existing_featured.get("enabled")
-            or existing.get("stripe_subscription_id")
-            or existing.get("vapi_phone_number_id")
-            or existing.get("vapi_assistant_id")
-        )
-    ):
-        seed_doc["featured"] = existing_featured
-
-    # Owner edits to contact/social fields are authoritative once a listing has
-    # entered the claim flow. Unclaimed editorial records continue to receive
-    # fresh source values on every re-seed.
-    owner_claimed = bool(existing.get("claimed_email")) or existing.get("claim_status") in {
-        "pending",
-        "claimed",
-        "verified",
-    }
-    if owner_claimed:
-        for field in ("phone", "website", "instagram"):
-            if field in existing and existing[field] is not None:
-                seed_doc[field] = existing[field]
-        existing_socials = existing.get("socials")
-        if isinstance(existing_socials, dict):
-            seed_doc["socials"] = {
-                **(seed_doc.get("socials") or {}),
-                **existing_socials,
-            }
-
-    # Owner-uploaded photos are GridFS-backed and cannot be reconstructed from
-    # the source snapshot. Seed photos remain the fallback for unclaimed rows.
-    existing_photos = existing.get("photos") or []
-    if any(_is_owner_uploaded_photo(photo) for photo in existing_photos):
-        seed_doc["photos"] = existing_photos
-
-    # An empty existing service list means "not populated"; retain the source
-    # menu in that case so a prior deploy bug cannot permanently erase it.
-    existing_services = existing.get("services") or []
-    if existing_services:
-        seed_doc["services"] = existing_services
-
-
 def _merged_businesses() -> Dict[str, List[Dict[str, Any]]]:
     """Combine the handcrafted showcase entries with the LLM-generated real
     businesses. Handcrafted entries win on slug collision (their rich blurbs
@@ -810,7 +692,7 @@ async def seed_network(network_slug: str) -> None:
             {"city_id": city["_id"], "slug": biz["slug"]}
         )
         if existing_biz:
-            _preserve_existing_business_state(existing_biz, biz_doc)
+            preserve_existing_business_state(existing_biz, biz_doc)
             # Seed-time services populate new listings; the helper retains a
             # non-empty live service menu when one already exists.
             if not existing_biz.get("services") and biz.get("services"):

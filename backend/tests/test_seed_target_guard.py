@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
+import importlib
 
 import pytest
 
@@ -38,6 +40,17 @@ from seed._helpers import (
 # A representative production MongoDB Atlas connection string. The guard must
 # treat this as production and refuse unless production is explicitly confirmed.
 ATLAS_URL = "mongodb+srv://appuser:pw@expertly.xuf7uv.mongodb.net/known_around_town"
+
+# Keep the guard inventory tied to the actual destructive city writers. This
+# prevents a newly deploy-invoked replace loop from escaping the fail-closed
+# entrypoint test merely because it was not added to a hand-maintained list.
+CITY_WRITER_MODULES = tuple(
+    sorted(
+        path.stem
+        for path in (Path(__file__).parents[1] / "seed").glob("seed_*.py")
+        if "businesses.replace_one" in path.read_text()
+    )
+)
 
 
 @pytest.fixture
@@ -210,16 +223,17 @@ def atlas_target(monkeypatch):
     make any DB access explode — so a passing test PROVES the guard fired before
     the seed could read or write the database."""
     # Import entrypoints before replacing app.database.ensure_indexes. The seed
-    # modules import that function by name, so importing them after the patch
-    # would cache the test's _boom function and break later fixtures.
-    from seed import seed_miami, seed_networks  # noqa: F401
+    # modules import that function by name, so patch each module's bound alias
+    # after import to prove its own main() guard runs first.
+    modules = {
+        name: importlib.import_module(f"seed.{name}")
+        for name in (*CITY_WRITER_MODULES, "seed_networks")
+    }
 
     settings = Settings(mongodb_url=ATLAS_URL, allow_local_mongodb=False, network_domains="")
     monkeypatch.setattr(config_module, "get_settings", lambda: settings)
     monkeypatch.setattr(_helpers, "get_settings", lambda: settings)
     monkeypatch.delenv(ALLOW_PRODUCTION_RESET_ENV, raising=False)
-
-    from app import database
 
     def _boom(*_args, **_kwargs):
         raise AssertionError(
@@ -227,9 +241,10 @@ def atlas_target(monkeypatch):
             "the seed guard did not fire first."
         )
 
-    # If the guard is wired correctly, neither of these is ever reached.
-    monkeypatch.setattr(database, "get_db", _boom)
-    monkeypatch.setattr(database, "ensure_indexes", _boom)
+    # If the guard is wired correctly, none of these bound aliases is reached.
+    for module in modules.values():
+        monkeypatch.setattr(module, "get_db", _boom, raising=False)
+        monkeypatch.setattr(module, "ensure_indexes", _boom, raising=False)
     return settings
 
 
@@ -247,3 +262,12 @@ async def test_seed_networks_main_aborts_before_db_access(atlas_target):
 
     with pytest.raises(SeedTargetForbiddenError):
         await seed_networks.main()
+
+
+@pytest.mark.parametrize("module_name", CITY_WRITER_MODULES)
+@pytest.mark.asyncio
+async def test_satellite_seed_main_aborts_before_db_access(atlas_target, module_name):
+    """Every city destructive entrypoint must fail closed before DB access."""
+    module = importlib.import_module(f"seed.{module_name}")
+    with pytest.raises(SeedTargetForbiddenError):
+        await module.main()

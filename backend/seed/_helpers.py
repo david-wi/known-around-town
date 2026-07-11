@@ -168,6 +168,172 @@ class SeedTargetForbiddenError(RuntimeError):
     """
 
 
+def _is_owner_uploaded_photo(photo: Any) -> bool:
+    """Return whether a photo was uploaded through the owner photo flow."""
+    if isinstance(photo, dict):
+        url = photo.get("url")
+    else:
+        url = photo
+    return isinstance(url, str) and url.startswith("/media/")
+
+
+# WHY: these fields are written by owners, admins, Stripe, voice provisioning,
+# Google sync, or analytics after a source row is loaded. Keeping the policy in
+# one helper prevents each satellite seed from growing a different, incomplete
+# list as new operational fields are added.
+_PRESERVE_ON_RESEED_FIELDS = (
+    # Claim and payment identity must remain attached to the stable listing.
+    "claimed",
+    "claim_status",
+    "claimed_email",
+    "claimed_by_user_id",
+    "claimed_at",
+    "verified_at",
+    "owner_id",
+    "stripe_customer_id",
+    "stripe_subscription_id",
+    "subscription_tier",
+    "is_founding_partner",
+    # Owner/editor/admin fields that source snapshots do not reliably carry.
+    "legal_name",
+    "service_area_text",
+    "email",
+    "facebook",
+    "booking_url",
+    "description",
+    "best_for",
+    "before_booking_notes",
+    "review_themes_summary",
+    "nearby_business_ids",
+    "import_source",
+    "import_data",
+    "meta_title_override",
+    "meta_description_override",
+    "hide_ratings",
+    "index_status",
+    "index_override",
+    # Cached ratings and negative lookup markers avoid paid re-fetches after a
+    # deploy reseed.
+    "google_place_id",
+    "google_rating",
+    "google_review_count",
+    "google_rating_synced_at",
+    "google_lookup_attempted_at",
+    # Concierge and measurement state is produced after the seed source loads.
+    "voice_phone_number",
+    "vapi_phone_number_id",
+    "vapi_assistant_id",
+    "page_view_count",
+    "mkb_referred_view_count",
+    "call_click_count",
+    "directions_click_count",
+    "website_click_count",
+    "hours",
+)
+
+# WHY: source builders commonly include optional fields as ``None`` or an empty
+# container when the checked-in row has no value. In that case an existing newer
+# source value must not be erased by a replacement document with no information.
+_SOURCE_FIELDS_PRESERVE_WHEN_ABSENT = (
+    "name",
+    "address",
+    "phone",
+    "website",
+    "instagram",
+    "socials",
+    "short_description",
+    "known_for",
+    "price_cues",
+    "category_slugs",
+    "neighborhood_slugs",
+)
+
+
+def preserve_existing_business_state(
+    existing: Dict[str, Any],
+    seed_doc: Dict[str, Any],
+) -> None:
+    """Keep live operational state while refreshing source-owned fields.
+
+    The source snapshot owns editorial identity and presentation fields. This
+    helper is the explicit boundary for fields written later by owners, admins,
+    Stripe, voice provisioning, Google sync, or analytics. It mutates
+    ``seed_doc`` so the caller can retain the existing document ID while
+    replacing source-owned fields.
+    """
+    # @define KAT-052 "City reseeding preserves live operational business state"
+    for field in _PRESERVE_ON_RESEED_FIELDS:
+        if field in existing:
+            seed_doc[field] = existing[field]
+
+    for field in _SOURCE_FIELDS_PRESERVE_WHEN_ABSENT:
+        if field in existing and not seed_doc.get(field):
+            seed_doc[field] = existing[field]
+
+    # WHY: an admin-confirmed archive is a lifecycle decision, not source
+    # decoration. Reseeding must not make a known-closed listing public again.
+    if existing.get("status") == "archived":
+        seed_doc["status"] = "archived"
+
+    # WHY: paid Featured and Concierge tiers are live billing/provisioning state;
+    # a satellite source row always carries the free default and would otherwise
+    # silently downgrade a paying listing.
+    existing_featured = existing.get("featured")
+    if isinstance(existing_featured, dict) and (
+        existing_featured.get("enabled")
+        or existing_featured.get("tier") not in {None, "free"}
+        or existing.get("stripe_subscription_id")
+        or existing.get("vapi_phone_number_id")
+        or existing.get("vapi_assistant_id")
+    ):
+        seed_doc["featured"] = existing_featured
+
+    # WHY: owner edits to contact/social fields are authoritative once a
+    # listing enters the claim flow. Unclaimed editorial rows continue to
+    # receive fresh source values on each reseed.
+    # WHY: older claim records may only carry the original boolean marker;
+    # treating it as owner-claimed prevents a reseed from overwriting owner
+    # contact details before the newer claim fields were backfilled.
+    owner_claimed = (
+        bool(existing.get("claimed"))
+        or bool(existing.get("claimed_email"))
+        or existing.get("claim_status") in {"pending", "claimed", "verified"}
+    )
+    if owner_claimed:
+        for field in ("phone", "website", "instagram"):
+            # A null legacy value is not an owner edit; keep the fresh source
+            # value rather than turning a usable contact field into None.
+            if field in existing and existing[field] is not None:
+                seed_doc[field] = existing[field]
+        existing_socials = existing.get("socials")
+        if isinstance(existing_socials, dict):
+            seed_doc["socials"] = {
+                **(seed_doc.get("socials") or {}),
+                **existing_socials,
+            }
+
+    # WHY: owner-uploaded GridFS photos cannot be reconstructed from a source
+    # snapshot. Keep those entries, but leave non-owner seed photos refreshable
+    # so a corrected source representative image can replace the old one.
+    existing_photos = existing.get("photos") or []
+    existing_source_photos = [
+        photo for photo in existing_photos if not _is_owner_uploaded_photo(photo)
+    ]
+    owner_photos = [photo for photo in existing_photos if _is_owner_uploaded_photo(photo)]
+    seed_photos = list(seed_doc.get("photos") or [])
+    if not seed_photos:
+        seed_photos = existing_source_photos
+    if owner_photos or existing_source_photos and not seed_doc.get("photos"):
+        seed_doc["photos"] = seed_photos + [photo for photo in owner_photos if photo not in seed_photos]
+
+    # WHY: an empty list means "not populated" in the existing Miami boundary;
+    # retain a non-empty live menu, while allowing source-time menus to fill a
+    # row that has no owner/admin service data yet.
+    existing_services = existing.get("services") or []
+    if existing_services:
+        seed_doc["services"] = existing_services
+
+
 def assert_seed_target_allowed() -> None:
     """Refuse to run the destructive demo-data seed unless the target is safe.
 
