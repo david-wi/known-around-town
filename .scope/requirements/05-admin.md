@@ -24,20 +24,35 @@ database query.
 
 ### KAT-052 — Database seeding (production-guarded) · V1 · implemented
 **Persona:** David (operator).
-Seed scripts at `seed/seed_miami.py` populate neighborhoods, categories, and
-business listings from Miami public data. Seeding is destructive (wipes and
-recreates records) and is guarded by `KAT_ALLOW_PRODUCTION_RESET=true`.
-Normal deploys do NOT run seeds.
-**Acceptance:** Given `KAT_ALLOW_PRODUCTION_RESET` not set, when the seed script
-runs, then it exits with an error and does not modify production data; given the
-flag set, then every checked-in Miami source row is seeded; given an existing listing is being
-re-seeded from the Miami source, then source-owned editorial fields refresh while
-claim, paid Featured, Concierge voice, archived lifecycle, Google-cache, and
-analytics-counter fields remain attached to that listing.
+Seed scripts at `seed/seed_miami.py` and the city-specific seed modules populate
+neighborhoods, categories, and business listings from Miami public data. Seeding
+is destructive (wipes and recreates records) and is guarded by
+`KAT_ALLOW_PRODUCTION_RESET=true`. Normal deploys do NOT run seeds.
+**Acceptance:** Given `KAT_ALLOW_PRODUCTION_RESET` not set, when any destructive
+seed entrypoint runs, then it exits with an error and does not modify production
+data; given the flag set, then every checked-in source row for the selected city
+is seeded; given an existing listing is being re-seeded from a checked-in source,
+then source-owned editorial fields refresh while the existing listing keeps its
+stable identity and live operational/owner state, including claim and payment
+fields, paid Featured/Concierge Voice state, archived lifecycle, Google cache,
+analytics counters, owner contact/social fields, services, hours, and owner-uploaded
+photos. A repeated re-seed must not create duplicate listings or replace the
+existing `_id`/`created_at`.
+**Regression evidence:** The KAT-052 disposable canary covers the reviewed
+13-row manifest (12 satellite rows plus one Miami control row) against mongomock
+and proves source refresh, operational-field preservation, stable IDs, and zero
+duplicates for the Miami, Aventura, Coral Gables, South Beach, and Sunny Isles
+writers. A deploy-derived wiring inventory confirms that every business
+replacement writer uses the same helper, and guard tests confirm every city
+entrypoint fails closed before database access.
 **Incidents:**
 - 2026-07-11 — The Miami custom replacement path restored archived listings and
   dropped paid/voice/counter state because it replaced the whole document without
   a complete operational-field boundary.
+- 2026-07-11 — The follow-up 13-row canary showed that the Miami fix did not reach
+  the Aventura, Coral Gables, South Beach, and Sunny Isles replacement loops;
+  eight satellite rows lost operational/owner state on re-seed. Source
+  consolidation is held until those writers share the reviewed boundary.
 
 ### KAT-054 — Admin settings page · V1 · implemented
 **Persona:** David (operator), Posey.

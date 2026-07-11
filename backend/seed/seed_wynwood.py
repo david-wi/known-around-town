@@ -12,7 +12,13 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from app.database import ensure_indexes, get_db
-from seed._helpers import assert_seed_target_allowed, run, upsert, pick_category_photo
+from seed._helpers import (
+    assert_seed_target_allowed,
+    pick_category_photo,
+    preserve_existing_business_state,
+    run,
+    upsert,
+)
 
 
 # ── Neighborhoods ─────────────────────────────────────────────────────────────
@@ -650,23 +656,11 @@ async def seed_wynwood() -> None:
             "updated_at": now,
         }
 
-        # WHY: preserve owner claim data, billing fields, hours, and services
-        # on re-seed so that any owner who has already claimed their listing
-        # doesn't lose their work. Same pattern as Coral Gables, Boca Raton,
-        # and Fort Lauderdale seeds.
+        # WHY: replacement writes share one live-state boundary so a satellite
+        # reseed cannot drop owner, billing, voice, or analytics state.
         existing = await db.businesses.find_one({"city_id": city_id, "slug": biz["slug"]})
         if existing:
-            for _preserve in (
-                "claim_status", "claimed_email", "claimed_by_user_id",
-                "claimed_at", "verified_at",
-                "stripe_customer_id", "stripe_subscription_id",
-                "is_founding_partner", "hours", "google_place_id", "google_rating", "google_review_count", "google_rating_synced_at",
-            ):
-                if _preserve in existing:
-                    biz_doc[_preserve] = existing[_preserve]
-            existing_services = existing.get("services") or []
-            if existing_services:
-                biz_doc["services"] = existing_services
+            preserve_existing_business_state(existing, biz_doc)
             biz_doc["_id"] = existing["_id"]
             biz_doc["created_at"] = existing.get("created_at", biz_doc["created_at"])
             await db.businesses.replace_one({"_id": existing["_id"]}, biz_doc)

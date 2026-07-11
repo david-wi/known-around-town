@@ -18,7 +18,7 @@ os.environ.setdefault("MONGODB_DATABASE", "wkl_test")
 os.environ.setdefault("NETWORK_DOMAINS", "beauty:knowsbeauty.localhost")
 os.environ.setdefault("PREVIEW_MODE_ENABLED", "false")
 
-from seed._helpers import upsert
+from seed._helpers import preserve_existing_business_state, upsert
 from seed import seed_miami
 
 
@@ -153,6 +153,8 @@ async def test_miami_reseed_preserves_operational_state_on_custom_path(seeded_db
         {"network_id": network["_id"], "slug": source_row["slug"]}
     )
     assert existing is not None
+    existing_id = existing["_id"]
+    existing_created_at = existing["created_at"]
 
     operational = {
         "status": "archived",
@@ -177,8 +179,152 @@ async def test_miami_reseed_preserves_operational_state_on_custom_path(seeded_db
     await seed_miami.main()
 
     reseeded = await seeded_db.businesses.find_one({"_id": existing["_id"]})
+    assert reseeded["_id"] == existing_id
+    assert reseeded["created_at"] == existing_created_at
     for field, expected in operational.items():
         assert reseeded[field] == expected, f"re-seed erased {field}"
+
+    # The control row must remain one stable listing across repeated Miami
+    # replacement runs, just like each satellite canary row.
+    await seed_miami.main()
+    reseeded_again = await seeded_db.businesses.find_one({"_id": existing_id})
+    assert reseeded_again["_id"] == existing_id
+    assert reseeded_again["created_at"] == existing_created_at
+    assert await seeded_db.businesses.count_documents(
+        {"network_id": network["_id"], "slug": source_row["slug"]}
+    ) == 1
+
+
+def test_shared_business_preservation_policy_keeps_present_state_only():
+    """The satellite boundary preserves live fields without inventing absent ones."""
+    existing = {
+        "_id": "stable",
+        "created_at": "old-created-at",
+        "status": "archived",
+        "claim_status": "verified",
+        "claimed_email": "owner@example.com",
+        "claimed_at": "claimed-at",
+        "stripe_customer_id": "cus-existing",
+        "stripe_subscription_id": "sub-existing",
+        "featured": {"enabled": True, "tier": "premium"},
+        "voice_phone_number": "(669) 232-8894",
+        "vapi_phone_number_id": "phone-existing",
+        "vapi_assistant_id": "assistant-existing",
+        "is_founding_partner": True,
+        "google_place_id": "place-existing",
+        "google_rating": 4.9,
+        "google_review_count": 321,
+        "page_view_count": 17,
+        "mkb_referred_view_count": 5,
+        "call_click_count": 3,
+        "directions_click_count": 2,
+        "website_click_count": 4,
+        "phone": "owner-phone",
+        "website": "https://owner.example",
+        "instagram": "@owner",
+        "socials": {"instagram": "@owner", "facebook": "https://facebook.example"},
+        "hours": [{"day": "Mon", "open": "10:00", "close": "18:00"}],
+        "services": [{"name": "Owner service"}],
+        "photos": [
+            {"url": "https://old-seed.example/photo.jpg"},
+            {"url": "/media/owner-photo", "is_hero": True},
+        ],
+    }
+    seed_doc = {
+        "name": "Refreshed source name",
+        "phone": "new-source-phone",
+        "website": "https://new-source.example",
+        "instagram": "@new-source",
+        "featured": {"enabled": False, "tier": "free"},
+        "status": "live",
+        "photos": [{"url": "https://new-seed.example/photo.jpg"}],
+        "hours": [],
+        "services": [],
+    }
+
+    preserve_existing_business_state(existing, seed_doc)
+
+    assert seed_doc["name"] == "Refreshed source name"
+    assert seed_doc["status"] == "archived"
+    assert seed_doc["featured"] == existing["featured"]
+    for field in (
+        "claim_status", "claimed_email", "claimed_at", "stripe_customer_id",
+        "stripe_subscription_id", "voice_phone_number", "vapi_phone_number_id",
+        "vapi_assistant_id", "is_founding_partner", "google_place_id",
+        "google_rating", "google_review_count", "page_view_count",
+        "mkb_referred_view_count", "call_click_count", "directions_click_count",
+        "website_click_count", "phone", "website", "instagram", "socials",
+        "hours", "services",
+    ):
+        assert seed_doc[field] == existing[field]
+    assert {photo["url"] for photo in seed_doc["photos"]} == {
+        "https://new-seed.example/photo.jpg",
+        "/media/owner-photo",
+    }
+    # The source cannot manufacture state that was absent from the live record.
+    assert "google_rating_synced_at" not in seed_doc
+    assert "nonexistent_operational_field" not in seed_doc
+
+
+def test_shared_business_preservation_does_not_replace_source_contact_with_null():
+    """Null legacy contact values leave fresh source contact/social values intact."""
+    existing = {
+        "claim_status": "claimed",
+        "phone": None,
+        "website": None,
+        "instagram": None,
+        "socials": {"facebook": "https://facebook.example/owner"},
+    }
+    seed_doc = {
+        "phone": "source-phone",
+        "website": "https://source.example",
+        "instagram": "@source",
+        "socials": {"instagram": "@source"},
+    }
+
+    preserve_existing_business_state(existing, seed_doc)
+
+    assert seed_doc["phone"] == "source-phone"
+    assert seed_doc["website"] == "https://source.example"
+    assert seed_doc["instagram"] == "@source"
+    assert seed_doc["socials"] == {
+        "instagram": "@source",
+        "facebook": "https://facebook.example/owner",
+    }
+
+    # Optional source fields omitted by a later snapshot do not erase newer
+    # values that are already present in the live document.
+    absent_source = {"name": "Another source refresh", "photos": []}
+    preserve_existing_business_state(
+        {"website": "https://newer-source.example", "address": {"street": "Newer"}},
+        absent_source,
+    )
+    assert absent_source["website"] == "https://newer-source.example"
+    assert absent_source["address"] == {"street": "Newer"}
+
+
+def test_shared_business_preservation_treats_claimed_boolean_as_owner_state():
+    """Legacy claimed=True records keep owner-edited contact fields."""
+    existing = {
+        "claimed": True,
+        "phone": "(305) 555-0199",
+        "website": "https://owner.example/legacy",
+        "instagram": "@legacy-owner",
+        "socials": {"instagram": "@legacy-owner"},
+    }
+    seed_doc = {
+        "phone": "(305) 555-0100",
+        "website": "https://source.example",
+        "instagram": "@source",
+        "socials": {"instagram": "@source"},
+    }
+
+    preserve_existing_business_state(existing, seed_doc)
+
+    assert seed_doc["phone"] == existing["phone"]
+    assert seed_doc["website"] == existing["website"]
+    assert seed_doc["instagram"] == existing["instagram"]
+    assert seed_doc["socials"] == existing["socials"]
 
 
 def test_seeded_footer_cross_links_use_canonical_hosts():
