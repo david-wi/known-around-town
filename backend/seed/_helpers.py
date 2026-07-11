@@ -200,7 +200,6 @@ _PRESERVE_ON_RESEED_FIELDS = (
     "email",
     "facebook",
     "booking_url",
-    "description",
     "best_for",
     "before_booking_notes",
     "review_themes_summary",
@@ -252,6 +251,8 @@ _SOURCE_FIELDS_PRESERVE_WHEN_ABSENT = (
 def preserve_existing_business_state(
     existing: Dict[str, Any],
     seed_doc: Dict[str, Any],
+    *,
+    preserve_description: bool = False,
 ) -> None:
     """Keep live operational state while refreshing source-owned fields.
 
@@ -262,7 +263,14 @@ def preserve_existing_business_state(
     replacing source-owned fields.
     """
     # @define KAT-052 "City reseeding preserves live operational business state"
-    for field in _PRESERVE_ON_RESEED_FIELDS:
+    fields = _PRESERVE_ON_RESEED_FIELDS
+    # Miami's checked-in source predates the city seed modules and has a
+    # reviewed owner/editor description override. Legacy city sources use the
+    # same top-level key as editorial content, so they keep the fresh source
+    # value unless the caller opts into Miami's established behavior.
+    if preserve_description:
+        fields = (*fields, "description")
+    for field in fields:
         if field in existing:
             seed_doc[field] = existing[field]
 

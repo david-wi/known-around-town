@@ -692,7 +692,11 @@ async def seed_network(network_slug: str) -> None:
             {"city_id": city["_id"], "slug": biz["slug"]}
         )
         if existing_biz:
-            preserve_existing_business_state(existing_biz, biz_doc)
+            preserve_existing_business_state(
+                existing_biz,
+                biz_doc,
+                preserve_description=True,
+            )
             # Seed-time services populate new listings; the helper retains a
             # non-empty live service menu when one already exists.
             if not existing_biz.get("services") and biz.get("services"):
