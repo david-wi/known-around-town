@@ -46,6 +46,13 @@ def test_every_deploy_invoked_business_replacer_uses_shared_preservation_helper(
 
     deployed_writer_modules = writer_modules & deployed_modules
     assert deployed_writer_modules, "deploy.sh must invoke at least one city replacement writer"
+    # Sunny Isles is intentionally covered by the helper and canary but is not
+    # currently in the production deploy list. Any other mismatch means a new
+    # writer was added without an explicit deploy decision and must fail review.
+    assert writer_modules - deployed_modules == {"seed_sunny_isles"}, (
+        "unexpected deploy-list coverage drift: "
+        f"{sorted(writer_modules - deployed_modules)}"
+    )
     # Validate all writers, including a city module kept out of the current
     # deploy list, so a later deploy-list expansion cannot bypass this policy.
     for module_name in sorted(writer_modules):

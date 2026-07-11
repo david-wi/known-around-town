@@ -327,6 +327,26 @@ def test_shared_business_preservation_treats_claimed_boolean_as_owner_state():
     assert seed_doc["socials"] == existing["socials"]
 
 
+def test_shared_business_preservation_refreshes_legacy_editorial_description():
+    """Legacy city source descriptions remain source-owned by default."""
+    existing = {"description": "old editorial copy"}
+    seed_doc = {"description": "fresh editorial copy"}
+
+    preserve_existing_business_state(existing, seed_doc)
+
+    assert seed_doc["description"] == "fresh editorial copy"
+
+
+def test_miami_can_opt_into_existing_description_override():
+    """Miami keeps its established owner/editor description override explicitly."""
+    existing = {"description": "owner-approved copy"}
+    seed_doc = {"description": "source copy"}
+
+    preserve_existing_business_state(existing, seed_doc, preserve_description=True)
+
+    assert seed_doc["description"] == "owner-approved copy"
+
+
 def test_seeded_footer_cross_links_use_canonical_hosts():
     """Footer 'Also in <city>' cross-links must point at hosts that are actually
     served, not a bare slug that has no certificate.
