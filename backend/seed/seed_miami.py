@@ -460,6 +460,125 @@ def _is_owner_uploaded_photo(photo: Any) -> bool:
     return isinstance(url, str) and url.startswith("/media/")
 
 
+_PRESERVE_ON_RESEED_FIELDS = (
+    # Ownership and billing state are written by claim approval and Stripe,
+    # not by the editorial source snapshot.
+    "claim_status",
+    "claimed_email",
+    "claimed_by_user_id",
+    "claimed_at",
+    "verified_at",
+    "stripe_customer_id",
+    "stripe_subscription_id",
+    "is_founding_partner",
+    # Owner/editor/admin fields absent from the Miami source must not disappear
+    # when the replacement document is written.
+    "legal_name",
+    "service_area_text",
+    "email",
+    "facebook",
+    "booking_url",
+    "description",
+    "best_for",
+    "before_booking_notes",
+    "review_themes_summary",
+    "nearby_business_ids",
+    "import_source",
+    "import_data",
+    "meta_title_override",
+    "meta_description_override",
+    "hide_ratings",
+    "index_status",
+    "index_override",
+    # Cached ratings and negative lookup markers avoid paid re-fetches after a
+    # deploy reseed.
+    "google_place_id",
+    "google_rating",
+    "google_review_count",
+    "google_rating_synced_at",
+    "google_lookup_attempted_at",
+    # Concierge and measurement state is produced after the seed source is
+    # loaded and must remain attached to the same listing.
+    "voice_phone_number",
+    "vapi_phone_number_id",
+    "vapi_assistant_id",
+    "page_view_count",
+    "mkb_referred_view_count",
+    "call_click_count",
+    "directions_click_count",
+    "website_click_count",
+    "hours",
+)
+
+
+def _preserve_existing_business_state(
+    existing: Dict[str, Any],
+    seed_doc: Dict[str, Any],
+) -> None:
+    """Keep live operational state while refreshing source-owned fields.
+
+    The Miami source snapshot owns editorial identity and presentation fields.
+    This helper is the explicit boundary for fields that are written later by
+    owners, admins, Stripe, voice provisioning, Google sync, or analytics.
+    It mutates ``seed_doc`` so the caller can retain the existing document ID
+    while replacing the source-owned portion.
+    """
+    # @define KAT-052 "Miami re-seeding preserves live operational business state"
+    for field in _PRESERVE_ON_RESEED_FIELDS:
+        if field in existing:
+            seed_doc[field] = existing[field]
+
+    # An admin-confirmed archive is a lifecycle decision, not source decoration.
+    # Re-seeding must not make a known-closed listing public again.
+    if existing.get("status") == "archived":
+        seed_doc["status"] = "archived"
+
+    # Featured is source-owned for an editorial premium seed, but a live paid or
+    # Concierge state must win over the source's default free value.
+    existing_featured = existing.get("featured")
+    if (
+        isinstance(existing_featured, dict)
+        and (
+            existing_featured.get("enabled")
+            or existing.get("stripe_subscription_id")
+            or existing.get("vapi_phone_number_id")
+            or existing.get("vapi_assistant_id")
+        )
+    ):
+        seed_doc["featured"] = existing_featured
+
+    # Owner edits to contact/social fields are authoritative once a listing has
+    # entered the claim flow. Unclaimed editorial records continue to receive
+    # fresh source values on every re-seed.
+    owner_claimed = bool(existing.get("claimed_email")) or existing.get("claim_status") in {
+        "pending",
+        "claimed",
+        "verified",
+    }
+    if owner_claimed:
+        for field in ("phone", "website", "instagram"):
+            if field in existing and existing[field] is not None:
+                seed_doc[field] = existing[field]
+        existing_socials = existing.get("socials")
+        if isinstance(existing_socials, dict):
+            seed_doc["socials"] = {
+                **(seed_doc.get("socials") or {}),
+                **existing_socials,
+            }
+
+    # Owner-uploaded photos are GridFS-backed and cannot be reconstructed from
+    # the source snapshot. Seed photos remain the fallback for unclaimed rows.
+    existing_photos = existing.get("photos") or []
+    if any(_is_owner_uploaded_photo(photo) for photo in existing_photos):
+        seed_doc["photos"] = existing_photos
+
+    # An empty existing service list means "not populated"; retain the source
+    # menu in that case so a prior deploy bug cannot permanently erase it.
+    existing_services = existing.get("services") or []
+    if existing_services:
+        seed_doc["services"] = existing_services
+
+
 def _merged_businesses() -> Dict[str, List[Dict[str, Any]]]:
     """Combine the handcrafted showcase entries with the LLM-generated real
     businesses. Handcrafted entries win on slug collision (their rich blurbs
@@ -691,46 +810,10 @@ async def seed_network(network_slug: str) -> None:
             {"city_id": city["_id"], "slug": biz["slug"]}
         )
         if existing_biz:
-            for _preserve in (
-                "claim_status",
-                "claimed_email",
-                "claimed_by_user_id",
-                "claimed_at",
-                "verified_at",
-                "stripe_customer_id",
-                "stripe_subscription_id",
-                # WHY: is_founding_partner from the DB always wins over the seed JSON
-                # value — an admin may have toggled the flag after first insert, and
-                # a re-seed should never override that decision.
-                "is_founding_partner",
-                "hours",
-                # WHY: preserve Google sync data — these fields are expensive to
-                # re-fetch (~$0.017/call) and the seed file has no way to know
-                # the correct values. A re-seed that updates a name or photo
-                # must not wipe out the cached Google star rating.
-                "google_place_id",
-                "google_rating",
-                "google_review_count",
-                "google_rating_synced_at",
-                ):
-                if _preserve in existing_biz:
-                    biz_doc[_preserve] = existing_biz[_preserve]
-            existing_photos = existing_biz.get("photos") or []
-            # WHY: owner-uploaded GridFS photos are paid/claimed-listing data,
-            # not seed decoration. A re-seed may refresh the representative seed
-            # photo for unclaimed businesses, but it must never wipe a real
-            # owner's uploaded gallery.
-            if any(_is_owner_uploaded_photo(p) for p in existing_photos):
-                biz_doc["photos"] = existing_photos
-            # WHY: services are a special case — only preserve the DB copy when it is
-            # non-empty (meaning an owner or admin actually set them). An empty list
-            # means "not yet populated" OR "was wiped by the deploy bug". In either
-            # case, fall back to the curated seed services so outreach targets keep
-            # their menus through every re-deploy.
-            existing_services = existing_biz.get("services") or []
-            if existing_services:
-                biz_doc["services"] = existing_services
-            elif biz.get("services"):
+            _preserve_existing_business_state(existing_biz, biz_doc)
+            # Seed-time services populate new listings; the helper retains a
+            # non-empty live service menu when one already exists.
+            if not existing_biz.get("services") and biz.get("services"):
                 biz_doc["services"] = biz["services"]
             biz_doc["_id"] = existing_biz["_id"]
             biz_doc["created_at"] = existing_biz.get("created_at", biz_doc["created_at"])

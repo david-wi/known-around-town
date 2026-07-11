@@ -209,6 +209,11 @@ def atlas_target(monkeypatch):
     """Point the seed entrypoints at an Atlas target with no confirmation, and
     make any DB access explode — so a passing test PROVES the guard fired before
     the seed could read or write the database."""
+    # Import entrypoints before replacing app.database.ensure_indexes. The seed
+    # modules import that function by name, so importing them after the patch
+    # would cache the test's _boom function and break later fixtures.
+    from seed import seed_miami, seed_networks  # noqa: F401
+
     settings = Settings(mongodb_url=ATLAS_URL, allow_local_mongodb=False, network_domains="")
     monkeypatch.setattr(config_module, "get_settings", lambda: settings)
     monkeypatch.setattr(_helpers, "get_settings", lambda: settings)
