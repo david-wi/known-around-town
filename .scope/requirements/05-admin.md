@@ -30,7 +30,14 @@ recreates records) and is guarded by `KAT_ALLOW_PRODUCTION_RESET=true`.
 Normal deploys do NOT run seeds.
 **Acceptance:** Given `KAT_ALLOW_PRODUCTION_RESET` not set, when the seed script
 runs, then it exits with an error and does not modify production data; given the
-flag set, then 147 businesses are seeded.
+flag set, then every checked-in Miami source row is seeded; given an existing listing is being
+re-seeded from the Miami source, then source-owned editorial fields refresh while
+claim, paid Featured, Concierge voice, archived lifecycle, Google-cache, and
+analytics-counter fields remain attached to that listing.
+**Incidents:**
+- 2026-07-11 — The Miami custom replacement path restored archived listings and
+  dropped paid/voice/counter state because it replaced the whole document without
+  a complete operational-field boundary.
 
 ### KAT-054 — Admin settings page · V1 · implemented
 **Persona:** David (operator), Posey.

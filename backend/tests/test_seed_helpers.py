@@ -19,6 +19,7 @@ os.environ.setdefault("NETWORK_DOMAINS", "beauty:knowsbeauty.localhost")
 os.environ.setdefault("PREVIEW_MODE_ENABLED", "false")
 
 from seed._helpers import upsert
+from seed import seed_miami
 
 
 @pytest.fixture
@@ -131,6 +132,53 @@ async def test_upsert_lets_seed_set_a_real_hero_photo(db):
 
     doc = await db.cities.find_one({"slug": "miami"})
     assert doc["hero_photo_url"] == "https://images.unsplash.com/new?w=1600"
+
+
+@pytest.mark.asyncio
+async def test_miami_reseed_preserves_operational_state_on_custom_path(seeded_db):
+    """A Miami re-seed must not erase state written after the source snapshot.
+
+    The custom Miami business loop replaces existing documents wholesale. The
+    source owns editorial fields, but claims, paid visibility, voice
+    provisioning, lifecycle state, and counters belong to the live record.
+    """
+    # @define-test KAT-052 "Miami re-seeding preserves live operational state"
+    network = await seeded_db.networks.find_one({"slug": "beauty"})
+    source_row = next(
+        row
+        for row in seed_miami.BUSINESSES_PER_NETWORK["beauty"]
+        if not row.get("premium")
+    )
+    existing = await seeded_db.businesses.find_one(
+        {"network_id": network["_id"], "slug": source_row["slug"]}
+    )
+    assert existing is not None
+
+    operational = {
+        "status": "archived",
+        "claim_status": "verified",
+        "claimed_email": "owner@example.com",
+        "facebook": "https://facebook.example/owner",
+        "featured": {"enabled": True, "tier": "concierge"},
+        "voice_phone_number": "(669) 232-8894",
+        "vapi_phone_number_id": "phone_test_123",
+        "vapi_assistant_id": "assistant_test_123",
+        "page_view_count": 17,
+        "mkb_referred_view_count": 5,
+        "call_click_count": 3,
+        "directions_click_count": 2,
+        "website_click_count": 4,
+    }
+    await seeded_db.businesses.update_one(
+        {"_id": existing["_id"]},
+        {"$set": operational},
+    )
+
+    await seed_miami.main()
+
+    reseeded = await seeded_db.businesses.find_one({"_id": existing["_id"]})
+    for field, expected in operational.items():
+        assert reseeded[field] == expected, f"re-seed erased {field}"
 
 
 def test_seeded_footer_cross_links_use_canonical_hosts():
