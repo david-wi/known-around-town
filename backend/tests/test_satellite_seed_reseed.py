@@ -124,6 +124,7 @@ async def test_satellite_reseed_canary_preserves_state_and_refreshes_source(seed
                     "status": "archived",
                     "claim_status": "verified",
                     "claimed_email": f"owner+{city_slug}@example.com",
+                    "description": f"Owner-edited description for {city_slug}",
                     "claimed_by_user_id": f"owner-{city_slug}",
                     # mongomock stores timezone-aware datetimes as naive values;
                     # the production invariant is the timestamp itself.
@@ -247,7 +248,7 @@ async def test_satellite_reseed_canary_preserves_state_and_refreshes_source(seed
         for field in (
             "_id", "created_at", "name", "address", "category_slugs",
             "neighborhood_slugs", "short_description", "status", "claim_status",
-            "claimed_email", "stripe_customer_id", "stripe_subscription_id",
+            "claimed_email", "description", "stripe_customer_id", "stripe_subscription_id",
             "featured", "voice_phone_number", "vapi_phone_number_id",
             "vapi_assistant_id", "page_view_count", "mkb_referred_view_count",
             "call_click_count", "directions_click_count", "website_click_count",

@@ -296,8 +296,8 @@ def preserve_existing_business_state(
     ):
         seed_doc["featured"] = existing_featured
 
-    # WHY: owner edits to contact/social fields are authoritative once a
-    # listing enters the claim flow. Unclaimed editorial rows continue to
+    # WHY: owner edits to profile, contact, and social fields are authoritative
+    # once a listing enters the claim flow. Unclaimed editorial rows continue to
     # receive fresh source values on each reseed.
     # WHY: older claim records may only carry the original boolean marker;
     # treating it as owner-claimed prevents a reseed from overwriting owner
@@ -308,6 +308,11 @@ def preserve_existing_business_state(
         or existing.get("claim_status") in {"pending", "claimed", "verified"}
     )
     if owner_claimed:
+        # Satellite source rows may omit this owner-editable field entirely, so
+        # a full replacement would otherwise delete it. Legacy sources that do
+        # provide description remain authoritative for unclaimed rows.
+        if "description" in existing:
+            seed_doc["description"] = existing["description"]
         for field in ("phone", "website", "instagram"):
             # A null legacy value is not an owner edit; keep the fresh source
             # value rather than turning a usable contact field into None.

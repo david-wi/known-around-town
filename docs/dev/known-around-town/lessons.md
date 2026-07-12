@@ -1,5 +1,15 @@
 # known-around-town — Lessons Learned
 
+## Satellite reseeds must preserve claimed owner descriptions (2026-07-12)
+
+All city seed writers use a shared full-document replacement helper, so an
+owner-editable field can be lost even when only one satellite source omits it.
+Claimed records now retain the existing `description` through that helper, while
+unclaimed records continue to receive fresh source descriptions and new
+businesses still receive the checked-in value. Keep cross-city moves separate:
+preserving fields does not decide whether an old-city record should be merged or
+archived when a listing changes cities.
+
 ## Hide unfinished language controls until another locale is actually available (2026-07-10)
 
 The shared header contained an English-only language pill with no working language choices. It looked interactive but could not change the page language, so it read as unfinished UI. The control was removed from the header until a real locale menu is implemented; the focused template test now prevents the old markup from returning while preserving desktop and mobile navigation.
