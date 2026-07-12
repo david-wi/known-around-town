@@ -53,6 +53,11 @@ entrypoint fails closed before database access.
   the Aventura, Coral Gables, South Beach, and Sunny Isles replacement loops;
   eight satellite rows lost operational/owner state on re-seed. Source
   consolidation is held until those writers share the reviewed boundary.
+- 2026-07-12 — Satellite replacement rows omitted `description`, so a claimed
+  listing's owner-edited description could be deleted on re-seed. The shared
+  preservation helper now retains it for claimed records while leaving
+  unclaimed source descriptions refreshable; the cross-city move/merge remains
+  held pending explicit stable-ID design and live-record evidence.
 
 ### KAT-054 — Admin settings page · V1 · implemented
 **Persona:** David (operator), Posey.

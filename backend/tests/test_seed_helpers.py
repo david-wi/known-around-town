@@ -19,7 +19,7 @@ os.environ.setdefault("NETWORK_DOMAINS", "beauty:knowsbeauty.localhost")
 os.environ.setdefault("PREVIEW_MODE_ENABLED", "false")
 
 from seed._helpers import preserve_existing_business_state, upsert
-from seed import seed_miami
+from seed import seed_miami, seed_miramar
 
 
 @pytest.fixture
@@ -345,6 +345,57 @@ def test_miami_can_opt_into_existing_description_override():
     preserve_existing_business_state(existing, seed_doc, preserve_description=True)
 
     assert seed_doc["description"] == "owner-approved copy"
+
+
+def test_satellite_preservation_keeps_owner_description_but_refreshes_source_copy():
+    """Claimed owner copy survives while unclaimed source copy stays refreshable."""
+    owner_existing = {
+        "claim_status": "claimed",
+        "claimed_email": "owner@example.com",
+        "description": "Owner-edited description",
+    }
+    owner_seed_doc = {"description": "Fresh source description"}
+
+    preserve_existing_business_state(owner_existing, owner_seed_doc)
+
+    assert owner_seed_doc["description"] == "Owner-edited description"
+
+    source_existing = {
+        "claim_status": "unclaimed",
+        "description": "Old source description",
+    }
+    source_seed_doc = {"description": "Fresh source description"}
+
+    preserve_existing_business_state(source_existing, source_seed_doc)
+
+    assert source_seed_doc["description"] == "Fresh source description"
+
+
+def test_satellite_preservation_restores_owner_description_when_source_omits_it():
+    """An owner description is retained even when a newer satellite row omits it."""
+    existing = {
+        "claimed_email": "owner@example.com",
+        "description": "Owner-edited description",
+    }
+    seed_doc = {"short_description": "Fresh source summary"}
+
+    preserve_existing_business_state(existing, seed_doc)
+
+    assert seed_doc["description"] == "Owner-edited description"
+
+
+@pytest.mark.asyncio
+async def test_legacy_satellite_new_business_keeps_source_description(seeded_db):
+    """A new legacy satellite listing still receives its checked-in description."""
+    await seed_miramar.main()
+
+    source = seed_miramar.BUSINESSES[0]
+    city = await seeded_db.cities.find_one({"slug": seed_miramar.CITY_SLUG})
+    business = await seeded_db.businesses.find_one(
+        {"city_id": city["_id"], "slug": source["slug"]}
+    )
+
+    assert business["description"] == source["description"]
 
 
 def test_seeded_footer_cross_links_use_canonical_hosts():
