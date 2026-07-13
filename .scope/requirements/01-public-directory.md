@@ -128,7 +128,7 @@ scope for this requirement.
 
 ### KAT-078 — Business-name search with independent service and neighborhood filters · V1 · implemented
 **Risk:** medium
-**Verified:** 2026-07-13 (automated repair verification; live deployment QA pending)
+**Verified:** 2026-07-13 (automated repair verification and live deployment QA)
 **Incidents:**
 - 2026-07-13 — Whole-phrase AI selection can make a direct business-name query depend on the model understanding unrelated service or neighborhood words.
 - 2026-07-13 — An unknown business-name query such as `Supercuts Downtown` returned unrelated live listings through semantic fallback instead of the existing no-results state.
