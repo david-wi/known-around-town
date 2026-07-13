@@ -128,9 +128,10 @@ scope for this requirement.
 
 ### KAT-078 — Business-name search with independent service and neighborhood filters · V1 · implemented
 **Risk:** medium
-**Verified:** 2026-07-13
+**Verified:** 2026-07-13 (automated repair verification; live deployment QA pending)
 **Incidents:**
 - 2026-07-13 — Whole-phrase AI selection can make a direct business-name query depend on the model understanding unrelated service or neighborhood words.
+- 2026-07-13 — An unknown business-name query such as `Supercuts Downtown` returned unrelated live listings through semantic fallback instead of the existing no-results state.
 **Refs:** PR #506; production search walkthrough 2026-07-13
 **Persona:** Salon Seeker.
 Business-name lookup is a primary search job: an exact or partial business name
@@ -160,6 +161,15 @@ ignored.
 - Given a mixed phrase such as `lash near Aventura`, the system may use the
   semantic fallback, but it must preserve the current-city and live-status
   boundaries and must fail closed when the AI selector is unavailable.
+- Given a query whose distinctive business-name token is absent from every
+  live current-city business name and its service, known-for, tag, or
+  description evidence (for example, `Supercuts Downtown` or `Great Clips
+  Wynwood`), `/search` returns the existing no-results state without calling
+  the AI selector.
+- Given a menu-level service term supported by live current-city evidence but
+  not necessarily by a category slug (for example, `keratin`), `/search` may
+  use semantic fallback and returns only the AI-selected live current-city
+  listings.
 - Draft, archived, and other-city businesses never appear in public search,
   including when their names exactly match the query.
 - Empty and no-match queries render the existing browse or empty states without
@@ -183,6 +193,10 @@ featured/editor's-pick ordering beyond ranking within the matching result set.
   rows remain excluded.
 - `@define-test KAT-078-ai-fallback` — semantic fallback uses the centralized
   gateway and returns the existing safe empty result on gateway failure.
+- `@define-test KAT-078-fallback-intent-gate` — unknown name-like queries with
+  uncovered distinctive tokens fail closed without an AI call, while generic
+  service/location and catalog-supported menu-service queries retain semantic
+  fallback.
 - Manual QA: use `/search` on desktop and mobile with an exact name, a partial
-  name, `nails Brickell`, and `lash near Aventura`; capture the rendered results
-  and empty state after deployment.
+  name, `nails Brickell`, `lash near Aventura`, and `Supercuts Downtown`;
+  capture the rendered results and empty state after deployment.
