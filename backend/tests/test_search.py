@@ -28,6 +28,8 @@ def _biz(
     neighborhood_slugs: List[str],
     short_description: str = "",
     tags: List[str] | None = None,
+    known_for: str = "",
+    services: List[Dict[str, Any]] | None = None,
     status: str = "live",
     city_id: str = CITY,
     featured_enabled: bool = False,
@@ -44,6 +46,8 @@ def _biz(
         "neighborhood_slugs": neighborhood_slugs,
         "short_description": short_description,
         "tags": tags or [],
+        "known_for": known_for,
+        "services": services or [],
         "featured": {"enabled": featured_enabled},
         "editors_pick": editors_pick,
         "quality_score": quality_score,
@@ -65,7 +69,8 @@ _SEED = [
          short_description="Nail art studio"),
     _biz("blow-dry-bar-brickell", "Blow Dry Bar Brickell",
          category_slugs=["hair"], neighborhood_slugs=["brickell"],
-         short_description="Blowouts and styling"),
+         short_description="Blowouts and styling",
+         services=[{"name": "Keratin Treatment"}]),
     _biz("four-seasons-spa", "The Spa at Four Seasons",
          category_slugs=["spa"], neighborhood_slugs=["brickell"],
          short_description="Hotel day spa", status="draft"),
@@ -149,6 +154,82 @@ async def test_nonsense_term_returns_empty(mock_db, monkeypatch):
     assert res == []
 
 
+# @define-test KAT-078-fallback-intent-gate
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("query", "extra_candidate"),
+    [
+        (
+            "Supercuts Downtown",
+            _biz(
+                "downtown-styling",
+                "Downtown Styling Studio",
+                category_slugs=["hair"],
+                neighborhood_slugs=["downtown"],
+            ),
+        ),
+        ("Great Clips Wynwood", None),
+    ],
+)
+async def test_unmatched_business_name_queries_skip_ai(
+    mock_db, monkeypatch, query, extra_candidate
+):
+    """A real location word must not turn an unknown brand into a fuzzy match."""
+    await _seed(mock_db)
+    if extra_candidate is not None:
+        await mock_db.businesses.insert_one(extra_candidate)
+
+    from app.services import content as content_svc
+
+    async def unexpected_ai_call(**kwargs):
+        raise AssertionError("unmatched business-name queries must fail closed before AI")
+
+    monkeypatch.setattr(content_svc, "_select_matching_business_ids", unexpected_ai_call)
+
+    assert await content_svc.search_businesses(CITY, query) == []
+
+
+# @define-test KAT-078-fallback-intent-gate
+@pytest.mark.asyncio
+async def test_gibberish_query_skips_ai(mock_db, monkeypatch):
+    await _seed(mock_db)
+    from app.services import content as content_svc
+
+    async def unexpected_ai_call(**kwargs):
+        raise AssertionError("uncovered gibberish must fail closed before AI")
+
+    monkeypatch.setattr(content_svc, "_select_matching_business_ids", unexpected_ai_call)
+
+    assert await content_svc.search_businesses(CITY, "zzqxnope") == []
+
+
+# @define-test KAT-078-fallback-intent-gate
+@pytest.mark.asyncio
+async def test_catalog_menu_service_query_keeps_semantic_fallback(mock_db, monkeypatch):
+    await _seed(mock_db)
+    from app.services import content as content_svc
+
+    called = False
+
+    async def service_ai_selector(*, query, businesses):
+        nonlocal called
+        called = True
+        assert query == "keratin"
+        assert any(
+            service.get("name") == "Keratin Treatment"
+            for business in businesses
+            for service in business.get("services", [])
+        )
+        return ["blow-dry-bar-brickell"]
+
+    monkeypatch.setattr(content_svc, "_select_matching_business_ids", service_ai_selector)
+
+    result = await content_svc.search_businesses(CITY, "keratin")
+
+    assert [business["_id"] for business in result] == ["blow-dry-bar-brickell"]
+    assert called
+
+
 @pytest.mark.asyncio
 async def test_partial_match_across_terms_excludes_non_matches(mock_db, monkeypatch):
     """"hair brickell" must return the Brickell hair salon, not the nail bar."""
@@ -208,7 +289,7 @@ async def test_meaningful_partial_business_name_match_is_deterministic(mock_db, 
     assert [business["_id"] for business in res] == ["lets-nail-bar-brickell"]
 
 
-# @define-test KAT-078-name-partial
+# @define-test KAT-078-fallback-intent-gate
 @pytest.mark.asyncio
 async def test_generic_only_name_terms_use_semantic_fallback(mock_db, monkeypatch):
     await _seed(mock_db)

@@ -261,6 +261,50 @@ def _search_terms(values: Any) -> set[str]:
     return terms
 
 
+def _meaningful_search_token_runs(
+    query: str,
+    *,
+    category_terms: set[str],
+    neighborhood_terms: set[str],
+) -> List[tuple[str, ...]]:
+    """Return contiguous query runs that can express a distinctive name."""
+    generic_terms = _NAME_MATCH_GENERIC_TERMS | category_terms | neighborhood_terms
+    meaningful_runs: List[tuple[str, ...]] = []
+    current_run: List[str] = []
+    for token in _normalize_search_text(query).split():
+        if token in generic_terms or len(token) < 3:
+            if current_run:
+                meaningful_runs.append(tuple(current_run))
+                current_run = []
+            continue
+        current_run.append(token)
+    if current_run:
+        meaningful_runs.append(tuple(current_run))
+    return meaningful_runs
+
+
+def _search_service_vocabulary(candidates: List[Dict[str, Any]]) -> set[str]:
+    """Return current-catalog evidence that makes semantic fallback eligible."""
+    evidence: List[Any] = []
+    for business in candidates:
+        evidence.extend(
+            [business.get("short_description"), business.get("known_for")]
+        )
+        if isinstance(business.get("tags"), list):
+            evidence.extend(business["tags"])
+        if isinstance(business.get("services"), list):
+            evidence.extend(
+                service.get("name")
+                for service in business["services"]
+                if isinstance(service, dict)
+            )
+
+    # WHY: This bounded, tenant-scoped scan admits semantic fallback only for
+    # evidence the current live catalog actually contains. It prevents an
+    # unknown brand plus a real neighborhood from becoming unrelated results.
+    return _NAME_MATCH_GENERIC_TERMS | _search_terms(evidence)
+
+
 async def _search_name_generic_terms(
     city_id: str,
     candidates: List[Dict[str, Any]],
@@ -307,20 +351,12 @@ def _name_match_score(
     if query_normalized == name_normalized:
         return 0
 
-    generic_terms = _NAME_MATCH_GENERIC_TERMS | category_terms | neighborhood_terms
-    query_tokens = query_normalized.split()
     name_tokens = name_normalized.split()
-    meaningful_runs: List[tuple[str, ...]] = []
-    current_run: List[str] = []
-    for token in query_tokens:
-        if token in generic_terms or len(token) < 3:
-            if current_run:
-                meaningful_runs.append(tuple(current_run))
-                current_run = []
-            continue
-        current_run.append(token)
-    if current_run:
-        meaningful_runs.append(tuple(current_run))
+    meaningful_runs = _meaningful_search_token_runs(
+        query,
+        category_terms=category_terms,
+        neighborhood_terms=neighborhood_terms,
+    )
     if not meaningful_runs:
         return None
 
@@ -399,6 +435,22 @@ async def search_businesses(
             if match_score == score
         ]
         return ordered_matches[:limit]
+
+    distinctive_tokens = {
+        token
+        for run in _meaningful_search_token_runs(
+            search_text,
+            category_terms=category_terms,
+            neighborhood_terms=neighborhood_terms,
+        )
+        for token in run
+    }
+    if distinctive_tokens and not distinctive_tokens.issubset(
+        _search_service_vocabulary(candidates)
+    ):
+        # A name-like token with no live catalog evidence is safer as a clear
+        # no-results state than an AI-selected list of unrelated businesses.
+        return []
 
     # The AI prompt remains bounded even though deterministic name matching
     # inspected the larger current-city catalog above.
