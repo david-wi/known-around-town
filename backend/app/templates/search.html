@@ -28,27 +28,59 @@
         style='font-family: Georgia, "Times New Roman", serif;'>
       {% if query %}
         Results for <em class="italic {{ theme.accent_text_strong }}">{{ query }}</em>
+      {% elif has_filters %}
+        Browse {{ city.name }}
       {% else %}
         Search {{ city.name }}
       {% endif %}
     </h1>
     {# Persistent search bar so users can refine their query without scrolling #}
-    <form class="bg-white ring-1 ring-stone-200 shadow-sm flex items-center max-w-xl" method="get" action="/search">
-      <div class="flex items-center pl-5 pr-3 text-stone-400">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-          <circle cx="11" cy="11" r="7"></circle>
-          <path d="M21 21l-4.35-4.35" stroke-linecap="round"></path>
-        </svg>
+    {# @define-start KAT-078 "Independent accessible service and neighborhood search controls" #}
+    <form class="bg-white ring-1 ring-stone-200 shadow-sm max-w-4xl p-2" method="get" action="/search">
+      <div class="flex flex-wrap items-center">
+        <div class="flex items-center pl-3 pr-3 text-stone-400">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="M21 21l-4.35-4.35" stroke-linecap="round"></path>
+          </svg>
+        </div>
+        <label class="sr-only" for="search-query">Business name or service</label>
+        <input type="text" name="q" value="{{ query }}" placeholder="Try 'lash bar', 'balayage', 'nail art'…"
+               id="search-query"
+               autofocus
+               class="flex-1 min-w-[12rem] py-3 px-1 bg-transparent text-stone-900 placeholder-stone-400 focus:outline-none text-sm">
+        <button type="submit"
+                class="bg-stone-950 hover:bg-stone-800 text-white font-medium px-7 py-3 text-xs uppercase tracking-[0.2em] transition">
+          Find
+        </button>
       </div>
-      <input type="text" name="q" value="{{ query }}" placeholder="Try 'lash bar', 'balayage', 'nail art'…"
-             autofocus
-             class="flex-1 py-4 px-1 bg-transparent text-stone-900 placeholder-stone-400 focus:outline-none text-sm">
-      <button type="submit"
-              class="bg-stone-950 hover:bg-stone-800 text-white font-medium px-7 py-4 text-xs uppercase tracking-[0.2em] transition">
-        Find
-      </button>
+      <div class="flex flex-wrap gap-3 border-t border-stone-100 mt-2 pt-2 px-3 pb-1 text-sm">
+        <label class="flex items-center gap-2 text-stone-600" for="search-service">
+          Service
+          <select id="search-service" name="service" aria-label="Service"
+                  class="bg-stone-50 ring-1 ring-stone-200 px-3 py-2 text-stone-800 focus:outline-none">
+            <option value="">All services</option>
+            {% for c in nav_categories %}
+            {% if not c.parent_slug %}
+            <option value="{{ c.slug }}"{% if service_slug == c.slug %} selected{% endif %}>{{ c.name }}</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </label>
+        <label class="flex items-center gap-2 text-stone-600" for="search-neighborhood">
+          Neighborhood
+          <select id="search-neighborhood" name="neighborhood" aria-label="Neighborhood"
+                  class="bg-stone-50 ring-1 ring-stone-200 px-3 py-2 text-stone-800 focus:outline-none">
+            <option value="">All neighborhoods</option>
+            {% for n in nav_neighborhoods %}
+            <option value="{{ n.slug }}"{% if neighborhood_slug == n.slug %} selected{% endif %}>{{ n.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
     </form>
-    {% if query and result_count %}
+    {# @define-end KAT-078 #}
+    {% if (query or has_filters) and result_count %}
     <p class="mt-4 text-sm text-stone-500">
       {{ result_count }} listing{{ 's' if result_count != 1 else '' }} found
     </p>
@@ -83,14 +115,14 @@
   </div>
 </section>
 
-{% elif query %}
+{% elif query or has_filters %}
 {# ============= ZERO-STATE (searched but no results) ============= #}
 <section class="max-w-3xl mx-auto px-6 lg:px-10 py-20 text-center">
   <p class="text-5xl mb-6">🔍</p>
   <h2 class="font-serif text-3xl font-light text-stone-900 mb-3"
-      style="font-family: Georgia, serif;">Nothing found for "{{ query }}"</h2>
+      style="font-family: Georgia, serif;">{% if query %}Nothing found for "{{ query }}"{% else %}No listings match these filters{% endif %}</h2>
   <p class="text-stone-600 mb-10 text-lg">
-    Try a shorter term or browse by category below.
+    {% if query %}Try a shorter term or browse by category below.{% else %}Try another service or neighborhood below.{% endif %}
   </p>
   {% if nav_categories %}
   <div class="flex flex-wrap justify-center gap-3">

@@ -1704,6 +1704,20 @@ def test_search_page_no_query(client):
     assert 'name="q"' in r.text
 
 
+# @define-test KAT-078-filter-controls
+def test_search_page_exposes_independent_filter_controls(client, seeded_db):
+    """The search form keeps service and neighborhood selections in the URL."""
+    r = client.get(
+        "/search?service=nails&neighborhood=brickell",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    assert 'name="service"' in r.text
+    assert 'name="neighborhood"' in r.text
+    assert 'option value="nails" selected' in r.text
+    assert 'option value="brickell" selected' in r.text
+
+
 def _patch_search_page_ai_results(monkeypatch):
     from app.services import content as content_svc
 

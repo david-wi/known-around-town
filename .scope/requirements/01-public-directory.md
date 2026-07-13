@@ -125,3 +125,64 @@ photo. Given seeded source data includes `category_slugs`, then the Miami seed
 preserves the complete category list instead of reducing it to one category.
 Direct production database edits and public photo-provenance notes are out of
 scope for this requirement.
+
+### KAT-078 — Business-name search with independent service and neighborhood filters · V1 · ready_to_build
+**Risk:** medium
+**Verified:** not yet
+**Incidents:**
+- 2026-07-13 — Whole-phrase AI selection can make a direct business-name query depend on the model understanding unrelated service or neighborhood words.
+**Refs:**
+**Persona:** Salon Seeker.
+Business-name lookup is a primary search job: an exact or partial business name
+must surface the matching live listing even when the query is not a complete
+sentence. Service and neighborhood are separate constraints, so a shopper can
+search for a service in a neighborhood without relying on one fragile parser.
+Mixed natural-language phrases may remain a convenience path, but they must not
+weaken a clear name match or allow a service/neighborhood constraint to be
+ignored.
+
+**Acceptance:**
+
+- Given a live business in the current city and a query equal to its normalized
+  name, `/search` returns that listing.
+- Given a live business in the current city and a query containing a contiguous
+  meaningful substring of its normalized name, `/search` returns that listing;
+  generic business-type words alone are not sufficient to claim a name match.
+- Given a service term and neighborhood term, results contain only live
+  businesses that match both the service/category or service-menu evidence and
+  the neighborhood; a service-only or neighborhood-only query remains broad.
+- Given the existing search page, separate Service and Neighborhood controls
+  submit independent URL parameters, preserve their selected values on the
+  results page, and work with an empty business-name field.
+- Given a business name plus service and/or neighborhood constraints, the name
+  match is still considered first but the explicit constraints are applied to
+  the final result set.
+- Given a mixed phrase such as `lash near Aventura`, the system may use the
+  semantic fallback, but it must preserve the current-city and live-status
+  boundaries and must fail closed when the AI selector is unavailable.
+- Draft, archived, and other-city businesses never appear in public search,
+  including when their names exactly match the query.
+- Empty and no-match queries render the existing browse or empty states without
+  an exception.
+
+**Out of scope:** Additional filter types, a new service taxonomy, service-data
+backfills, location deduplication, production database writes, and changes to
+featured/editor's-pick ordering beyond ranking within the matching result set.
+
+## Verification
+
+- `@define-test KAT-078-name-exact` — exact business-name query returns the
+  live current-city listing without requiring an AI response.
+- `@define-test KAT-078-name-partial` — meaningful partial name matching works
+  while generic-only terms do not become name matches.
+- `@define-test KAT-078-filter-composition` — service and neighborhood filters
+  are independently applied, including name-plus-filter queries.
+- `@define-test KAT-078-filter-controls` — the existing search form submits and
+  preserves independent Service and Neighborhood selections.
+- `@define-test KAT-078-visibility-boundary` — draft, archived, and other-city
+  rows remain excluded.
+- `@define-test KAT-078-ai-fallback` — semantic fallback uses the centralized
+  gateway and returns the existing safe empty result on gateway failure.
+- Manual QA: use `/search` on desktop and mobile with an exact name, a partial
+  name, `nails Brickell`, and `lash near Aventura`; capture the rendered results
+  and empty state after deployment.
