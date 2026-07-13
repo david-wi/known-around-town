@@ -10,6 +10,12 @@ businesses still receive the checked-in value. Keep cross-city moves separate:
 preserving fields does not decide whether an old-city record should be merged or
 archived when a listing changes cities.
 
+## Business-name lookup should be deterministic before semantic search (2026-07-13, PR #506)
+
+The public search route sent the entire visitor phrase to one semantic selector. That made a known salon name dependent on the model correctly interpreting unrelated service or neighborhood words, and there was no explicit way to constrain those dimensions independently.
+
+The durable pattern is to match exact and meaningful partial business names first within the current city's live catalog, apply explicit service and neighborhood constraints before either path, and keep the centralized AI gateway only as the fail-closed fallback for service intent and mixed natural-language phrases. URL-backed controls make the independent constraints reachable and testable on the existing search page.
+
 ## Hide unfinished language controls until another locale is actually available (2026-07-10)
 
 The shared header contained an English-only language pill with no working language choices. It looked interactive but could not change the page language, so it read as unfinished UI. The control was removed from the header until a real locale menu is implemented; the focused template test now prevents the old markup from returning while preserving desktop and mobile navigation.

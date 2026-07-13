@@ -126,12 +126,12 @@ preserves the complete category list instead of reducing it to one category.
 Direct production database edits and public photo-provenance notes are out of
 scope for this requirement.
 
-### KAT-078 — Business-name search with independent service and neighborhood filters · V1 · ready_to_build
+### KAT-078 — Business-name search with independent service and neighborhood filters · V1 · implemented
 **Risk:** medium
-**Verified:** not yet
+**Verified:** 2026-07-13
 **Incidents:**
 - 2026-07-13 — Whole-phrase AI selection can make a direct business-name query depend on the model understanding unrelated service or neighborhood words.
-**Refs:**
+**Refs:** PR #506; production search walkthrough 2026-07-13
 **Persona:** Salon Seeker.
 Business-name lookup is a primary search job: an exact or partial business name
 must surface the matching live listing even when the query is not a complete

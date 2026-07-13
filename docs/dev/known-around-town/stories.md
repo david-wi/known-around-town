@@ -17,7 +17,7 @@
 | GA4 analytics | ✅ Live | `GA_MEASUREMENT_ID` env var |
 | Google star ratings display | ✅ Live | On salon pages + JSON-LD AggregateRating; populated after API sync |
 | Google Search Console | ⚠️ Pending | Verification tag ready; David needs to verify |
-| Business-name search with independent filters | 🛠 Ready to build | Exact/partial name matching is primary; service and neighborhood remain separate constraints; mixed phrases may use semantic fallback |
+| Business-name search with independent filters | ✅ Live | Exact/partial name matching is primary; service and neighborhood remain separate constraints; mixed phrases use the centralized semantic fallback |
 
 ## Preview / Access Control
 
