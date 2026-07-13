@@ -69,6 +69,12 @@ _SEED = [
     _biz("four-seasons-spa", "The Spa at Four Seasons",
          category_slugs=["spa"], neighborhood_slugs=["brickell"],
          short_description="Hotel day spa", status="draft"),
+    _biz("draft-name-match", "Let's Nail Bar Brickell",
+         category_slugs=["nails"], neighborhood_slugs=["brickell"], status="draft"),
+    _biz("archived-name-match", "Let's Nail Bar Brickell",
+         category_slugs=["nails"], neighborhood_slugs=["brickell"], status="archived"),
+    _biz("other-city-name-match", "Let's Nail Bar Brickell",
+         category_slugs=["nails"], neighborhood_slugs=["brickell"], city_id=OTHER_CITY),
     _biz("other-city-nail-bar", "Other City Nail Bar",
          category_slugs=["nails"], neighborhood_slugs=["brickell"],
          city_id=OTHER_CITY, short_description="nails"),
@@ -174,6 +180,100 @@ async def test_empty_query_returns_empty(mock_db):
     assert await content_svc.search_businesses(CITY, "   ") == []
 
 
+# @define-test KAT-078-name-exact
+@pytest.mark.asyncio
+async def test_exact_business_name_match_is_deterministic(mock_db, monkeypatch):
+    await _seed(mock_db)
+    from app.services import content as content_svc
+
+    async def unexpected_ai_call(**kwargs):
+        raise AssertionError("exact business names must not require AI")
+
+    monkeypatch.setattr(content_svc, "_select_matching_business_ids", unexpected_ai_call)
+    res = await content_svc.search_businesses(CITY, " let's nail bar brickell ")
+    assert [business["_id"] for business in res] == ["lets-nail-bar-brickell"]
+
+
+# @define-test KAT-078-name-partial
+@pytest.mark.asyncio
+async def test_meaningful_partial_business_name_match_is_deterministic(mock_db, monkeypatch):
+    await _seed(mock_db)
+    from app.services import content as content_svc
+
+    async def unexpected_ai_call(**kwargs):
+        raise AssertionError("meaningful partial names must not require AI")
+
+    monkeypatch.setattr(content_svc, "_select_matching_business_ids", unexpected_ai_call)
+    res = await content_svc.search_businesses(CITY, "lets nail")
+    assert [business["_id"] for business in res] == ["lets-nail-bar-brickell"]
+
+
+# @define-test KAT-078-name-partial
+@pytest.mark.asyncio
+async def test_generic_only_name_terms_use_semantic_fallback(mock_db, monkeypatch):
+    await _seed(mock_db)
+    from app.services import content as content_svc
+
+    called = False
+
+    async def empty_ai_selector(*, query, businesses):
+        nonlocal called
+        called = True
+        return []
+
+    monkeypatch.setattr(content_svc, "_select_matching_business_ids", empty_ai_selector)
+    res = await content_svc.search_businesses(CITY, "nail bar brickell")
+
+    assert res == []
+    assert called, "generic service/category/neighborhood words must not be name matches"
+
+
+# @define-test KAT-078-filter-composition
+@pytest.mark.asyncio
+async def test_service_and_neighborhood_filters_are_independent_constraints(
+    mock_db, monkeypatch
+):
+    await _seed(mock_db)
+    content_svc = _patch_ai_matches(
+        monkeypatch,
+        {"nails": {"lets-nail-bar-brickell", "wynwood-nails"}},
+    )
+    res = await content_svc.search_businesses(
+        CITY,
+        "nails",
+        service_slug="nails",
+        neighborhood_slug="brickell",
+    )
+    assert [business["_id"] for business in res] == ["lets-nail-bar-brickell"]
+
+    service_only = await content_svc.search_businesses(CITY, service_slug="nails")
+    assert {business["_id"] for business in service_only} == {
+        "lets-nail-bar-brickell",
+        "wynwood-nails",
+    }
+    neighborhood_only = await content_svc.search_businesses(CITY, neighborhood_slug="brickell")
+    assert {business["_id"] for business in neighborhood_only} == {
+        "lets-nail-bar-brickell",
+        "blow-dry-bar-brickell",
+    }
+
+
+@pytest.mark.asyncio
+async def test_filter_only_search_returns_live_filtered_list_without_ai(mock_db, monkeypatch):
+    await _seed(mock_db)
+    from app.services import content as content_svc
+
+    async def unexpected_ai_call(**kwargs):
+        raise AssertionError("filter-only browsing must not require AI")
+
+    monkeypatch.setattr(content_svc, "_select_matching_business_ids", unexpected_ai_call)
+    res = await content_svc.search_businesses(CITY, service_slug="nails")
+    assert {business["_id"] for business in res} == {
+        "lets-nail-bar-brickell",
+        "wynwood-nails",
+    }
+
+
 @pytest.mark.asyncio
 async def test_search_normalizes_case_before_ai_selection(mock_db, monkeypatch):
     await _seed(mock_db)
@@ -187,6 +287,7 @@ async def test_search_normalizes_case_before_ai_selection(mock_db, monkeypatch):
 
 
 @pytest.mark.asyncio
+# @define-test KAT-078-visibility-boundary
 async def test_other_city_results_excluded(mock_db, monkeypatch):
     await _seed(mock_db)
     content_svc = _patch_ai_matches(
@@ -197,6 +298,35 @@ async def test_other_city_results_excluded(mock_db, monkeypatch):
     res = await content_svc.search_businesses(CITY, "nails brickell")
     ids = {r["_id"] for r in res}
     assert "other-city-nail-bar" not in ids
+
+
+# @define-test KAT-078-visibility-boundary
+@pytest.mark.asyncio
+async def test_exact_names_for_draft_archived_and_other_city_rows_stay_hidden(
+    mock_db, monkeypatch
+):
+    await _seed(mock_db)
+    await mock_db.businesses.insert_one(
+        _biz(
+            "archived-nail-bar",
+            "Archived Nail Bar",
+            category_slugs=["nails"],
+            neighborhood_slugs=["brickell"],
+            status="archived",
+        )
+    )
+    from app.services import content as content_svc
+
+    async def empty_ai_selector(*, query, businesses):
+        return []
+
+    monkeypatch.setattr(content_svc, "_select_matching_business_ids", empty_ai_selector)
+    for query in (
+        "The Spa at Four Seasons",
+        "Archived Nail Bar",
+        "Other City Nail Bar",
+    ):
+        assert await content_svc.search_businesses(CITY, query) == []
 
 
 @pytest.mark.asyncio
@@ -227,6 +357,53 @@ async def test_featured_and_editors_pick_ordering_preserved(mock_db, monkeypatch
     assert order == ["featured-nails", "editors-nails", "plain-nails"], order
 
 
+# @define-test KAT-078-name-partial
+@pytest.mark.asyncio
+async def test_equal_relevance_name_matches_keep_existing_listing_order(
+    mock_db, monkeypatch
+):
+    rows = [
+        _biz(
+            "plain-glow",
+            "Glow Plain Studio",
+            category_slugs=["hair"],
+            neighborhood_slugs=["brickell"],
+            quality_score=10,
+        ),
+        _biz(
+            "featured-glow",
+            "Glow Featured Studio",
+            category_slugs=["hair"],
+            neighborhood_slugs=["brickell"],
+            featured_enabled=True,
+            quality_score=1,
+        ),
+        _biz(
+            "editors-glow",
+            "Glow Editors Studio",
+            category_slugs=["hair"],
+            neighborhood_slugs=["brickell"],
+            editors_pick=True,
+            quality_score=5,
+        ),
+    ]
+    await mock_db.businesses.insert_many(rows)
+
+    from app.services import content as content_svc
+
+    async def unexpected_ai_call(**kwargs):
+        raise AssertionError("meaningful name matches must not require AI")
+
+    monkeypatch.setattr(content_svc, "_select_matching_business_ids", unexpected_ai_call)
+    res = await content_svc.search_businesses(CITY, "glow")
+
+    assert [business["_id"] for business in res] == [
+        "featured-glow",
+        "editors-glow",
+        "plain-glow",
+    ]
+
+
 @pytest.mark.asyncio
 async def test_limit_is_respected(mock_db, monkeypatch):
     rows = [
@@ -244,6 +421,7 @@ async def test_limit_is_respected(mock_db, monkeypatch):
     assert len(res) == 3
 
 
+# @define-test KAT-078-ai-fallback
 @pytest.mark.asyncio
 async def test_select_matching_business_ids_uses_gateway_and_filters_invented_ids(monkeypatch):
     from app.services import content as content_svc
@@ -270,6 +448,7 @@ async def test_select_matching_business_ids_uses_gateway_and_filters_invented_id
 
 
 @pytest.mark.asyncio
+# @define-test KAT-078-ai-fallback
 async def test_select_matching_business_ids_fails_closed_on_gateway_failure(monkeypatch):
     from app.services import content as content_svc
 
@@ -283,6 +462,31 @@ async def test_select_matching_business_ids_fails_closed_on_gateway_failure(monk
         businesses=[
             _biz("lets-nail-bar-brickell", "Let's Nail Bar Brickell",
                  category_slugs=["nails"], neighborhood_slugs=["brickell"]),
+        ],
+    )
+
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_select_matching_business_ids_fails_closed_on_unexpected_gateway_error(
+    monkeypatch,
+):
+    from app.services import content as content_svc
+
+    async def fake_gateway(**kwargs):
+        raise RuntimeError("gateway connection reset")
+
+    monkeypatch.setattr(content_svc, "call_gateway_text", fake_gateway)
+    result = await content_svc._select_matching_business_ids(
+        query="lash near Aventura",
+        businesses=[
+            _biz(
+                "lash-studio",
+                "Lash Studio",
+                category_slugs=["lash-brow"],
+                neighborhood_slugs=["aventura"],
+            )
         ],
     )
 

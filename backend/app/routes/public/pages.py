@@ -347,6 +347,14 @@ def _category_slug_for_exact_search(
     return None
 
 
+def _validated_search_filter(
+    value: Optional[str], allowed_slugs: set[str]
+) -> Optional[str]:
+    """Return a normalized navigation slug, or ignore an unknown URL value."""
+    candidate = (value or "").strip().casefold()
+    return candidate if candidate in allowed_slugs else None
+
+
 def _vertical_word(network: Dict[str, Any]) -> str:
     """Pull the trailing word from the network name ("Knows Beauty" -> "Beauty")."""
     name = network.get("name", "")
@@ -1323,33 +1331,66 @@ async def neighborhood_category_page(
 
 
 @router.get("/search", response_class=HTMLResponse)
-async def search_page(request: Request, q: Optional[str] = None) -> HTMLResponse:
+async def search_page(
+    request: Request,
+    q: Optional[str] = None,
+    service: Optional[str] = None,
+    neighborhood: Optional[str] = None,
+) -> HTMLResponse:
     tenant = await _require_tenant(request)
     if not tenant.city:
         raise HTTPException(404, "City required")
     city = tenant.city
 
     query = (q or "").strip()
-    businesses: List[Dict[str, Any]] = []
-    if query:
-        businesses = await content_svc.search_businesses(city["_id"], query)
-
     ctx = await _base_context(request, tenant)
-    active_category_slug = _category_slug_for_exact_search(
-        query, ctx["nav_categories"]
-    ) if query else None
+    valid_service_slugs = {
+        c["slug"]
+        for c in ctx["nav_categories"]
+        if c.get("slug") and not c.get("parent_slug")
+    }
+    valid_neighborhood_slugs = {
+        n["slug"] for n in ctx["nav_neighborhoods"] if n.get("slug")
+    }
+    service_slug = _validated_search_filter(service, valid_service_slugs)
+    neighborhood_slug = _validated_search_filter(
+        neighborhood, valid_neighborhood_slugs
+    )
+
+    # @define-start KAT-078 "Business-name search with independent service and neighborhood filters"
+    businesses: List[Dict[str, Any]] = []
+    if query or service_slug or neighborhood_slug:
+        businesses = await content_svc.search_businesses(
+            city["_id"],
+            query,
+            service_slug=service_slug,
+            neighborhood_slug=neighborhood_slug,
+        )
+    # @define-end KAT-078
+
+    has_filters = bool(service_slug or neighborhood_slug)
+    active_category_slug = service_slug or (
+        _category_slug_for_exact_search(query, ctx["nav_categories"])
+        if query
+        else None
+    )
     businesses = _with_category_card_context(businesses, active_category_slug)
     ctx.update(
         {
             "query": query,
             "businesses": businesses,
             "active_category_slug": active_category_slug,
+            "service_slug": service_slug,
+            "neighborhood_slug": neighborhood_slug,
+            "has_filters": has_filters,
             "result_count": len(businesses),
             "seo_title": f"Search {city.get('name')}{': ' + query if query else ''} — {tenant.network.get('name')}",
             "meta_description": (
                 f"{len(businesses)} result{'s' if len(businesses) != 1 else ''} for '{query}' "
                 f"in {city.get('name')} — {tenant.network.get('name')}."
                 if query
+                else f"{len(businesses)} result{'s' if len(businesses) != 1 else ''} in {city.get('name')} — {tenant.network.get('name')}."
+                if has_filters
                 else f"Search {tenant.network.get('name')} — find salons, spas, and beauty businesses in {city.get('name')}."
             ),
             # WHY: og:image controls the preview card when someone copies and shares a

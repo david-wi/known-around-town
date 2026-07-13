@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
+import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.database import get_db
@@ -192,6 +194,12 @@ async def list_businesses(
 # the same featured/editorial ordering users already see.
 SEARCH_AI_CANDIDATE_LIMIT = 80
 
+# WHY: name matching must see the complete current-city catalog so a newly
+# seeded listing cannot be hidden behind the AI prompt cap. Current catalogs
+# are well below this bound; the cap is a defensive ceiling until normalized
+# name fields are indexed for direct database lookup.
+SEARCH_NAME_CANDIDATE_LIMIT = 1000
+
 # WHY: The model only returns business IDs. 450 tokens leaves room for JSON and
 # whitespace while preventing the gateway call from turning into copywriting.
 SEARCH_AI_MAX_TOKENS = 450
@@ -218,42 +226,192 @@ Rules:
 """
 
 
-async def search_businesses(
-    city_id: str, query: str, *, limit: int = 40
-) -> List[Dict[str, Any]]:
-    """Full-text-style search across a business's name, description, tags,
-    category, neighborhood, what it's known for, and the services it offers.
+# WHY: These words describe a business type, common service, search connective,
+# or location constraint rather than a distinctive brand. Generic-only queries
+# must use semantic matching instead of claiming a name match from "Nails" or
+# "Brickell" appearing in many unrelated listing names.
+_NAME_MATCH_GENERIC_TERMS = {
+    "a", "an", "and", "at", "bar", "barber", "barbers", "barbershop", "bars",
+    "balayage", "beauty", "blow", "blowout", "blowouts", "braid", "braids", "brow",
+    "brows", "by", "center", "centre", "clinic", "clinics", "co", "color", "colour",
+    "company", "cut", "cuts", "extensions", "facial", "facials", "for", "gel", "hair",
+    "in", "inc", "lash", "lashes", "make", "makeup", "manicure", "manicures", "massage",
+    "med", "medical", "near", "nail", "nails", "of", "pedicure", "pedicures", "salon",
+    "salons", "shop", "shops", "skin", "spa", "spas", "studio", "studios", "the", "total",
+    "wax", "waxing", "wellness",
+}
 
-    Uses AI because visitor searches are semantic: "date-night manicure near
-    Brickell" should match nail salons in Brickell even when the exact phrase is
-    absent from the listing. Including the salon's service-menu names also lets a
-    service-intent query ("keratin", "brazilian blowout") match every salon that
-    actually offers it, not just one with the word in its description. Mongo still
-    handles only the deterministic tenant and status filter.
+
+def _normalize_search_text(value: Any) -> str:
+    """Normalize search/name text for stable, punctuation-insensitive matching."""
+    if not isinstance(value, str):
+        return ""
+    folded = unicodedata.normalize("NFKD", value.casefold())
+    ascii_text = folded.encode("ascii", "ignore").decode("ascii")
+    ascii_text = ascii_text.replace("'", "")
+    return re.sub(r"[^a-z0-9]+", " ", ascii_text).strip()
+
+
+def _search_terms(values: Any) -> set[str]:
+    terms: set[str] = set()
+    if not isinstance(values, list):
+        return terms
+    for value in values:
+        terms.update(_normalize_search_text(value).split())
+    return terms
+
+
+async def _search_name_generic_terms(
+    city_id: str,
+    candidates: List[Dict[str, Any]],
+) -> tuple[set[str], set[str]]:
+    """Return generic words from candidate data and current-city navigation."""
+    category_terms = _search_terms(
+        [slug for business in candidates for slug in (business.get("category_slugs") or [])]
+    )
+    neighborhood_terms = _search_terms(
+        [
+            slug
+            for business in candidates
+            for slug in (business.get("neighborhood_slugs") or [])
+        ]
+    )
+
+    # WHY: nav names are the current city's source of truth. Slugs cover most
+    # labels, but names can contain additional words such as a city's fuller
+    # neighborhood label; those words must also stay out of deterministic brand
+    # matching when they are the only query signal.
+    for nav_item in await list_categories(city_id):
+        category_terms.update(
+            _search_terms([nav_item.get("slug"), nav_item.get("name")])
+        )
+    for nav_item in await list_neighborhoods(city_id):
+        neighborhood_terms.update(
+            _search_terms([nav_item.get("slug"), nav_item.get("name")])
+        )
+    return category_terms, neighborhood_terms
+
+
+def _name_match_score(
+    query: str,
+    business: Dict[str, Any],
+    *,
+    category_terms: set[str],
+    neighborhood_terms: set[str],
+) -> Optional[int]:
+    """Return a deterministic name-match rank, or ``None`` for no match."""
+    query_normalized = _normalize_search_text(query)
+    name_normalized = _normalize_search_text(business.get("name"))
+    if not query_normalized or not name_normalized:
+        return None
+    if query_normalized == name_normalized:
+        return 0
+
+    generic_terms = _NAME_MATCH_GENERIC_TERMS | category_terms | neighborhood_terms
+    query_tokens = query_normalized.split()
+    name_tokens = name_normalized.split()
+    meaningful_runs: List[tuple[str, ...]] = []
+    current_run: List[str] = []
+    for token in query_tokens:
+        if token in generic_terms or len(token) < 3:
+            if current_run:
+                meaningful_runs.append(tuple(current_run))
+                current_run = []
+            continue
+        current_run.append(token)
+    if current_run:
+        meaningful_runs.append(tuple(current_run))
+    if not meaningful_runs:
+        return None
+
+    # A contiguous meaningful run is the strongest partial-name signal after
+    # an exact match (for example, "muse" in "MUSE Total Beauty"). Requiring
+    # token adjacency prevents unrelated query words from combining into a
+    # false brand match.
+    for run in meaningful_runs:
+        run_length = len(run)
+        for index in range(len(name_tokens) - run_length + 1):
+            if tuple(name_tokens[index : index + run_length]) == run:
+                return 1
+    return None
+
+
+# @define-start KAT-078 "Business-name search with independent service and neighborhood filters"
+async def search_businesses(
+    city_id: str,
+    query: str = "",
+    *,
+    service_slug: Optional[str] = None,
+    neighborhood_slug: Optional[str] = None,
+    limit: int = 40,
+) -> List[Dict[str, Any]]:
+    """Search live businesses by name first, then semantic intent.
+
+    Service and neighborhood are explicit constraints. If a query does not
+    identify a distinctive business name, the existing centralized AI selector
+    handles semantic service and intent matching over the already-filtered set.
     """
     search_text = " ".join(query.split())
-    if not search_text or limit <= 0:
+    if limit <= 0:
+        return []
+    if not search_text and not service_slug and not neighborhood_slug:
         return []
 
-    q: Dict[str, Any] = {
-        "city_id": city_id,
-        "status": "live",
-    }
+    q: Dict[str, Any] = {"city_id": city_id, "status": "live"}
+    if service_slug:
+        q["category_slugs"] = service_slug
+    if neighborhood_slug:
+        q["neighborhood_slugs"] = neighborhood_slug
+
     db = get_db()
-    cur = db.businesses.find(q)
-    # WHY: featured + editor's pick first — so the best listings surface when
-    # the query matches multiple businesses (e.g. "balayage" could match 8).
-    cur = cur.sort(
+    cur = db.businesses.find(q).sort(
         [("featured.enabled", -1), ("editors_pick", -1), ("quality_score", -1), ("name", 1)]
     )
-    cur = cur.limit(SEARCH_AI_CANDIDATE_LIMIT)
-    candidates = await cur.to_list(length=SEARCH_AI_CANDIDATE_LIMIT)
+    cur = cur.limit(SEARCH_NAME_CANDIDATE_LIMIT)
+    candidates = await cur.to_list(length=SEARCH_NAME_CANDIDATE_LIMIT)
+
+    if not search_text:
+        # Filter-only browsing is deterministic and deliberately does not call
+        # the AI gateway; /search?service=... is a normal browse result.
+        return candidates[:limit]
+
+    category_terms, neighborhood_terms = await _search_name_generic_terms(
+        city_id, candidates
+    )
+    name_matches = [
+        (score, index, business)
+        for index, business in enumerate(candidates)
+        if (score := _name_match_score(
+            search_text,
+            business,
+            category_terms=category_terms,
+            neighborhood_terms=neighborhood_terms,
+        )) is not None
+    ]
+    if name_matches:
+        # The Mongo query already supplies the established ordering. Grouping
+        # by relevance rank without sorting the rows again preserves that order
+        # exactly within exact, partial, and semantic-equivalent name matches.
+        ordered_matches = [
+            business
+            for score in (0, 1, 2)
+            for match_score, _, business in name_matches
+            if match_score == score
+        ]
+        return ordered_matches[:limit]
+
+    # The AI prompt remains bounded even though deterministic name matching
+    # inspected the larger current-city catalog above.
+    ai_candidates = candidates[:SEARCH_AI_CANDIDATE_LIMIT]
     selected_ids = await _select_matching_business_ids(
         query=search_text,
-        businesses=candidates,
+        businesses=ai_candidates,
     )
     selected = set(selected_ids)
-    return [business for business in candidates if str(business.get("_id")) in selected][:limit]
+    return [business for business in ai_candidates if str(business.get("_id")) in selected][:limit]
+
+
+# @define-end KAT-078
 
 
 async def _select_matching_business_ids(
@@ -320,7 +478,14 @@ async def _select_matching_business_ids(
             },
         )
         parsed = json.loads(_strip_json_code_fence(response))
-    except (CaptionGenerationError, json.JSONDecodeError, TypeError, ValueError) as exc:
+    # WHY: The gateway wrapper normally converts transport failures to
+    # CaptionGenerationError, but a test double or a future adapter may raise a
+    # different runtime exception. Public search must fail closed for every
+    # gateway-side failure rather than accidentally showing unverified matches.
+    except CaptionGenerationError as exc:
+        log.warning("AI business search unavailable; returning no semantic matches: %s", exc)
+        return []
+    except Exception as exc:  # noqa: BLE001 - fail closed at the AI boundary
         log.warning("AI business search unavailable; returning no semantic matches: %s", exc)
         return []
 
