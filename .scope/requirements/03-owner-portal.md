@@ -228,7 +228,9 @@ and any external outreach.
 `.scope/requirements/` files are the manual, Git-backed requirements source;
 this requirement is maintained there without a direct Define API call.
 
-## Implementation verification evidence
+## Verification
+
+### Implementation evidence
 
 - `@define-test KAT-079-review-credential-success` —
   `backend/tests/test_legacy_owner_dashboard_access.py::test_legacy_dashboard_allows_valid_preview_session_or_admin_key`
@@ -275,7 +277,7 @@ this requirement is maintained there without a direct Define API call.
   and a 303 `/owners/login` redirect while preview mode is off. The mockup
   remained usable without implying it is `/owners/me`.
 
-## Required post-release follow-up
+### Required post-release follow-up
 
 - At +24h and +7d, request
   `/owner/dashboard` without following redirects. With preview mode on, a
