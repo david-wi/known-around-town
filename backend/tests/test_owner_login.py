@@ -357,6 +357,65 @@ def test_me_page_renders_with_valid_session(client):
     assert "signed in" in r.text.lower()
 
 
+def test_owners_me_owner_session_behavior_is_unchanged(client, mock_db, monkeypatch):
+    """@define-test KAT-079-owners-me-regression"""
+    # @define-test KAT-079
+    from app.services import site_settings
+    from app.services.owner_auth import SESSION_COOKIE_NAME, sign_session
+    from app.services.preview_auth import hash_value, session_expires_at
+
+    async def _preview_mode() -> bool:
+        return True
+
+    monkeypatch.setattr(site_settings, "get_preview_mode_enabled", _preview_mode)
+    host = {"host": "miami.knowsbeauty.localhost"}
+
+    no_owner_session = client.get("/owners/me", headers=host, follow_redirects=False)
+    assert no_owner_session.status_code == 303
+    assert no_owner_session.headers["location"] == "/owners/login"
+
+    owner_cookie = sign_session("owner@example.com")
+    valid_owner_session = client.get(
+        "/owners/me",
+        headers={**host, "Cookie": f"{SESSION_COOKIE_NAME}={owner_cookie}"},
+        follow_redirects=False,
+    )
+    assert valid_owner_session.status_code == 200, valid_owner_session.text
+    assert "owner@example.com" in valid_owner_session.text
+
+    # WHY: /owners/me refreshes a valid owner cookie, and TestClient retains
+    # response cookies. Clear that test-client state so the next two requests
+    # prove that their preview/admin credentials alone do not authenticate an owner.
+    client.cookies.clear()
+
+    preview_token = "owners-me-preview-session"
+    asyncio.run(
+        mock_db.preview_sessions.insert_one(
+            {
+                "_id": "owners-me-preview-session",
+                "email": "reviewer@expertly.com",
+                "token_hash": hash_value(preview_token),
+                "created_at": datetime.now(timezone.utc),
+                "expires_at": session_expires_at(),
+            }
+        )
+    )
+    preview_session_only = client.get(
+        "/owners/me",
+        headers={**host, "Cookie": f"preview_token={preview_token}"},
+        follow_redirects=False,
+    )
+    admin_header_only = client.get(
+        "/owners/me",
+        headers={**host, "X-API-Key": "test-admin-key"},
+        follow_redirects=False,
+    )
+
+    for response in (preview_session_only, admin_header_only):
+        assert response.status_code == 303
+        assert response.headers["location"] == "/owners/login"
+
+
 def test_login_page_redirects_when_already_signed_in(client):
     from app.services.owner_auth import SESSION_COOKIE_NAME, sign_session
 
