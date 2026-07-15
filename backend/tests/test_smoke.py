@@ -513,7 +513,11 @@ def test_owner_dashboard_preview(client):
     actually in the HTML — not to test live functionality, which doesn't
     exist yet."""
     r = client.get(
-        "/owner/dashboard", headers={"host": "miami.knowsbeauty.localhost"}
+        "/owner/dashboard",
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            **ADMIN_HEADERS,
+        },
     )
     assert r.status_code == 200, r.text
     body = r.text
@@ -558,7 +562,11 @@ def test_owner_dashboard_links_back_to_public_listing(client):
     salon it's showing, so reviewers can compare the owner view to the
     public view in one click."""
     r = client.get(
-        "/owner/dashboard", headers={"host": "miami.knowsbeauty.localhost"}
+        "/owner/dashboard",
+        headers={
+            "host": "miami.knowsbeauty.localhost",
+            **ADMIN_HEADERS,
+        },
     )
     assert r.status_code == 200, r.text
     # The public listing URL pattern is /b/<slug>. The route falls through

@@ -20,6 +20,8 @@ import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
+from app.database import get_db
+
 
 # WHY: allowed domains and explicit email addresses for the private preview.
 # Any email at these domains gets in; specific personal accounts are listed
@@ -123,3 +125,25 @@ def code_expires_at() -> datetime:
 
 def session_expires_at() -> datetime:
     return _now() + timedelta(seconds=SESSION_TTL_SECONDS)
+
+
+async def preview_session_is_valid(token: str) -> bool:
+    """Return whether ``token`` maps to a current preview session.
+
+    Database failures deliberately propagate: the preview middleware preserves
+    its availability-first fail-open policy, while sensitive routes can deny
+    access safely. Callers must make that policy choice explicitly.
+    """
+    if not token:
+        return False
+
+    db = get_db()
+    token_hash = hash_value(token)
+    now = datetime.now(timezone.utc)
+    doc = await db.preview_sessions.find_one(
+        {
+            "token_hash": token_hash,
+            "expires_at": {"$gt": now},
+        }
+    )
+    return doc is not None

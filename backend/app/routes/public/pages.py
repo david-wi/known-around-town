@@ -8,6 +8,7 @@ template only receives plain data — no DB access from the template.
 from __future__ import annotations
 
 import hashlib
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus, urlencode, urlparse
@@ -22,8 +23,10 @@ from app.database import get_db
 from app.services import content as content_svc
 from app.services.copy import CopyResolver
 from app.services.owner_auth import SESSION_COOKIE_NAME, verify_session
+from app.services.preview_auth import PREVIEW_COOKIE_NAME, preview_session_is_valid
 from app.services.site_settings import get_google_site_verification, get_preview_mode_enabled
 from app.services.tenant import TenantContext, resolve_tenant
+from app.routes.api.v1._auth import admin_key_matches
 
 # WHY: the runtime reuses the seed's curated per-category photo pool so a home-page
 # card whose stock photo collides with another card can be handed a *different*
@@ -34,6 +37,8 @@ from seed._helpers import _CATEGORY_PHOTOS, _PHOTO_BASE
 
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 _templates: Optional[Jinja2Templates] = None
 
@@ -2120,10 +2125,39 @@ _OWNER_DASHBOARD_SAMPLE_SLUGS: List[str] = [
     "elia-spa-ritz-carlton-south-beach",
 ]
 
+# WHY: the legacy mock includes illustrative owner and billing figures, so its
+# authorized response and denial redirect must never be cached for another
+# visitor or restored from a shared browser cache.
+_LEGACY_OWNER_DASHBOARD_CACHE_HEADERS = {"Cache-Control": "private, no-store"}
+
+
+async def _has_legacy_owner_dashboard_review_access(request: Request) -> bool:
+    """Return whether a request may view the legacy owner-dashboard mock.
+
+    This route is stricter than the global preview gate because the mock must
+    remain internal after preview mode is disabled. Preview-session lookup
+    failures therefore deny access rather than inheriting the gate's
+    availability-first fail-open policy.
+    """
+    if admin_key_matches(request.headers.get("X-API-Key", "")):
+        # WHY: the established header-only admin grant must bypass the preview
+        # lookup so an internal reviewer is not blocked by a transient DB error.
+        return True
+
+    try:
+        return await preview_session_is_valid(
+            request.cookies.get(PREVIEW_COOKIE_NAME, "")
+        )
+    except Exception:
+        logger.exception(
+            "owner_dashboard_preview: preview-session lookup failed; denying access"
+        )
+        return False
+
 
 @router.get("/owner/dashboard", response_class=HTMLResponse)
 async def owner_dashboard_preview(request: Request) -> HTMLResponse:
-    """Static, unauthenticated preview of the owner dashboard.
+    """Internal review mockup of the owner dashboard.
 
     This is a UX mockup — the real claim-and-pay flow is being built on a
     separate workstream. We render a real seeded business as if its owner
@@ -2132,6 +2166,17 @@ async def owner_dashboard_preview(request: Request) -> HTMLResponse:
     preview banner at the top makes it obvious to any reviewer that the
     page is not live functionality.
     """
+    # @define-start KAT-079 "Legacy owner dashboard review access"
+    if not await _has_legacy_owner_dashboard_review_access(request):
+        # WHY: deny before tenant or listing work so an uncredentialed request
+        # cannot depend on, render, or infer the mock's sampled business data.
+        return RedirectResponse(
+            url="/owners/login",
+            status_code=303,
+            headers=_LEGACY_OWNER_DASHBOARD_CACHE_HEADERS,
+        )
+    # @define-end KAT-079
+
     tenant = await _require_tenant(request)
     if not tenant.city:
         raise HTTPException(404, "City required")
@@ -2187,17 +2232,21 @@ async def owner_dashboard_preview(request: Request) -> HTMLResponse:
                 "Preview of the owner dashboard for the Featured tier — "
                 "this is a mockup, not the live claim-and-pay flow."
             ),
-            # WHY: this is a static, unauthenticated MOCKUP of a real salon's
-            # dashboard with every control rigged to "Coming soon". The live
-            # owner dashboard now exists at /owners/me, so this page must never
-            # be indexed — otherwise Google could surface a half-built "Coming
-            # soon" version of our product to a prospect. base.html renders the
-            # robots meta from this var (its comment documents exactly this
-            # demo-page use); it was simply never set here.
+            # WHY: this is an internal MOCKUP of a real salon's dashboard with
+            # every control rigged to "Coming soon". The live owner dashboard
+            # now exists at /owners/me, so this page must never be indexed —
+            # otherwise Google could surface a half-built version of our product
+            # to a prospect. base.html renders the robots meta from this var.
             "robots": "noindex, nofollow",
         }
     )
-    return _templates.TemplateResponse(request, "owner_dashboard.html", ctx)
+    # @define KAT-079 "Legacy owner dashboard review access"
+    return _templates.TemplateResponse(
+        request,
+        "owner_dashboard.html",
+        ctx,
+        headers=_LEGACY_OWNER_DASHBOARD_CACHE_HEADERS,
+    )
 
 @router.get("/owners/preview/caption", response_class=HTMLResponse)
 async def owners_caption_preview(request: Request) -> HTMLResponse:

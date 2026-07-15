@@ -172,3 +172,116 @@ HTML is inspected, then there is no `id="start"`, `href="#start"`, or
 `/expertly-voice.html#start` reference; given the final enrollment path is still
 unconfirmed, then the copy frames setup as an Expertly follow-up/configuration
 step rather than an AI-led self-enrollment.
+
+### KAT-079 — Legacy `/owner/dashboard` review access · V1 · implemented
+**Persona:** Internal reviewer.
+`/owner/dashboard` is an internal mockup for reviewing the owner experience.
+Its figures, billing state, and activity are illustrative; it is not the real
+owner dashboard or a source of owner data. The real owner dashboard remains
+`/owners/me`.
+
+**Incidents:**
+- 2026-07-15 — The initially reviewed cache policy allowed storage
+  (`private, max-age=0`) where the protected mock requires `private, no-store`.
+  The response contract and regression coverage now enforce the non-storable
+  policy.
+
+**Acceptance:**
+
+- In either preview-mode state, a valid preview-session credential or valid
+  admin `X-API-Key` header lets a reviewer request `/owner/dashboard` and
+  receive the existing mockup with status 200. The mockup continues to identify
+  itself as a preview/mockup and uses illustrative figures rather than a real
+  dashboard view.
+- When preview mode is on, a request with a missing, malformed, expired, or
+  invalid preview credential and no valid admin header remains subject to the
+  global KAT-020 preview gate: it receives a 302 redirect to `/preview-login`
+  with the existing `next` behavior. This includes a request carrying only a
+  `kb_owner_session`; an owner session is not a review credential.
+- When preview mode is off, those same missing, malformed, expired, or invalid
+  review-credential cases receive a route-level 303 redirect to
+  `/owners/login`. An owner session alone receives this same 303 response.
+- If preview-session lookup raises an error and no valid admin `X-API-Key`
+  header is present, the existing middleware may fail open while preview mode
+  is on, but `/owner/dashboard` must recheck the credential and fail closed
+  with the route-level 303 `/owners/login` response. When preview mode is off,
+  that route-level lookup error also fails closed as the same 303 response. A
+  valid admin-header request remains a 200 response in either mode without a
+  preview-session lookup.
+- Every route-level 303 denial happens before tenant resolution, listing or
+  neighborhood lookup, base-context construction, or template rendering. A
+  denied request must not do work that could expose or depend on tenant or
+  listing data.
+- `/owners/me` keeps its existing owner-session authentication and dashboard
+  behavior. This requirement does not make a preview session or admin key an
+  owner-dashboard login, and does not alter an owner's normal route.
+- Every unauthenticated redirect emitted by `PreviewGateMiddleware`, not only
+  redirects for this legacy route, sends `Cache-Control: private, no-store`.
+  For `/owner/dashboard`, the authorized 200 mockup, route-level 303 denial,
+  and global-gate 302 redirect each send that exact header.
+
+**Out of scope:** Changes to real owner authentication or the real owner
+dashboard, the preview-launch toggle, data or billing behavior, navigation,
+and any external outreach.
+
+**Repository note:** This repository is not formally Scope-bound. Its existing
+`.scope/requirements/` files are the manual, Git-backed requirements source;
+this requirement is maintained there without a direct Define API call.
+
+## Implementation verification evidence
+
+- `@define-test KAT-079-review-credential-success` —
+  `backend/tests/test_legacy_owner_dashboard_access.py::test_legacy_dashboard_allows_valid_preview_session_or_admin_key`
+  covers both preview-mode states and proves each valid review credential
+  reaches the 200 internal mockup with its explicit mock/illustrative framing.
+- `@define-test KAT-079-deny-before-context` —
+  `backend/tests/test_legacy_owner_dashboard_access.py::test_legacy_dashboard_denies_missing_malformed_expired_and_invalid_credentials_before_context`
+  covers preview mode off and proves missing, malformed, expired, and
+  unknown review credentials receive the 303 `/owners/login` response before
+  tenant, listing, context, or template work.
+- `@define-test KAT-079-db-fail-closed` —
+  `backend/tests/test_legacy_owner_dashboard_access.py::test_legacy_dashboard_preview_session_lookup_error_denies_before_context`
+  makes preview-session lookup raise with no valid admin `X-API-Key` header
+  in both preview-mode states and proves the legacy route returns the early 303
+  `/owners/login` response, including after the preview-on middleware's
+  permitted fail-open path; it separately proves a valid admin header
+  remains 200 without a preview-session lookup.
+- `@define-test KAT-079-owner-session-is-not-review-access` —
+  `backend/tests/test_legacy_owner_dashboard_access.py::test_legacy_dashboard_owner_session_alone_is_denied`
+  proves an owner cookie alone never authorizes this mockup: it receives
+  the preview-on 302 or preview-off 303 result as applicable.
+- `@define-test KAT-079-preview-gate-compatibility` —
+  `backend/tests/test_legacy_owner_dashboard_access.py::test_legacy_dashboard_global_preview_no_credential_redirect_is_preserved`
+  proves that, while preview mode is on, missing, malformed, expired, and
+  invalid preview credentials without a valid admin header remain 302 redirects
+  to `/preview-login` with the existing `next` path.
+- `@define-test KAT-079-cache-control` —
+  `backend/tests/test_legacy_owner_dashboard_access.py::test_legacy_dashboard_review_responses_are_private_no_store`
+  proves the authorized 200 plus the legacy route's 303 and global-gate 302
+  each send exactly `Cache-Control: private, no-store`, and exercises a
+  separate unauthenticated `PreviewGateMiddleware` redirect to prove the
+  middleware-wide cache policy.
+- `@define-test KAT-079-owners-me-regression` —
+  `backend/tests/test_owner_login.py::test_owners_me_owner_session_behavior_is_unchanged`
+  runs with `PREVIEW_MODE_ENABLED=true` and proves that no owner session
+  receives a 303 `/owners/login` response, rather than a 302
+  `/preview-login`; a valid `kb_owner_session` receives the real `/owners/me`
+  dashboard with status 200; and a preview session or admin `X-API-Key` alone
+  never authenticates `/owners/me` and instead receives the owner-login path.
+- Local visual QA passed at 390px and 1280px: the authorized legacy mockup
+  visibly identified itself as a preview/mockup with illustrative content. A
+  browser no-follow check also confirmed the unauthorized `/owner/dashboard`
+  path is a 302 `/preview-login` redirect with `next` while preview mode is on,
+  and a 303 `/owners/login` redirect while preview mode is off. The mockup
+  remained usable without implying it is `/owners/me`.
+
+## Required post-release follow-up
+
+- At +24h and +7d, request
+  `/owner/dashboard` without following redirects. With preview mode on, a
+  valid preview session or admin header must return 200, while missing,
+  malformed, expired, or invalid preview credentials without a valid admin
+  header must return 302 `/preview-login`. With preview mode off, the valid
+  review credentials must return 200 and those invalid/no-credential cases
+  must return 303 `/owners/login`. Confirm `private, no-store` in every case
+  without changing data or settings.

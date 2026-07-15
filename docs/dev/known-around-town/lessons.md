@@ -1494,6 +1494,24 @@ Two gotchas from KAT-075:
   `business.claim_status == "verified"` plus `business.claimed_email`, never a
   forged or stale `business_claims` row or owner-session artifact.
 
+## Legacy owner-dashboard mock access (2026-07-15)
+
+`/owner/dashboard` is a review-only mock containing illustrative owner and
+billing figures; it is not the real owner route (`/owners/me`). The global
+preview gate alone is not enough because it intentionally fails open when the
+preview-session database is unavailable and disappears when preview mode is
+off. Keep a route-local, fail-closed review credential check before tenant,
+listing, context, or template work. A valid preview session or header-only
+admin key may open the mock; an owner cookie never may.
+
+The review route's 200 response, its own 303 denial, and every unauthenticated
+preview-gate 302 must use exactly `Cache-Control: private, no-store`. `private,
+max-age=0` still permits storage and is not an equivalent substitute for a page
+with illustrative billing data. Shared preview-session lookup intentionally
+propagates database errors so each caller chooses its availability/security
+policy explicitly: the site-wide gate may fail open, sensitive mock routes must
+deny.
+
 ## 2026-07-02 — Full-directory page (/all) and the home "See all N" count cap
 
 **The home page is a curated sample, not the catalog.** `home()` loads

@@ -48,7 +48,6 @@ Design choice — middleware vs. route dependency:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from urllib.parse import quote_plus
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -56,10 +55,9 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 from starlette.types import ASGIApp
 
-from app.database import get_db
 from app.services.preview_auth import (
     PREVIEW_COOKIE_NAME,
-    hash_value,
+    preview_session_is_valid,
 )
 
 logger = logging.getLogger(__name__)
@@ -159,6 +157,11 @@ _BYPASS_EXACT = frozenset({
     "/pricing",
 })
 
+# WHY: preview-login redirects can contain the original requested URL, so every
+# unauthenticated redirect must stay in the requesting browser and never be
+# reused by a shared cache for a later visitor.
+_UNAUTHENTICATED_REDIRECT_CACHE_HEADERS = {"Cache-Control": "private, no-store"}
+
 
 def _is_bypassed(path: str) -> bool:
     return path in _BYPASS_EXACT or any(path.startswith(prefix) for prefix in _BYPASS_PREFIXES)
@@ -208,24 +211,17 @@ class PreviewGateMiddleware(BaseHTTPMiddleware):
         # original URL so the visitor lands where they wanted after login.
         next_url = str(request.url)
         login_url = f"/preview-login?next={quote_plus(next_url)}"
-        return RedirectResponse(url=login_url, status_code=302)
+        return RedirectResponse(
+            url=login_url,
+            status_code=302,
+            headers=_UNAUTHENTICATED_REDIRECT_CACHE_HEADERS,
+        )
 
 
 async def _is_valid_session(token: str) -> bool:
     """Return True if the token corresponds to an unexpired preview session."""
-    if not token:
-        return False
     try:
-        db = get_db()
-        token_hash = hash_value(token)
-        now = datetime.now(timezone.utc)
-        doc = await db.preview_sessions.find_one(
-            {
-                "token_hash": token_hash,
-                "expires_at": {"$gt": now},
-            }
-        )
-        return doc is not None
+        return await preview_session_is_valid(token)
     except Exception:
         # WHY: if the DB is momentarily unreachable, fail open rather
         # than locking everyone out of the site during an outage.
