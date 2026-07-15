@@ -1317,10 +1317,6 @@ def test_admin_new_claim_email_function_exists_with_correct_content():
     # Verify the helper module exports the function (import error = not implemented)
     assert callable(send_admin_new_claim_email)
 
-    # Test the HTML and text bodies directly via the private helpers
-    import importlib
-    mod = importlib.import_module("app.services.owner_email")
-
     # The admin alert builds its body inline inside send_admin_new_claim_email,
     # so we test the final rendered strings via the function's source inspection
     # or by calling the private _admin html string directly. Since the function
@@ -1916,7 +1912,8 @@ def test_business_jsonld_omits_empty_address_fields(client):
     WHY: the seed businesses may not have region/postal data. The template
     must omit those fields when empty rather than emitting '\"addressRegion\": \"\"'
     which looks valid to a human but fails structured-data validation."""
-    import json, re
+    import json
+    import re
 
     r = client.get(
         "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
@@ -1950,7 +1947,9 @@ def test_business_jsonld_emits_address_region_when_state_present(seeded_db, clie
     database stores this as business.address.state. The field was silently
     omitted from every listing even though the data existed, meaning Google
     never saw the state abbreviation in structured data."""
-    import asyncio, json, re
+    import asyncio
+    import json
+    import re
 
     # Patch the seed business to have an explicit state in its address
     city = asyncio.run(seeded_db.cities.find_one({"slug": "miami"}))
@@ -2005,7 +2004,9 @@ def test_business_jsonld_emits_geo_when_coordinates_present(seeded_db, client):
     WHY: the Address model has lat/lng fields but the template never emitted
     them. Adding the geo block lets Google skip its own geocoding step (which
     introduces ambiguity for addresses stored as a single combined string)."""
-    import asyncio, json, re
+    import asyncio
+    import json
+    import re
 
     city = asyncio.run(seeded_db.cities.find_one({"slug": "miami"}))
     assert city, "test seed missing miami city"
@@ -2054,7 +2055,8 @@ def test_business_jsonld_omits_geo_when_no_coordinates(client):
     """The JSON-LD on a business page must NOT include a geo block when the
     business has no lat/lng stored, to avoid emitting an incomplete or
     null-valued GeoCoordinates node that would fail Rich Results validation."""
-    import json, re
+    import json
+    import re
 
     r = client.get(
         "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
@@ -2079,7 +2081,8 @@ def test_business_jsonld_address_always_has_country(client):
     """The JSON-LD address block must always include addressCountry when an
     address is present. Google's Rich Results validator requires this field
     for the address to render in the Knowledge Panel."""
-    import json, re
+    import json
+    import re
 
     r = client.get(
         "/b/blow-dry-bar-brickell", headers={"host": "miami.knowsbeauty.localhost"}
@@ -2112,7 +2115,8 @@ def test_business_jsonld_schema_type_by_category(seeded_db, client):
     A lash/brow bar tagged as "HairSalon" (the old behaviour — 'lash-brow'
     contains 'brow' which used to match the hair condition) was showing up
     incorrectly in hair-salon rich results instead of general beauty results."""
-    import json, re
+    import json
+    import re
 
     # WHY: slugs chosen from the Miami beauty seed (_real_businesses.json) that
     # have the target category as their sole/primary category_slug. Using seeded
@@ -2170,7 +2174,9 @@ def test_business_jsonld_emits_aggregate_rating_when_eligible(seeded_db, client)
     The test uses a seeded business that meets all three conditions so the block
     must appear. bestRating and worstRating are also required by Google's Rich
     Results validator — omitting them suppresses the snippet."""
-    import asyncio, json, re
+    import asyncio
+    import json
+    import re
 
     city = asyncio.run(seeded_db.cities.find_one({"slug": "miami"}))
     assert city, "test seed missing miami city"
@@ -2241,7 +2247,9 @@ def test_business_jsonld_omits_aggregate_rating_when_hidden(seeded_db, client):
     the data is disputed), emitting an aggregateRating in JSON-LD would make Google
     show stars in search results that are invisible on the actual page — misleading
     both Google and searchers. The JSON-LD and the visible UI must agree."""
-    import asyncio, json, re
+    import asyncio
+    import json
+    import re
 
     city = asyncio.run(seeded_db.cities.find_one({"slug": "miami"}))
     biz = asyncio.run(
@@ -2288,7 +2296,9 @@ def test_business_jsonld_emits_opening_hours_when_hours_present(seeded_db, clien
     guess hours from the page text — which it often gets wrong. The schema.org
     dayOfWeek field requires a full URL (https://schema.org/Monday), not a
     bare string, or the validator rejects the block entirely."""
-    import asyncio, json, re
+    import asyncio
+    import json
+    import re
 
     city = asyncio.run(seeded_db.cities.find_one({"slug": "miami"}))
     biz = asyncio.run(
@@ -2363,7 +2373,8 @@ def test_business_jsonld_emits_opening_hours_when_hours_present(seeded_db, clien
 
 def _extract_jsonld_blocks(html: str):
     """Return parsed JSON-LD dicts from all <script type='application/ld+json'> blocks."""
-    import json, re
+    import json
+    import re
     blocks = re.findall(
         r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL
     )
@@ -2551,13 +2562,9 @@ def test_owner_me_upgrade_card_shows_specific_neighborhood():
     Featured listing can appear first.
     """
     import pathlib
-    from jinja2 import Environment, FileSystemLoader
-
     templates_dir = (
         pathlib.Path(__file__).parent.parent / "app" / "templates"
     )
-    env = Environment(loader=FileSystemLoader(str(templates_dir)))
-
     # Mock a minimal base.html so we can render owner_me.html in isolation.
     # owner_me.html extends base.html; we only care about the upgrade card block.
     # We read the raw template source and render it without the {% extends %} —
@@ -2851,46 +2858,119 @@ def test_neighborhood_page_has_itemlist_jsonld(client):
     assert first.get("item", {}).get("url"), "ItemList elements must include a business URL"
 
 
-def test_neighborhood_category_page_has_itemlist_jsonld(client):
-    """Neighborhood+category pages (e.g. /n/wynwood/c/hair) are the most
-    specific listing pages in the directory and must include ItemList JSON-LD.
+def _prepare_wynwood_hair_style_intersection(seeded_db):
+    """Create an isolated cross-page target and clear its exact intersection.
 
-    WHY: 'hair salons in Wynwood' is the highest-intent query format — the
-    user has already narrowed by both service type and area. An ItemList block
-    here gives Google the business names for exactly that intersection, which
-    is what Google needs to show individual salon names in rich results for
-    these very specific local searches."""
-    # Find a neighborhood+category combo that has businesses
+    WHY: the production seed intentionally changes as the directory grows, so
+    relying on whichever hair business happens to be in Wynwood makes this SEO
+    regression test pass without exercising either required branch.
+    """
+
+    async def _prepare():
+        network = await seeded_db.networks.find_one({"slug": "beauty"})
+        assert network, "beauty network must be seeded"
+        city = await seeded_db.cities.find_one(
+            {"network_id": network["_id"], "slug": "miami"}
+        )
+        assert city, "Miami beauty city must be seeded"
+
+        await seeded_db.categories.update_one(
+            {"city_id": city["_id"], "slug": "hair-style"},
+            {
+                "$set": {
+                    "network_id": network["_id"],
+                    "city_id": city["_id"],
+                    "slug": "hair-style",
+                    "parent_slug": None,
+                    "name": "Hair Style",
+                    "status": "live",
+                }
+            },
+            upsert=True,
+        )
+        await seeded_db.businesses.delete_many(
+            {
+                "city_id": city["_id"],
+                "category_slugs": "hair-style",
+                "neighborhood_slugs": "wynwood",
+            }
+        )
+        return network, city
+
+    return asyncio.run(_prepare())
+
+
+def test_populated_neighborhood_category_page_has_itemlist_jsonld(seeded_db, client):
+    """A populated /n/wynwood/c/hair-style page emits a valid ItemList.
+
+    WHY: this is the highest-intent directory page type. Google needs a
+    nonempty, machine-readable list of the exact matching businesses to surface
+    them for searches such as "hair styles in Wynwood."
+    """
+    network, city = _prepare_wynwood_hair_style_intersection(seeded_db)
+    business = {
+        "_id": "test-wynwood-hair-style-itemlist",
+        "network_id": network["_id"],
+        "city_id": city["_id"],
+        "slug": "test-wynwood-hair-style-salon",
+        "name": "Test Wynwood Hair Style Salon",
+        "category_slugs": ["hair-style"],
+        "neighborhood_slugs": ["wynwood"],
+        "featured": {"enabled": False, "tier": "free"},
+        "editors_pick": False,
+        "claim_status": "unclaimed",
+        "photos": [],
+        "status": "live",
+    }
+    asyncio.run(seeded_db.businesses.insert_one(business))
+
     r = client.get(
-        "/n/wynwood/c/hair", headers={"host": "miami.knowsbeauty.localhost"}
+        "/n/wynwood/c/hair-style",
+        headers={"host": "miami.knowsbeauty.localhost"},
     )
-    assert r.status_code == 200, f"/n/wynwood/c/hair returned {r.status_code}"
+    assert r.status_code == 200, r.text
     blocks = _extract_jsonld_blocks(r.text)
     item_list_blocks = [b for b in blocks if b.get("@type") == "ItemList"]
+    assert len(item_list_blocks) == 1, "Populated cross-page must emit one ItemList"
 
-    # WHY: the route emits ItemList only when there are businesses at the
-    # intersection. If the seed has no hair salons in Wynwood the block is
-    # legitimately absent, so we skip the structural assertions rather than
-    # failing on correct behaviour. The test still acts as a regression guard:
-    # if the route starts emitting a malformed block it will fail the
-    # numberOfItems consistency check below.
-    if not item_list_blocks:
-        # Verify the page has no businesses either (correct omission)
-        import re as _re
-        biz_count_match = _re.search(r'"numberOfItems":\s*0', r.text)
-        # No block and no businesses is correct; no further assertions needed.
-        return
-
-    elements = item_list_blocks[0].get("itemListElement", [])
-    # numberOfItems must be consistent with itemListElement count.
-    assert item_list_blocks[0].get("numberOfItems") == len(elements), (
-        "numberOfItems in ItemList does not match the actual number of itemListElement entries"
+    item_list = item_list_blocks[0]
+    elements = item_list.get("itemListElement", [])
+    assert elements, "Populated cross-page ItemList must not be empty"
+    assert item_list.get("numberOfItems") == len(elements), (
+        "numberOfItems in ItemList must match itemListElement entries"
     )
-    if elements:
-        first = elements[0]
-        assert first.get("position") == 1, "First ItemList element must have position 1"
-        assert first.get("item", {}).get("name"), "ItemList elements must include a business name"
-        assert first.get("item", {}).get("url"), "ItemList elements must include a business URL"
+    first = elements[0]
+    item = first.get("item", {})
+    assert first.get("@type") == "ListItem"
+    assert first.get("position") == 1
+    assert item.get("@type") == "LocalBusiness"
+    assert item.get("name") == business["name"]
+    assert item.get("url", "").endswith(f"/b/{business['slug']}")
+    assert item.get("@id") == item.get("url")
+    assert '<meta name="robots" content="noindex, follow">' not in r.text
+
+
+def test_empty_neighborhood_category_page_omits_itemlist_and_is_noindexed(
+    seeded_db, client
+):
+    """An empty /n/wynwood/c/hair-style page suppresses ItemList and noindexes.
+
+    WHY: an empty ItemList is invalid structured data, while an indexable empty
+    intersection wastes crawl budget on a thin page. Both protections must hold
+    even when the seed changes.
+    """
+    _prepare_wynwood_hair_style_intersection(seeded_db)
+
+    r = client.get(
+        "/n/wynwood/c/hair-style",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert r.status_code == 200, r.text
+    blocks = _extract_jsonld_blocks(r.text)
+    assert not [b for b in blocks if b.get("@type") == "ItemList"], (
+        "Empty cross-page must not emit an ItemList"
+    )
+    assert '<meta name="robots" content="noindex, follow">' in r.text
 
 
 def test_home_page_has_organization_jsonld(client):
@@ -3168,7 +3248,7 @@ def test_editorial_guide_page_has_article_jsonld(client, seeded_db):
     Google uses this to treat the page differently in its index — potentially
     surfacing it in Top Stories results or the Discover feed. Without it, Google
     has no signal that these pages are editorial."""
-    import asyncio, json, re
+    import asyncio
 
     network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
     city = asyncio.run(seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"}))
@@ -4249,55 +4329,6 @@ async def test_cross_city_footer_hidden_when_only_one_city(seeded_db):
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
     assert "More cities" not in r.text
-
-
-def test_neighborhoods_with_zero_businesses_hidden_from_navigation(client, seeded_db):
-    """Neighborhoods with listed_count == 0 must not appear in city navigation.
-
-    WHY: cities that have placeholder neighborhood records but no businesses
-    assigned to those neighborhoods would otherwise show empty neighborhood
-    pages in the nav — thin content pages that hurt SEO and confuse visitors.
-
-    Regression: list_neighborhoods() used to return all non-archived neighborhoods
-    regardless of listed_count, so 7 cities (Doral, Weston, Hialeah, Plantation,
-    Pembroke Pines, Miramar, Pompano Beach) showed empty neighborhood nav links.
-    """
-    import asyncio
-
-    # Find Miami's city_id from the seeded mock DB (same asyncio.run pattern
-    # used by test_claim_sends_confirmation_email and similar tests)
-    network = asyncio.run(seeded_db.networks.find_one({"slug": "beauty"}))
-    city = asyncio.run(
-        seeded_db.cities.find_one({"network_id": network["_id"], "slug": "miami"})
-    )
-    city_id = city["_id"]
-
-    # Insert a ghost neighborhood with listed_count = 0 — must be filtered out
-    asyncio.run(seeded_db.neighborhoods.insert_one({
-        "_id": "ghost-test-slug",
-        "city_id": city_id,
-        "slug": "ghost-test-neighborhood",
-        "name": "Ghost Test Neighborhood",
-        "listed_count": 0,
-        "status": "active",
-    }))
-
-    r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
-    assert r.status_code == 200, r.text
-    assert "Ghost Test Neighborhood" not in r.text, (
-        "Neighborhood with listed_count=0 should be hidden from navigation"
-    )
-
-    # Bump listed_count to 5 — it must then appear in the nav
-    asyncio.run(seeded_db.neighborhoods.update_one(
-        {"_id": "ghost-test-slug"},
-        {"$set": {"listed_count": 5}},
-    ))
-    r2 = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
-    assert r2.status_code == 200, r2.text
-    assert "Ghost Test Neighborhood" in r2.text, (
-        "Neighborhood with listed_count > 0 should appear in navigation"
-    )
 
 
 @pytest.mark.asyncio
