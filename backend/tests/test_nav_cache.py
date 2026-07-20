@@ -2,7 +2,7 @@
 
 `app.services.content` caches `list_categories`, `list_neighborhoods`, and
 `list_cities` so the header nav and footer don't re-query MongoDB on every
-public page render. These tests pin three properties:
+public page render. These tests pin five properties:
 
 1. Cache HIT — repeated calls within the TTL run the underlying DB query only
    ONCE (we count queries through a wrapper).
@@ -11,6 +11,9 @@ public page render. These tests pin three properties:
 3. TTL EXPIRY — after the TTL elapses, the data is refetched (so an edit shows
    up within the TTL bound). We drive the clock by monkeypatching the cache's
    clock seam rather than sleeping.
+4. PRUNING — an ordinary lookup removes expired entries for other cache keys.
+5. GENERATION SAFETY — an in-flight read cannot refill data invalidated by a
+   successful write.
 
 Also covered: each function keys its cache on its own argument(s) so different
 tenants/parents don't share an entry, and `clear_nav_cache()` busts the cache.
@@ -21,11 +24,16 @@ The DB is mongomock (see conftest). We never sleep — the cache reads time from
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+import asyncio
 
 import pytest
 
 from app.services import content as content_svc
+
+
+# WHY: One second is ample for mongomock-only synchronization while ensuring a
+# broken event handoff fails promptly instead of hanging the full test suite.
+_ASYNC_TEST_TIMEOUT_SECONDS = 1
 
 
 # ---------------------------------------------------------------------------
@@ -45,9 +53,8 @@ class _FakeClock:
 
 
 class _CountingCursor:
-    def __init__(self, cursor, counters):
+    def __init__(self, cursor):
         self._cursor = cursor
-        self._counters = counters
 
     def sort(self, *a, **k):
         # Motor cursors are chainable; mirror that so the production code's
@@ -60,7 +67,7 @@ class _CountingCursor:
 
 
 class _CountingCollection:
-    """Wraps one mongomock collection and counts every `find` call."""
+    """Wrap one mongomock collection and count nav query operations."""
 
     def __init__(self, coll, counters):
         self._coll = coll
@@ -68,18 +75,21 @@ class _CountingCollection:
 
     def find(self, *a, **k):
         self._counters["find"] += 1
-        return _CountingCursor(self._coll.find(*a, **k), self._counters)
+        return _CountingCursor(self._coll.find(*a, **k))
+
+    async def distinct(self, *a, **k):
+        self._counters["distinct"] += 1
+        return await self._coll.distinct(*a, **k)
 
 
 class _CountingDb:
-    """Exposes counting wrappers for the three nav collections."""
+    """Expose counting wrappers for collections queried by nav lookups."""
 
     def __init__(self, db, counters):
-        self._db = db
-        self._counters = counters
         self.categories = _CountingCollection(db.categories, counters)
         self.neighborhoods = _CountingCollection(db.neighborhoods, counters)
         self.cities = _CountingCollection(db.cities, counters)
+        self.businesses = _CountingCollection(db.businesses, counters)
 
 
 async def _seed_nav(db) -> None:
@@ -105,10 +115,19 @@ async def _seed_nav(db) -> None:
     await db.neighborhoods.insert_many(
         [
             {"_id": "n1", "city_id": city_id, "slug": "wynwood", "name": "Wynwood",
-             "listed_count": 5, "order": 1, "status": "active"},
-            # listed_count == 0 — hidden from nav.
+             "listed_count": 0, "order": 1, "status": "active"},
+            # The stale count claims this neighborhood is populated, but only
+            # a draft business references it, so it must stay out of public nav.
             {"_id": "n2", "city_id": city_id, "slug": "ghost", "name": "Ghost",
-             "listed_count": 0, "order": 2, "status": "active"},
+             "listed_count": 5, "order": 2, "status": "active"},
+        ]
+    )
+    await db.businesses.insert_many(
+        [
+            {"_id": "b1", "city_id": city_id, "status": "live",
+             "neighborhood_slugs": ["wynwood"]},
+            {"_id": "b2", "city_id": city_id, "status": "draft",
+             "neighborhood_slugs": ["ghost"]},
         ]
     )
     await db.cities.insert_many(
@@ -131,28 +150,30 @@ def fake_clock(monkeypatch):
 @pytest.fixture
 def counters(mock_db, monkeypatch):
     """Route content's get_db at a query-counting wrapper over mongomock."""
-    c = {"find": 0}
+    c = {"distinct": 0, "find": 0}
     counting_db = _CountingDb(mock_db, c)
     monkeypatch.setattr(content_svc, "get_db", lambda: counting_db)
     return c
 
 
 # ---------------------------------------------------------------------------
-# (a) Cache HIT: repeated calls within the TTL run the DB query exactly once.
+# (a) Cache HIT: repeated calls run each lookup operation exactly once.
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_repeat_calls_within_ttl_hit_cache(mock_db, fake_clock, counters):
     await _seed_nav(mock_db)
 
-    # First call: one query. Three more calls well inside the TTL: zero queries.
+    # First call: one query sequence. Three calls inside the TTL: no new work.
     for _ in range(4):
         await content_svc.list_categories("city-1")
     assert counters["find"] == 1, "expected exactly one DB query for 4 cached reads"
 
     counters["find"] = 0
+    counters["distinct"] = 0
     for _ in range(4):
         await content_svc.list_neighborhoods("city-1")
     assert counters["find"] == 1
+    assert counters["distinct"] == 1
 
     counters["find"] = 0
     for _ in range(4):
@@ -192,8 +213,80 @@ async def test_cached_value_equals_uncached(mock_db, fake_clock, counters):
 
     # And the cached lists honour the production filters/order:
     assert [c["slug"] for c in cold_categories] == ["hair", "nails"]  # archived + sub-cat excluded
-    assert [n["slug"] for n in cold_neighborhoods] == ["wynwood"]      # listed_count==0 hidden
+    assert [n["slug"] for n in cold_neighborhoods] == ["wynwood"]      # current live businesses only
     assert [c["slug"] for c in cold_cities] == ["miami", "tampa"]      # alphabetical
+
+
+@pytest.mark.asyncio
+async def test_neighborhood_navigation_uses_current_live_businesses_not_listed_count(
+    mock_db,
+):
+    """@define-test KAT-010-current-live-businesses"""
+    await mock_db.neighborhoods.insert_many(
+        [
+            {
+                "_id": "n-live",
+                "city_id": "city-1",
+                "slug": "live-with-zero",
+                "name": "Live with zero",
+                "listed_count": 0,
+                "order": 1,
+                "status": "active",
+            },
+            {
+                "_id": "n-empty",
+                "city_id": "city-1",
+                "slug": "empty-with-high",
+                "name": "Empty with high",
+                "listed_count": 99,
+                "order": 2,
+                "status": "active",
+            },
+            {
+                "_id": "n-archived",
+                "city_id": "city-1",
+                "slug": "archived-neighborhood",
+                "name": "Archived neighborhood",
+                "listed_count": 1,
+                "order": 3,
+                "status": "archived",
+            },
+        ]
+    )
+    await mock_db.businesses.insert_many(
+        [
+            {
+                "_id": "b-live",
+                "city_id": "city-1",
+                "status": "live",
+                "neighborhood_slugs": ["live-with-zero", "archived-neighborhood"],
+            },
+            {
+                "_id": "b-draft",
+                "city_id": "city-1",
+                "status": "draft",
+                "neighborhood_slugs": ["empty-with-high"],
+            },
+            {
+                "_id": "b-archived",
+                "city_id": "city-1",
+                "status": "archived",
+                "neighborhood_slugs": ["empty-with-high"],
+            },
+            {
+                "_id": "b-other-city",
+                "city_id": "city-2",
+                "status": "live",
+                "neighborhood_slugs": ["empty-with-high"],
+            },
+        ]
+    )
+
+    neighborhoods = await content_svc.list_neighborhoods("city-1")
+
+    assert [neighborhood["slug"] for neighborhood in neighborhoods] == [
+        "live-with-zero"
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +323,21 @@ async def test_data_refetched_after_ttl_expires(mock_db, fake_clock, counters):
     assert counters["find"] == 2, "exactly one refetch after expiry"
 
 
+@pytest.mark.asyncio
+async def test_any_lookup_prunes_other_expired_cache_keys(
+    mock_db, fake_clock, counters
+):
+    await _seed_nav(mock_db)
+    await content_svc.list_categories("city-1")
+    expired_key = ("categories", "city-1", None)
+    assert expired_key in content_svc._nav_cache
+
+    fake_clock.advance(content_svc._NAV_CACHE_TTL_SECONDS + 1)
+    await content_svc.list_cities("net-1")
+
+    assert expired_key not in content_svc._nav_cache
+
+
 # ---------------------------------------------------------------------------
 # Keying: each function caches per-argument, so distinct inputs don't collide.
 # ---------------------------------------------------------------------------
@@ -264,6 +372,81 @@ async def test_clear_nav_cache_forces_refetch(mock_db, fake_clock, counters):
     content_svc.clear_nav_cache()
     await content_svc.list_categories("city-1")
     assert counters["find"] == 2, "after clear_nav_cache the next read must refetch"
+
+
+@pytest.mark.asyncio
+async def test_in_flight_read_cannot_repopulate_cache_after_clear(mock_db, monkeypatch):
+    """@define-test KAT-010-concurrent-invalidation"""
+    await mock_db.neighborhoods.insert_many(
+        [
+            {
+                "_id": "n-old",
+                "city_id": "city-1",
+                "slug": "old",
+                "name": "Old",
+                "order": 1,
+                "status": "active",
+            },
+            {
+                "_id": "n-new",
+                "city_id": "city-1",
+                "slug": "new",
+                "name": "New",
+                "order": 2,
+                "status": "active",
+            },
+        ]
+    )
+    await mock_db.businesses.insert_one(
+        {
+            "_id": "b1",
+            "city_id": "city-1",
+            "status": "live",
+            "neighborhood_slugs": ["old"],
+        }
+    )
+
+    distinct_finished = asyncio.Event()
+    release_distinct = asyncio.Event()
+
+    class _BlockingBusinesses:
+        async def distinct(self, *args, **kwargs):
+            result = await mock_db.businesses.distinct(*args, **kwargs)
+            distinct_finished.set()
+            await release_distinct.wait()
+            return result
+
+    class _BlockingDb:
+        businesses = _BlockingBusinesses()
+        neighborhoods = mock_db.neighborhoods
+
+    monkeypatch.setattr(content_svc, "get_db", lambda: _BlockingDb())
+
+    in_flight_lookup = asyncio.create_task(
+        content_svc.list_neighborhoods("city-1")
+    )
+    try:
+        await asyncio.wait_for(
+            distinct_finished.wait(), timeout=_ASYNC_TEST_TIMEOUT_SECONDS
+        )
+        await mock_db.businesses.update_one(
+            {"_id": "b1"},
+            {"$set": {"neighborhood_slugs": ["new"]}},
+        )
+        content_svc.clear_nav_cache()
+        release_distinct.set()
+        in_flight_result = await asyncio.wait_for(
+            in_flight_lookup, timeout=_ASYNC_TEST_TIMEOUT_SECONDS
+        )
+    finally:
+        release_distinct.set()
+        if not in_flight_lookup.done():
+            in_flight_lookup.cancel()
+        await asyncio.gather(in_flight_lookup, return_exceptions=True)
+    assert [item["slug"] for item in in_flight_result] == ["old"]
+
+    next_lookup = await content_svc.list_neighborhoods("city-1")
+    assert [item["slug"] for item in next_lookup] == ["new"]
 
 
 # ---------------------------------------------------------------------------

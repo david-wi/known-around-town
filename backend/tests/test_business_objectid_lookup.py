@@ -8,7 +8,6 @@ businesses in some cities — a salon owner clicking "Claim your listing" got
 """
 
 from datetime import datetime
-
 import pytest
 from bson import ObjectId
 from fastapi.testclient import TestClient
@@ -98,3 +97,33 @@ async def test_claim_flow_still_works_for_uuid_business(client, mock_db):
     assert r.status_code == 200, r.text
     biz = await mock_db.businesses.find_one({"_id": uid})
     assert biz["claim_status"] == "pending"
+
+
+async def test_archive_business_works_for_objectid_record(client, mock_db):
+    """@define-test KAT-010-business-lifecycle-cache"""
+    from app.services import content as content_svc
+
+    oid = ObjectId("6a2e6713442d35eb8a936914")
+    await _seed_city(mock_db)
+    await _seed_business(mock_db, oid)
+    await mock_db.neighborhoods.insert_one(
+        {
+            "_id": "brickell",
+            "city_id": CITY_ID,
+            "slug": "brickell",
+            "name": "Brickell",
+            "status": "live",
+        }
+    )
+    assert [item["slug"] for item in await content_svc.list_neighborhoods(CITY_ID)] == [
+        "brickell"
+    ]
+
+    response = client.delete(
+        f"/api/v1/businesses/{oid}", headers={"X-API-Key": "test-admin-key"}
+    )
+
+    assert response.status_code == 200, response.text
+    archived = await mock_db.businesses.find_one({"_id": oid})
+    assert archived["status"] == "archived"
+    assert await content_svc.list_neighborhoods(CITY_ID) == []

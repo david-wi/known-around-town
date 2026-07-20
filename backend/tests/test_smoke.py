@@ -4379,17 +4379,11 @@ async def test_upsert_preserves_google_rating_on_reseed(seeded_db):
     assert updated.get("hours"), "opening hours from Google sync were wiped"
 
 
-async def test_neighborhoods_with_zero_businesses_hidden_from_navigation(seeded_db):
-    """Neighborhoods with listed_count == 0 must not appear in city navigation.
+async def test_neighborhood_navigation_follows_current_live_businesses(seeded_db):
+    """@define-test KAT-010-public-navigation
 
-    WHY: cities that have placeholder neighborhood records but no businesses
-    assigned to those neighborhoods would otherwise show empty neighborhood
-    pages in the nav — thin content pages that hurt SEO and confuse visitors.
-
-    Regression: list_neighborhoods() used to return all non-archived neighborhoods
-    regardless of listed_count, so cities like Doral, Weston, and Hialeah showed
-    empty neighborhood nav links because they had neighborhood records but no
-    published businesses.
+    Stale editorial counts must neither expose an empty neighborhood nor hide
+    one that a current live business actually occupies.
     """
     from app.main import app
     from fastapi.testclient import TestClient
@@ -4400,41 +4394,63 @@ async def test_neighborhoods_with_zero_businesses_hidden_from_navigation(seeded_
     )
     city_id = city["_id"]
 
-    # Insert a ghost neighborhood with no businesses (listed_count = 0)
+    # A stale high count without a current live business must stay hidden.
     await seeded_db.neighborhoods.insert_one({
         "_id": "ghost-test-slug",
         "city_id": city_id,
         "slug": "ghost-test-neighborhood",
         "name": "Ghost Test Neighborhood",
-        "listed_count": 0,
+        "listed_count": 99,
         "status": "active",
     })
 
     client = TestClient(app)
     r = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r.status_code == 200, r.text
-    # The zero-count neighborhood must NOT appear in navigation
     assert "Ghost Test Neighborhood" not in r.text, (
-        "Neighborhood with listed_count=0 should be hidden from navigation"
+        "A stale high count must not expose a neighborhood with no live business"
     )
 
-    # Bump listed_count to 5 — it must now appear
+    live_business = await seeded_db.businesses.find_one(
+        {"city_id": city_id, "status": "live"}
+    )
+    assert live_business is not None
+    # A stale zero count must not hide a neighborhood once a current live
+    # business references it.
     await seeded_db.neighborhoods.update_one(
         {"_id": "ghost-test-slug"},
-        {"$set": {"listed_count": 5}},
+        {"$set": {"listed_count": 0}},
     )
-    # WHY: the navigation lists are cached in-process with a short TTL. A real
-    # admin edit clears that cache via the categories/neighborhoods/cities write
-    # routes; this test mutates the database directly (bypassing those routes),
-    # so we clear the cache here to assert the change shows up immediately rather
-    # than only after the TTL expires.
-    from app.services.content import clear_nav_cache
-
-    clear_nav_cache()
+    neighborhood_slugs = list(live_business.get("neighborhood_slugs") or [])
+    neighborhood_slugs.append("ghost-test-neighborhood")
+    patch_response = client.patch(
+        f"/api/v1/businesses/{live_business['_id']}",
+        headers={"X-API-Key": "test-admin-key"},
+        json={"neighborhood_slugs": neighborhood_slugs},
+    )
+    assert patch_response.status_code == 200, patch_response.text
     r2 = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
     assert r2.status_code == 200, r2.text
-    assert "Ghost Test Neighborhood" in r2.text, (
-        "Neighborhood with listed_count > 0 should appear in navigation"
+    assert 'href="/n/ghost-test-neighborhood"' in r2.text, (
+        "A current live business must make its neighborhood navigable even at count zero"
+    )
+    neighborhood_page = client.get(
+        "/n/ghost-test-neighborhood",
+        headers={"host": "miami.knowsbeauty.localhost"},
+    )
+    assert neighborhood_page.status_code == 200, neighborhood_page.text
+    assert live_business["name"] in neighborhood_page.text
+
+    draft_response = client.patch(
+        f"/api/v1/businesses/{live_business['_id']}",
+        headers={"X-API-Key": "test-admin-key"},
+        json={"status": "draft"},
+    )
+    assert draft_response.status_code == 200, draft_response.text
+    r3 = client.get("/", headers={"host": "miami.knowsbeauty.localhost"})
+    assert r3.status_code == 200, r3.text
+    assert 'href="/n/ghost-test-neighborhood"' not in r3.text, (
+        "A draft business must not keep its neighborhood in public navigation"
     )
 
 
