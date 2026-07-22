@@ -7,6 +7,7 @@ import logging
 import re
 import time
 import unicodedata
+from collections.abc import Awaitable, Callable, Collection
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.database import get_db
@@ -44,8 +45,29 @@ log = logging.getLogger(__name__)
 # safe to tune.
 _NAV_CACHE_TTL_SECONDS = 120.0
 
+# WHY: cities and neighborhoods are compact navigation catalogs; 200 is well
+# above current inventory while preventing an accidental unbounded page render.
+_NAV_PRIMARY_LIST_LIMIT = 200
+
+# WHY: category navigation can include many parent-specific entries across a
+# mature city; 500 preserves the existing generous ceiling without unbounded IO.
+_NAV_CATEGORY_LIST_LIMIT = 500
+
 # Maps a cache key to (cached_value, expires_at_monotonic_seconds).
 _nav_cache: Dict[Tuple[Any, ...], Tuple[List[Dict[str, Any]], float]] = {}
+
+# WHY: A cache miss can overlap an admin write. The generation lets that
+# already-running read return to its caller without repopulating data that the
+# successful write just invalidated. Zero is only the process-local starting
+# point; correctness depends on equality, not the absolute value.
+_nav_cache_generation = 0
+
+# WHY: neighborhood eligibility reads exactly these business fields. Keeping
+# the dependency beside the cached query makes future predicate changes and
+# their invalidation requirements reviewable in one module.
+_NAV_RELEVANT_BUSINESS_FIELDS = frozenset(
+    {"city_id", "status", "neighborhood_slugs"}
+)
 
 
 def _nav_clock() -> float:
@@ -56,49 +78,97 @@ def _nav_clock() -> float:
 
 
 def _nav_cache_get(key: Tuple[Any, ...]) -> Optional[List[Dict[str, Any]]]:
+    now = _nav_clock()
+    expired_keys = [
+        cached_key
+        for cached_key, (_, expires_at) in _nav_cache.items()
+        if now >= expires_at
+    ]
+    for expired_key in expired_keys:
+        _nav_cache.pop(expired_key, None)
     entry = _nav_cache.get(key)
     if entry is None:
         return None
     value, expires_at = entry
-    if _nav_clock() >= expires_at:
-        # Expired — drop it so the caller refetches and we don't leak stale keys.
-        _nav_cache.pop(key, None)
-        return None
     return value
 
 
-def _nav_cache_set(key: Tuple[Any, ...], value: List[Dict[str, Any]]) -> None:
+def _nav_cache_set(
+    key: Tuple[Any, ...],
+    value: List[Dict[str, Any]],
+    generation: int,
+) -> None:
+    if generation != _nav_cache_generation:
+        return
     _nav_cache[key] = (value, _nav_clock() + _NAV_CACHE_TTL_SECONDS)
 
 
 def clear_nav_cache() -> None:
-    """Drop all cached navigation lists in THIS process.
+    """Drop cached lists and prevent older in-flight reads from refilling them.
 
     Best-effort, single-worker invalidation: admin write routes call this after
-    creating/updating/archiving a category, neighborhood, or city so the worker
-    that handled the edit reflects it immediately. Other workers (and any future
-    process) self-heal within `_NAV_CACHE_TTL_SECONDS`. There is intentionally
-    no cross-process broadcast — see the module-level note above.
+    creating/updating/archiving a category, neighborhood, city, or business so
+    the worker that handled the edit reflects it immediately. Other workers (and
+    any future process) self-heal within `_NAV_CACHE_TTL_SECONDS`. There is
+    intentionally no cross-process broadcast — see the module-level note above.
     """
+    global _nav_cache_generation
+
     _nav_cache.clear()
+    _nav_cache_generation += 1
 
 
-async def list_neighborhoods(city_id: str) -> List[Dict[str, Any]]:
-    cache_key = ("neighborhoods", city_id)
+def invalidate_nav_after_business_write(
+    changed_fields: Optional[Collection[str]] = None,
+) -> None:
+    """Invalidate navigation when a successful business write can affect it.
+
+    ``None`` represents create/archive, where the lifecycle effect is always
+    relevant. PATCH callers provide only the submitted field names.
+    """
+    if changed_fields is None or _NAV_RELEVANT_BUSINESS_FIELDS.intersection(
+        changed_fields
+    ):
+        clear_nav_cache()
+
+
+async def _cached_nav_lookup(
+    cache_key: Tuple[Any, ...],
+    load: Callable[[], Awaitable[List[Dict[str, Any]]]],
+) -> List[Dict[str, Any]]:
     cached = _nav_cache_get(cache_key)
     if cached is not None:
         return cached
-    db = get_db()
-    # WHY: only surface neighborhoods that actually have businesses — a
-    # listed_count of 0 (or missing) means the page would be empty, which
-    # hurts SEO and confuses visitors. The field is incremented whenever a
-    # business is published to this neighborhood.
-    cur = db.neighborhoods.find(
-        {"city_id": city_id, "status": {"$ne": "archived"}, "listed_count": {"$gt": 0}}
-    )
-    result = await cur.sort([("order", 1), ("name", 1)]).to_list(length=200)
-    _nav_cache_set(cache_key, result)
+    cache_generation = _nav_cache_generation
+    result = await load()
+    _nav_cache_set(cache_key, result, cache_generation)
     return result
+
+
+# @define KAT-010 "Neighborhood browsing follows current live businesses"
+async def list_neighborhoods(city_id: str) -> List[Dict[str, Any]]:
+    cache_key = ("neighborhoods", city_id)
+
+    async def load() -> List[Dict[str, Any]]:
+        db = get_db()
+        # WHY: listed_count is editorial display metadata and can fall behind
+        # ordinary business lifecycle writes. Live business records are the
+        # source of truth for public-page eligibility.
+        live_neighborhood_slugs = await db.businesses.distinct(
+            "neighborhood_slugs", {"city_id": city_id, "status": "live"}
+        )
+        cur = db.neighborhoods.find(
+            {
+                "city_id": city_id,
+                "status": {"$ne": "archived"},
+                "slug": {"$in": live_neighborhood_slugs},
+            }
+        )
+        return await cur.sort([("order", 1), ("name", 1)]).to_list(
+            length=_NAV_PRIMARY_LIST_LIMIT
+        )
+
+    return await _cached_nav_lookup(cache_key, load)
 
 
 async def list_cities(network_id: str) -> List[Dict[str, Any]]:
@@ -109,16 +179,19 @@ async def list_cities(network_id: str) -> List[Dict[str, Any]]:
     open.
     """
     cache_key = ("cities", network_id)
-    cached = _nav_cache_get(cache_key)
-    if cached is not None:
-        return cached
-    db = get_db()
-    cur = db.cities.find({"network_id": network_id, "status": {"$ne": "archived"}})
-    # WHY: alphabetical is the safest default when there's more than one
-    # city; it's a stable order that needs no per-city configuration.
-    result = await cur.sort([("name", 1)]).to_list(length=200)
-    _nav_cache_set(cache_key, result)
-    return result
+
+    async def load() -> List[Dict[str, Any]]:
+        db = get_db()
+        cur = db.cities.find(
+            {"network_id": network_id, "status": {"$ne": "archived"}}
+        )
+        # WHY: alphabetical is the safest default when there's more than one
+        # city; it's a stable order that needs no per-city configuration.
+        return await cur.sort([("name", 1)]).to_list(
+            length=_NAV_PRIMARY_LIST_LIMIT
+        )
+
+    return await _cached_nav_lookup(cache_key, load)
 
 
 async def list_categories(
@@ -128,19 +201,20 @@ async def list_categories(
     # `list_categories(city_id, parent_slug=...)` (a category page's
     # sub-categories) return different result sets and must not share an entry.
     cache_key = ("categories", city_id, parent_slug)
-    cached = _nav_cache_get(cache_key)
-    if cached is not None:
-        return cached
-    db = get_db()
-    q: Dict[str, Any] = {"city_id": city_id, "status": {"$ne": "archived"}}
-    if parent_slug is None:
-        q["parent_slug"] = None
-    else:
-        q["parent_slug"] = parent_slug
-    cur = db.categories.find(q)
-    result = await cur.sort([("order", 1), ("name", 1)]).to_list(length=500)
-    _nav_cache_set(cache_key, result)
-    return result
+
+    async def load() -> List[Dict[str, Any]]:
+        db = get_db()
+        q: Dict[str, Any] = {"city_id": city_id, "status": {"$ne": "archived"}}
+        if parent_slug is None:
+            q["parent_slug"] = None
+        else:
+            q["parent_slug"] = parent_slug
+        cur = db.categories.find(q)
+        return await cur.sort([("order", 1), ("name", 1)]).to_list(
+            length=_NAV_CATEGORY_LIST_LIMIT
+        )
+
+    return await _cached_nav_lookup(cache_key, load)
 
 
 async def get_category(city_id: str, slug: str) -> Optional[Dict[str, Any]]:

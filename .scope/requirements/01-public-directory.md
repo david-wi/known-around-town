@@ -1,11 +1,39 @@
 # Epic: Public Directory — browsing, business pages, SEO
 
 ### KAT-010 — Neighborhood browsing · V1 · implemented
+**Risk:** medium
+**Verified:** 2026-07-20 (recovery review and focused regression suite)
+**Incidents:**
+- 2026-07-20 — Recovery review found that a concurrent profile edit could restore stale navigation fields after an admin lifecycle change.
+**Refs:** PR #513 recovery review
 **Persona:** Salon Seeker.
-The home page shows a grid of Miami neighborhoods. Each tile links to a
-neighborhood landing page listing businesses in that area.
-**Acceptance:** Given a visitor at `/`, when the page loads, then neighborhood
-tiles are shown; clicking one leads to `/<neighborhood-slug>/` with filtered listings.
+The home page shows a grid of neighborhoods that currently contain at least one
+live business in the visitor's city. Each tile links to a neighborhood landing
+page listing businesses in that area. The editorial `listed_count` remains
+display metadata and does not decide whether a neighborhood is navigable.
+**Acceptance:** Given a visitor at `/`, when the page loads, then every shown
+neighborhood is non-archived and has at least one current live business in that
+city; draft, archived, and other-city businesses do not make a tile eligible;
+stale `listed_count` values neither expose an empty tile nor hide a populated
+one; clicking a tile leads to `/n/<neighborhood-slug>` with filtered listings;
+and after an admin creates, republishes, reassigns, drafts, or archives a
+business (including a legacy ObjectId-keyed listing), the next navigation
+lookup begun by the worker after that successful write reflects the new
+eligible neighborhoods; invalid statuses, malformed slugs, and city/neighborhood
+assignments that do not correspond to current directory records are rejected.
+**Verification:** `@define-test KAT-010-current-live-businesses` covers stale
+counts and lifecycle/city boundaries in the navigation service;
+`@define-test KAT-010-business-lifecycle-cache` covers create, draft,
+reassignment, republish, and archive through the authenticated API; and
+`@define-test KAT-010-public-navigation` covers the rendered home-page result.
+`@define-test KAT-010-concurrent-invalidation` proves a read begun before an
+admin write cannot refill the cache after that write invalidates it.
+`@define-test KAT-010-atomic-business-update` proves an unrelated concurrent
+profile edit cannot restore a drafted or archived navigation state.
+`@define-test KAT-010-atomic-business-assignment` proves a concurrent
+neighborhood edit cannot cross into a newly assigned city without validation;
+`@define-test KAT-010-valid-business-assignment` covers malformed and
+cross-city create/update rejection.
 
 ### KAT-011 — Category browsing · V1 · implemented
 **Persona:** Salon Seeker.
